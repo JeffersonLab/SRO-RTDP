@@ -13,3 +13,7 @@
 5. Configure a system comparable in size and bandwidth to a future JLab experiment (e.g. SoLID) which includes a 400Gbps transfer requirement from the counting house to the Computer Center, at least one FPGA component and one GPU component for at-scale testing.
 
 6. Identify potential issues relevant to a future HPDF in receiving and processing SRO data, including from remote, non-JLab experiments.
+
+A full details of the Proposal along with the architecture can be found below: 
+
+*** https://wiki.jlab.org/epsciwiki/index.php/SRO_RTDP#Documentation ***
