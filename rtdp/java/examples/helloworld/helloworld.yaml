@@ -1,0 +1,18 @@
+---
+io-services:
+  reader:
+    class: org.jlab.ersap.actor.helloworld.engine.FileReaderEngine
+    name: Source
+  writer:
+    class: org.jlab.ersap.actor.helloworld.engine.PrintStdIOEngine
+    name: Sink
+services:
+  - class: org.jlab.ersap.actor.helloworld.engine.HelloWorldEngine
+    name: HelloWorld
+configuration:
+  io-services:
+    reader:
+      port: 5555
+      inputFile: /Users/ayan/Desktop/Detector_Files/file1.bin
+mime-types:
+  - binary/data-sampa
