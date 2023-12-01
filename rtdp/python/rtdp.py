@@ -3,6 +3,7 @@
 """
 Entry point of rdtp.
 """
+from config_parser import ERSAPReader
 
 import argparse
 # Logging cookboook: https://docs.python.org/3/howto/logging-cookbook.html
@@ -39,9 +40,13 @@ def run_rtdp(parser):
     """
     args = parser.parse_args()
     if args.config_file:
-        # TODO: this does not gaurentee the config file even exit or is a valid yaml file.
         print(f"Starting the platform using the specified YAML configuration file:\
             {args.config_file}")
+        # TODO: using ERSAP reader here. Should be generalized.
+        # TODO: not a service launching yet.
+        configurations = ERSAPReader(args.config_file)
+        configurations.visualize_flowchart()
+        configurations.print_nodes()
     else:
         parser.print_help()
 
