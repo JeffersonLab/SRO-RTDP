@@ -1,12 +1,9 @@
 # Python cache files
 __pycache__
-<<<<<<< HEAD
 .DS_Store
 
 # Java Binary files
 *.class
-=======
->>>>>>> fcd8a8e (Add graphviz code to visualize ersap configuration yml file)
 
 # graphviz flowchart files
 *.gv
