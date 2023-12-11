@@ -1,2 +1,10 @@
 # Python cache files
 __pycache__
+.DS_Store
+
+# Java Binary files
+*.class
+
+# graphviz flowchart files
+*.gv
+*.pdf
