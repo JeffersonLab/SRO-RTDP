@@ -38,13 +38,12 @@ class ConfigReader(ABC):
         Details are defined in the children classes."""
         pass
     
-    def visualize_flowchart(self):
+    def graphviz_flowchart(self):
         """Visualize the configuration file that the name of each service is treated as a node in a DAG."""
+        # TODO: this function is not called  by the main now.
         node_list = self.get_flowchart_nodes()
 
         # graphviz examples: https://graphviz.readthedocs.io/en/stable/examples.html
-        # It will generate a pdf file named as config.gz.pdf in the same path. Also a config.gv in dot.
-        # TODO: better handling of filename, saved path, etc. May take parameters from cli args.
         g = Digraph('config',
                     node_attr={'color': 'lightblue2', 'style': 'filled'},
                     graph_attr={'rankdir': 'LR'})  # "rankdir" is for the direction
@@ -53,7 +52,35 @@ class ConfigReader(ABC):
         for i in range(len(node_list) - 1):
             g.edge(node_list[i].name, node_list[i + 1].name)
         
+        # It will generate a pdf file named as config.gz.pdf in the same path. Also a config.gv in dot.
+        # TODO: better handling of filename, saved path, etc. May take parameters from cli args.
         g.view()
+
+    def get_cytoscape_elements(self):
+        """
+        Transfer the node list into a cytoscape-format dictionary array.
+        """
+        r = []
+        node_list = self.get_flowchart_nodes()
+        n = len(node_list)
+
+        # Dash Cytoscape ref: https://dash.plotly.com/cytoscape/elements
+
+        # The node elements
+        for i in range(n):
+            r.append({
+                'data': {'id': node_list[i].name, 'label': node_list[i].name},
+                'position': {'x': 20 + 50 * i, 'y': 50}
+                })
+
+        # The edge elements
+        for i in range(n - 1):
+            r.append({'data': {'source': node_list[i].name, 'target': node_list[i + 1].name}})
+
+        return r
+    
+    def print_cytoscape_elements(self):
+        print(json.dumps(self.get_cytoscape_elements(), indent=4))
 
 
 class ERSAPFlowchartNode:

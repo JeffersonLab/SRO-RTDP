@@ -3,11 +3,16 @@
 """
 Entry point of rdtp.
 """
-from config_parser import ERSAPReader
 
 import argparse
 # Logging cookboook: https://docs.python.org/3/howto/logging-cookbook.html
 # import logging
+
+# Dash modules
+from dash import html, Dash, dcc
+import dash_cytoscape as cyto
+
+from config_parser import ERSAPReader
 
 RTDP_CLI_APP_DESCRIP_STR = \
     "rtdp: JLab's streaming readout RealTime Development and testing Platform."
@@ -45,18 +50,24 @@ def run_rtdp(parser):
         # TODO: using ERSAP reader here. Should be generalized.
         # TODO: not a service launching yet.
         configurations = ERSAPReader(args.config_file)
-        configurations.visualize_flowchart()
-        configurations.print_nodes()
+        # configurations.print_cytoscape_elements()
+
+        app = Dash(__name__)
+
+        app.layout = html.Div([
+            html.H1(children='Visulization of the ERSAP configuration file', style={'textAlign':'Left'}),
+            cyto.Cytoscape(
+                id='cyto-display',
+                layout={'name': 'grid'},
+                style={'width': '1200px', 'height': '400px'},
+                elements=configurations.get_cytoscape_elements()
+            )
+        ])
+
+        app.run_server(debug=True)
     else:
         parser.print_help()
 
 
-def main():
-    """
-    The main function to start the application.
-    """
-    run_rtdp(get_parser())
-
-
 if __name__ == '__main__':
-    main()
+    run_rtdp(get_parser())
