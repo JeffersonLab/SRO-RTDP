@@ -5,27 +5,34 @@ Layouts and callbacks of the Dash application using dash_cytoscape library.
 """
 
 # Dash modules. Ref: https://dash.plotly.com
-from dash import html, Dash
+from dash import html, Dash, Input, Output, callback
 # Dash cytoscape. Ref: https://dash.plotly.com/cytoscape
 import dash_cytoscape as cyto
 
 
 # dash_cytoscape stylesheets
 cyto_display_stylesheet_config_flowchart=[
-        {
-            'selector': 'node',
-            'style': {
-                'label': 'data(label)'
-            }
-        },
-            {
-                'selector': 'edge',
-                'style': {
-                    'curve-style': 'bezier',
-                    'target-arrow-shape': 'triangle'
-                }
-            }
-        ]
+    {
+        'selector': 'node',
+        'style': {
+            'label': 'data(label)'
+        }
+    },
+    {
+        'selector': 'edge',
+        'style': {
+            'curve-style': 'bezier',
+            'target-arrow-shape': 'triangle'
+        }
+    }
+    ]
+
+styles = {
+    'pre': {
+        'border': 'thin lightgrey solid',
+        'overflowX': 'scroll'
+    }
+}
 
 
 def get_cytoscape_elements(node_list):
@@ -63,7 +70,7 @@ def get_cytoscape_elements(node_list):
 
 
 def get_dash_app(nodes):
-    """Define the Dash application layout and callbacks.
+    """Define the Dash application layouts and callbacks.
 
     Args:
     - nodes: The node list parsed from the YAML configuration file.
@@ -75,16 +82,41 @@ def get_dash_app(nodes):
 
     app.layout = html.Div([
         html.H1(
-            children='Visulization of the ERSAP configuration file',
+            children='SRO-RTDP Dash Demo',
             style={'textAlign':'Left'}
             ),
-        cyto.Cytoscape(
-            id='cyto-display-config-flowchart',
-            layout={'name': 'grid'},
-            style={'width': '800px', 'height': '300px'},
-            elements=get_cytoscape_elements(nodes),
-            stylesheet=cyto_display_stylesheet_config_flowchart
-        ),
-        html.Pre(id='cyto-tapNode')
+        html.Div([
+            html.H3(
+                children='Visualization of the ERSAP configuration file',
+                style={'textAlign':'Left'}
+                ),
+            cyto.Cytoscape(
+                id='cyto-display-config-flowchart',
+                layout={'name': 'grid'},
+                style={'width': '800px', 'height': '200px'},
+                elements=get_cytoscape_elements(nodes),
+                stylesheet=cyto_display_stylesheet_config_flowchart
+            )
+        ]),
+        # Ref: https://dash.plotly.com/cytoscape/events
+        html.Div([
+            html.Pre(id='cyto-tapNode-resp', style=styles['pre'])
+        ])
     ])
+
+
+    @callback(Output('cyto-tapNode-resp', 'children'),
+              Input('cyto-display-config-flowchart', 'tapNodeData'))
+    def display_tap_config_node(data):
+        if not data:
+            return html.H4("No service selected.")
+
+        node_id = int(data['id'])
+        node_info = nodes[node_id]
+        # TODO: better CSS style
+        return html.Div([
+            html.H4(f"Selected service: {data['label']}"),
+            html.P(f"  class: {node_info.cls}\n  language: {node_info.lan}\n")
+        ])
+
     return app

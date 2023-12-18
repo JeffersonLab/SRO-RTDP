@@ -44,7 +44,6 @@ class ConfigReader(ABC):
     def get_flowchart_nodes(self):
         """Translate the input yml configuration file into a flowchart 
         and extract the flowchart nodes. Details are defined in the children classes."""
-        pass
 
     def graphviz_flowchart(self):
         """Visualize the configuration file that the name of each service
