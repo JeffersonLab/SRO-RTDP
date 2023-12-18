@@ -37,6 +37,23 @@ def get_parser():
         help='path to your YAML configuration file')
     return parser
 
+# dash_cytoscape stylesheets
+cyto_display_stylesheet=[
+        {
+            'selector': 'node',
+            'style': {
+                'label': 'data(id)'
+            }
+        },
+            {
+                'selector': 'edge',
+                'style': {
+                    'curve-style': 'bezier',
+                    'target-arrow-shape': 'triangle'
+                }
+            }
+        ]
+
 
 def get_dash_app(config):
     """Define the Dash application layout and callbacks.
@@ -57,8 +74,9 @@ def get_dash_app(config):
         cyto.Cytoscape(
             id='cyto-display-1',
             layout={'name': 'grid'},
-            style={'width': '1200px', 'height': '400px'},
-            elements=config.get_cytoscape_elements()
+            style={'width': '800px', 'height': '300px'},
+            elements=config.get_cytoscape_elements(),
+            stylesheet=cyto_display_stylesheet
         )
     ])
     return app
