@@ -8,8 +8,8 @@ import argparse
 # Logging cookboook: https://docs.python.org/3/howto/logging-cookbook.html
 # import logging
 
-from config_parser import ERSAPReader
-from dash_cyto import get_dash_app
+from rtdp_config_parser import ERSAPReader
+from rtdp_dash_cyto import get_dash_app
 
 RTDP_CLI_APP_DESCRIP_STR = \
     "rtdp: JLab's streaming readout RealTime Development and testing Platform."
@@ -46,7 +46,6 @@ def run_rtdp(parser):
         # TODO: not a service launching yet.
         configurations = ERSAPReader(args.config_file)
         ersap_nodes = configurations.get_flowchart_nodes()
-        # configurations.print_cytoscape_elements()
 
         app = get_dash_app(ersap_nodes)
         app.run_server(debug=True)
