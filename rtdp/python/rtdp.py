@@ -32,7 +32,7 @@ def get_parser():
         version=f'%(prog)s {RTDP_CLI_APP_VERSION_STR}')
     parser.add_argument('--log_file', type=str,
                         default=RTDP_CLI_DEFAULT_LOGFILE, help='log file name')
-    parser.add_argument('--log_level', type=str, default='info',
+    parser.add_argument('--log_level', type=str, default='debug',
                         choices=['debug', 'info', 'warning', 'error', 'critical'],
                         help='log level: debug, info, warning, error, critical')
     parser.add_argument('config_file', nargs='?',
