@@ -66,37 +66,6 @@ class ConfigReader(ABC):
         # TODO: better handling of filename, saved path, etc. May take parameters from cli args.
         g.view()
 
-    def get_cytoscape_elements(self):
-        """
-        Transfer the node list into a cytoscape-format dictionary array.
-        """
-        r = []
-        node_list = self.get_flowchart_nodes()
-        n = len(node_list)
-
-        # The Dash Cytoscape elements are represented in the Python dictionary format with
-        # specified keywords. Ref: https://dash.plotly.com/cytoscape/elements
-
-        # The node elements.
-        # "position" is not required because the "layout" of "cyto.Cytoscape" is "grid".
-        for i in range(n):
-            r.append({
-                'data': {'id': node_list[i].name, 'label': node_list[i].name},
-                'position': {'x': 20 + 50 * i, 'y': 50}
-                })
-
-        # The edge elements
-        for i in range(n - 1):
-            r.append({
-                'data': {'source': node_list[i].name, 'target': node_list[i + 1].name},
-                'selectable': False
-                })
-
-        return r
-
-    def print_cytoscape_elements(self):
-        print(json.dumps(self.get_cytoscape_elements(), indent=4))
-
 
 class ERSAPFlowchartNode:
     def __init__(self, item):
@@ -118,7 +87,7 @@ class ERSAPFlowchartNode:
         for f in ["name", "class"]:
             if f not in item:
                 print(f"Error: '{f}' is required in the service module {item}!")
-                exit(KeyError)
+                sys.exit(KeyError)
 
 
 class ERSAPReader(ConfigReader):
@@ -149,7 +118,7 @@ class ERSAPReader(ConfigReader):
 
         # EARSAP io-services reader, the 1st node in the flowchart.
         node_list.append(ERSAPFlowchartNode(self.config_data["io-services"]["reader"]))
-        
+
         for service in self.config_data["services"]:
             node_list.append(ERSAPFlowchartNode(service))
 
