@@ -8,8 +8,9 @@ import argparse
 # Logging cookboook: https://docs.python.org/3/howto/logging-cookbook.html
 # import logging
 
-# Dash modules
-from dash import html, Dash, dcc
+# Dash modules. Ref: https://dash.plotly.com
+from dash import html, Dash
+# Dash cytoscape. Ref: https://dash.plotly.com/cytoscape
 import dash_cytoscape as cyto
 
 from config_parser import ERSAPReader
@@ -23,7 +24,7 @@ def get_parser():
     """Define the application arguments. Create the ArgumentParser object and return it.
 
     Returns:
-        parser (argparse.ArgumentParser): The created argument parser.
+    - parser (argparse.ArgumentParser): The created argument parser.
     """
     parser = argparse.ArgumentParser(
         prog="rtdp",
@@ -37,33 +38,46 @@ def get_parser():
     return parser
 
 
+def get_dash_app(config):
+    """Define the Dash application layout and callbacks.
+
+    Args:
+    - config: The parsed configuration object based on the input yaml file.
+
+    Returns:
+    - app: The created Dash application.
+    """
+    app = Dash(__name__)
+
+    app.layout = html.Div([
+        html.H1(
+            children='Visulization of the ERSAP configuration file',
+            style={'textAlign':'Left'}
+            ),
+        cyto.Cytoscape(
+            id='cyto-display-1',
+            layout={'name': 'grid'},
+            style={'width': '1200px', 'height': '400px'},
+            elements=config.get_cytoscape_elements()
+        )
+    ])
+    return app
+
+
 def run_rtdp(parser):
     """Proocess the cli inputs.
 
     Args:
-        parser (argparse.ArgumentParser): The created argument parser.
+    - parser (argparse.ArgumentParser): The created argument parser.
     """
     args = parser.parse_args()
     if args.config_file:
-        print(f"Starting the platform using the specified YAML configuration file:\
-            {args.config_file}")
         # TODO: using ERSAP reader here. Should be generalized.
         # TODO: not a service launching yet.
         configurations = ERSAPReader(args.config_file)
         # configurations.print_cytoscape_elements()
 
-        app = Dash(__name__)
-
-        app.layout = html.Div([
-            html.H1(children='Visulization of the ERSAP configuration file', style={'textAlign':'Left'}),
-            cyto.Cytoscape(
-                id='cyto-display',
-                layout={'name': 'grid'},
-                style={'width': '1200px', 'height': '400px'},
-                elements=configurations.get_cytoscape_elements()
-            )
-        ])
-
+        app = get_dash_app(configurations)
         app.run_server(debug=True)
     else:
         parser.print_help()

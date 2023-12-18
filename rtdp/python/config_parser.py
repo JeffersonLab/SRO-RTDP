@@ -4,29 +4,37 @@
 Read the configurations from yaml file and visualize it as DAG.
 """
 
-import yaml
-import json
-from graphviz import Digraph
 from abc import ABC, abstractmethod
+import sys
+import json
+import yaml
+from graphviz import Digraph
+
 
 class ConfigReader(ABC):
+    """Abstract base class for reading ERSAP/RTDP configuration YAML files."""
+
     def __init__(self, filepath):
         self.config_data = self._get_config(filepath)
-        if not self.config_data:
-            print("Error: incorrect yaml file!")
-            exit(ValueError)
+        print(f"\nStarting the platform using the specified YAML configuration file: {filepath}")
         # self._pprint_config()
 
     def _get_config(self, filepath):
         """Parse the configuration file into a dictionary using the pyYAML module.
+
+        Args:
+        - file_path (str): The path to the configuration file.
+
+        Returns:
+        - config_data : A dictionary containing the configuration data.
         """
         with open(filepath, 'r') as file:
             try:
                 config_data = yaml.safe_load(file)
                 return config_data
-            except yaml.YAMLError as e:
-                print("Error reading YAML file:", e)
-                return None
+            except (yaml.YAMLError, FileNotFoundError) as e:
+                print("Error reading or loading YAML file:", e)
+                sys.exit(1)
 
     def _pprint_config(self):
         """Print the raw parsed dictionary in json format."""
@@ -34,12 +42,13 @@ class ConfigReader(ABC):
 
     @abstractmethod
     def get_flowchart_nodes(self):
-        """Translate the input yml configuration file into a flowchart and extract the flowchart nodes.
-        Details are defined in the children classes."""
+        """Translate the input yml configuration file into a flowchart 
+        and extract the flowchart nodes. Details are defined in the children classes."""
         pass
-    
+
     def graphviz_flowchart(self):
-        """Visualize the configuration file that the name of each service is treated as a node in a DAG."""
+        """Visualize the configuration file that the name of each service
+        is treated as a node in a DAG."""
         # TODO: this function is not called  by the main now.
         node_list = self.get_flowchart_nodes()
 
@@ -51,8 +60,9 @@ class ConfigReader(ABC):
 
         for i in range(len(node_list) - 1):
             g.edge(node_list[i].name, node_list[i + 1].name)
-        
-        # It will generate a pdf file named as config.gz.pdf in the same path. Also a config.gv in dot.
+
+        # It will generate a pdf file named as config.gz.pdf and a config.gv in dot
+        #    at current path.
         # TODO: better handling of filename, saved path, etc. May take parameters from cli args.
         g.view()
 
@@ -64,9 +74,11 @@ class ConfigReader(ABC):
         node_list = self.get_flowchart_nodes()
         n = len(node_list)
 
-        # Dash Cytoscape ref: https://dash.plotly.com/cytoscape/elements
+        # The Dash Cytoscape elements are represented in the Python dictionary format with
+        # specified keywords. Ref: https://dash.plotly.com/cytoscape/elements
 
-        # The node elements
+        # The node elements.
+        # "position" is not required because the "layout" of "cyto.Cytoscape" is "grid".
         for i in range(n):
             r.append({
                 'data': {'id': node_list[i].name, 'label': node_list[i].name},
@@ -75,21 +87,25 @@ class ConfigReader(ABC):
 
         # The edge elements
         for i in range(n - 1):
-            r.append({'data': {'source': node_list[i].name, 'target': node_list[i + 1].name}})
+            r.append({
+                'data': {'source': node_list[i].name, 'target': node_list[i + 1].name},
+                'selectable': False
+                })
 
         return r
-    
+
     def print_cytoscape_elements(self):
         print(json.dumps(self.get_cytoscape_elements(), indent=4))
 
 
 class ERSAPFlowchartNode:
     def __init__(self, item):
-        """Definition of an ERSAP flowchart node. Currently it's only for visulization, but it may support
-        services launching in the future (needs to figure out parameter extracting first).
+        """Definition of an ERSAP flowchart node. Currently it's only for visulization.
+        It may support services launching in the future (needs to figure out parameter
+            extracting first).
 
         Args:
-            item: A dictionary entry parsed by pyYAML.
+        - item (dict): A dictionary entry parsed by pyYAML.
         """
         self._validate_required(item)
         self.name = item["name"]
@@ -106,19 +122,17 @@ class ERSAPFlowchartNode:
 
 
 class ERSAPReader(ConfigReader):
-    def __init__(self, filepath):
-        super().__init__(filepath)
 
     def _validate_ioservices(self):
         """Validate the config yaml file has "io-services" and its sub "reader" and "writer."""
         if "io-services" not in self.config_data:
-            print(f"Error: 'io-services' is required in ERSAP configuration!")
+            print("Error: 'io-services' is required in ERSAP configuration!")
             return False
         if "reader" not in self.config_data["io-services"]:
-            print(f"Error: 'reader' is required in 'io-services'!")
+            print("Error: 'reader' is required in 'io-services'!")
             return False
         if "writer" not in self.config_data["io-services"]:
-            print(f"Error: 'writer' is required in 'io-services'!")
+            print("Error: 'writer' is required in 'io-services'!")
             return False
         return True
 
@@ -129,7 +143,7 @@ class ERSAPReader(ConfigReader):
             node_list: A list where each element is an ERSAPFlowchartNode.
         """
         if not self._validate_ioservices():
-            exit(KeyError)
+            sys.exit(KeyError)
 
         node_list = []
 
