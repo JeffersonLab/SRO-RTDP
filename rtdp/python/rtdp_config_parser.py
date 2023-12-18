@@ -6,9 +6,13 @@ Read the configurations from yaml file and visualize it as DAG.
 
 from abc import ABC, abstractmethod
 import sys
+import logging
 import json
 import yaml
 from graphviz import Digraph
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigReader(ABC):
@@ -16,7 +20,7 @@ class ConfigReader(ABC):
 
     def __init__(self, filepath):
         self.config_data = self._get_config(filepath)
-        print(f"\nStarting the platform using the specified YAML configuration file: {filepath}")
+        logger.info("Parsed the yaml configuration file at %s", filepath)
         # self._pprint_config()
 
     def _get_config(self, filepath):
@@ -28,7 +32,7 @@ class ConfigReader(ABC):
         Returns:
         - config_data : A dictionary containing the configuration data.
         """
-        with open(filepath, 'r') as file:
+        with open(filepath, 'r', encoding="utf-8") as file:
             try:
                 config_data = yaml.safe_load(file)
                 return config_data
@@ -48,7 +52,7 @@ class ConfigReader(ABC):
     def graphviz_flowchart(self):
         """Visualize the configuration file that the name of each service
         is treated as a node in a DAG."""
-        # TODO: this function is not called  by the main now.
+        # This function is not called  by the main now.
         node_list = self.get_flowchart_nodes()
 
         # graphviz examples: https://graphviz.readthedocs.io/en/stable/examples.html
@@ -67,6 +71,8 @@ class ConfigReader(ABC):
 
 
 class ERSAPFlowchartNode:
+    """Definition of an ERSAP node."""
+
     def __init__(self, item):
         """Definition of an ERSAP flowchart node. Currently it's only for visulization.
         It may support services launching in the future (needs to figure out parameter
@@ -90,6 +96,7 @@ class ERSAPFlowchartNode:
 
 
 class ERSAPReader(ConfigReader):
+    """Rules to load and parse ERSAP yaml configuration file."""
 
     def _validate_ioservices(self):
         """Validate the config yaml file has "io-services" and its sub "reader" and "writer."""
@@ -127,6 +134,7 @@ class ERSAPReader(ConfigReader):
         return node_list
 
     def print_nodes(self):
+        """Print all the ERSAP service nodes."""
         node_list = self.get_flowchart_nodes()
 
         print("\n\nThe ERSAP services:\n")

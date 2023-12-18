@@ -8,3 +8,6 @@ __pycache__
 # graphviz flowchart files
 *.gv
 *.pdf
+
+# logfiles
+*.log
