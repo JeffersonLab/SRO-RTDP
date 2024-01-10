@@ -27,6 +27,7 @@ def check_systems():
     # indent=2 for pretty print of json response 
     pprint(json, indent=2)
 
+
 def list_directories(dir_path):
     verb = "utilities/ls"    
     system = "perlmutter"
@@ -35,6 +36,7 @@ def list_directories(dir_path):
     json = resp.json()
     # indent=2 for pretty print of json response 
     pprint(json, indent=2)
+
 
 def run_cmd():
     verb = "utilities/command"
@@ -50,7 +52,6 @@ def run_cmd():
     sleep(10)
     task_id = json["task_id"]
     read_api_result(task_id)
-
 
 
 def read_api_result(task_id):
@@ -82,4 +83,3 @@ if __name__ == "__main__":
     # list_directories("/global/homes/j/jlabtsai/run-vk/slurm")
     run_cmd()
     # submit_slurm_job()
-
