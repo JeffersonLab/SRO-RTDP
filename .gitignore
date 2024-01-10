@@ -2,8 +2,9 @@
 __pycache__
 .DS_Store
 
-# Java Binary files
+# Binary files
 *.class
+*.bat
 
 # graphviz flowchart files
 *.gv
@@ -11,3 +12,7 @@ __pycache__
 
 # logfiles
 *.log
+
+# Sphinx built files
+sp_doc/build/
+sp_doc/Makefile
