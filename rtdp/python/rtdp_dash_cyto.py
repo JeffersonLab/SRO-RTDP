@@ -42,10 +42,10 @@ def get_cytoscape_elements(node_list):
     Transfer the node list into a cytoscape-format dictionary array.
 
     Args:
-    - node_list: A list of configuration parsed from YAML.
+        - node_list: A list of configuration parsed from YAML.
 
     Returns:
-    - r: A list of dictionaries where the keywords subject to Cytoscape.
+        - r: A list of dictionaries where the keywords subject to Cytoscape.
     """
     r = []
     n = len(node_list)
@@ -75,10 +75,10 @@ def get_dash_app(nodes):
     """Define the Dash application layouts and callbacks.
 
     Args:
-    - nodes: The node list parsed from the YAML configuration file.
+        - nodes: The node list parsed from the YAML configuration file.
 
     Returns:
-    - app: The created Dash application.
+        - app: The created Dash application.
     """
     app = Dash(__name__)
 

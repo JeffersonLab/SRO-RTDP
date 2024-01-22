@@ -21,7 +21,7 @@ def get_parser():
     """Define the application arguments. Create the ArgumentParser object and return it.
 
     Returns:
-    - parser (argparse.ArgumentParser): The created argument parser.
+        - parser (argparse.ArgumentParser): The created argument parser.
     """
     parser = argparse.ArgumentParser(
         prog="rtdp",
@@ -56,7 +56,7 @@ def run_rtdp(parser):
     """Proocess the cli inputs.
 
     Args:
-    - parser (argparse.ArgumentParser): The created argument parser.
+        - parser (argparse.ArgumentParser): The created argument parser.
     """
     args = parser.parse_args()
 
