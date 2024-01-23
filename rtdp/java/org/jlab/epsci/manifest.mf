@@ -1,0 +1,9 @@
+Manifest-Version: 1.0
+Created-By: coda.jlab.org
+Specification-Title: CODA III EMU
+Sealed: true
+Main-Class: org.jlab.epsci.rtdp.Aggregator
+Class-Path: cMsg-6.0.jar jevio-6.0.jar emu-3.3.jar disruptor-4.0.0.jar
+
+
+
