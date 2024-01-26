@@ -96,6 +96,7 @@ public class ModuleAdapter  {
 
     // ---------------------------------------------------
 
+    private final boolean debug;
 
 
     /**
@@ -103,8 +104,9 @@ public class ModuleAdapter  {
      *
      * @param name name of module
      */
-    public ModuleAdapter(String name) {
+    public ModuleAdapter(String name, boolean debug) {
         this.name = name;
+        this.debug = debug;
         id = 0;
 
         // Set number of event-producing threads
@@ -112,7 +114,7 @@ public class ModuleAdapter  {
 
         // Is output written in big or little endian?
         outputOrder = ByteOrder.nativeOrder();
-System.out.println("  Module Adapter: output byte order = " + outputOrder);
+        if (debug) System.out.println("  Module Adapter: output byte order = " + outputOrder);
 
         // For FPGAs, fake ROCs, or EBs: is data in streaming format?
         streamingData = true;
