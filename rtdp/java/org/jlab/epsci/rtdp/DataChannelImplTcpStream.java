@@ -141,7 +141,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
         tcpRecvBuf = 20000000;
         if (debug) System.out.println("      DataChannel TcpStream: recvBuf = " + tcpRecvBuf);
 
-        startInputThread();
+//        startInputThread();
     }
 
 
@@ -220,14 +220,14 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
         }
 //System.out.println("      DataChannel TcpStream in: created " + (numBufs) + " node pools for socket " + index + ", " + name());
 
-        bbInSupply = new ByteBufferSupply(numBufs, 32,
+        bbInSupply = new ByteBufferSupply(numBufs, maxBufferSize,
                 ByteOrder.BIG_ENDIAN, direct,
                 sequentialRelease, nodePools);
 
         if (debug) System.out.println("      DataChannel TcpStream in: connection made from " + name);
 
         // Start thread to handle socket input
-        dataInputThread = new DataInputHelper();
+        dataInputThread = new DataInputHelper(bbInSupply);
         dataInputThread.start();
 
         // If this is the last socket, make sure all threads are started up before proceeding
@@ -249,12 +249,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
         catch (IOException e) {}
     }
 
-
-    /** {@inheritDoc} */
-    public TransportType getTransportType() {
-        return TransportType.EMU;
-    }
-
+    
 
     /** {@inheritDoc} */
     public int getInputLevel() {
@@ -335,15 +330,15 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
 
 
 
-    /**
-     * For input channel, start the DataInputHelper thread which takes Evio
-     * file-format data, parses it, puts the parsed Evio banks into the ring buffer.
-     */
-    private void startInputThread() {
-        dataInputThread = new DataInputHelper();
-        dataInputThread.start();
-        dataInputThread.waitUntilStarted();
-    }
+//    /**
+//     * For input channel, start the DataInputHelper thread which takes Evio
+//     * file-format data, parses it, puts the parsed Evio banks into the ring buffer.
+//     */
+//    private void startInputThread() {
+//        dataInputThread = new DataInputHelper();
+//        dataInputThread.start();
+//        dataInputThread.waitUntilStarted();
+//    }
 
 
     /**
@@ -364,10 +359,10 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
 
 
         /** Constructor. */
-        DataInputHelper() {
+        DataInputHelper(ByteBufferSupply bbSupply) {
             super("data_in");
             inStream = in;
-            bbSupply = bbInSupply;
+            this.bbSupply = bbSupply;
         }
 
 
@@ -403,7 +398,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
 
                     // Sets the producer sequence
                     item = bbSupply.get();
-//System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + " from ByteBuffer supply");
+System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + " from ByteBuffer supply");
 
                     // First read the command & size with one read, into a long.
                     // These 2, 32-bit ints are sent in network byte order, cmd first.
@@ -420,12 +415,12 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
                     buf = item.getBuffer();
                     buf.limit(size);
 
-//System.out.println("      DataChannel TcpStream in: got cmd = " + cmd + ", size = " + size + ", now read in data ...");
+System.out.println("      DataChannel TcpStream in: got cmd = " + cmd + ", size = " + size + ", now read in data ...");
                     inStream.readFully(item.getBuffer().array(), 0, size);
 //System.out.println("      DataChannel TcpStream in: done reading in data");
 
-//System.out.println("      DataChannel TcpStream in: " + name + ", incoming buf size = " + size);
-//Utilities.printBuffer(item.getBuffer(), 0, size/4, "PRESTART EVENT, buf lim = " + buf.limit());
+System.out.println("      DataChannel TcpStream in: " + name + ", incoming buf size = " + size);
+Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + buf.limit());
                     bbSupply.publish(item);
 
                     // We just received the END event

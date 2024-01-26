@@ -196,7 +196,7 @@ public class DataChannelImplEmu extends DataChannelAdapter {
         try {
              openOutputChannel();
         }
-        catch (Exception e) {
+        catch (cMsgException e) {
             throw new CmdExecException(e);
         }
     }

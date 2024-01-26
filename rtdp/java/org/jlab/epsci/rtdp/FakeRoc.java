@@ -13,6 +13,7 @@ package org.jlab.epsci.rtdp;
 
 
 import org.jlab.coda.cMsg.cMsgNetworkConstants;
+import org.jlab.coda.emu.support.control.CmdExecException;
 
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -176,9 +177,16 @@ public class FakeRoc extends Thread {
         // Create the Aggregator module
         RocSimulation sim = new RocSimulation("RocSim", debug);
         sim.addOutputChannels(outputChannels);
+        try {
+            emuChannel.prestart();
+        }
+        catch (CmdExecException e) {
+            e.printStackTrace();
+        }
 
         // And get it running
         sim.prestart();
+        sim.go();
 
         // This is a daemon thread so if all other threads end, this application will end too.
         try {

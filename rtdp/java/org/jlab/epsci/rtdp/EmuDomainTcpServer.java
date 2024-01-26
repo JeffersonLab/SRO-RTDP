@@ -77,7 +77,7 @@ class EmuDomainTcpServer extends Thread {
 
     /** This method is executed as a thread. */
     public void run() {
-        if (debug)  System.out.println("Emu domain TCP server: running");
+        if (debug)  System.out.println("Emu domain TCP server: running @ port " + serverPort);
 
         // Direct buffer for reading 3 magic & 5 other integers with non-blocking IO
         int BYTES_TO_READ = 8*4;
@@ -192,7 +192,7 @@ class EmuDomainTcpServer extends Thread {
 
                                 // Check for server / client compatibility for cMsg version
                                 version = buffer.getInt();
-//System.out.println("Got version = " + version);
+System.out.println("Got version = " + version);
                                 if (version != cMsgConstants.version) {
                                     if (debug) {
                                         System.out.println("Emu domain server: version mismatch, got " +
@@ -205,7 +205,7 @@ class EmuDomainTcpServer extends Thread {
 
                                 // CODA id of sender
                                 codaId = buffer.getInt();
-//System.out.println("Got coda id = " + codaId);
+System.out.println("Got coda id = " + codaId);
                                 if (codaId < 0) {
                                     if (debug) {
                                         System.out.println("Emu domain server: bad coda id of sender (" +
@@ -218,7 +218,7 @@ class EmuDomainTcpServer extends Thread {
 
                                 // Max size buffers to hold incoming data in bytes
                                 bufferSizeDesired = buffer.getInt();
-//System.out.println("Got buffer size = " + bufferSizeDesired);
+System.out.println("Got buffer size = " + bufferSizeDesired);
                                 if (bufferSizeDesired < 4*10) {
                                     // 40 bytes is smallest possible evio file format size
                                     if (debug) {
