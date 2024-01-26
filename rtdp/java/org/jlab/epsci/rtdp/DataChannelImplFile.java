@@ -38,6 +38,8 @@ public class DataChannelImplFile extends DataChannelAdapter {
     /** Name of file being written-to / read-from. */
     private final String fileName;
 
+    private final boolean debug;
+
     //----------------------------------------
     // Output file parameters
     //----------------------------------------
@@ -53,19 +55,20 @@ public class DataChannelImplFile extends DataChannelAdapter {
      * @param fileName  name of file to create & write to
      * @throws DataTransportException if unable to create file.
      */
-    DataChannelImplFile(String chName, String fileName) throws DataTransportException {
+    DataChannelImplFile(String chName, String fileName, boolean debug) throws DataTransportException {
 
         // constructor of super class
-        super(chName, false, 0);
+        super(chName, false, debug, 0);
         this.fileName = fileName;
+        this.debug = debug;
 
-        System.out.println("      DataChannel File: file name = " + fileName);
+        if (debug) System.out.println("      DataChannel File: file name = " + fileName);
 
         try {
                 // Only for output channels here !!!
                 evioFileWriter = new EventWriterUnsync(fileName);
 
-System.out.println("      DataChannel File: file = " + evioFileWriter.getCurrentFilePath());
+            if (debug) System.out.println("      DataChannel File: file = " + evioFileWriter.getCurrentFilePath());
 
                 dataOutputThread = new DataOutputHelper(name() + "_data out");
                 dataOutputThread.start();

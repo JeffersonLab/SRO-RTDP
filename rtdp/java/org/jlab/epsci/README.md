@@ -81,12 +81,12 @@ To run the server which will accept incoming TCP connections
 and the data which follows (and get the HELP output):
 
     cd <main dir>
-    java -cp 'build/lib/rtdp-0.9.jar:java/jars/*' org.jlab.coda.rtdp.Aggregator -h
+    java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.Aggregator -h
  
 To run a single fake ROC in order to test the server, (and get the HELP output):
 
     cd <main dir>
-    java -cp 'build/lib/rtdp-0.9.jar:java/jars/*' org.jlab.coda.rtdp.SimRoc -h
+    java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.FakeRoc -h
  
 ----------------------------
 

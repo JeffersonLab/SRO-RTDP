@@ -12,6 +12,7 @@ class EmuDomainServer extends Thread {
 
     private final String expid;
     private final String name;
+    private final boolean debug;
 
     /** Expecting data input from ROCs over TCP only. */
     private final boolean tcp;
@@ -32,7 +33,7 @@ class EmuDomainServer extends Thread {
     private EmuDomainTcpServer tcpServer;
 
 
-    public EmuDomainServer(int port, int clientCount, String expid, String name, boolean tcp, CountDownLatch latch) {
+    public EmuDomainServer(int port, int clientCount, String expid, String name, boolean tcp, CountDownLatch latch, boolean debug) {
 
         this.name = name;
         this.expid = expid;
@@ -41,6 +42,7 @@ class EmuDomainServer extends Thread {
         this.tcp = tcp;
         this.udp = !tcp;
         this.clientAttachLatch = latch;
+        this.debug = debug;
     }
 
 
@@ -60,7 +62,7 @@ class EmuDomainServer extends Thread {
 
         try {
             // Start TCP server thread
-            tcpServer = new EmuDomainTcpServer(this, serverPort, clientCount, clientAttachLatch);
+            tcpServer = new EmuDomainTcpServer(this, serverPort, clientCount, clientAttachLatch, debug);
             tcpServer.start();
 
             // Wait for indication thread is running before continuing on
@@ -80,7 +82,7 @@ class EmuDomainServer extends Thread {
 
             if (udp) {
                 // Start listening for udp packets
-                listener = new EmuDomainUdpListener(this, serverPort, clientCount, expid, name);
+                listener = new EmuDomainUdpListener(this, serverPort, clientCount, expid, name, debug);
                 listener.start();
 
                 // Wait for indication listener thread is running before continuing on

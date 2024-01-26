@@ -39,7 +39,7 @@ public class StreamAggregator extends ModuleAdapter {
     private final ArrayList<BuildingThread> buildingThreadList = new ArrayList<>(6);
 
     /** If <code>true</code>, produce debug print out. */
-    private final boolean debug = true;
+    private final boolean debug;
 
     // ---------------------------------------------------
     // Configuration parameters
@@ -102,8 +102,9 @@ public class StreamAggregator extends ModuleAdapter {
      *
      * @param name name of module
      */
-    public StreamAggregator(String name) {
-        super(name);
+    public StreamAggregator(String name, boolean debug) {
+        super(name, debug);
+        this.debug = debug;
 
         // The only way a StreamAggregator gets created in the first place
         // is for streaming="on" to be set in jcedit.
@@ -122,7 +123,7 @@ public class StreamAggregator extends ModuleAdapter {
         // since it costs real memory. For big events, 128 x 20MB events = 2.56GB
         // of mem used. Multiply that times the number of build threads.
         ringItemCount = 256;
-System.out.println("  Agg mod: internal ring buf count -> " + ringItemCount);
+        if (debug) System.out.println("  Agg mod: internal ring buf count -> " + ringItemCount);
 
         //--------------------------------------------------------------------
         // Create rings to hold TimeSliceBanks, 1 ring for each build thread.

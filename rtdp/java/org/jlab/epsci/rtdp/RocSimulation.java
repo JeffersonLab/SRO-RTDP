@@ -62,6 +62,8 @@ public class RocSimulation extends ModuleAdapter {
     /** Number of ByteBuffers in each EventGeneratingThread. */
     private int bufSupplySize = 1024;
 
+    private final boolean debug;
+
 
 
     //----------------------------------------------------
@@ -89,9 +91,10 @@ public class RocSimulation extends ModuleAdapter {
      *
      * @param name name of module
      */
-    public RocSimulation(String name) {
+    public RocSimulation(String name, boolean debug) {
 
-        super(name);
+        super(name, debug);
+        this.debug = debug;
 
         //outputOrder = ByteOrder.LITTLE_ENDIAN;
         //outputOrder = ByteOrder.BIG_ENDIAN;
@@ -483,7 +486,7 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
 
             try {
                 t1 = System.currentTimeMillis();
-                System.out.println("SET loops to " + loops);
+                if (debug) System.out.println("SET loops to " + loops);
 
                 while (true) {
 
@@ -568,12 +571,10 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
     /** {@inheritDoc} */
     public void prestart() {
 
-System.out.println("  Roc mod: PRESTART");
+        if (debug) System.out.println("  Roc mod: PRESTART");
 
         // Reset some variables
         rocRecordId = 1;
-
-
         rocRecordId++;
     }
 
@@ -585,9 +586,9 @@ System.out.println("  Roc mod: PRESTART");
 
 
             for (int i = 0; i < eventProducingThreads; i++) {
-System.out.println("  Roc mod: create new event generating thread ");
+                if (debug) System.out.println("  Roc mod: create new event generating thread ");
                     eventGeneratingThreads[i] = new EventGeneratingThread(i, name + ":generator");
-System.out.println("  Roc mod: starting event generating thread");
+                if (debug) System.out.println("  Roc mod: starting event generating thread");
                     eventGeneratingThreads[i].start();
             }
 

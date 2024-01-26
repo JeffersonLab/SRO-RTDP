@@ -70,7 +70,7 @@ public class Aggregator extends Thread {
                 try {
                     tcpPort = Integer.parseInt(port);
                     if (tcpPort < 1024 || tcpPort > 65535) {
-                        tcpPort = 46100;
+                        tcpPort = cMsgNetworkConstants.emuTcpPort;
                     }
                 }
                 catch (NumberFormatException e) {
@@ -108,7 +108,7 @@ public class Aggregator extends Thread {
             else if (args[i].equalsIgnoreCase("-one")) {
                 singleVTPinput = true;
             }
-            else if (args[i].equalsIgnoreCase("-debug")) {
+            else if (args[i].equalsIgnoreCase("-v")) {
                 debug = true;
             }
             else if (args[i].equalsIgnoreCase("-udp")) {
@@ -142,7 +142,7 @@ public class Aggregator extends Thread {
                 "        [-c <# of clients>]  number of ROCs sending data (default = 1)\n" +
                 "        [-f <output file>]   name of output file\n" +
                 "        [-udp]        accept data from udp channels (tcp is default)\n" +
-                "        [-debug]      turn on printout\n" +
+                "        [-v]          turn on printout\n" +
                 "        [-one]        all channels are from 1 VTP\n" +
                 "        [-h]          print this help\n");
 
@@ -168,36 +168,36 @@ public class Aggregator extends Thread {
 
     /** This method is executed as a thread. */
     public void run() {
-        System.out.println("STARTED Aggregator thread!!");
+        if (debug) System.out.println("STARTED Aggregator thread!!");
 
         // Create output file channel
         DataChannelImplFile fileChannel = null;
         try {
-            System.out.println("Call channel constructor ");
-            fileChannel = new DataChannelImplFile("fileChannel", fileName);
-System.out.println("Past channel creation ");
+            if (debug) System.out.println("Call channel constructor ");
+            fileChannel = new DataChannelImplFile("fileChannel", fileName, debug);
+            if (debug) System.out.println("Past channel creation ");
         }
         catch (DataTransportException e) {
             e.printStackTrace();
             System.exit(1);
         }
-System.out.println("Created a file channel for " + fileName);
+        if (debug) System.out.println("Created a file channel for " + fileName);
         ArrayList<DataChannel> outputChannels = new ArrayList<DataChannel>();
         outputChannels.add(fileChannel);
 
 
         // Let us know that the server has the expected # of client connected
         CountDownLatch latch = new CountDownLatch(clientCount);
-System.out.println("Created a latch");
+        if (debug) System.out.println("Created a latch");
 
         //--------------------------------------------------------------------
         // Start up the TCP server or UDP receivers.
         // The TCP server will create DataChannelImplTcpStream channels as connections are made.
         // (Haven't dealt with UDP yet ...)
-        EmuDomainServer server = new EmuDomainServer(tcpPort, clientCount, expid, name, tcp, latch);
-System.out.println("Created a TCP server and start it");
+        EmuDomainServer server = new EmuDomainServer(tcpPort, clientCount, expid, name, tcp, latch, debug);
+        if (debug) System.out.println("Created a TCP server and start it");
         server.start();
-System.out.println("TCP server started");
+        if (debug) System.out.println("TCP server started");
 
         // Wait until the expected # of client connect
         System.out.println("Waiting for " + clientCount + " clients to connect");
@@ -214,7 +214,7 @@ System.out.println("TCP server started");
         //--------------------------------------------------------------------
 
         // Create the Aggregator module
-        StreamAggregator agg = new StreamAggregator("Aggregator");
+        StreamAggregator agg = new StreamAggregator("Aggregator", debug);
         agg.setSingleVTPInputs(singleVTPinput);
         agg.addInputChannels(server.getTcpServer().getInputChannels());
         agg.addOutputChannels(outputChannels);

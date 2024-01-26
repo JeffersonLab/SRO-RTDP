@@ -26,7 +26,7 @@ class EmuDomainTcpServer extends Thread {
 
 
     /** Level of debug output for this class. */
-    private int debug = cMsgConstants.debugInfo;
+    private final boolean debug;
 
     private final int serverPort;
 
@@ -64,11 +64,12 @@ class EmuDomainTcpServer extends Thread {
      * @param server emu server that created this object
      * @param serverPort TCP port on which to receive transmissions from emu clients
      */
-    public EmuDomainTcpServer(EmuDomainServer server, int serverPort, int clientCount, CountDownLatch latch) {
+    public EmuDomainTcpServer(EmuDomainServer server, int serverPort, int clientCount, CountDownLatch latch, boolean debug) {
         this.server = server;
         this.serverPort = serverPort;
         this.clientCount = clientCount;
         this.clientAttachLatch = latch;
+        this.debug = debug;
 
         inputChannels = new ArrayList<>(20);
     }
@@ -76,9 +77,7 @@ class EmuDomainTcpServer extends Thread {
 
     /** This method is executed as a thread. */
     public void run() {
-        if (debug >= cMsgConstants.debugInfo) {
-            System.out.println("Emu domain TCP server: running");
-        }
+        if (debug)  System.out.println("Emu domain TCP server: running");
 
         // Direct buffer for reading 3 magic & 5 other integers with non-blocking IO
         int BYTES_TO_READ = 8*4;
@@ -130,7 +129,7 @@ class EmuDomainTcpServer extends Thread {
                     }
                     continue;
                 }
-System.out.println("Emu domain server: someone trying to connect");
+                if (debug) System.out.println("Emu domain server: someone trying to connect");
 
                 // Get an iterator of selected keys (ready sockets)
                 Iterator it = selector.selectedKeys().iterator();
@@ -157,9 +156,7 @@ System.out.println("Emu domain server: someone trying to connect");
 
                         // Loop until all 6 integers of incoming data read or timeout
                         while (bytesRead < BYTES_TO_READ) {
-                            if (debug >= cMsgConstants.debugInfo) {
-                                System.out.println("Emu domain server: try reading rest of Buffer");
-                            }
+                            if (debug)  System.out.println("Emu domain server: try reading rest of Buffer");
 
                             bytes = channel.read(buffer);
 
@@ -172,9 +169,7 @@ System.out.println("Emu domain server: someone trying to connect");
 
                             bytesRead += bytes;
 
-                            if (debug >= cMsgConstants.debugInfo) {
-                                System.out.println("Emu domain server: bytes read = " + bytesRead);
-                            }
+                            if (debug) System.out.println("Emu domain server: bytes read = " + bytesRead);
 
                             // If we've read everything, look to see what we got ...
                             if (bytesRead >= BYTES_TO_READ) {
@@ -187,7 +182,7 @@ System.out.println("Emu domain server: someone trying to connect");
                                 if (magic1 != cMsgNetworkConstants.magicNumbers[0] ||
                                     magic2 != cMsgNetworkConstants.magicNumbers[1] ||
                                     magic3 != cMsgNetworkConstants.magicNumbers[2])  {
-                                    if (debug >= cMsgConstants.debugInfo) {
+                                    if (debug) {
                                         System.out.println("Emu domain server: Magic #s did NOT match, ignore");
                                     }
                                     channel.close();
@@ -199,7 +194,7 @@ System.out.println("Emu domain server: someone trying to connect");
                                 version = buffer.getInt();
 //System.out.println("Got version = " + version);
                                 if (version != cMsgConstants.version) {
-                                    if (debug >= cMsgConstants.debugInfo) {
+                                    if (debug) {
                                         System.out.println("Emu domain server: version mismatch, got " +
                                                             version + ", needed " + cMsgConstants.version);
                                     }
@@ -212,7 +207,7 @@ System.out.println("Emu domain server: someone trying to connect");
                                 codaId = buffer.getInt();
 //System.out.println("Got coda id = " + codaId);
                                 if (codaId < 0) {
-                                    if (debug >= cMsgConstants.debugInfo) {
+                                    if (debug) {
                                         System.out.println("Emu domain server: bad coda id of sender (" +
                                                            codaId + ')');
                                     }
@@ -226,7 +221,7 @@ System.out.println("Emu domain server: someone trying to connect");
 //System.out.println("Got buffer size = " + bufferSizeDesired);
                                 if (bufferSizeDesired < 4*10) {
                                     // 40 bytes is smallest possible evio file format size
-                                    if (debug >= cMsgConstants.debugInfo) {
+                                    if (debug) {
                                         System.out.println("Emu domain server: bad buffer size from sender (" +
                                                            bufferSizeDesired + ')');
                                     }
@@ -239,7 +234,7 @@ System.out.println("Emu domain server: someone trying to connect");
                                 socketCount = buffer.getInt();
 System.out.println("Got socket count = " + socketCount);
                                 if (socketCount < 1) {
-                                    if (debug >= cMsgConstants.debugInfo) {
+                                    if (debug) {
                                         System.out.println("    Transport Emu: domain server, bad socket count of sender (" +
                                                                    socketCount + ')');
                                     }
@@ -252,7 +247,7 @@ System.out.println("Got socket count = " + socketCount);
                                 socketPosition = buffer.getInt();
 System.out.println("Got socket position = " + socketPosition);
                                 if (socketCount < 1) {
-                                    if (debug >= cMsgConstants.debugInfo) {
+                                    if (debug) {
                                         System.out.println("    Transport Emu: domain server, bad socket position of sender (" +
                                                                    socketPosition + ')');
                                     }
@@ -282,7 +277,7 @@ System.out.println("Got socket position = " + socketPosition);
                         // Create a new TCP streaming channel each with unique name, 2nd arg is only used to
                         // distinguish between streams from one VTP. Don't care about that here.
                         DataChannelImplTcpStream tcpStreamChannel =
-                                new DataChannelImplTcpStream("VTP_" + streamCount, 0);
+                                new DataChannelImplTcpStream("VTP_" + streamCount, 0, debug);
                         streamCount++;
 
                         // Store for later use by Aggregating module
@@ -295,7 +290,7 @@ System.out.println("Got socket position = " + socketPosition);
                             tcpStreamChannel.attachToInput(channel, codaId, bufferSizeDesired);
                         }
                         catch (IOException e) {
-                            if (debug >= cMsgConstants.debugInfo) {
+                            if (debug) {
                                 System.out.println("Emu domain server: " + e.getMessage());
                             }
                             channel.close();
@@ -303,7 +298,7 @@ System.out.println("Got socket position = " + socketPosition);
                             continue;
                         }
 
-                        if (debug >= cMsgConstants.debugInfo) {
+                        if (debug) {
                             System.out.println("Emu domain server: new connection");
                         }
                     }
@@ -322,7 +317,7 @@ System.out.println("Got socket position = " + socketPosition);
             try {if (selector != null) selector.close();} catch (IOException e) {}
         }
 
-        if (debug >= cMsgConstants.debugInfo) {
+        if (debug) {
             System.out.println("Emu domain server: quitting");
         }
     }

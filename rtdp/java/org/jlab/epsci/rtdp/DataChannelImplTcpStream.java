@@ -56,6 +56,8 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
     /** Read END event from input ring. */
     private volatile boolean haveInputEndEvent;
 
+    private final boolean debug;
+
     // OUTPUT
 
     // not using this channel for output
@@ -120,15 +122,16 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
      *
      * @param name         the name of this channel
      */
-    DataChannelImplTcpStream(String name, int streamNumber) {
+    DataChannelImplTcpStream(String name, int streamNumber, boolean debug) {
 
         // constructor of super class
-        super(name, true, 0);
+        super(name, true, debug, 0);
 
+        this.debug = debug;
         this.streamNumber = streamNumber;
 
         // always INPUT channel
-        System.out.println("      DataChannel TcpStream: creating input channel " + name);
+        if (debug) System.out.println("      DataChannel TcpStream: creating input channel " + name);
 
         // Use direct ByteBuffers or not, faster & more stable with non-direct.
         // Turn this off since performance is better.
@@ -136,7 +139,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
 
         // size of TCP receive buffer (0 means use operating system default)
         tcpRecvBuf = 20000000;
-        System.out.println("      DataChannel TcpStream: recvBuf = " + tcpRecvBuf);
+        if (debug) System.out.println("      DataChannel TcpStream: recvBuf = " + tcpRecvBuf);
 
         startInputThread();
     }
@@ -221,7 +224,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
                 ByteOrder.BIG_ENDIAN, direct,
                 sequentialRelease, nodePools);
 
-        System.out.println("      DataChannel TcpStream in: connection made from " + name);
+        if (debug) System.out.println("      DataChannel TcpStream in: connection made from " + name);
 
         // Start thread to handle socket input
         dataInputThread = new DataInputHelper();
@@ -230,7 +233,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
         // If this is the last socket, make sure all threads are started up before proceeding
         parserMergerThread.start();
         dataInputThread.waitUntilStarted();
-        System.out.println("      DataChannel TcpStream in: last connection made, parser thd started, input threads running");
+        if (debug) System.out.println("      DataChannel TcpStream in: last connection made, parser thd started, input threads running");
     }
 
 
@@ -646,9 +649,9 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
                         isUser = true;
                         eventType = EventType.USER;
                         if (hasFirstEvent) {
-                            System.out.println("      DataChannel TcpStream in: " + name + "  FIRST event from ROC RAW");
+                            if (debug) System.out.println("      DataChannel TcpStream in: " + name + "  FIRST event from ROC RAW");
                         } else {
-                            System.out.println("      DataChannel TcpStream in: " + name + " USER event from ROC RAW");
+                            if (debug) System.out.println("      DataChannel TcpStream in: " + name + " USER event from ROC RAW");
                         }
                     }
                     else {
@@ -756,7 +759,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
                     ri.setTimestamp(timestamp);
                 }
                 else {
-                    System.out.println("      DataChannel TcpStream in: put CONTROL (user?) event into channel ring, event from " + name);
+                    if (debug) System.out.println("      DataChannel TcpStream in: put CONTROL (user?) event into channel ring, event from " + name);
                     ri.setAll(null, null, node, eventType, controlType,
                             isUser, hasFirstEvent, isStreamingData, id, recordId, sourceId,
                             1, name, item, bbSupply);

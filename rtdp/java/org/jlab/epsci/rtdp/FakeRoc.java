@@ -102,7 +102,7 @@ public class FakeRoc extends Thread {
                 name = args[i + 1];
                 i++;
             }
-            else if (args[i].equalsIgnoreCase("-debug")) {
+            else if (args[i].equalsIgnoreCase("-v")) {
                 debug = true;
             }
             else {
@@ -136,7 +136,7 @@ public class FakeRoc extends Thread {
                 "        [-n <name>]   name of fake ROC\n" +
                 "        [-id <CODA id>]  CODA id of fake ROC\n" +
                 "        [-ip <server IP addr>]  IP address of TCP server\n" +
-                "        [-debug]      turn on printout\n" +
+                "        [-v]          turn on printout\n" +
                 "        [-h]          print this help\n");
 
         // TODO: "[-single VTP input] to pass on to module of aggregator !!!
@@ -161,15 +161,12 @@ public class FakeRoc extends Thread {
 
     /** This method is executed as a thread. */
     public void run() {
-        System.out.println("STARTED Aggregator thread!!");
+        if (debug) System.out.println("STARTED Aggregator thread!!");
 
         // Create output file channel
-        System.out.println("Call channel constructor ");
         DataChannelImplEmu emuChannel = new DataChannelImplEmu("emuChannel", codaId, expid,
-                                                               serverIP, tcpPort);
-        System.out.println("Past channel creation ");
+                                                               serverIP, tcpPort, debug);
 
-        System.out.println("Created an emu channel for RocSim");
         ArrayList<DataChannel> outputChannels = new ArrayList<DataChannel>();
         outputChannels.add(emuChannel);
 
@@ -177,7 +174,7 @@ public class FakeRoc extends Thread {
         //--------------------------------------------------------------------
 
         // Create the Aggregator module
-        RocSimulation sim = new RocSimulation("RocSim");
+        RocSimulation sim = new RocSimulation("RocSim", debug);
         sim.addOutputChannels(outputChannels);
 
         // And get it running

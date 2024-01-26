@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project name="EMU" default="compile" basedir=".">
+<project name="SRO-RTDP" default="compile" basedir=".">
 
 
     <!-- environmental variables -->
@@ -13,7 +13,7 @@
     <property name="javac.debug" value="on" />
     
     <!-- Directories/Files -->
-    <property name="src.dir"       value="java" />
+    <property name="src.dir"       value="rtdp/java" />
     <property name="build.dir"     value="build" />
     <property name="build.classes" value="${build.dir}/classes" />
     <property name="build.lib"     value="${build.dir}/lib" />
@@ -178,7 +178,7 @@
 
     <target name="compile" depends="RTDP_cp,prepare" description="Compiles all source code.">
         <javac sourcepath="" srcdir="${src.dir}" destdir="${build.classes}" debug="${javac.debug}" optimize="yes" >
-            <include name="**/*.java"/>
+            <include name="org/jlab/epsci/rtdp/*.java"/>
             <!-- Only way to exclude a file to set the sourcepath, then specify include as well as exclude
             <exclude name="**/DataChannelImplUdpStream.java" />
             <exclude name="**/DataTransportImplUdpStream.java" />  -->
@@ -232,7 +232,7 @@
     <!-- Create Jar file -->
     <target name="jar" depends="compile" description="Generates jar file.">
         <delete file="${jarPath}"/>
-        <jar jarfile="${jarPath}" manifest="java/org/jlab/epsci/manifest.mf">
+        <jar jarfile="${jarPath}" manifest="rtdp/java/org/jlab/epsci/manifest.mf">
             <fileset dir="${build.classes}" excludes="*.class" >
                 <include name="org/jlab/epsci/**/*.class"/>
                 <include name="**/*.properties"/>
