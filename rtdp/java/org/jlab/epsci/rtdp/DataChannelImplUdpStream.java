@@ -49,8 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class DataChannelImplUdpStream extends DataChannelAdapter {
 
-    /** Do we pause the dataThread? */
-    private volatile boolean pause;
+    private final boolean debug;
 
     /** Read END event from input ring. */
     private volatile boolean haveInputEndEvent;
@@ -155,20 +154,22 @@ public class DataChannelImplUdpStream extends DataChannelAdapter {
      * @throws DataTransportException - unable to create buffers or socket.
      */
     DataChannelImplUdpStream(String name,
-                             boolean input,
+                             boolean input, boolean debug,
                              int outputIndex)
             throws DataTransportException {
 
         // constructor of super class
-        super(name, input, outputIndex);
+        super(name, input, debug, outputIndex);
+        this.debug = debug;
 
-
-        if (input) {
-            System.out.println("    DataChannel UDP: creating input channel " + name);
-        }
-        else {
-            System.out.println("    DataChannel UDP: creating output channel " + name);
-        }
+           if (debug) {
+               if (input) {
+                   System.out.println("    DataChannel UDP: creating input channel " + name);
+               }
+               else {
+                   System.out.println("    DataChannel UDP: creating output channel " + name);
+               }
+           }
 
         // We need a supplies of buffers - 1 supply for each data source.
         // First we need to know how big to make them to start with.
@@ -176,7 +177,7 @@ public class DataChannelImplUdpStream extends DataChannelAdapter {
         // TODO: see how many bytes Dave A. sends at once
 
         bufSize = 100000;
-        System.out.println("    DataChannel UDP stream: single buffer starting byte size = " + bufSize);
+        if (debug) System.out.println("    DataChannel UDP stream: single buffer starting byte size = " + bufSize);
 
 
         // Either destination port to send UDP datagrams to, or port to receive on
@@ -205,7 +206,7 @@ public class DataChannelImplUdpStream extends DataChannelAdapter {
                 inSocket = new DatagramSocket(port);
                 inSocket.setReceiveBufferSize(recvBufSize);
 
-                System.out.println("    DataChannel UDP: create UDP receiving socket at port " + port +
+                if (debug) System.out.println("    DataChannel UDP: create UDP receiving socket at port " + port +
                         " with " + inSocket.getReceiveBufferSize() + " byte UDP receive buffer, on host " +
                         inSocket.getLocalAddress().getHostName());
             }
@@ -240,8 +241,8 @@ public class DataChannelImplUdpStream extends DataChannelAdapter {
             parserMergerThread = new ParserMerger();
             parserMergerThread.start();
 
-            System.out.println("    DataChannel UDP stream in: seq release of buffers = " + sequentialRelease);
-            System.out.println("    DataChannel UDP stream in: created " + ringSize + " node pools for source");
+            if (debug) System.out.println("    DataChannel UDP stream in: seq release of buffers = " + sequentialRelease);
+            if (debug) System.out.println("    DataChannel UDP stream in: created " + ringSize + " node pools for source");
 
             //            dumpData = true;
 //System.out.println("    DataChannel UDP stream: dumpData = " + dumpData);
@@ -262,7 +263,7 @@ public class DataChannelImplUdpStream extends DataChannelAdapter {
                 // Include LB header
                 LB_HEADER_BYTES = 16;
                 HEADER_BYTES = RE_HEADER_BYTES + LB_HEADER_BYTES;
-System.out.println("    DataChannel UDP stream: total header bytes = " + HEADER_BYTES);
+                if (debug) System.out.println("    DataChannel UDP stream: total header bytes = " + HEADER_BYTES);
             }
 
             // Let's try 20MB buf by default, which will most likely get doubled to 40MB by the system
@@ -381,7 +382,7 @@ System.out.println("    DataChannel UDP stream: total header bytes = " + HEADER_
             parserMergerThread = null;
             if (inSocket != null) inSocket.close();
         }
-        System.out.println("    DataChannel UDP stream: buffers reassembled = " + buffersReassembled);
+        if (debug) System.out.println("    DataChannel UDP stream: buffers reassembled = " + buffersReassembled);
     }
     
 
@@ -764,13 +765,6 @@ System.out.println("    DataChannel UDP stream: total header bytes = " + HEADER_
                     // If I've been told to RESET ...
                     if (gotResetCmd) {
                         return;
-                    }
-
-                    if (pause) {
-                        if (pauseCounter++ % 400 == 0)
-                            System.out.println("    DataChannel UDP stream in: " + name + " - PAUSED");
-                        Thread.sleep(5);
-                        continue;
                     }
 
                     // We need to get another chunk of buffers to read valid data into
@@ -2790,17 +2784,6 @@ System.out.println("    DataChannel UDP stream out: " + name + " got END event, 
                 }
 
                 while (true) {
-
-                    if (pause) {
-                        if (pauseCounter++ % 400 == 0) {
-                            try {
-                                Thread.sleep(5);
-                            }
-                            catch (InterruptedException e1) {
-                            }
-                        }
-                        continue;
-                    }
 
                     try {
                         ringItem = getNextOutputRingItem(ringIndex);

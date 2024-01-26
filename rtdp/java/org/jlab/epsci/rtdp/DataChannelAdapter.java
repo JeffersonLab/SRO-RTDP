@@ -150,8 +150,11 @@ public  class DataChannelAdapter implements DataChannel {
     /** Total number of slots in all output channel ring buffers. */
     protected int totalRingCapacity;
 
+    //-------------------------------------------
+    private boolean debug;
 
-static int idNum = 0;
+
+    static int idNum = 0;
 
 
     /**
@@ -161,14 +164,16 @@ static int idNum = 0;
      *
      * @param name          the name of this channel
      * @param input         true if this is an input data channel, otherwise false
+     * @param debug         true if want debug output
      * @param outputIndex   order in which module's events will be sent to this
      *                      output channel (0 for first output channel, 1 for next, etc.).
     */
     public DataChannelAdapter(String name,
-                              boolean input,
+                              boolean input, boolean debug,
                               int outputIndex) {
         this.name = name;
         this.input = input;
+        this.debug = debug;
         this.outputIndex = outputIndex;
 
 
@@ -192,7 +197,7 @@ static int idNum = 0;
 
             // Create RingBuffers
             setupInputRingBuffers();
-            System.out.println("      DataChannel Adapter: input ring item count -> " + inputRingItemCount);
+            if (debug) System.out.println("      DataChannel Adapter: input ring item count -> " + inputRingItemCount);
         }
         else {
             // Set the number of items for the output chan ring buffers.
@@ -206,15 +211,15 @@ static int idNum = 0;
             outputRingItemCount = 256;
 
             outputRingItemCount = EmuUtilities.powerOfTwo(outputRingItemCount, false);
-            System.out.println("      DataChannel Adapter: output ring item count -> " + outputRingItemCount);
+            if (debug) System.out.println("      DataChannel Adapter: output ring item count -> " + outputRingItemCount);
 
             // Set endianness of output data, default same as this node
             byteOrder = ByteOrder.nativeOrder();
-            System.out.println("      DataChannel Adapter: byte order = " + byteOrder);
+            if (debug) System.out.println("      DataChannel Adapter: byte order = " + byteOrder);
 
             // Set number of data output ring buffers (1 for each build thread, only 1 in this case)
             outputRingCount = 1;
-            System.out.println("      DataChannel Adapter: output ring buffer count (1/buildthread) = " + outputRingCount);
+            if (debug) System.out.println("      DataChannel Adapter: output ring buffer count (1 per buildthread) = " + outputRingCount);
 
             // Create RingBuffers
             ringBuffersOut = new RingBuffer[outputRingCount];
@@ -242,7 +247,7 @@ static int idNum = 0;
             // Initialize the ring number (of first buildable event)
             ringIndex = (int) (nextEvent % outputRingCount);
 
-System.out.println("      DataChannel Adapter: prestart, nextEv (" +
+            if (debug) System.out.println("      DataChannel Adapter: prestart, nextEv (" +
                            nextEvent + "), ringIndex (" + ringIndex + ')' +
                     ", output channel count = (" + outputChannelCount + ")");
 
@@ -325,10 +330,7 @@ System.out.println("      DataChannel Adapter: prestart, nextEv (" +
 
     /** {@inheritDoc} */
     public boolean isInput() {return input;}
-
-//    /** {@inheritDoc} */
-//    public DataTransport getDataTransport() {return dataTransport;}
-
+    
     /** {@inheritDoc} */
     public int getOutputRingCount() {return outputRingCount;}
 

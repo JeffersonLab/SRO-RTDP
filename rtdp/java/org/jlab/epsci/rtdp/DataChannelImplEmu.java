@@ -42,6 +42,8 @@ public class DataChannelImplEmu extends DataChannelAdapter {
     private volatile boolean haveInputEndEvent;
 
     private final String expid;
+
+    private final boolean debug;
     
     // OUTPUT
 
@@ -95,17 +97,18 @@ public class DataChannelImplEmu extends DataChannelAdapter {
      * @param serverIp     IP addr of server to send data to.
      * @param serverPort   port of server to send data to.
      */
-    DataChannelImplEmu(String name, int codaId, String expid, String serverIp, int serverPort) {
+    DataChannelImplEmu(String name, int codaId, String expid, String serverIp, int serverPort, boolean debug) {
 
         // constructor of super class
-        super(name, false, 0);
+        super(name, false, debug, 0);
 
         this.id = codaId;
         this.expid = expid;
+        this.debug = debug;
         this.serverIP = serverIp;
         this.sendPort = serverPort;
 
-        System.out.println("      DataChannel Emu: creating output channel " + name);
+        if (debug) System.out.println("      DataChannel Emu: creating output channel " + name);
 
         // Use direct ByteBuffers or not, faster & more stable with non-direct.
         // Turn this off since performance is better.
@@ -163,7 +166,7 @@ public class DataChannelImplEmu extends DataChannelAdapter {
         // This connection will contain "sockCount" number of sockets
         // which are all used to send data.
         try {
-            System.out.println("      DataChannel Emu out: will directly connect to server w/ UDL = " + builder.toString());
+            if (debug) System.out.println("      DataChannel Emu out: will directly connect to server w/ UDL = " + builder.toString());
             emuDomain = new cMsg(builder.toString(), name, "emu domain client");
             emuDomain.connect();
             startOutputThread();
@@ -454,7 +457,7 @@ System.out.println("SocketSender thread interrupted");
 
             for (int i=0; i < socketCount; i++) {
                 // A mini ring of buffers, 16 is the best size
-System.out.println("DataOutputHelper constr: making BB supply of 8 bufs @ bytes = " + maxBufferSize);
+                if (debug) System.out.println("DataOutputHelper constr: making BB supply of 8 bufs @ bytes = " + maxBufferSize);
                 bbOutSupply[i] = new ByteBufferSupply(16, maxBufferSize, byteOrder,
                                                       direct, orderedRelease);
 
@@ -476,7 +479,6 @@ System.out.println("DataOutputHelper constr: making BB supply of 8 bufs @ bytes 
                 writer = new EventWriterUnsync(currentBuffer);
                 //writer = new EventWriterUnsync(currentBuffer, 0, 0, null, 1, null, 0);
 
-// TODO: This writes a trailer into currentBuffer
                 writer.close();
             }
             catch (InterruptedException e) {/* never happen */}

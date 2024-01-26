@@ -30,7 +30,7 @@ class EmuDomainUdpListener extends Thread {
     private MulticastSocket multicastSocket;
 
     /** Level of debug output for this class. */
-    private int debug = cMsgConstants.debugInfo;
+    private final boolean debug;
 
     private String expid;
     private String emuName;
@@ -60,15 +60,16 @@ class EmuDomainUdpListener extends Thread {
      * @throws cMsgException if multicast port is taken
      */
     public EmuDomainUdpListener(EmuDomainServer server, int port, int clientCount,
-                                String expid, String emuName) throws cMsgException {
+                                String expid, String emuName, boolean debug) throws cMsgException {
 
         this.expid = expid;
         this.emuName = emuName;
         this.clientCount = clientCount;
+        this.debug = debug;
         multicastPort = tcpPort = port;
 
         try {
-System.out.println("Listening for multicasts on port " + multicastPort);
+            if (debug) System.out.println("Listening for multicasts on port " + multicastPort);
 
             // Create a UDP socket for accepting multi/unicasts from the Emu client
             multicastSocket = new MulticastSocket(multicastPort);
@@ -101,9 +102,7 @@ System.out.println("Listening for multicasts on port " + multicastPort);
     /** This method is executed as a thread. */
     public void run() {
 
-        if (debug >= cMsgConstants.debugInfo) {
-            System.out.println("Emu Multicast Listening Thread: running");
-        }
+        if (debug) System.out.println("Emu Multicast Listening Thread: running");
 
         // Create a packet to be written into from client
         byte[] buf = new byte[2048];
@@ -161,7 +160,7 @@ System.out.println("Listening for multicasts on port " + multicastPort);
             baos.close();
         }
         catch (IOException e) {
-            if (debug >= cMsgConstants.debugError) {
+            if (debug) {
                 System.out.println("I/O Error: " + e);
             }
         }
@@ -177,7 +176,7 @@ System.out.println("Listening for multicasts on port " + multicastPort);
                 if (killThreads) { return; }
 
                 packet.setLength(2048);
-System.out.println("Emu listen: WAITING TO RECEIVE PACKET");
+                if (debug) System.out.println("Emu listen: WAITING TO RECEIVE PACKET");
                 multicastSocket.receive(packet);   // blocks
 
                 if (killThreads) { return; }
@@ -188,9 +187,7 @@ System.out.println("Emu listen: WAITING TO RECEIVE PACKET");
                 int multicasterUdpPort = packet.getPort();   // Port to send response packet to
 
                 if (packet.getLength() < 4*4) {
-                    if (debug >= cMsgConstants.debugWarn) {
-                        System.out.println("Emu listen: got multicast packet that's too small");
-                    }
+                    System.out.println("Emu listen: got multicast packet that's too small");
                     continue;
                 }
 
@@ -200,9 +197,7 @@ System.out.println("Emu listen: WAITING TO RECEIVE PACKET");
                 if (magic1 != cMsgNetworkConstants.magicNumbers[0] ||
                     magic2 != cMsgNetworkConstants.magicNumbers[1] ||
                     magic3 != cMsgNetworkConstants.magicNumbers[2])  {
-                    if (debug >= cMsgConstants.debugWarn) {
                         System.out.println("Emu listen: got multicast packet with bad magic #s");
-                    }
                     continue;
                 }
 
@@ -211,16 +206,16 @@ System.out.println("Emu listen: WAITING TO RECEIVE PACKET");
                 switch (msgType) {
                     // Multicasts from emu clients
                     case cMsgNetworkConstants.emuDomainMulticastClient:
-System.out.println("Emu listen: client wants to connect");
+                        if (debug) System.out.println("Emu listen: client wants to connect");
                         break;
                     // Packet from client just trying to locate emu multicast servers.
                     // Send back a normal response but don't do anything else.
                     case cMsgNetworkConstants.emuDomainMulticastProbe:
-System.out.println("Emu listen: I was probed");
+                        if (debug) System.out.println("Emu listen: I was probed");
                         break;
                     // Ignore packets from unknown sources
                     default:
-System.out.println("Emu listen: unknown command");
+                        if (debug) System.out.println("Emu listen: unknown command");
                         continue;
                 }
 
@@ -231,10 +226,8 @@ System.out.println("Emu listen: unknown command");
 
                  // Check for conflicting cMsg versions
                 if (cMsgVersion != cMsgConstants.version) {
-                    if (debug >= cMsgConstants.debugInfo) {
                         System.out.println("Emu listen: conflicting cMsg versions, client = " + cMsgVersion +
                         ", cMsg lib = " + cMsgConstants.version);
-                    }
                     continue;
                 }
 
@@ -263,10 +256,8 @@ System.out.println("Emu listen: unknown command");
 
                 // Check for conflicting expids
                 if (!expid.equalsIgnoreCase(multicasterExpid)) {
-                    if (debug >= cMsgConstants.debugInfo) {
                         System.out.println("Emu listen: conflicting EXPIDs, got " + multicasterExpid +
                                            ", need " + expid);
-                    }
                     continue;
                 }
 
@@ -292,10 +283,8 @@ System.out.println("Emu listen: unknown command");
                 if (msgType == cMsgNetworkConstants.emuDomainMulticastClient &&
                     !componentName.equalsIgnoreCase(emuName)) {
 
-                    if (debug >= cMsgConstants.debugInfo) {
                         System.out.println("Emu UDP listen: this emu wrong destination, I am " +
                                                    emuName + ", client looking for " + componentName);
-                    }
                     continue;
                 }
 
@@ -310,11 +299,8 @@ System.out.println("Emu listen: unknown command");
             }
         }
         catch (IOException e) {
-            if (debug >= cMsgConstants.debugError) {
                 System.out.println("Emu listen: I/O ERROR in emu multicast server");
-                System.out.println("Emu listen: close multicast socket, port = " +
-                                           multicastSocket.getLocalPort());
-            }
+                System.out.println("Emu listen: close multicast socket, port = " +  multicastSocket.getLocalPort());
         }
         finally {
             if (!multicastSocket.isClosed())  multicastSocket.close();
