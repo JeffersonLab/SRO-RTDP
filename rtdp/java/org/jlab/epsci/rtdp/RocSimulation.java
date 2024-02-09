@@ -340,7 +340,7 @@ public class RocSimulation extends ModuleAdapter {
      * @param templateBuf  buffer with time slice data
      * @param frameNumber  new frame number to place into buf.
      * @param timestamp    new time stamp to place into buf
-     * @param copy         ss templateBuf to be copied into buf or not.
+     * @param copy         is templateBuf to be copied into buf or not.
      * @param generatedDataBytes number of bytes generated as data for each payload data bank.
      */
     void  writeTimeSliceBuffer(ByteBuffer buf, ByteBuffer templateBuf,
@@ -514,11 +514,11 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
 
 
 
-                   //     Thread.sleep(1);
+                        Thread.sleep(1000);
 
-                        if (loops != 0 && loopCount++ % loops == 0) {
-                            Thread.sleep(1);
-                        }
+//                        if (loops != 0 && loopCount++ % loops == 0) {
+//                            Thread.sleep(1);
+//                        }
 
                         if (killThd) return;
 
