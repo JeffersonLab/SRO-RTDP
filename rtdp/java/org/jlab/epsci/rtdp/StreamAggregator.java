@@ -13,23 +13,124 @@ package org.jlab.epsci.rtdp;
 
 import com.lmax.disruptor.*;
 import org.jlab.coda.emu.EmuException;
+import org.jlab.coda.emu.support.codaComponent.CODAState;
+import org.jlab.coda.emu.support.codaComponent.CODAStateIF;
+import org.jlab.coda.emu.support.configurer.Configurer;
+import org.jlab.coda.emu.support.configurer.DataNotFoundException;
+import org.jlab.coda.emu.support.control.CmdExecException;
 import org.jlab.coda.emu.support.data.*;
 import org.jlab.coda.jevio.ByteDataTransformer;
 import org.jlab.coda.jevio.EvioException;
 import org.jlab.coda.jevio.EvioNode;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 
 import static com.lmax.disruptor.RingBuffer.createSingleProducer;
 
 /**
- * This class implements an event aggregator for a reconstructed stream for multple VTPs.
- * Pcap files of TCP communication from VTPs were stored and replayed. Now trying to make
- * sense of it.
+ * This class implements an event builder.
+ *
+ * <pre><code>
+ *
+ *   Ring Buffer (single producer, lock free) for a single input channel
+ *
+ *                        | Gate (producer cannot go beyond this point)
+ *                        |
+ *                      __|__
+ *                     /  |  \
+ *                    /1 _|_ 2\  &lt;---- Sorter Thread
+ *                   |__/   \__|        |
+ *                   |6 |   | 3|        |
+ *             ^     |__|___|__|        |
+ *             |      \ 5 | 4 /         |
+ *         Producer-&gt;  \__|__/          V
+ *                        |
+ *                        |
+ *                        | Barrier (at last sequence produced)
+ *
+ * Actual input channel ring buffers have thousands of events (not 6).
+ * The producer is a single input channel which reads incoming data,
+ * parses it and places it into the ring buffer.
+ *
+ * The leading consumer of each input channel ring is the sorter thread. This thread
+ * sends all events of the same time frame to the ring of the same build thread.
+ * Each build thread consumes items from its ring (that the sorter thread fills).
+ * There are a fixed number of build threads which can be set in the config file.
+ * After initially consuming all empty input channel ring slots and filling each with
+ * data (once around ring), the producer (input channel) will only take additional
+ * slots that the build thread is finished with.
+ *
+ * N Input Channels
+ * (evio bank ring bufs)    RB1       RB2  ...  RBN
+ *                           3         4         4
+ *  time frame of event      3         4         3
+ *                           3         3         2
+ *                           2         3         1
+ *                           2         2         |
+ *                           2         2         |
+ *                           1         1         |
+ *                           1         1         |
+ *                           1         |         |
+ *                           V         V         V
+ *  Sorter sends all     ____________________________
+ *  banks of the same    -----   Sorter Thread  -----
+ *  frame to the same    ____________________________
+ *  build thread                3          4
+ *                              3          4
+ *                              3          4
+ *                              3          4
+ *                              3          4
+ *                              3          4
+ *                              1          2
+ *                              1          2
+ *                              1          2
+ *                              1          2
+ *                              1          2
+ *                              1          2
+ *                              |          |
+ *                              V          V
+ *  BuildingThreads:          BT1         BT2  ...  BTM
+ *  Grab all identical frame   |           |
+ *  banks from 1 ring,         |           |
+ *  build event, and           |           |
+ *  place in                   |           |
+ *  output channel(s)          |           |
+ *                             |           |
+ *                             V           V
+ * Output Channel(s):    OC1: RB1         RB2
+ * (1 ring buffer for    OCZ: RB1         RB2
+ *  each build thread
+ *  in each channel)
+ *
+ *  M != N in general
+ *  M  = 1 by default
+ *
+ *
+ * </code></pre>
+ *
+ *     <p>Before an input channel can reuse a place on the ring (say 4, although at that
+ *     point its number would be 6+4=10), the gating sequence for that ring must reach that same value
+ *     (10) or higher. This signals that the user (Sorter which depends on BT1 and BT2) are done using
+ *     that ring item.</p>
+ *
+ *  --------------------------------------------------------------------------------------------------
+ *
+ * <p>Each BuildingThread - of which there may be any number - takes
+ * all banks with identical frame number from its own ring buffer,
+ * and builds them into a single event. The built event is placed in a ring buffer of
+ * an output channel. This is by round robin if more than one channel or on all output channels
+ * if a control event, or the first output channel's first ring if user event.
+ * Each output channel has the same number of ring buffers
+ * as build threads. This avoids any contention and locking while writing. Each build thread
+ * only writes to a fixed, single ring buffer of each output channel. It is the job of each
+ * output channel to merge the contents of their rings into a single, ordered output stream.</p>
+ *
+ * NOTE: When building, any Control events must appear on each channel in the same order.
+ * If not, an exception may be thrown. If so, the Control event is passed along to all output channels.
+ * If no output channels are defined in the config file, this module builds, but discards all events.
  */
-public class StreamAggregator extends ModuleAdapter {
+public class StreamAggregator2 extends ModuleAdapter {
 
 
     /** The number of BuildingThread objects. */
@@ -37,6 +138,12 @@ public class StreamAggregator extends ModuleAdapter {
 
     /** Container for threads used to build events. */
     private final ArrayList<BuildingThread> buildingThreadList = new ArrayList<>(6);
+
+    /** The number of the experimental run. */
+    private int runNumber;
+
+    /** The number of the experimental run's configuration. */
+    private int runTypeId;
 
     /** If <code>true</code>, produce debug print out. */
     private final boolean debug;
@@ -51,6 +158,13 @@ public class StreamAggregator extends ModuleAdapter {
      */
     private int timestampSlop;
 
+    // ---------------------------------------------------
+    // Control events
+    // ---------------------------------------------------
+
+    /** Have complete END event (on all input channels)
+     *  detected by one of the building threads. */
+    private volatile boolean haveEndEvent;
 
     //-------------------------------------------
     // Disruptor (RingBuffer)
@@ -96,13 +210,24 @@ public class StreamAggregator extends ModuleAdapter {
     /** For each sorter ring, 1 barrier since only 1 build thread uses it. */
     private SequenceBarrier[] buildBarrierIn;
 
+    //-------------------------------------------
+    // Statistics
+    //-------------------------------------------
+
+    /** Number of events built by build-thread 0 (not all bts). */
+    private long builtEventCount;
+
+    /** Number of slots in each output channel ring buffer. */
+    private int outputRingSize;
+
 
     /**
      * Constructor creates a new EventBuilding instance.
      *
-     * @param name name of module
+     * @param name      name of module
+     * @param debug     if true, print debug output
      */
-    public StreamAggregator(String name, boolean debug) {
+    public StreamAggregator2(String name, boolean debug) {
         super(name, debug);
         this.debug = debug;
 
@@ -123,7 +248,7 @@ public class StreamAggregator extends ModuleAdapter {
         // since it costs real memory. For big events, 128 x 20MB events = 2.56GB
         // of mem used. Multiply that times the number of build threads.
         ringItemCount = 256;
-        if (debug) System.out.println("  Agg mod: internal ring buf count -> " + ringItemCount);
+        outputRingSize = getInternalRingCount();
 
         //--------------------------------------------------------------------
         // Create rings to hold TimeSliceBanks, 1 ring for each build thread.
@@ -144,7 +269,7 @@ public class StreamAggregator extends ModuleAdapter {
 
 
     /** {@inheritDoc} */
-    public boolean dataFromVTP() {return true;}
+    public boolean dataFromVTP() {return false;}
 
 
 
@@ -191,6 +316,60 @@ public class StreamAggregator extends ModuleAdapter {
     }
 
 
+   /**
+    * This method writes the specified control event into all the output channels, ring 0.
+    *
+    * @param isPrestart {@code true} if prestart event being written, else go event
+    * @param isEnd {@code true} if END event being written. END take precedence.
+    * @param sourceName name of event source.
+    * @throws InterruptedException if writing of event to output channels is interrupted
+    */
+    private void controlToOutputAsync(boolean isPrestart, boolean isEnd, String sourceName)
+            throws InterruptedException {
+
+        if (outputChannelCount < 1) {
+            return;
+        }
+
+        // We have GO or PRESTART?
+        ControlType controlType = isPrestart ? ControlType.PRESTART : ControlType.GO;
+        controlType = isEnd ? ControlType.END : controlType;
+
+        // Space for 1 control event per channel
+        PayloadBuffer[] controlBufs = new PayloadBuffer[outputChannelCount];
+
+        // Create a new control event with updated control data in it
+ // TODO: for streaming, event count does NOT make sense!!
+        controlBufs[0] = Evio.createControlBuffer(controlType,
+                                                  runNumber, runTypeId,
+                                                  (int)frameCountTotal, (int)frameCountTotal,
+                                                  0, outputOrder,
+                                                    sourceName, false, streamingData);
+
+        // For the other output channels, duplicate first with separate position & limit.
+        // Important to do this duplication BEFORE sending to output channels or position
+        // and limit can be copied while changing.
+        for (int i=1; i < outputChannelCount; i++) {
+            controlBufs[i] =  new PayloadBuffer(controlBufs[0]);
+        }
+
+        // Write event to output channels
+        for (int i=0; i < outputChannelCount; i++) {
+System.out.println("WRITE CONTROL EVENT to chan #" + i + ", ring 0");
+            eventToOutputChannel(controlBufs[i], i, 0);
+        }
+
+        if (isEnd) {
+            System.out.println("  Agg mod: wrote immediate END from sorter thread");
+        }
+        else if (isPrestart) {
+            System.out.println("  Agg mod: wrote PRESTART from sorter thread");
+        }
+        else {
+            System.out.println("  Agg mod: wrote GO from sorter thread");
+        }
+    }
+
     /**
      * Copied from Evio class.
      * Check the given payload buffer for correct record id, source id.
@@ -221,7 +400,7 @@ public class StreamAggregator extends ModuleAdapter {
         // Check source ID of bank to see if it matches channel id
         if (!pBuf.matchesId()) {
             System.out.println("checkInput: buf source id = " + sourceId +
-                    " != input channel id = " + channel.getID());
+                                       " != input channel id = " + channel.getID());
             nonFatalError = true;
         }
 
@@ -250,6 +429,7 @@ public class StreamAggregator extends ModuleAdapter {
 
         // Check payload buffer for source id.
         // Store sync and error info in payload buffer.
+        //if (!dumpData)
         checkInput(buildingBank, inputChannel,
                         eventType, inputNode, recordIdError);
 
@@ -431,8 +611,8 @@ public class StreamAggregator extends ModuleAdapter {
          * @param recordIdError non-fatal record id error.
          */
         public void checkStreamInput(PayloadBuffer pBuf, DataChannel channel,
-                                            EventType eventType, EvioNode inputNode,
-                                            boolean recordIdError) {
+                                     EventType eventType, EvioNode inputNode,
+                                     boolean recordIdError) {
 
             int sourceId = pBuf.getSourceId();
             boolean nonFatalError = false;
@@ -442,7 +622,7 @@ public class StreamAggregator extends ModuleAdapter {
             if (eventType != null && eventType.isROCRawStream()) {
                 if (sourceId != inputNode.getTag()) {
                     System.out.println("checkInput: buf source Id (" + sourceId +
-                            ") != buf's id from tag (0x" + Integer.toHexString(inputNode.getTag()) + ')');
+                                               ") != buf's id from tag (0x" + Integer.toHexString(inputNode.getTag()) + ')');
                     nonFatalError = true;
                 }
             }
@@ -450,7 +630,7 @@ public class StreamAggregator extends ModuleAdapter {
             // Check source ID of bank to see if it matches channel id
             if (!pBuf.matchesId()) {
                 System.out.println("checkInput: buf source id = " + sourceId +
-                        " != input channel id = " + channel.getID());
+                                           " != input channel id = " + channel.getID());
                 nonFatalError = true;
             }
 
@@ -497,7 +677,7 @@ public class StreamAggregator extends ModuleAdapter {
                             // If the Agg does not end its threads and complete the END transition,
                             // then the whole state machine gets stuck and it cannot go to DOWNLOAD.
                             if (millisecWait >= 5000) {
-System.out.println("  Agg mod: findEnd, stop looking for END on chan " + ch + " since no more events available");
+                                System.out.println("  Agg mod: findEnd, stop looking for END on chan " + ch + " since no more events available");
                                 continue channelLoop;
                             }
 
@@ -578,12 +758,26 @@ System.out.println("  Agg mod: findEnd, chan " + ch + " got END from " + source 
         }
 
 
+        /**
+         * Since we've received END events on the input channels, create an END event now
+         * and send it to the build thread next in line.
+         */
+        private void endEventToBuildThread(String sourceName) throws InterruptedException {
+            // Create END event
+            PayloadBuffer endEvent = Evio.createControlBuffer(ControlType.END, runNumber, runTypeId,
+                    (int) frameCountTotal, (int)frameCountTotal, 0,
+                    outputOrder, sourceName, false, streamingData);
+
+            int nextBt = (currentBT + 1) % buildingThreadCount;
+            sendToTimeSliceBankRing(endEvent, nextBt);
+        }
+
 
         /** Run this thread. */
         public void run() {
 
             // Initialize
-            boolean streaming, gotBank, recordIdError;
+            boolean gotBank, recordIdError;
             EventType eventType = null;
             EvioNode inputNode;
             PayloadBuffer[] buildingBanks = new PayloadBuffer[inputChannelCount];
@@ -772,9 +966,9 @@ System.out.println("  Agg mod: sorter got user event from channel " + inputChann
 
                         // If not END, we got problems
                         if (!bank.getControlType().isEnd()) {
-                            if (debug) System.out.println("  Agg mod: " + bank.getControlType() +
+                            System.out.println("  Agg mod: " + bank.getControlType() +
                                                           " control events not allowed");
-                           return;
+                            return;
                         }
 
                         //-------------------------------------------
@@ -793,6 +987,7 @@ System.out.println("  Agg mod: sorter found END event from " + bank.getSourceNam
                         }
                         else {
 System.out.println("  Agg mod: sorter found END events on all input channels");
+                            endEventToBuildThread(name);
                             return;
                         }
                     }
@@ -862,9 +1057,6 @@ System.out.println("  Agg mod: sorter found END events on all input channels");
         private long nextSequence;
 
 
-        private String thdName;
-
-
 
         /**
          * Constructor.
@@ -874,11 +1066,146 @@ System.out.println("  Agg mod: sorter found END events on all input channels");
          */
         BuildingThread(int btIndex, String name) {
             super(name);
-            thdName = name;
             this.btIndex = btIndex;
             evIndex = btIndex;
             btCount = buildingThreadCount;
 System.out.println("  Agg mod: create Build Thread (" + name + ") with index " + btIndex + ", count = " + btCount);
+        }
+
+
+
+        /**
+         * Handle the END event.
+         * @param bank the banks holding the locally created END event
+         */
+        private void handleEndEvent(PayloadBuffer bank) {
+
+System.out.println("  Agg mod: in handleEndEvent(), bt #" + btIndex + ", output chan count = " +
+                           outputChannelCount);
+
+            PayloadBuffer[] endBufs;
+
+            if (outputChannelCount > 0) {
+                // Tricky stuff:
+                // Handing a buffer with the END event off to an output channel,
+                // one needs to be aware that its limit will most likely change when
+                // being written by that channel. Thus, when copying the END event,
+                // do that FIRST, BEFORE these things are being written by their output channels.
+                // Been burned by this.
+
+                // Create END event(s)
+                endBufs = new PayloadBuffer[outputChannelCount];
+
+                // For the first output channel
+                endBufs[0] = bank;
+
+                // For the other output channel(s), duplicate first with separate position & limit
+                for (int i=1; i < outputChannelCount; i++) {
+                    endBufs[i] = new PayloadBuffer(bank);
+                }
+
+                // END needs to be sent over each channel.
+                // The question is, which ring will each channel be waiting to read from?
+                // The PRESTART and GO events are always sent to ring 0; however,
+                // now that physics events are being read by each channel, each
+                // channel calculates which ring to read from. This depends
+                // on the number of buildthreads (BTs). It's much easier to send
+                // the END to the ring each channel is expecting to read a physics
+                // event from than it is to send it to ring 0 and try interrupt
+                // the reader, etc.
+                // Each BT writes to the same numbered ring in each
+                // channel since we carefully created one ring/BT in each channel.
+                //
+                // One output channel is easy, have this build thread
+                // write the END as it would the very next physics.
+                //
+                // Here's the strategy for multiple output channels:
+                //
+                // - This build thread (btIndex) has the END event.
+                //   It writes that as it would the next physics -
+                //   to the channel found by:
+                //        outputChannelIndex = evIndex % outputChannelCount
+                //   The ring is that same one this thread always writes to.
+                //
+                // - Writing an END to the next channel is the exact equivalent of having
+                //   the next build thread writing its next physics. This tells us
+                //   the ring it's written to:
+                //       btIndexNext = (btIndex + 1) % buildThreadCount
+                //   The channel is found by the normal round robin method:
+                //       outputChannelIndex = (evIndex + 1) % outputChannelCount.
+
+
+                // The channel due to receive the next physics event is ...
+                outputChannelIndex = (int) (evIndex % outputChannelCount);
+
+System.out.println("  Agg mod: try sending END event to output channel " + outputChannelIndex +
+               ", ring " + btIndex + ", ev# = " + evIndex);
+                // Send END event to that channel
+                try {
+                    eventToOutputChannel(endBufs[0], outputChannelIndex, btIndex);
+                }
+                catch (InterruptedException e) {
+                    return;
+                }
+System.out.println("  Agg mod: sent END event to output channel  " + outputChannelIndex);
+
+                // If there are multiple channels,
+                // give any other build threads time to finish writing their last event
+                // since we'll be writing END to rings this thread does not normally write to.
+                // Wait 2 seconds, print warning
+                if ((outputChannelCount > 1) && (buildingThreadCount > 1)) {
+                        try {
+                            Thread.sleep(2000);
+                        }
+                        catch (InterruptedException e) {}
+System.out.println("  Agg mod: WARNING, might have a problem writing END event");
+                }
+
+                // Now send END to the other channels. Do this by going forward.
+                // Physics events are sent to output channels round-robin and are
+                // processed by build threads round-robin. So ...
+                // go to the next channel we would normally send a physics event on,
+                // calculate which ring & channel, and write END to it.
+                // Then continue by going to the next channel until all additional
+                // channels are done.
+                for (int i=1; i < outputChannelCount; i++) {
+
+                    // Next channel to be sent a physics event
+                    int nextChannel = (int) ((evIndex + i) % outputChannelCount);
+
+                    // Next build thread to write (and therefore ring to receive) a physics event.
+                    // int nextBtIndex = (btIndex + i) % btCount; OR
+                    int nextBtIndex = (int) ((evIndex + i) % btCount);
+
+                    // One issue here is that each build thread only writes to a single
+                    // ring in an output channel. This allows us not to use locks when writing.
+                    // NOW, however, we're using this one build thread
+                    // to write the END event to all channels and other rings.
+                    // We must make sure that the last physics event has been written already
+                    // or there may be conflict when writing the END.
+
+                    // Already waited for other build threads to finish before
+                    // writing END to first channel above, so now we can go ahead
+                    // and write END to other channels without waiting.
+System.out.println("  Agg mod: try sending END event to output channel " + nextChannel +
+                   ", ring " + nextBtIndex + ", ev# = " + evIndex);
+                    // Send END event to first output channel
+                    try {
+                        eventToOutputChannel(endBufs[i] , nextChannel, nextBtIndex);
+                    }
+                    catch (InterruptedException e) {
+                        return;
+                    }
+System.out.println("  Agg mod: sent END event to output channel  " + nextChannel);
+                }
+
+                // Stats
+                eventCountTotal++;
+                wordCountTotal += 5;
+            }
+
+            // No END events need to be released from a ByteBuffer supply since they
+            // were locally created in the Sorter thread.
         }
 
 
@@ -907,6 +1234,7 @@ System.out.println("  Agg mod: bbSupply -> " + ringItemCount + " # of bufs, dire
 
                 // Initialize
                 int     tag;
+                long    startTime=0L;
                 long    storedSequence = 0L;
                 long    endSequence = -1;
                 boolean havePhysicsEvents;
@@ -1075,6 +1403,8 @@ System.out.println("  Agg mod: bbSupply -> " + ringItemCount + " # of bufs, dire
                         // This will be the only build thread with the END event.
 
                         endSequence = nextSequence;
+                        haveEndEvent = true;
+                        handleEndEvent(bank);
 System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " + endSequence);
                         return;
                     }
@@ -1108,11 +1438,10 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
 
                     // Create a (top-level) physics event from payload banks
                     // and the combined SIB bank.
+                    //CODAClass myClass = emu.getCodaClass();
                     eventType = EventType.PHYSICS_STREAM;
                     tag = CODATag.STREAMING_PHYSICS.getValue();
 
-                    // We assume that this is a first-level stream aggregator (input from ROCs/VTPs)
-                    //CODAClass myClass = CODAClass.PAGG;
                     //if (myClass == CODAClass.PAGG) {
                         // Check input roc banks for non-fatal errors
                         for (int i=0; i < sliceCount; i++) {
@@ -1124,7 +1453,6 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
                     int writeIndex=0;
 
                     // Building with ROC raw records ...
-
                         // If all inputs are from 1 VTP and can be combined into one ROC Time Slice Bank, do it
                         if (singleVTPInputs()) {
                             nonFatalError = Evio.combineSingleVtpStreamsToPhysics(
@@ -1160,11 +1488,6 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
 //                    System.out.println("writeIndex = " + writeIndex + ", %4 = " + (writeIndex % 4));
                     evBuf.limit(writeIndex).position(0);
 
-                    //-------------------------
-                    // Stats
-                    //-------------------------
-
-
                     // Which output channel do we use?  Round-robin.
                     if (outputChannelCount > 1) {
                         outputChannelIndex = (int) (evIndex % outputChannelCount);
@@ -1193,6 +1516,11 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
                     // buffer of the components it uses to build the physics event.
 //System.out.println("  Agg mod: bt#" + btIndex + " release build seq " + (nextSequence - 1));
                     buildSequenceIn[btIndex].set(nextSequence - 1);
+
+                    // Stats
+                    frameCountTotal++;
+                    eventCountTotal++;
+                    wordCountTotal  += writeIndex / 4;
                 }
             }
             catch (InterruptedException e) {
@@ -1209,6 +1537,8 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
                 System.out.println("  Agg mod: MAJOR ERROR building event: " + e.getMessage());
             }
 
+
+            System.out.println("  Agg mod: Building thread is ending");
         }
 
     } // BuildingThread
@@ -1217,9 +1547,8 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
 
     /**
      * Interrupt all EB threads because an END cmd/event or RESET cmd came through.
-     * @param end if <code>true</code> called from end(), else called from reset()
      */
-    private void interruptThreads(boolean end) {
+    private void interruptThreads() {
         // Interrupt the sorter thread
         if (timeSliceSorterThread != null) {
             timeSliceSorterThread.interrupt();
@@ -1276,18 +1605,17 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
         }
         timeSliceSorterThread = new TimeSliceSorter();
         if (timeSliceSorterThread.getState() == Thread.State.NEW) {
-System.out.println("  Aggregator.startThreads(): start time slice sorter thread");
             timeSliceSorterThread.start();
         }
 
-        // Build threads
-        buildingThreadList.clear();
-        for (int i = 0; i < buildingThreadCount; i++) {
-            BuildingThread thd1 = new BuildingThread(i, name + ":builder" + i);
-            buildingThreadList.add(thd1);
-System.out.println("  Aggregator.startThreads(): start build thread " + i);
-            thd1.start();
-        }
+            // Build threads
+            buildingThreadList.clear();
+            for (int i = 0; i < buildingThreadCount; i++) {
+                BuildingThread thd1 = new BuildingThread(i, name + ":builder" + i);
+                buildingThreadList.add(thd1);
+//System.out.println("  Agg mod: startThreads(), start build thread " + i);
+                thd1.start();
+            }
     }
 
 
@@ -1300,7 +1628,7 @@ System.out.println("  Aggregator.startThreads(): start build thread " + i);
     public void reset() {
 
         // EB threads must be immediately ended
-        interruptThreads(false);
+        interruptThreads();
         joinThreads();
 
         timeSliceSorterThread = null;
@@ -1315,7 +1643,7 @@ System.out.println("  Aggregator.startThreads(): start build thread " + i);
     public void end() {
 
         // Build & pre-processing threads should already be ended by END event
-        interruptThreads(true);
+        interruptThreads();
         joinThreads();
 
         timeSliceSorterThread = null;
@@ -1327,7 +1655,7 @@ System.out.println("  Aggregator.startThreads(): start build thread " + i);
 
 
     /** {@inheritDoc} */
-    public void prestart()  {
+    public void prestart() throws CmdExecException {
 
         //------------------------------------------------
         // Disruptor (RingBuffer) stuff for input channels
@@ -1400,10 +1728,16 @@ System.out.println("  Aggregator.startThreads(): start build thread " + i);
             buildBarrierIn[j] = sorterRingBuffers[j].newBarrier();
         }
 
+        //------------------------------------------------
+        // Reset some variables
+        //------------------------------------------------
+        frameCountTotal = eventCountTotal = wordCountTotal = 0L;
+       // runTypeId = emu.getRunTypeId();
+       // runNumber = emu.getRunNumber();
+        haveEndEvent = false;
 
         startThreads();
     }
-
 
 
 
