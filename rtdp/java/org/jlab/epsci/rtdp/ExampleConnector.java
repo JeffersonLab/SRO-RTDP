@@ -33,7 +33,7 @@ public class ExampleConnector {
     public static int EVIO_HDR_MAGIC_NUMBER = 0xc0da0100;
 
     /** Version of cMsg being used when communicating. */
-    public static final int cMsgVersion = 4;
+    public static final int cMsgVersion = 6;
 
     /** For generating fake data. **/
     public static int bytesPerDataBank = 0;
@@ -82,6 +82,14 @@ public class ExampleConnector {
      */
     public int maxBufferSize = 4000000;
 
+    /** How many time-slice frames to be sent to server. */
+    public int frameCount;
+
+    public long frameNumber;
+    public long timestamp = 100;
+
+    /** Is an END event sent after frames? */
+    public boolean sendEnd;
 
     /** Socket over which to send messages to the server over TCP. */
     public Socket tcpSocket;
@@ -112,8 +120,6 @@ public class ExampleConnector {
         //---------------------------------------------------------
 
         // First, generate buffer of properly formatted time-slice data in evio
-        long timestamp = 100;
-        long frameNumber = 0L;
         // Number of data words in each event
         int generatedDataWords = 5;
 
@@ -123,8 +129,6 @@ public class ExampleConnector {
                                                                 generatedDataWords, frameNumber, timestamp);
 
 //        int eventWordSize = templateBuffer.remaining()/4;
-//        frameNumber++;
-//        timestamp += 10;
 
         // Second place an evio v4 block header in front of the data
         // (as would normally be the case)
@@ -177,9 +181,8 @@ public class ExampleConnector {
         endBuffer.putInt(9*4,  (0xFFD4 << 16 | 1 << 8));  // second bank word
         endBuffer.putInt(10*4, (int)(System.currentTimeMillis()));    // time
         endBuffer.putInt(11*4, 0);       // reserved
-        endBuffer.putInt(12*4, frames);  // frames sent so far
-
-
+        endBuffer.putInt(12*4, frameCount);  // frames sent so far
+        endBuffer.limit(endBuffer.capacity());
     }
 
 
@@ -217,7 +220,24 @@ public class ExampleConnector {
                 try {
                     codaId = Integer.parseInt(count);
                     if (codaId < 0) {
-                        System.out.println("coda ID must be >= 0");
+                        System.out.println("coda ID must be >= 0\n");
+                        usage();
+                        System.exit(-1);
+                    }
+                }
+                catch (NumberFormatException e) {
+                    e.printStackTrace();
+                    System.exit(-1);
+                }
+            }
+            else if (args[i].equalsIgnoreCase("-c")) {
+                String count = args[i + 1];
+                i++;
+                try {
+                    frameCount = Integer.parseInt(count);
+                    if (frameCount < 0) {
+                        System.out.println("frame count must be >= 0\n");
+                        usage();
                         System.exit(-1);
                     }
                 }
@@ -236,6 +256,9 @@ public class ExampleConnector {
             }
             else if (args[i].equalsIgnoreCase("-v")) {
                 verbose = true;
+            }
+            else if (args[i].equalsIgnoreCase("-end")) {
+                sendEnd = true;
             }
             else if (args[i].equalsIgnoreCase("-big")) {
                 dataOrder = ByteOrder.BIG_ENDIAN;
@@ -293,52 +316,25 @@ public class ExampleConnector {
 
             // Connect to server
             connector.directConnect();
+            
+            if (connector.frameCount > 0) {
+                // Send frame to server
+                for (int i=0; i < connector.frameCount; i++) {
+                    connector.send(connector.sendBuffer.array(), 0, connector.sendBuffer.capacity());
 
-            // Send an evio buffer to server
+                    connector.frameNumber++;
+                    connector.timestamp += 10;
+                    connector. updateTimeSliceBuffer(connector.sendBuffer, 32,
+                                                     connector.frameNumber,
+                                                     connector.timestamp);
+                }
+            }
 
-            // First, generate buffer of properly formatted time-slice data in evio
-            long timestamp = 100;
-            long frameNumber = 0L;
-            // Number of data words in each event
-            int generatedDataWords = 5;
+            if (connector.sendEnd) {
+                // Send END event
+                connector.send(connector.endBuffer.array(), 0, connector.endBuffer.capacity());
+            }
 
-            System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n");
-            // Creates a ready-to-read, array-backed ByteBuffer
-            ByteBuffer templateBuffer = createSingleTimeSliceBuffer(ByteOrder.LITTLE_ENDIAN, connector.codaId,
-            generatedDataWords, frameNumber, timestamp);
-//Utilities.printBuffer(templateBuffer, 0, 56, "TEMPLATE BUFFER");
-            int eventWordSize = templateBuffer.remaining()/4;
-            frameNumber++;
-            timestamp += 10;
-
-            // Second place an evio v4 block header in front of the data
-            // (as would normally be the case)
-
-            int dataLen    = templateBuffer.limit();
-            int totalLen   = dataLen + 32;
-            int totalWords = totalLen/4;
-
-            // Create buf to hold header + data
-            byte[] sendArray   = new byte[totalLen];
-            ByteBuffer sendBuf = ByteBuffer.wrap(sendArray);
-            // Make sure endian is consistent
-            sendBuf.order(templateBuffer.order());
-
-            // Copy in data - 32 bytes into destination allowing for header
-            System.arraycopy(templateBuffer.array(), 0, sendArray, 32, dataLen);
-
-            // Write header at beginning
-            sendBuf.putInt(0, totalWords);   // total length of block in words
-            sendBuf.putInt(1*4, 1);            // block #
-            sendBuf.putInt(2*4, 8);            // header len in words
-            sendBuf.putInt(3*4, 1);            // event count
-            sendBuf.putInt(4*4, 0);            // reserved
-            sendBuf.putInt(5*4, 0x204);        // version (4), RocRaw content (0), and last block bit set
-            sendBuf.putInt(6*4, 0);            // reserved
-            sendBuf.putInt(7*4, EVIO_HDR_MAGIC_NUMBER);
-
-            // Send to server
-            connector.send(sendArray, 0, totalLen);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -605,15 +601,16 @@ System.out.println("connect: try making TCP connection to host = " + serverIP + 
      * Both of these are data in the Stream Info Bank.
      *
      * @param buf          buffer with time slice data
+     * @param off          offset into buffer
      * @param frameNumber  new frame number to place into buf.
      * @param timestamp    new time stamp to place into buf
      */
-    void  writeTimeSliceBuffer(ByteBuffer buf, long frameNumber, long timestamp) {
+    void  updateTimeSliceBuffer(ByteBuffer buf, int off, long frameNumber, long timestamp) {
 
         // Get buf ready to read for output channel
-        buf.putInt(20, (int)frameNumber);
-        buf.putInt(24, (int)timestamp);// low 32 bits
-        buf.putInt(28, (int)(timestamp >>> 32 & 0xFFFF)); // high 32 bits
+        buf.putInt(20+off, (int)frameNumber);
+        buf.putInt(24+off, (int)timestamp);// low 32 bits
+        buf.putInt(28+off, (int)(timestamp >>> 32 & 0xFFFF)); // high 32 bits
     }
 
 
