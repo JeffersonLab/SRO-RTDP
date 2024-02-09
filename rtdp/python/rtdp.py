@@ -9,7 +9,8 @@ import logging
 import argparse
 
 from rtdp_config_parser import ERSAPReader
-from rtdp_dash_cyto import get_dash_app
+# from rtdp_dash_cyto import get_dash_app
+from rdtp_grafana_nodegraph import get_nodegraph_app
 
 RTDP_CLI_APP_DESCRIP_STR = \
     "rtdp: JLab's streaming readout RealTime Development and testing Platform."
@@ -65,10 +66,12 @@ def run_rtdp(parser):
     if args.config_file:
         # TODO: using ERSAP reader here. Should be generalized.
         configurations = ERSAPReader(args.config_file)
+
+        # configurations.print_nodes()
         ersap_nodes = configurations.get_flowchart_nodes()
 
-        app = get_dash_app(ersap_nodes)
-        app.run_server(debug=True)
+        app = get_nodegraph_app(ersap_nodes)
+        app.run(debug=True, port=5000)
     else:
         parser.print_help()
 
