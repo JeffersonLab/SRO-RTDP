@@ -73,21 +73,44 @@ and uninstalled when executing
 
 ----------------------------
 
-# **Running Executables**
+# **Running the Aggregator**
 
 ----------------------------
 
 To run the server which will accept incoming TCP connections
-and the data which follows (and get the HELP output):
+and the data which follows (for HELP use -h option):
 
     cd <main dir>
     java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.Aggregator -h
  
-To run a single fake ROC in order to test the server, (and get the HELP output):
+To run this in a way which will accept meaningful input:
 
-    cd <main dir>
+    java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.Aggregator -c <# clients> 
+
+
+----------------------------
+
+# **Running other executables**
+
+----------------------------
+
+
+To test the server, run the ExampleConnector, (and get the HELP output):
+
+    java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.ExampleConnector -h
+
+The above program produces evio 4 output which is in proper streaming format. By adding the
+"-end" command line option, an END event will follow the specified number of
+time slice buffers sent.
+
+
+To run a simulated ROC which produces evio 6 data, run
+
     java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.FakeRoc -h
- 
+
+The above program will cause the Aggregator to fail as there is a bug in the evio lib
+which makes parsing throw an exception.
+
 ----------------------------
 
 # **Copyright**
