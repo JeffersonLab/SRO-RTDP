@@ -23,7 +23,7 @@ import java.util.concurrent.CountDownLatch;
  * has emu domain streaming input channels and a file output channel.
  * This is used in the context of Dave Lawrence's experiment to save
  * streamed data from ROCs/VTPs, storing them in pcap files and later replaying them.
- * The data comes as chunks of evio without the preceeding prestart and go event.
+ * The data comes as chunks of evio without the preceding prestart and go event.
  * The first round of data was sent over TCP, so emphasis is on the TCP server/channels.
  *
  * @author timmer
@@ -36,11 +36,11 @@ public class Aggregator extends Thread {
 
     private boolean singleVTPinput = false;
 
-    private int tcpPort= cMsgNetworkConstants.emuTcpPort;
+    private int tcpPort     = cMsgNetworkConstants.emuTcpPort;
     private int clientCount = 1;
     private String expid;
-    private String name = "Aggregator";
-    private String fileName = "streamingRTD.dat";
+    private String name     = "Aggregator";
+    private String fileName = "/tmp/rtdpTest.data";
 
     /**
      * Constructor.
@@ -123,9 +123,7 @@ public class Aggregator extends Thread {
         if (expid == null) {
             expid = System.getenv("EXPID");
             if (expid == null) {
-                System.out.println("Provide an EXPID either on the cmd line");
-                System.out.println("or in an environmental variable");
-                System.exit(-1);
+                expid = "myExpid";
             }
         }
 
@@ -136,15 +134,15 @@ public class Aggregator extends Thread {
     private static void usage() {
         System.out.println("\nUsage:\n\n" +
                 "   java Aggregator\n" +
-                "        [-p <port>]   TCP port to listen on for connections or starting UDP port\n" +
-                "        [-x <expid>]  EXPID of experiment\n" +
-                "        [-n <name>]   name of server's CODA component\n" +
-                "        [-c <# of clients>]  number of ROCs sending data (default = 1)\n" +
-                "        [-f <output file>]   name of output file\n" +
-                "        [-udp]        accept data from udp channels (tcp is default)\n" +
-                "        [-v]          turn on printout\n" +
-                "        [-one]        all channels are from 1 VTP\n" +
-                "        [-h]          print this help\n");
+                "        [-p <port>]          TCP port to listen on (default 46100)\n" +
+                "        [-x <expid>]         EXPID of experiment (can ignore)\n" +
+                "        [-n <name>]          name of server's CODA component (can ignore, default Aggregator)\n" +
+                "        [-c <# of clients>]  number of ROCs sending data (default 1)\n" +
+                "        [-f <output file>]   name of output file (default /tmp/rtdpTest.dat)\n" +
+                "        [-udp]               accept data from udp channels (default tcp)\n" +
+                "        [-v]                 turn on printout\n" +
+                "        [-one]               all channels are from 1 VTP\n" +
+                "        [-h]                 print this help\n");
 
         // TODO: "[-single VTP input] to pass on to module of aggregator !!!
     }
