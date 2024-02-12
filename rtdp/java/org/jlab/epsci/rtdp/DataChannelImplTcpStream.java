@@ -398,7 +398,7 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
 
                     // Sets the producer sequence
                     item = bbSupply.get();
-System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + " from ByteBuffer supply");
+if (debug) System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + " from ByteBuffer supply");
 
                     // First read the command & size with one read, into a long.
                     // These 2, 32-bit ints are sent in network byte order, cmd first.
@@ -415,12 +415,19 @@ System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + 
                     buf = item.getBuffer();
                     buf.limit(size);
 
-System.out.println("      DataChannel TcpStream in: got cmd = " + cmd + ", size = " + size + ", now read in data ...");
+if (debug) System.out.println("      DataChannel TcpStream in: got cmd = " + cmd + ", size = " + size + ", now read in data ...");
                     inStream.readFully(item.getBuffer().array(), 0, size);
 //System.out.println("      DataChannel TcpStream in: done reading in data");
 
-System.out.println("      DataChannel TcpStream in: " + name + ", incoming buf size = " + size);
-Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + buf.limit());
+if (debug) System.out.println("      DataChannel TcpStream in: " + name + ", incoming buf size = " + size);
+
+if (debug) {
+    ByteOrder origOrder = buf.order();
+    buf.order(ByteOrder.LITTLE_ENDIAN);
+    Utilities.printBuffer(item.getBuffer(), 0, buf.limit() / 4, "BUFFER, lim = " + buf.limit());
+    buf.order(origOrder);
+}
+
                     bbSupply.publish(item);
 
                     // We just received the END event
@@ -520,7 +527,7 @@ Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + bu
 
             // Get buffer from an item from ByteBufferSupply - one per channel
             ByteBuffer buf = item.getBuffer();
-//Utilities.printBytes(buf, 0, 100, "Incoming buf");
+//Utilities.printBytes(buf, 0, 500, "Incoming buf");
 
 //            // Do this for possibly compressed data. Make sure the buffer we got from the
 //            // supply is big enough to hold the uncompressed data. If not, created a new,
