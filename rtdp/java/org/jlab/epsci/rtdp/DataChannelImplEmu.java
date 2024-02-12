@@ -18,6 +18,7 @@ import org.jlab.coda.emu.EmuException;
 import org.jlab.coda.emu.EmuUtilities;
 import org.jlab.coda.emu.support.control.CmdExecException;
 import org.jlab.coda.emu.support.data.*;
+import org.jlab.coda.hipo.CompressionType;
 import org.jlab.coda.jevio.*;
 
 
@@ -475,9 +476,11 @@ System.out.println("SocketSender thread interrupted");
                 currentBuffer = currentBBitem.getBuffer();
 //System.out.println("\nFirst current buf -> rec # = " + currentBuffer.getInt(4) +
 //                           ", " + System.identityHashCode(currentBuffer));
+                // For debug purposes, limit record to 1 event
+                int maxEventCount = 1;  // 100000   orig
+                writer = new EventWriterUnsync(currentBuffer, 0, maxEventCount, null, 1, CompressionType.RECORD_UNCOMPRESSED);
+                // writer = new EventWriterUnsync(currentBuffer, 0, 100000, null, 1, CompressionType.RECORD_UNCOMPRESSED);     // orig
 
-                writer = new EventWriterUnsync(currentBuffer);
-                //writer = new EventWriterUnsync(currentBuffer, 0, 0, null, 1, null, 0);
 
                 writer.close();
             }
@@ -526,7 +529,7 @@ System.out.println("SocketSender thread interrupted");
             // Put the written-into buffer back into the supply so the consumer -
             // the thread which writes it over the network - can get it and
             // write it.
-            ByteBuffer bb = writer.getByteBuffer();
+//            ByteBuffer bb = writer.getByteBuffer();
             currentBuffer.flip();
             currentBuffer.limit(writer.getBytesWrittenToBuffer());
 
@@ -599,12 +602,7 @@ System.out.println("SocketSender thread interrupted");
                     }
                 }
 
-                if (isBuildable) {
-                    blockNum = recordId;
-                }
-                else {
-                    blockNum = -1;
-                }
+                blockNum = -1;
 
                 recordId++;
 //System.out.println("      DataChannel Emu out: writeEvioData: record Id set to " + blockNum +
@@ -663,11 +661,6 @@ System.out.println("      c: single ev buf, pos = " + buf.position() +
                 rItem.releaseByteBuffer();
 
 
-                if (isBuildable) {
-//System.out.println("      DataChannel Emu out: writeEvioData: flush " + eType + " type event, don't force ");
-                    flushEvents(false, false, true);
-                }
-                else {
 //System.out.println("      DataChannel Emu out: writeEvioData: flush " + eType + " type event, FORCE");
                     if (rItem.getControlType() == ControlType.END) {
 //System.out.println("      DataChannel Emu out: writeEvioData: call flushEvents for END");
@@ -677,7 +670,6 @@ System.out.println("      c: single ev buf, pos = " + buf.position() +
 //System.out.println("      DataChannel Emu out: writeEvioData: call flushEvents for non-END");
                         flushEvents(true, false, false);
                     }
-                }
             }
             // If we're marshalling events into a single buffer before sending ...
             else {
@@ -701,7 +693,8 @@ System.out.println("      c: single ev buf, pos = " + buf.position() +
 //System.out.println("      DataChannel Emu out: writeEvioData *** PLENTY OF ROOM, has room = " +
 //                           writer.hasRoom(rItem.getTotalBytes()));
 //                    }
-                    // Flush closes the writer so that the next "if" is true
+                    // Flush closes the writer so that the next "if" is true,
+                    // and currentBBitem & currentBuffer are reset
                 }
 
                 boolean writerClosed = writer.isClosed();
@@ -713,7 +706,12 @@ System.out.println("      c: single ev buf, pos = " + buf.position() +
                     if (rItem.getTotalBytes() > currentBuffer.capacity()) {
                         currentBBitem.ensureCapacity(rItem.getTotalBytes() + 1024);
                         currentBuffer = currentBBitem.getBuffer();
+//System.out.println("      DataChannel Emu out: nothing written, but not enough room, ensuring cap bytes = " +
+//                           (rItem.getTotalBytes() + 1024));
                     }
+//                    else {
+//System.out.println("      DataChannel Emu out: nothing written, but should already be enough room");
+//                    }
 
                     // Reinitialize writer
                     EmuUtilities.setEventType(bitInfo, eType);
@@ -727,7 +725,17 @@ System.out.println("      c: single ev buf, pos = " + buf.position() +
                 // Write the new event ..
                 ByteBuffer buf = rItem.getBuffer();
                 if (buf != null) {
-                    //System.out.print("b");
+//                    System.out.println("try writing " + buf.limit() + " data bytes into buf of size " +
+//                                 writer.getByteBuffer().remaining() + ", has cap = " +
+//                                             writer.getByteBuffer().capacity() + ", has pos = " +
+//                                             writer.getByteBuffer().position() + ", has room = " +
+//                            writer.hasRoom(rItem.getTotalBytes()));
+
+                    EvioNode node = rItem.getNode();
+                    if (node != null) {
+                        System.out.print("HEY! node is not null!!!");
+                    }
+                    
                     boolean fit = writer.writeEvent(buf);
                     if (!fit) {
                         // Our buffer is too small to fit even 1 event!
