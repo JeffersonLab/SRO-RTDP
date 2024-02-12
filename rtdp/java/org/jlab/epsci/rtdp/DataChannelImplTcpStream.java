@@ -492,7 +492,7 @@ if (debug) {
                     // Sets the consumer sequence
                     ByteBufferItem item = bbSupply.consumerGet();
                     if (parseStreamingToRing(item, bbSupply)) {
-                        System.out.println("      DataChannel TcpStream in: 1 quit streaming parser/merger thread for END event from " + name);
+                        if (debug) System.out.println("      DataChannel TcpStream in: 1 quit streaming parser/merger thread for END event from " + name);
                         break;
                     }
                 }
@@ -779,7 +779,7 @@ if (debug) {
                     // thread down.
                     haveInputEndEvent = true;
                     // Run callback saying we got end event
-                    System.out.println("      DataChannel TcpStream in: BREAK from loop, got END event");
+                    if (debug) System.out.println("      DataChannel TcpStream in: BREAK from loop, got END event");
                     break;
                 }
             }
