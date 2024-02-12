@@ -1655,7 +1655,7 @@ System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " 
 
 
     /** {@inheritDoc} */
-    public void prestart() throws CmdExecException {
+    public void prestart()  {
 
         //------------------------------------------------
         // Disruptor (RingBuffer) stuff for input channels
