@@ -192,7 +192,7 @@ class EmuDomainTcpServer extends Thread {
 
                                 // Check for server / client compatibility for cMsg version
                                 version = buffer.getInt();
-System.out.println("Got version = " + version);
+System.out.println("Got cMsg version = " + version);
                                 if (version != cMsgConstants.version) {
                                     if (debug) {
                                         System.out.println("Emu domain server: version mismatch, got " +
@@ -232,7 +232,7 @@ System.out.println("Got buffer size = " + bufferSizeDesired);
 
                                 // Number of sockets expected to be made by client
                                 socketCount = buffer.getInt();
-System.out.println("Got socket count = " + socketCount);
+if (debug) System.out.println("Got socket count = " + socketCount);
                                 if (socketCount < 1) {
                                     if (debug) {
                                         System.out.println("    Transport Emu: domain server, bad socket count of sender (" +
@@ -245,7 +245,7 @@ System.out.println("Got socket count = " + socketCount);
 
                                 // Position of this socket compared to others: 1, 2, ...
                                 socketPosition = buffer.getInt();
-System.out.println("Got socket position = " + socketPosition);
+if (debug) System.out.println("Got socket position = " + socketPosition);
                                 if (socketCount < 1) {
                                     if (debug) {
                                         System.out.println("    Transport Emu: domain server, bad socket position of sender (" +
