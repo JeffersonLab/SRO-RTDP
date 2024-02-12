@@ -5,10 +5,7 @@ package org.jlab.epsci.rtdp;
 //import org.jlab.coda.cMsg.cMsgMessage;
 //import org.jlab.coda.cMsg.cMsgNetworkConstants;
 
-import org.jlab.coda.emu.support.data.ByteBufferSupply;
 import org.jlab.coda.emu.support.data.CODATag;
-import org.jlab.coda.emu.support.data.Evio;
-import org.jlab.coda.jevio.BlockHeaderV4;
 import org.jlab.coda.jevio.CompactEventBuilder;
 import org.jlab.coda.jevio.DataType;
 import org.jlab.coda.jevio.EvioException;
