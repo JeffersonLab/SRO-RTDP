@@ -336,19 +336,18 @@ public class StreamAggregator extends ModuleAdapter {
             throws EmuException, InterruptedException {
 
         ControlType controlType = null;
-        System.out.println("  Agg mod: getAllControlEvents IN");
 
         // First thing we do is look for the go or prestart event and pass it on
         // Grab one control event from each ring buffer.
         for (int i=0; i < inputChannelCount; i++) {
-            System.out.println("  Agg mod: getAllControlEvents input chan " + i);
+            if (debug) System.out.println("  Agg mod: getAllControlEvents input chan " + i);
             try  {
                 ControlType cType;
                 while (true) {
-                    System.out.println("  Agg mod: getAllControlEvents wait for seq " + nextSequences[i]);
+                    if (debug) System.out.println("  Agg mod: getAllControlEvents wait for seq " + nextSequences[i]);
                     barriers[i].waitFor(nextSequences[i]);
                     buildingBanks[i] = (PayloadBuffer) ringBuffersIn[i].get(nextSequences[i]);
-                    System.out.println("  Agg mod: getAllControlEvents got seq " + nextSequences[i]);
+                    if (debug) System.out.println("  Agg mod: getAllControlEvents got seq " + nextSequences[i]);
 
                     cType = buildingBanks[i].getControlType();
                     if (cType == null) {
@@ -456,21 +455,24 @@ public class StreamAggregator extends ModuleAdapter {
 
         // Write event to output channels
         for (int i=0; i < outputChannelCount; i++) {
-System.out.println("WRITE CONTROL EVENT to chan #" + i + ", ring 0");
+//System.out.println("WRITE CONTROL EVENT to chan #" + i + ", ring 0");
             eventToOutputChannel(controlBufs[i], i, 0);
         }
 
-        if (isEnd) {
-            System.out.println("  Agg mod: wrote immediate END from sorter thread");
-        }
-        else if (isPrestart) {
-            System.out.println("  Agg mod: wrote PRESTART from sorter thread");
-        }
-        else {
-            System.out.println("  Agg mod: wrote GO from sorter thread");
+        if (debug) {
+            if (isEnd) {
+                System.out.println("  Agg mod: wrote immediate END from sorter thread");
+            }
+            else if (isPrestart) {
+                System.out.println("  Agg mod: wrote PRESTART from sorter thread");
+            }
+            else {
+                System.out.println("  Agg mod: wrote GO from sorter thread");
+            }
         }
     }
 
+    
     /**
      * Copied from Evio class.
      * Check the given payload buffer for correct record id, source id.
@@ -805,7 +807,7 @@ System.out.println("WRITE CONTROL EVENT to chan #" + i + ", ring 0");
                             if (eventType == EventType.CONTROL) {
                                 if (bank.getControlType() == ControlType.END) {
                                     // Found the END event
-System.out.println("  Agg mod: findEnd, chan " + ch + " got END from " + source + ", back " + offset + " places in ring");
+if (debug) System.out.println("  Agg mod: findEnd, chan " + ch + " got END from " + source + ", back " + offset + " places in ring");
                                     // Release buffer back to ByteBufferSupply
                                     bank.releaseByteBuffer();
                                     endEventCount++;
@@ -1146,7 +1148,7 @@ System.out.println("  Agg mod: sorter got user event from channel " + inputChann
                         // We need one from each channel so find them now.
                         int endEventCount = findEnds(chan, lookingForFrame);
 
-System.out.println("  Agg mod: sorter found END event from " + bank.getSourceName() + " at seq " + nextSequences[chan]);
+if (debug) System.out.println("  Agg mod: sorter found END event from " + bank.getSourceName() + " at seq " + nextSequences[chan]);
 
                         if (endEventCount != inputChannelCount) {
                             // We do NOT have all END events
@@ -1237,7 +1239,7 @@ System.out.println("  Agg mod: sorter found END events on all input channels");
             this.btIndex = btIndex;
             evIndex = btIndex;
             btCount = buildingThreadCount;
-System.out.println("  Agg mod: create Build Thread (" + name + ") with index " + btIndex + ", count = " + btCount);
+if (debug) System.out.println("  Agg mod: create Build Thread (" + name + ") with index " + btIndex + ", count = " + btCount);
         }
 
 
@@ -1248,7 +1250,7 @@ System.out.println("  Agg mod: create Build Thread (" + name + ") with index " +
          */
         private void handleEndEvent(PayloadBuffer bank) {
 
-System.out.println("  Agg mod: in handleEndEvent(), bt #" + btIndex + ", output chan count = " +
+if (debug) System.out.println("  Agg mod: in handleEndEvent(), bt #" + btIndex + ", output chan count = " +
                            outputChannelCount);
 
             PayloadBuffer[] endBufs;
@@ -1306,7 +1308,7 @@ System.out.println("  Agg mod: in handleEndEvent(), bt #" + btIndex + ", output 
                 // The channel due to receive the next physics event is ...
                 outputChannelIndex = (int) (evIndex % outputChannelCount);
 
-System.out.println("  Agg mod: try sending END event to output channel " + outputChannelIndex +
+if (debug) System.out.println("  Agg mod: try sending END event to output channel " + outputChannelIndex +
                ", ring " + btIndex + ", ev# = " + evIndex);
                 // Send END event to that channel
                 try {
@@ -1315,7 +1317,7 @@ System.out.println("  Agg mod: try sending END event to output channel " + outpu
                 catch (InterruptedException e) {
                     return;
                 }
-System.out.println("  Agg mod: sent END event to output channel  " + outputChannelIndex);
+if (debug) System.out.println("  Agg mod: sent END event to output channel  " + outputChannelIndex);
 
                 // If there are multiple channels,
                 // give any other build threads time to finish writing their last event
@@ -1355,7 +1357,7 @@ System.out.println("  Agg mod: WARNING, might have a problem writing END event")
                     // Already waited for other build threads to finish before
                     // writing END to first channel above, so now we can go ahead
                     // and write END to other channels without waiting.
-System.out.println("  Agg mod: try sending END event to output channel " + nextChannel +
+if (debug) System.out.println("  Agg mod: try sending END event to output channel " + nextChannel +
                    ", ring " + nextBtIndex + ", ev# = " + evIndex);
                     // Send END event to first output channel
                     try {
@@ -1364,7 +1366,7 @@ System.out.println("  Agg mod: try sending END event to output channel " + nextC
                     catch (InterruptedException e) {
                         return;
                     }
-System.out.println("  Agg mod: sent END event to output channel  " + nextChannel);
+if (debug) System.out.println("  Agg mod: sent END event to output channel  " + nextChannel);
                 }
 
                 // Stats
@@ -1396,7 +1398,7 @@ System.out.println("  Agg mod: sent END event to output channel  " + nextChannel
                 boolean useDirectBB = false;
                 ByteBufferSupply bbSupply = new ByteBufferSupply(ringItemCount, 2000, outputOrder,
                                                                  useDirectBB, releaseSequentially);
-System.out.println("  Agg mod: bbSupply -> " + ringItemCount + " # of bufs, direct = " + false +
+if (debug) System.out.println("  Agg mod: bbSupply -> " + ringItemCount + " # of bufs, direct = " + false +
                    ", seq = " + releaseSequentially);
 
 
@@ -1573,7 +1575,7 @@ System.out.println("  Agg mod: bbSupply -> " + ringItemCount + " # of bufs, dire
                         endSequence = nextSequence;
                         haveEndEvent = true;
                         handleEndEvent(bank);
-System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " + endSequence);
+if (debug) System.out.println("  Agg mod: bt" + btIndex + " ***** found END event at seq " + endSequence);
                         return;
                     }
 
