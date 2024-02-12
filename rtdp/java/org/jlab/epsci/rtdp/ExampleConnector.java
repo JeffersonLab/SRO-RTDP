@@ -1,9 +1,5 @@
 package org.jlab.epsci.rtdp;
 
-//import org.jlab.coda.cMsg.cMsg;
-//import org.jlab.coda.cMsg.cMsgException;
-//import org.jlab.coda.cMsg.cMsgMessage;
-//import org.jlab.coda.cMsg.cMsgNetworkConstants;
 
 import org.jlab.coda.emu.support.data.CODATag;
 import org.jlab.coda.jevio.CompactEventBuilder;
@@ -39,7 +35,7 @@ public class ExampleConnector {
 
 
     /** debug. */
-    public boolean verbose;
+    public boolean verbose = false;
 
     /** Byte order in which to send our data. */
     public ByteOrder dataOrder = ByteOrder.LITTLE_ENDIAN;
@@ -70,8 +66,6 @@ public class ExampleConnector {
     /** TCP no delay setting. */
     public boolean tcpNoDelay = true;
 
-//    /** Does the work of connecting to emu domain server. */
-//    public cMsg emuDomain;
 
     /**
      * Biggest chunk of data sent by data producer.
@@ -82,11 +76,11 @@ public class ExampleConnector {
     /** How many time-slice frames to be sent to server. */
     public int frameCount;
 
-    public long frameNumber;
+    public long frameNumber = 0L;
     public long timestamp = 100;
 
-    /** Is an END event sent after frames? */
-    public boolean sendEnd;
+    /** Do we send PRESTART, GO, and END? */
+    public boolean sendControls;
 
     /** Socket over which to send messages to the server over TCP. */
     public Socket tcpSocket;
@@ -98,6 +92,12 @@ public class ExampleConnector {
     /** Contains time-slice data + preceding evio v4 block header. **/
     public ByteBuffer sendBuffer;
 
+    /** Contains CODA PRESTART event + preceding evio v4 block header. **/
+    public ByteBuffer prestartBuffer;
+
+    /** Contains CODA GO event + preceding evio v4 block header. **/
+    public ByteBuffer goBuffer;
+
     /** Contains CODA END event + preceding evio v4 block header. **/
     public ByteBuffer endBuffer;
 
@@ -107,9 +107,9 @@ public class ExampleConnector {
     ExampleConnector(String[] args) {
         decodeCommandLine(args);
 
-        // Create a couple of data buffers:
+        // Create a few data buffers:
         // One will have time slice data from a ROC.
-        // The other will have an END event (used in CODA to bring data-taking to an end).
+        // The others will have PRESTART, GO, and END events (used in CODA to control data flow).
 
 
         //---------------------------------------------------------
@@ -120,7 +120,7 @@ public class ExampleConnector {
         // Number of data words in each event
         int generatedDataWords = 5;
 
-        System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n");
+        if (verbose) System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n");
         // Creates a ready-to-read, array-backed ByteBuffer
         ByteBuffer templateBuffer = createSingleTimeSliceBuffer(dataOrder, codaId,
                                                                 generatedDataWords, frameNumber, timestamp);
@@ -154,7 +154,64 @@ public class ExampleConnector {
         sendBuffer.putInt(7*4, EVIO_HDR_MAGIC_NUMBER);
 
         //---------------------------------------------------------
-        // 2) Create an END event
+        // 2) Create a PRESTART event
+        //---------------------------------------------------------
+
+        // Create buf to hold header + END event
+        byte[] prestartArray = new byte[32+20];
+        prestartBuffer       = ByteBuffer.wrap(prestartArray);
+        // Make sure endian is consistent
+        prestartBuffer.order(dataOrder);
+
+        // Write header
+        prestartBuffer.putInt(0, 13);       // total length of block in words
+        prestartBuffer.putInt(1*4, 1);      // block #
+        prestartBuffer.putInt(2*4, 8);      // header len in words
+        prestartBuffer.putInt(3*4, 1);      // event count
+        prestartBuffer.putInt(4*4, 0);      // reserved
+        prestartBuffer.putInt(5*4, 0x1604); // version (4), Control event content (5), and last block bit set
+        prestartBuffer.putInt(6*4, 0);      // reserved
+        prestartBuffer.putInt(7*4, EVIO_HDR_MAGIC_NUMBER);
+
+        // PRESTART
+        prestartBuffer.putInt(8*4,  4);  // evio bank length in words (non-inclusive)
+        prestartBuffer.putInt(9*4,  (0xFFD1 << 16 | 1 << 8));  // second bank word
+        prestartBuffer.putInt(10*4, (int)(System.currentTimeMillis()));    // time
+        prestartBuffer.putInt(11*4, 1);  // run #
+        prestartBuffer.putInt(12*4, 1);  // run type
+        prestartBuffer.limit(prestartBuffer.capacity());
+
+        //---------------------------------------------------------
+        // 3) Create a GO event
+        //---------------------------------------------------------
+
+        // Create buf to hold header + END event
+        byte[] goArray = new byte[32+20];
+        goBuffer       = ByteBuffer.wrap(goArray);
+        // Make sure endian is consistent
+        goBuffer.order(dataOrder);
+
+        // Write header
+        goBuffer.putInt(0, 13);       // total length of block in words
+        goBuffer.putInt(1*4, 1);      // block #
+        goBuffer.putInt(2*4, 8);      // header len in words
+        goBuffer.putInt(3*4, 1);      // event count
+        goBuffer.putInt(4*4, 0);      // reserved
+        goBuffer.putInt(5*4, 0x1604); // version (4), Control event content (5), and last block bit set
+        goBuffer.putInt(6*4, 0);      // reserved
+        goBuffer.putInt(7*4, EVIO_HDR_MAGIC_NUMBER);
+
+        // GO
+        goBuffer.putInt(8*4,  4);  // evio bank length in words (non-inclusive)
+        goBuffer.putInt(9*4,  (0xFFD2 << 16 | 1 << 8));  // second bank word
+        goBuffer.putInt(10*4, (int)(System.currentTimeMillis()));    // time
+        goBuffer.putInt(11*4, 0);           // reserved
+        goBuffer.putInt(12*4, frameCount);  // frames sent so far
+        goBuffer.limit(goBuffer.capacity());
+
+
+        //---------------------------------------------------------
+        // 4) Create an END event
         //---------------------------------------------------------
 
         // Create buf to hold header + END event
@@ -227,7 +284,7 @@ public class ExampleConnector {
                     System.exit(-1);
                 }
             }
-            else if (args[i].equalsIgnoreCase("-c")) {
+            else if (args[i].equalsIgnoreCase("-fr")) {
                 String count = args[i + 1];
                 i++;
                 try {
@@ -254,8 +311,8 @@ public class ExampleConnector {
             else if (args[i].equalsIgnoreCase("-v")) {
                 verbose = true;
             }
-            else if (args[i].equalsIgnoreCase("-end")) {
-                sendEnd = true;
+            else if (args[i].equalsIgnoreCase("-control")) {
+                sendControls = true;
             }
             else if (args[i].equalsIgnoreCase("-big")) {
                 dataOrder = ByteOrder.BIG_ENDIAN;
@@ -291,9 +348,9 @@ public class ExampleConnector {
                                    "        [-x <expid>]     EXPID of experiment\n" +
                                    "        [-id <CODA id>]  id of this CODA component\n" +
                                    "        [-ip <IP addr>]  IP addr of TCP server)\n" +
-                                   "        [-c <# frames>]  number of frames to send\n" +
+                                   "        [-fr <# frames>] number of frames to send\n" +
+                                   "        [-control]       send PRESTART & GO before frames and END event after\n" +
                                    "        [-big]           send big endian data\n" +
-                                   "        [-end]           send END event after frames\n" +
                                    "        [-v]             turn on verbose mode\n" +
                                    "        [-h]             print this help\n");
     }
@@ -313,7 +370,13 @@ public class ExampleConnector {
 
             // Connect to server
             connector.directConnect();
-            
+
+            if (connector.sendControls) {
+                // Send PRESTART and GO events
+                connector.send(connector.prestartBuffer.array(), 0, connector.prestartBuffer.capacity());
+                connector.send(connector.goBuffer.array(), 0, connector.goBuffer.capacity());
+            }
+
             if (connector.frameCount > 0) {
                 // Send frame to server
                 for (int i=0; i < connector.frameCount; i++) {
@@ -327,7 +390,7 @@ public class ExampleConnector {
                 }
             }
 
-            if (connector.sendEnd) {
+            if (connector.sendControls) {
                 // Send END event
                 connector.send(connector.endBuffer.array(), 0, connector.endBuffer.capacity());
             }
