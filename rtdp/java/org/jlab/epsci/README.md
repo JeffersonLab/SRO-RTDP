@@ -21,13 +21,17 @@ a running DAQ system in Hall B.
 This software was developed using **Java 15** and most of the associated jar files were
 also compiled with it.
 
+A good place to get Java 15 on the ejfat nodes is:
+
+    /daqfs/java/jdk-15.0.2/bin/java
+
 The accompanying jar files contain the main emu jar along with those that support it
 such as cMsg, evio, lz4 compression (not used but needed for compilation), and the
 disruptor which is an ultra-fast ring buffer.
 
 To compile:
   
-    cd <main dir>
+    cd <top level dir>
     ant
 
 
@@ -56,7 +60,7 @@ To get a list of options with ant, type **ant help**:
         [echo]      prepare     - create necessary directories
 
 
-To generate a new rtdp-0.9.jar file, execute
+To generate a new rtdp-0.9.jar file, from the top directory execute
 
     ant jar
     
@@ -77,13 +81,14 @@ and uninstalled when executing
 
 ----------------------------
 
-To run the server which will accept incoming TCP connections
-and the data which follows (for HELP use -h option):
+Run the server which will accept incoming TCP connections
+and the data which follows. Use -h to see all options:
 
-    cd <main dir>
+    cd <top level dir>
     java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.Aggregator -h
  
-To run this in a way which will accept meaningful input:
+To run this in a way which will accept run at default port and accept a
+given number of connections:
 
     java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.Aggregator -c <# clients> 
 
@@ -95,13 +100,13 @@ To run this in a way which will accept meaningful input:
 ----------------------------
 
 
-To test the server, run the ExampleConnector, (and get the HELP output):
+To test the server, run the ExampleConnector, (use the HELP output):
 
     java -cp 'build/lib/rtdp-0.9.jar:rtdp/java/jars/*' org.jlab.epsci.rtdp.ExampleConnector -h
 
 The above program produces evio 4 output which is in proper streaming format. By adding the
-"-end" command line option, an END event will follow the specified number of
-time slice buffers sent.
+"-control" command line option, all CODA control events will appear in the proper order as
+well as the specified number of time slice buffers sent.
 
 
 To run a simulated ROC which produces evio 6 data, run
