@@ -477,7 +477,7 @@ System.out.println("SocketSender thread interrupted");
 //System.out.println("\nFirst current buf -> rec # = " + currentBuffer.getInt(4) +
 //                           ", " + System.identityHashCode(currentBuffer));
                 // For debug purposes, limit record to 1 event
-                int maxEventCount = 1;  // 100000   orig
+                int maxEventCount = 100000;  // 100000   orig
                 writer = new EventWriterUnsync(currentBuffer, 0, maxEventCount, null, 1, CompressionType.RECORD_UNCOMPRESSED);
                 // writer = new EventWriterUnsync(currentBuffer, 0, 100000, null, 1, CompressionType.RECORD_UNCOMPRESSED);     // orig
 
