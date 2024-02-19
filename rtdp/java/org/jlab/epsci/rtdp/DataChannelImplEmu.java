@@ -25,6 +25,7 @@ import org.jlab.coda.jevio.*;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import java.nio.ByteOrder;
 import java.util.BitSet;
 import java.util.concurrent.CountDownLatch;
 
@@ -97,8 +98,12 @@ public class DataChannelImplEmu extends DataChannelAdapter {
      * @param codaId       CODA id of this data source.
      * @param serverIp     IP addr of server to send data to.
      * @param serverPort   port of server to send data to.
+     * @param debug        print debug output if true.
+     * @param order        byte order of any output data.
+     *
      */
-    DataChannelImplEmu(String name, int codaId, String expid, String serverIp, int serverPort, boolean debug) {
+    DataChannelImplEmu(String name, int codaId, String expid, String serverIp,
+                       int serverPort, boolean debug, ByteOrder order) {
 
         // constructor of super class
         super(name, false, debug, 0);
@@ -108,6 +113,7 @@ public class DataChannelImplEmu extends DataChannelAdapter {
         this.debug = debug;
         this.serverIP = serverIp;
         this.sendPort = serverPort;
+        this.byteOrder = order;
 
         if (debug) System.out.println("      DataChannel Emu: creating output channel " + name);
 
@@ -600,6 +606,7 @@ System.out.println("SocketSender thread interrupted");
                     else {
                         flushEvents(true, false, false);
                     }
+                    // This will close the writer and reset currentBBitem & currentBuffer
                 }
 
                 blockNum = -1;
