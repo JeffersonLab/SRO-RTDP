@@ -165,7 +165,7 @@ public class ExampleConnector {
 
         // Write header
         prestartBuffer.putInt(0, 13);       // total length of block in words
-        prestartBuffer.putInt(1*4, 1);      // block #
+        prestartBuffer.putInt(1*4, 0xffffffff);      // block # = -1 for non-built events
         prestartBuffer.putInt(2*4, 8);      // header len in words
         prestartBuffer.putInt(3*4, 1);      // event count
         prestartBuffer.putInt(4*4, 0);      // reserved
@@ -193,7 +193,7 @@ public class ExampleConnector {
 
         // Write header
         goBuffer.putInt(0, 13);       // total length of block in words
-        goBuffer.putInt(1*4, 1);      // block #
+        goBuffer.putInt(1*4, 0xffffffff);      // block # = -1 for non-built events
         goBuffer.putInt(2*4, 8);      // header len in words
         goBuffer.putInt(3*4, 1);      // event count
         goBuffer.putInt(4*4, 0);      // reserved
@@ -222,7 +222,7 @@ public class ExampleConnector {
 
         // Write header
         endBuffer.putInt(0, 13);       // total length of block in words
-        endBuffer.putInt(1*4, 1);      // block #
+        endBuffer.putInt(1*4, 0xffffffff);      // block # = -1 for non-built events
         endBuffer.putInt(2*4, 8);      // header len in words
         endBuffer.putInt(3*4, 1);      // event count
         endBuffer.putInt(4*4, 0);      // reserved
