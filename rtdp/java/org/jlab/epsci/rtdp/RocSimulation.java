@@ -12,9 +12,14 @@
 package org.jlab.epsci.rtdp;
 
 import com.lmax.disruptor.RingBuffer;
+import org.jlab.coda.cMsg.cMsgException;
 import org.jlab.coda.emu.Emu;
 import org.jlab.coda.emu.support.codaComponent.CODAClass;
 
+import org.jlab.coda.emu.support.codaComponent.CODAState;
+import org.jlab.coda.emu.support.configurer.Configurer;
+import org.jlab.coda.emu.support.configurer.DataNotFoundException;
+import org.jlab.coda.emu.support.control.CmdExecException;
 import org.jlab.coda.emu.support.data.*;
 import org.jlab.coda.jevio.*;
 
@@ -22,6 +27,7 @@ import org.jlab.coda.jevio.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import java.util.Date;
 import java.util.Map;
 
 
@@ -41,43 +47,18 @@ public class RocSimulation extends ModuleAdapter {
     /** Threads used for generating events. */
     private EventGeneratingThread[] eventGeneratingThreads;
 
-    /** Type of trigger sent from trigger supervisor. */
-    private int triggerType;
-
-    /** Number of events in each ROC raw record. */
-    private int eventBlockSize;
-
-    /** The id of the detector which produced the data in block banks of the ROC raw records. */
-    private int detectorId;
-
     /** Size of a single generated Roc raw event in 32-bit words (including header). */
     private int eventWordSize;
-
-    /** Size of a single generated event in WORDS (including header). */
-    private int eventSize;
-
-    /** Number of computational loops to act as a delay. */
-    private int loops;
 
     /** Number of ByteBuffers in each EventGeneratingThread. */
     private int bufSupplySize = 1024;
 
     private final boolean debug;
 
-
-
-    //----------------------------------------------------
-    // Members used to synchronize all fake Rocs to each other which allows run to
-    // end properly. I.e., they all produce the same number of buildable events.
-    //----------------------------------------------------
-    /** If true, no physics events are produced.
-     *  This is equivalent to having no triggers. */
-    private boolean noPhysics;
-
-
-    /** Set this ROC's sync bit set every syncBitCount events.
-     *  Value of 0 means no sync bit. */
-    private final int syncBitCount;
+    private int runNumber;
+    private int runType;
+    private int frameCount;
+    private boolean sendControls;
 
 
 
@@ -91,48 +72,26 @@ public class RocSimulation extends ModuleAdapter {
      *
      * @param name name of module
      */
-    public RocSimulation(String name, boolean debug) {
+    public RocSimulation(String name, boolean debug, boolean sendControls, int frameCount, ByteOrder outputOrder) {
 
         super(name, debug);
-        this.debug = debug;
+        this.debug        = debug;
+        this.sendControls = sendControls;
+        this.frameCount   = frameCount;
+        this.outputOrder  = outputOrder;
 
         //outputOrder = ByteOrder.LITTLE_ENDIAN;
         //outputOrder = ByteOrder.BIG_ENDIAN;
-
-        // Set the sync bit every 5000th record
-        syncBitCount = 5000;
-
-        // Value for trigger type from trigger supervisor
-        triggerType = 15;
-
-        // Id of detector producing data
-        detectorId = 111;
-
-        // How many entangled events in one data block?
-        eventBlockSize = 40;
-
-        // How many WORDS in a single event?
-        eventSize = 75;  // 300 bytes
-
-        // How many loops to constitute a delay?
-        loops = 0;
-
-        // Is this ROC to be synced with others? NO
-
-
-        // Does this ROC produce physics events?
-        // Set this to true if you want to test a zero-trigger setup.
-        // Just for testing! No physics events are sent.
-        // Use this with synced = false, and don't run a TS.
-        noPhysics = false;
 
         // Keep things simple for streaming
         streamingData = true;
         eventProducingThreads = 1;
 
+        runNumber = 1;
+        runType = 1;
+
         // Event generating threads
         eventGeneratingThreads = new EventGeneratingThread[eventProducingThreads];
-
     }
 
 
@@ -341,11 +300,10 @@ public class RocSimulation extends ModuleAdapter {
      * @param frameNumber  new frame number to place into buf.
      * @param timestamp    new time stamp to place into buf
      * @param copy         is templateBuf to be copied into buf or not.
-     * @param generatedDataBytes number of bytes generated as data for each payload data bank.
      */
     void  writeTimeSliceBuffer(ByteBuffer buf, ByteBuffer templateBuf,
                                long frameNumber, long timestamp,
-                               boolean copy, int generatedDataBytes) {
+                               boolean copy) {
 
         // Since we're using recirculating buffers, we do NOT need to copy everything
         // into the buffer each time. Once each of the buffers in the BufferSupply object
@@ -380,7 +338,7 @@ public class RocSimulation extends ModuleAdapter {
         // So the best thing is for each ROC to have different data.
 
         // Move to data input position
-        int writeIndex = 4*13;
+        //int writeIndex = 4*13;
     }
 
 
@@ -407,7 +365,6 @@ public class RocSimulation extends ModuleAdapter {
         private ByteBufferSupply bbSupply;
         // Number of data words in each event
         private int generatedDataWords;
-        private int generatedDataBytes;
         private ByteBuffer templateBuffer;
 
         /** Boolean used to kill this thread. */
@@ -425,10 +382,6 @@ public class RocSimulation extends ModuleAdapter {
 
                 //generatedDataWords = 40*75;
                 generatedDataWords = 5;
-                //ByteBuffer singleTSB = createSingleTimeSliceBuffer(generatedDataWords, frameNumber, timestamp);
-                //singleTSBsize = singleTSB.limit() - 8;
-//System.out.println("  Roc mod: single TSB bytes size = " + singleTSBsize + ", words = " + (singleTSBsize/4));
-                //templateBuffer = createDualTimeSliceBuffer(generatedDataWords, frameNumber, timestamp);
 System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n");
                 templateBuffer = createSingleTimeSliceBuffer(generatedDataWords, frameNumber, timestamp);
 //Utilities.printBuffer(templateBuffer, 0, 56, "TEMPLATE BUFFER");
@@ -451,8 +404,9 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
         public void run() {
 
             int  skip=3;
-            int loopCount = loops;
 
+
+            int framesSent = 0;
 
             // Stat time
             long totalT=0L, t1, deltaT, t2;
@@ -482,13 +436,13 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
             }
 
             // Now create our own buffer supply to match
-            bbSupply = new ByteBufferSupply(bufSupplySize, 4*eventWordSize, ByteOrder.BIG_ENDIAN, false);
+            bbSupply = new ByteBufferSupply(bufSupplySize, 4*eventWordSize, outputOrder, false);
 
             try {
                 t1 = System.currentTimeMillis();
-                if (debug) System.out.println("SET loops to " + loops);
 
-                while (true) {
+
+                while (framesSent < frameCount) {
 
                     if (killThd) return;
 
@@ -510,15 +464,11 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
 //System.out.println("  Roc mod: write event");
 
                     writeTimeSliceBuffer(buf, templateBuffer, frameNumber,
-                                         timestamp, copyWholeBuf, bytesPerDataBank);
+                                         timestamp, copyWholeBuf);
+                    
 
+                    //    Thread.sleep(1000);
 
-
-                        Thread.sleep(1000);
-
-//                        if (loops != 0 && loopCount++ % loops == 0) {
-//                            Thread.sleep(1);
-//                        }
 
                         if (killThd) return;
 
@@ -529,6 +479,7 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
                     // Switch frame and timestamp, every  send
                     frameNumber++;
                     timestamp += 10;
+                    framesSent++;
 
 
                     t2 = System.currentTimeMillis();
@@ -550,6 +501,10 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
                     }
 
                 }
+
+                // Send END event
+                end();
+
             }
             catch (InterruptedException e) {
                 // End or Reset most likely
@@ -567,6 +522,32 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
     //---------------------------------------
 
 
+    /** {@inheritDoc} */
+    public void end() {
+
+        if (sendControls) {
+            // Put in END event
+            PayloadBuffer pBuf = Evio.createControlBuffer(ControlType.END, 0, 0,
+                                                          (int) eventCountTotal, (int) frameCountTotal, 0,
+                                                          outputOrder, name, false, isStreamingData());
+            // Send to first ring on ALL channels
+            for (int i = 0; i < outputChannelCount; i++) {
+                if (i > 0) {
+                    // copy buffer and use that
+                    pBuf = new PayloadBuffer(pBuf);
+                }
+                try {
+                    eventToOutputChannel(pBuf, i, 0);
+                }
+                catch (InterruptedException e) {
+                    return;
+                }
+                System.out.println("  Roc mod: inserted END event to channel " + i);
+            }
+        }
+    }
+
+
 
     /** {@inheritDoc} */
     public void prestart() {
@@ -575,12 +556,51 @@ System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n
 
         // Reset some variables
         rocRecordId = 1;
+
+        if (sendControls) {
+            // Create PRESTART event
+            PayloadBuffer pBuf = Evio.createControlBuffer(ControlType.PRESTART, runNumber,
+                                                          runType, 0, 0, 0,
+                                                          outputOrder, name, false, isStreamingData());
+            // Send to first ring on ALL channels
+            for (int i = 0; i < outputChannelCount; i++) {
+                // Copy buffer and use that
+                PayloadBuffer pBuf2 = new PayloadBuffer(pBuf);
+                try {
+                    eventToOutputChannel(pBuf2, i, 0);
+                }
+                catch (InterruptedException e) {
+                    return;
+                }
+                System.out.println("  Roc mod: inserted PRESTART event to channel " + i);
+            }
+        }
+
         rocRecordId++;
     }
 
 
     /** {@inheritDoc} */
     public void go() {
+
+        // Create GO event
+        PayloadBuffer pBuf = Evio.createControlBuffer(ControlType.GO, 0, 0,
+                                                      (int) eventCountTotal, (int)frameCountTotal, 0,
+                                                      outputOrder, name, false, isStreamingData());
+        if (sendControls) {
+            // Send to first ring on ALL channels
+            for (int i = 0; i < outputChannelCount; i++) {
+                // Copy buffer and use that
+                PayloadBuffer pBuf2 = new PayloadBuffer(pBuf);
+                try {
+                    eventToOutputChannel(pBuf2, i, 0);
+                }
+                catch (InterruptedException e) {
+                    return;
+                }
+                System.out.println("  Roc mod: inserted GO event to channel " + i);
+            }
+        }
 
         rocRecordId++;
 
