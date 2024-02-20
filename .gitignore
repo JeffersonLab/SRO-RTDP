@@ -11,3 +11,10 @@ __pycache__
 
 # logfiles
 *.log
+
+# built files
+build
+
+# IDE files
+.idea
+SRO-RTDP.iml
