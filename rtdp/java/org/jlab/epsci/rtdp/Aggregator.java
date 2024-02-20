@@ -166,7 +166,7 @@ public class Aggregator extends Thread {
 
     /** This method is executed as a thread. */
     public void run() {
-        if (debug) System.out.println("STARTED Aggregator thread!!");
+        if (debug) System.out.println("STARTED Aggregator!");
 
         // Create output file channel
         DataChannelImplFile fileChannel = null;
@@ -179,10 +179,29 @@ public class Aggregator extends Thread {
             e.printStackTrace();
             System.exit(1);
         }
+
         if (debug) System.out.println("Created a file channel for " + fileName);
         ArrayList<DataChannel> outputChannels = new ArrayList<DataChannel>();
         outputChannels.add(fileChannel);
 
+        // Create input emu-stream channels and store all channels created
+        ArrayList<DataChannel> inputChannels = new ArrayList<>(clientCount);
+        for (int i=0; i < clientCount; i++) {
+            DataChannelImplTcpStream tcpStreamChannel =
+                    new DataChannelImplTcpStream("stream_" + i, i, debug);
+            inputChannels.add(tcpStreamChannel);
+        }
+
+        //--------------------------------------------------------------------
+
+        // Create the Aggregator module
+        StreamAggregator agg = new StreamAggregator("Aggregator", debug);
+        agg.setSingleVTPInputs(singleVTPinput);
+        agg.addInputChannels(inputChannels);
+        agg.addOutputChannels(outputChannels);
+
+        // And get it ready to run
+        agg.prestart();
 
         // Let us know that the server has the expected # of client connected
         CountDownLatch latch = new CountDownLatch(clientCount);
@@ -192,7 +211,7 @@ public class Aggregator extends Thread {
         // Start up the TCP server or UDP receivers.
         // The TCP server will create DataChannelImplTcpStream channels as connections are made.
         // (Haven't dealt with UDP yet ...)
-        EmuDomainServer server = new EmuDomainServer(tcpPort, clientCount, expid, name, tcp, latch, debug);
+        EmuDomainServer server = new EmuDomainServer(tcpPort, inputChannels, expid, name, tcp, latch, debug);
         if (debug) System.out.println("Created a TCP server and start it");
         server.start();
         if (debug) System.out.println("TCP server started");
@@ -209,16 +228,6 @@ public class Aggregator extends Thread {
         }
 
         System.out.println("All clients have connected");
-        //--------------------------------------------------------------------
-
-        // Create the Aggregator module
-        StreamAggregator agg = new StreamAggregator("Aggregator", debug);
-        agg.setSingleVTPInputs(singleVTPinput);
-        agg.addInputChannels(server.getTcpServer().getInputChannels());
-        agg.addOutputChannels(outputChannels);
-
-        // And get it running
-        agg.prestart();
 
         // This is a daemon thread so if all other threads end, this application will end too.
         try {

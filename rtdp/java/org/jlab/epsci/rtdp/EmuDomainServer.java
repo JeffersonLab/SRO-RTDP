@@ -2,6 +2,7 @@ package org.jlab.epsci.rtdp;
 
 import org.jlab.coda.cMsg.cMsgException;
 
+import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 
 /** Local copy of EmuDomainServer class. */
@@ -32,17 +33,22 @@ class EmuDomainServer extends Thread {
     /** Thread that listens for TCP client connections and then handles client. */
     private EmuDomainTcpServer tcpServer;
 
+    private ArrayList<DataChannel> inputChannels;
 
-    public EmuDomainServer(int port, int clientCount, String expid, String name, boolean tcp, CountDownLatch latch, boolean debug) {
+
+
+    public EmuDomainServer(int port, ArrayList<DataChannel> inputChannels,
+                           String expid, String name, boolean tcp, CountDownLatch latch, boolean debug) {
 
         this.name = name;
         this.expid = expid;
         this.serverPort = port;
-        this.clientCount = clientCount;
         this.tcp = tcp;
         this.udp = !tcp;
         this.clientAttachLatch = latch;
         this.debug = debug;
+        this.inputChannels = inputChannels;
+        this.clientCount = inputChannels.size();
     }
 
 
@@ -62,7 +68,7 @@ class EmuDomainServer extends Thread {
 
         try {
             // Start TCP server thread
-            tcpServer = new EmuDomainTcpServer(this, serverPort, clientCount, clientAttachLatch, debug);
+            tcpServer = new EmuDomainTcpServer(serverPort, inputChannels, clientAttachLatch, debug);
             tcpServer.start();
 
             // Wait for indication thread is running before continuing on

@@ -32,9 +32,7 @@ class EmuDomainTcpServer extends Thread {
 
     /** Number of clients expected to connect. */
     private final int clientCount;
-
-    private final EmuDomainServer server;
-
+    
     /** Setting this to true will kill all threads. */
     private volatile boolean killThreads;
 
@@ -61,13 +59,16 @@ class EmuDomainTcpServer extends Thread {
 
     /**
      * Constructor.
-     * @param server emu server that created this object
-     * @param serverPort TCP port on which to receive transmissions from emu clients
+     * @param serverPort TCP port on which to receive transmissions from emu clients.
+     * @param inputChannels channel objects to associated with incoming connections.
+     * @param latch sync object to let caller know when all connections are made.
+     * @param debug
      */
-    public EmuDomainTcpServer(EmuDomainServer server, int serverPort, int clientCount, CountDownLatch latch, boolean debug) {
-        this.server = server;
+    public EmuDomainTcpServer(int serverPort, ArrayList<DataChannel> inputChannels,
+                              CountDownLatch latch, boolean debug) {
         this.serverPort = serverPort;
-        this.clientCount = clientCount;
+        this.inputChannels = inputChannels;
+        this.clientCount = inputChannels.size();
         this.clientAttachLatch = latch;
         this.debug = debug;
 
@@ -102,7 +103,7 @@ class EmuDomainTcpServer extends Thread {
                 listeningSocket.bind(new InetSocketAddress(serverPort));
             }
             catch (IOException ex) {
-                System.out.println("Emu domain server: TCP port number " + serverPort + " in use.");
+                System.out.println("Agg TCP server: TCP port number " + serverPort + " in use.");
                 System.exit(-1);
             }
 
@@ -129,7 +130,7 @@ class EmuDomainTcpServer extends Thread {
                     }
                     continue;
                 }
-                if (debug) System.out.println("Emu domain server: someone trying to connect");
+                if (debug) System.out.println("Agg TCP server: someone trying to connect");
 
                 // Get an iterator of selected keys (ready sockets)
                 Iterator it = selector.selectedKeys().iterator();
@@ -156,7 +157,7 @@ class EmuDomainTcpServer extends Thread {
 
                         // Loop until all 6 integers of incoming data read or timeout
                         while (bytesRead < BYTES_TO_READ) {
-                            if (debug)  System.out.println("Emu domain server: try reading rest of Buffer");
+                            if (debug)  System.out.println("Agg TCP server: try reading rest of Buffer");
 
                             bytes = channel.read(buffer);
 
@@ -169,7 +170,7 @@ class EmuDomainTcpServer extends Thread {
 
                             bytesRead += bytes;
 
-                            if (debug) System.out.println("Emu domain server: bytes read = " + bytesRead);
+                            if (debug) System.out.println("Agg TCP server: bytes read = " + bytesRead);
 
                             // If we've read everything, look to see what we got ...
                             if (bytesRead >= BYTES_TO_READ) {
@@ -183,7 +184,7 @@ class EmuDomainTcpServer extends Thread {
                                     magic2 != cMsgNetworkConstants.magicNumbers[1] ||
                                     magic3 != cMsgNetworkConstants.magicNumbers[2])  {
                                     if (debug) {
-                                        System.out.println("Emu domain server: Magic #s did NOT match, ignore");
+                                        System.out.println("Agg TCP server: Magic #s did NOT match, ignore");
                                     }
                                     channel.close();
                                     it.remove();
@@ -195,7 +196,7 @@ class EmuDomainTcpServer extends Thread {
 System.out.println("Got cMsg version = " + version);
                                 if (version != cMsgConstants.version) {
                                     if (debug) {
-                                        System.out.println("Emu domain server: version mismatch, got " +
+                                        System.out.println("Agg TCP server: version mismatch, got " +
                                                             version + ", needed " + cMsgConstants.version);
                                     }
                                     channel.close();
@@ -208,7 +209,7 @@ System.out.println("Got cMsg version = " + version);
 System.out.println("Got coda id = " + codaId);
                                 if (codaId < 0) {
                                     if (debug) {
-                                        System.out.println("Emu domain server: bad coda id of sender (" +
+                                        System.out.println("Agg TCP server: bad coda id of sender (" +
                                                            codaId + ')');
                                     }
                                     channel.close();
@@ -222,7 +223,7 @@ System.out.println("Got buffer size = " + bufferSizeDesired);
                                 if (bufferSizeDesired < 4*10) {
                                     // 40 bytes is smallest possible evio file format size
                                     if (debug) {
-                                        System.out.println("Emu domain server: bad buffer size from sender (" +
+                                        System.out.println("Agg TCP server: bad buffer size from sender (" +
                                                            bufferSizeDesired + ')');
                                     }
                                     channel.close();
@@ -274,24 +275,30 @@ if (debug) System.out.println("Got socket position = " + socketPosition);
                         // The emu (not socket) channel will start a
                         // thread to handle all further communication.
 
-                        // Create a new TCP streaming channel each with unique name, 2nd arg is only used to
-                        // distinguish between streams from one VTP. Don't care about that here.
-                        DataChannelImplTcpStream tcpStreamChannel =
-                                new DataChannelImplTcpStream("VTP_" + streamCount, 0, debug);
-                        streamCount++;
 
-                        // Store for later use by Aggregating module
-                        inputChannels.add(tcpStreamChannel);
+//                        DataChannelImplTcpStream tcpStreamChannel =
+//                                new DataChannelImplTcpStream("VTP_" + streamCount, streamCount, debug);
+//                        streamCount++;
+//
+//                        // Store for later use by Aggregating module
+//                        inputChannels.add(tcpStreamChannel);
 
                         // Will release aggregator to continue once last client is connected
                         clientAttachLatch.countDown();
 
                         try {
-                            tcpStreamChannel.attachToInput(channel, codaId, bufferSizeDesired);
+                            // Create a new TCP streaming channel each with unique name, 2nd arg is only used to
+                            // distinguish between streams from one VTP. Don't care about that here.
+                            DataChannelImplTcpStream dc = (DataChannelImplTcpStream)inputChannels.get(streamCount);
+
+                            // Starts thread to handle socket input & thread to parse and
+                            // place banks into ring buffer for aggregation
+                            dc.attachToInput(channel, codaId, bufferSizeDesired);
+                            streamCount++;
                         }
                         catch (IOException e) {
                             if (debug) {
-                                System.out.println("Emu domain server: " + e.getMessage());
+                                System.out.println("Agg TCP server: " + e.getMessage());
                             }
                             channel.close();
                             it.remove();
@@ -299,7 +306,13 @@ if (debug) System.out.println("Got socket position = " + socketPosition);
                         }
 
                         if (debug) {
-                            System.out.println("Emu domain server: new connection");
+                            System.out.println("Agg TCP server: new connection");
+                        }
+
+                        if (streamCount >= clientCount) {
+                            // All clients have connected so shut down server
+                            System.out.println("Agg TCP server: all clients connected, shut down TCP server");
+                            return;
                         }
                     }
 
@@ -309,7 +322,7 @@ if (debug) System.out.println("Got socket position = " + socketPosition);
             }
         }
         catch (IOException ex) {
-            System.out.println("Emu domain server: main server IO error");
+            System.out.println("Agg TCP server: main server IO error");
             ex.printStackTrace();
         }
         finally {
@@ -318,7 +331,7 @@ if (debug) System.out.println("Got socket position = " + socketPosition);
         }
 
         if (debug) {
-            System.out.println("Emu domain server: quitting");
+            System.out.println("Agg TCP server: quitting");
         }
     }
 
