@@ -349,7 +349,8 @@ public class ExampleConnector {
                                    "        [-id <CODA id>]  id of this CODA component\n" +
                                    "        [-ip <IP addr>]  IP addr of TCP server)\n" +
                                    "        [-fr <# frames>] number of frames to send\n" +
-                                   "        [-control]       send PRESTART & GO before frames and END event after\n" +
+                                   "        [-control]       send PRESTART & GO before frames and END event after,\n" +
+                                   "                         4 sec delay before sending END\n" +
                                    "        [-big]           send big endian data\n" +
                                    "        [-v]             turn on verbose mode\n" +
                                    "        [-h]             print this help\n");
@@ -371,8 +372,18 @@ public class ExampleConnector {
             // Connect to server
             connector.directConnect();
 
+            // Put in a delay here to allow all the channels to be created for the Aggregator
+            // and its main building thread to start. Not sure exactly what to do here since
+            // in a DAQ system all this timing is controlled by the RunControl program.
+            // When replaying packets this shouldn't be an issue either as it reflects the
+            // operation of RunControl.
+            Thread.sleep(1000);
+
             if (connector.sendControls) {
                 // Send PRESTART and GO events
+                if (connector.verbose) {
+                    System.out.println("connect: sent prestart and go");
+                }
                 connector.send(connector.prestartBuffer.array(), 0, connector.prestartBuffer.capacity());
                 connector.send(connector.goBuffer.array(), 0, connector.goBuffer.capacity());
             }
@@ -380,6 +391,9 @@ public class ExampleConnector {
             if (connector.frameCount > 0) {
                 // Send frame to server
                 for (int i=0; i < connector.frameCount; i++) {
+                    if (connector.verbose) {
+                        System.out.println("connect: sent event " + i);
+                    }
                     connector.send(connector.sendBuffer.array(), 0, connector.sendBuffer.capacity());
 
                     connector.frameNumber++;
@@ -392,6 +406,11 @@ public class ExampleConnector {
 
             if (connector.sendControls) {
                 // Send END event
+                // Put in a delay so aggregator can finish building all events, not strictly necessary
+                Thread.sleep(4000);
+                if (connector.verbose) {
+                    System.out.println("connect: sent end");
+                }
                 connector.send(connector.endBuffer.array(), 0, connector.endBuffer.capacity());
             }
 

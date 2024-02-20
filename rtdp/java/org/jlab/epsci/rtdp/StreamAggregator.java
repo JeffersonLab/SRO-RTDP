@@ -329,7 +329,7 @@ public class StreamAggregator extends ModuleAdapter {
      * @throws EmuException if got non-control or non-prestart/go/end event
      * @throws InterruptedException if taking of event off of Q is interrupted
      */
-    private ControlType getAllControlEvents(Sequence[] sequences,
+    private ControlType getAllControlEventsOrig(Sequence[] sequences,
                                             SequenceBarrier[] barriers,
                                             PayloadBuffer[] buildingBanks,
                                             long[] nextSequences)
@@ -338,6 +338,110 @@ public class StreamAggregator extends ModuleAdapter {
         ControlType controlType = null;
 
         // First thing we do is look for the go or prestart event and pass it on
+        // Grab one control event from each ring buffer.
+        for (int i=0; i < inputChannelCount; i++) {
+            if (debug) System.out.println("  Agg mod: getAllControlEvents input chan " + i);
+            try  {
+                ControlType cType;
+                while (true) {
+                    if (debug) System.out.println("  Agg mod: getAllControlEvents wait for seq " + nextSequences[i]);
+                    barriers[i].waitFor(nextSequences[i]);
+                    buildingBanks[i] = (PayloadBuffer) ringBuffersIn[i].get(nextSequences[i]);
+                    if (debug) System.out.println("  Agg mod: getAllControlEvents got seq " + nextSequences[i]);
+
+                    cType = buildingBanks[i].getControlType();
+                    if (cType == null) {
+                        // If it's not a control event, it may be a user event.
+                        // If so, skip over it and look at the next one.
+                        EventType eType = buildingBanks[i].getEventType();
+                        if (eType == EventType.USER) {
+                            // Send it to the output channel
+                            handleUserEvent(buildingBanks[i], inputChannels.get(i), false);
+                            // Release ring slot
+                            sequences[i].set(nextSequences[i]);
+                            // Get ready to read item in next slot
+                            nextSequences[i]++;
+                            continue;
+                        }
+                        throw new EmuException("Expecting control, but got some other, non-user event");
+                    }
+                    break;
+                }
+
+                // Look for what the first channel sent, on the other channels
+                if (controlType == null) {
+                    controlType = cType;
+                }
+                else if (cType != controlType) {
+                    throw new EmuException("Control event differs across inputs, expect " +
+                                                   controlType + ", got " + cType);
+                }
+
+                if (!cType.isEnd() && !cType.isGo() && !cType.isPrestart()) {
+                    Utilities.printBuffer(buildingBanks[i].getBuffer(), 0, 5, "Bad control event");
+                    throw new EmuException("Expecting prestart, go or end, got " + cType);
+                }
+            }
+            catch (final TimeoutException | AlertException e) {
+                e.printStackTrace();
+                throw new EmuException("Cannot get control event", e);
+            }
+        }
+
+// Since we don't know our runNumber and runType, just skip this check!!  (Timmer 2/12/2024)
+
+//        // control types, and in Prestart events, run #'s and run types
+//        // must be identical across input channels, else throw exception
+//        Evio.gotConsistentControlEvents(buildingBanks, runNumber, runTypeId);
+
+        // Release the input ring slots AFTER checking for consistency.
+        // If done before, the PayloadBuffer obtained from the slot can be
+        // overwritten by incoming data, leading to a bad result.
+
+        for (int i=0; i < inputChannelCount; i++) {
+            // Release ring slot. Each build thread has its own sequences array
+            sequences[i].set(nextSequences[i]);
+
+            // Get ready to read item in next slot
+            nextSequences[i]++;
+
+            // Release any temp buffer (from supply ring)
+            // that may have been used for control event.
+            // Should only be done once - by single sorter thread
+            buildingBanks[i].releaseByteBuffer();
+        }
+
+        return controlType;
+    }
+
+
+
+    /**
+     * This method looks for either a prestart or go event in all the
+     * input channels' ring buffers.
+     *
+     * @param sequences     one sequence per ring buffer
+     * @param barriers      one barrier per ring buffer
+     * @param buildingBanks empty array of payload buffers (reduce garbage)
+     * @param nextSequences one "index" per ring buffer to keep track of which event
+     *                      sorter is at in each ring buffer.
+     * @return type of control events found
+     * @throws EmuException if got non-control or non-prestart/go/end event
+     * @throws InterruptedException if taking of event off of Q is interrupted
+     */
+    private ControlType getAllControlEvents(Sequence[] sequences,
+                                            SequenceBarrier[] barriers,
+                                            PayloadBuffer[] buildingBanks,
+                                            long[] nextSequences)
+            throws EmuException, InterruptedException {
+
+        ControlType controlType = null;
+
+        for (int i=0; i < inputChannelCount; i++) {
+            if (debug) System.out.println("  Agg mod: getAllControlEvents chan " + i + " at seq " + nextSequences[i]);
+        }
+
+            // First thing we do is look for the go or prestart event and pass it on
         // Grab one control event from each ring buffer.
         for (int i=0; i < inputChannelCount; i++) {
             if (debug) System.out.println("  Agg mod: getAllControlEvents input chan " + i);
@@ -500,12 +604,12 @@ public class StreamAggregator extends ModuleAdapter {
             pBuf.setError(Evio.tagHasError(tag));
         }
 
-        // Check source ID of bank to see if it matches channel id
-        if (!pBuf.matchesId()) {
-            System.out.println("checkInput: buf source id = " + sourceId +
-                                       " != input channel id = " + channel.getID());
-            nonFatalError = true;
-        }
+//        // Check source ID of bank to see if it matches channel id
+//        if (!pBuf.matchesId()) {
+//            System.out.println("checkInput: buf source id = " + sourceId +
+//                                       " != input channel id = " + channel.getID());
+//            nonFatalError = true;
+//        }
 
         pBuf.setNonFatalBuildingError(nonFatalError || recordIdError);
     }
@@ -730,12 +834,12 @@ public class StreamAggregator extends ModuleAdapter {
                 }
             }
 
-            // Check source ID of bank to see if it matches channel id
-            if (!pBuf.matchesId()) {
-                System.out.println("checkInput: buf source id = " + sourceId +
-                                           " != input channel id = " + channel.getID());
-                nonFatalError = true;
-            }
+//            // Check source ID of bank to see if it matches channel id
+//            if (!pBuf.matchesId()) {
+//                System.out.println("checkInput: buf source id = " + sourceId +
+//                                           " != input channel id = " + channel.getID());
+//                nonFatalError = true;
+//            }
 
             pBuf.setNonFatalBuildingError(nonFatalError || recordIdError);
         }
@@ -799,8 +903,8 @@ public class StreamAggregator extends ModuleAdapter {
                         while (veryNextSequence <= available) {
                             PayloadBuffer bank = (PayloadBuffer) ringBuffersIn[ch].get(veryNextSequence);
                             String source = bank.getSourceName();
-//System.out.println("  Agg mod: findEnd, on chan " + ch + " found event of type " + bank.getEventType() + " from " + source + ", back " + offset +
-//                   " places in ring with seq = " + veryNextSequence);
+if (debug) System.out.println("  Agg mod: findEnd, on chan " + ch + " found event of type " + bank.getEventType() + " from " + source + ", back " + offset +
+                   " places in ring with seq = " + veryNextSequence);
                             EventType eventType = bank.getEventType();
                             written = false;
 
@@ -897,6 +1001,7 @@ if (debug) System.out.println("  Agg mod: findEnd, chan " + ch + " got END from 
             for (int i = 0; i < inputChannelCount; i++) {
                 // Gating sequence for each of the input channel rings
                 nextSequences[i] = sorterSequenceIn[i].get() + 1L;
+                if (debug) System.out.println("  Agg mod: tinesliceSorter chan " + i + " at seq " + nextSequences[i]);
             }
 
             // First thing we do is look for the PRESTART event(s) and pass it on
@@ -981,7 +1086,7 @@ if (debug) System.out.println("  Agg mod: findEnd, chan " + ch + " got END from 
 
                     // Cycle through the channels over and over.
                     // Grab all identical TSs from the first channel. Go to the next and
-                    // and so on until all identical slices are read and placed into the
+                    // so on until all identical slices are read and placed into the
                     // ring of the same build thread.
                     // Next go to the next slice, copy them to the ring of the next
                     // build thread - round and round.
@@ -1664,7 +1769,7 @@ if (debug) System.out.println("  Agg mod: bt" + btIndex + " ***** found END even
                     }
 
                     // Put event in the correct output channel.
-//System.out.println("  Agg mod: bt#" + btIndex + " write event " + evIndex + " on ch" + outputChannelIndex + ", ring " + btIndex);
+//if (debug) System.out.println("  Agg mod: bt#" + btIndex + " write event " + evIndex + " on ch" + outputChannelIndex + ", ring " + btIndex);
                     eventToOutputRing(btIndex, outputChannelIndex, sliceCount,
                                       evBuf, eventType, bufItem, bbSupply);
 
