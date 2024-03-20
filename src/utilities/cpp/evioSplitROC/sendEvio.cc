@@ -94,13 +94,11 @@ bool sendEvioData(Parameters& param) {
     }
 
     // Read and send the file in chunks
-    const int bufferSize = 1024;
+    const int BUFFER_SIZE = 8192;
     ssize_t totalBytesRead = 0;
-    char buffer[bufferSize];
+    char buffer[BUFFER_SIZE];
     while (!file.eof()) {
-        cout << " Checkpoint 1" << endl;
-        std::cout << "File size: " << file.tellg() << " bytes" << std::endl;
-        file.read(buffer, bufferSize);
+        file.read(buffer, BUFFER_SIZE);
         ssize_t bytesRead = file.gcount();
         totalBytesRead += bytesRead;
         if (bytesRead > 0) {
@@ -111,12 +109,11 @@ bool sendEvioData(Parameters& param) {
                 close(sockfd);
                 return false;
             }
+            cout << "Sent" <<endl;
         }
-    }
+    } 
     std::cout << "Total bytes read: " << totalBytesRead << endl;
     std::cout << "File sent successfully\n";
-
-    return 0;
     close(sockfd);
     return true;
 }

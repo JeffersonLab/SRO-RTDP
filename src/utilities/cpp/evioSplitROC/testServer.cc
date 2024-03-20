@@ -55,7 +55,7 @@ int main() {
             // Process the received data (e.g., print or save to a file)
             std::cout << "Received " << bytesRead << " bytes from client: " << std::endl;
             // Echo back to the client
-            send(clientSocket, buffer, bytesRead, 0);
+            send(clientSocket, "ACK", sizeof("ACK"), 0);
         }
 
         if (bytesRead == -1) {
