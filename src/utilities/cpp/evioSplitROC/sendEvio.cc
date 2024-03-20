@@ -86,7 +86,6 @@ bool sendEvioData(Parameters& param) {
 
         // Open the file to send
     std::ifstream file(param.fileName, std::ios::binary);
-    std::cout << "File size: " << file.tellg() << " bytes" << std::endl;
     if (!file.is_open()) {
         std::cerr << "Error opening file\n";
         close(sockfd);
@@ -96,20 +95,20 @@ bool sendEvioData(Parameters& param) {
     // Read and send the file in chunks
     const int BUFFER_SIZE = 8192;
     ssize_t totalBytesRead = 0;
+    ssize_t bytesSent = 0;
     char buffer[BUFFER_SIZE];
     while (!file.eof()) {
         file.read(buffer, BUFFER_SIZE);
         ssize_t bytesRead = file.gcount();
         totalBytesRead += bytesRead;
         if (bytesRead > 0) {
-            ssize_t bytesSent = send(sockfd, buffer, bytesRead, 0);
+            bytesSent = send(sockfd, buffer, bytesRead, 0);
             if (bytesSent == -1) {
                 std::cerr << "Error sending data\n";
                 file.close();
                 close(sockfd);
                 return false;
             }
-            cout << "Sent" <<endl;
         }
     } 
     std::cout << "Total bytes read: " << totalBytesRead << endl;
