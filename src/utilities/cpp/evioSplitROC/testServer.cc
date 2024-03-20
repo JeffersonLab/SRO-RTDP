@@ -1,10 +1,19 @@
 #include <iostream>
 #include <cstring>
+#include <fstream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 
 int main() {
+
+    // Open the file for writing
+    std::ofstream outputFile("testFile.evio", std::ios::binary);
+    if (!outputFile.is_open()) {
+        std::cerr << "Failed to open output file." << std::endl;
+        return 1; // Return an error code
+    }
+
     // Create a socket
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == -1) {
@@ -49,21 +58,23 @@ int main() {
 
         char buffer[1024];
         ssize_t bytesRead;
-
+        bool clientConnected = true;
         // Receive data from client and process it
-        while ((bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0) {
-            // Process the received data (e.g., print or save to a file)
+        while (clientConnected) {
+            std::cout << "Client connected" << std::endl;
+            bytesRead = recv(clientSocket, buffer, sizeof(buffer), 0);
+            if (bytesRead <= 0) {
+            // Error or client closed the connection
+            clientConnected = false;
+            }
+            else {
+                // Process the received data (e.g., print or save to a file)
             std::cout << "Received " << bytesRead << " bytes from client: " << std::endl;
+            outputFile.write(buffer, bytesRead);
             // Echo back to the client
             send(clientSocket, "ACK", sizeof("ACK"), 0);
+            }
         }
-
-        if (bytesRead == -1) {
-            std::cerr << "Error receiving data\n";
-        } else {
-            std::cout << "Client disconnected\n";
-        }
-
         close(clientSocket); // Close the client socket
     }
 
