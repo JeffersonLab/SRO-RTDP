@@ -108,7 +108,6 @@ bool sendEvioData(Parameters& param)
         std::cerr << "Error creating socket\n";
         return false;
     }
-
     // Set up the server address
     struct sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
@@ -129,37 +128,38 @@ bool sendEvioData(Parameters& param)
         close(sockfd);
         return false;
     }
-    int bufferSize = 100000;
-	uint32_t buffer[bufferSize];
+     while (true) {
+        std::cout << "Started Sending" << std::endl;
+        file.seekg(0, std::ios::beg); // Move file pointer to the beginning
+        try {
 
-	try {
-
-		// open input file channel
-		evioFileChannel *chan = new evioFileChannel(param.fileName.c_str(),"r");
-		chan->open();
-        int nev=0;
-		while(chan->readNoCopy()) {
-			nev++;          
-            int buffSize = (*(uint32_t*)chan->getNoCopyBuffer() + 1 )* 4;
-            int bytesSent = send(sockfd, chan->getNoCopyBuffer(), buffSize, 0);
-			if (bytesSent == -1) {
-                    std::cerr << "Error sending data\n";
-                    file.close();
-                    close(sockfd);
-                    return false;
+            // open input file channel
+            evioFileChannel *chan = new evioFileChannel(param.fileName.c_str(),"r");
+            chan->open();
+            int nev=0;
+            bool checkStatus = false;
+            bool ackStatus = false;
+            while(chan->readNoCopy()) {
+                nev++;          
+                int buffSize = (*(uint32_t*)chan->getNoCopyBuffer() + 1 )* 4;
+                int bytesSent = send(sockfd, chan->getNoCopyBuffer(), buffSize, 0);
+                if (bytesSent == -1) {
+                std::cerr << "Error sending data\n";
+                file.close();
+                close(sockfd);
+                return false;
                 }   
-            
-             std::cout << "Send Data" << std::endl;
+            }
+            cout << endl;
+            cout << "Closing files" << endl;
+            chan->close();
+            std::cout << "File sent successfully\n";
+            cout << "Wrote " << nev << " events" << endl; 
+        }catch (evioException e) {
+            cerr << e.what() << endl;
+            exit(EXIT_FAILURE);
         }
-		cout << endl;
-		cout << "Closing files" << endl;
-		chan->close();
-        std::cout << "File sent successfully\n";
-		cout << "Wrote " << nev << " events" << endl; 
-    }catch (evioException e) {
-		cerr << e.what() << endl;
-		exit(EXIT_FAILURE);
-}
+     }
     
     return true;
 }
@@ -169,8 +169,7 @@ bool sendEvioData(Parameters& param)
 // main
 //------------------
 int main(int argc, char **argv) {
-  
-  	Parameters param;
+    Parameters param;
 
     if (!parseCommandLine(argc, argv, param)) {
         printCommand(argv[0]);
@@ -178,12 +177,13 @@ int main(int argc, char **argv) {
     }
 
     calculatePeriod(param);
-    if (!sendEvioData(param)) {
-        cout << "Error while sending the data... " << ends ;
-        return 1;
-    }
 
-        return 0;
+    // the stream will send the same data using an infinite loop 
+    if (!sendEvioData(param)) {
+    cout << "Error while sending the data... " << ends ;
+    //return 1;
+    }
+    return 0;
 }
 
 //-------------------------------------------
