@@ -137,18 +137,17 @@ bool sendEvioData(Parameters& param)
             evioFileChannel *chan = new evioFileChannel(param.fileName.c_str(),"r");
             chan->open();
             int nev=0;
-            bool checkStatus = false;
-            bool ackStatus = false;
             while(chan->readNoCopy()) {
                 nev++;          
                 int buffSize = (*(uint32_t*)chan->getNoCopyBuffer() + 1 )* 4;
                 int bytesSent = send(sockfd, chan->getNoCopyBuffer(), buffSize, 0);
                 if (bytesSent == -1) {
-                std::cerr << "Error sending data\n";
-                file.close();
-                close(sockfd);
-                return false;
+                    std::cerr << "Error sending data\n";
+                    file.close();
+                    close(sockfd);
+                    return false;
                 }   
+                usleep(param.period);
             }
             cout << endl;
             cout << "Closing files" << endl;
