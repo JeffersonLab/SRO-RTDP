@@ -65,7 +65,7 @@ void printCommand(const char* programName) {
 
 bool parseCommandLine(int argc, char* argv[], Parameters& param) {
     if (argc < 5) {
-        cout << "Here: " << argc << ends; 
+        //cout << "Here: " << argc << ends; 
         return false;
     }
 
