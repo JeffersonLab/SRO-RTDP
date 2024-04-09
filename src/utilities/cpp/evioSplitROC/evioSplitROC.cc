@@ -35,7 +35,7 @@ using namespace evio;
 
 
 static string dname = "ROCfiles";
-static int maxRoc = 18; // make this 18 if using EVIO <4.1 !
+static int maxRoc = 100; // make this 18 if using EVIO <4.1 !
 static int maxEvt = 0;
 
 
