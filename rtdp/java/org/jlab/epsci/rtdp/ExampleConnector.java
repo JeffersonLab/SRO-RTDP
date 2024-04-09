@@ -3,8 +3,7 @@ package org.jlab.epsci.rtdp;
 
 import org.jlab.coda.emu.support.data.CODATag;
 import org.jlab.coda.jevio.CompactEventBuilder;
-import org.jlab.coda.jevio.DataType;
-import org.jlab.coda.jevio.EvioException;
+import org.jlab.coda.jevio.*;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -72,7 +71,6 @@ public class ExampleConnector {
      * Allows good initial value of ByteBuffer size.
      */
     public int maxBufferSize = 4000000;
-
     /** How many time-slice frames to be sent to server. */
     public int frameCount;
 
@@ -106,53 +104,6 @@ public class ExampleConnector {
 
     ExampleConnector(String[] args) {
         decodeCommandLine(args);
-
-        // Create a few data buffers:
-        // One will have time slice data from a ROC.
-        // The others will have PRESTART, GO, and END events (used in CODA to control data flow).
-
-
-        //---------------------------------------------------------
-        // 1) Data buffer with preceding evio block header
-        //---------------------------------------------------------
-
-        // First, generate buffer of properly formatted time-slice data in evio
-        // Number of data words in each event
-        int generatedDataWords = 5;
-
-        if (verbose) System.out.println("\n  Roc mod: Starting sim ROC frame at " + frameNumber + "\n");
-        // Creates a ready-to-read, array-backed ByteBuffer
-        ByteBuffer templateBuffer = createSingleTimeSliceBuffer(dataOrder, codaId,
-                                                                generatedDataWords, frameNumber, timestamp);
-
-//        int eventWordSize = templateBuffer.remaining()/4;
-
-        // Second place an evio v4 block header in front of the data
-        // (as would normally be the case)
-
-        int dataLen    = templateBuffer.limit();
-        int totalLen   = dataLen + 32;
-        int totalWords = totalLen/4;
-
-        // Create buf to hold header + data
-        byte[] sendArray = new byte[totalLen];
-        sendBuffer       = ByteBuffer.wrap(sendArray);
-        // Make sure endian is consistent
-        sendBuffer.order(dataOrder);
-
-        // Copy in data - 32 bytes into destination allowing for header
-        System.arraycopy(templateBuffer.array(), 0, sendArray, 32, dataLen);
-
-        // Write header at beginning
-        sendBuffer.putInt(0, totalWords); // total length of block in words
-        sendBuffer.putInt(1*4, 1);        // block #
-        sendBuffer.putInt(2*4, 8);        // header len in words
-        sendBuffer.putInt(3*4, 1);        // event count
-        sendBuffer.putInt(4*4, 0);        // reserved
-        sendBuffer.putInt(5*4, 0x204);    // version (4), RocRaw content (0), and last block bit set
-        sendBuffer.putInt(6*4, 0);        // reserved
-        sendBuffer.putInt(7*4, EVIO_HDR_MAGIC_NUMBER);
-
         //---------------------------------------------------------
         // 2) Create a PRESTART event
         //---------------------------------------------------------
@@ -237,10 +188,8 @@ public class ExampleConnector {
         endBuffer.putInt(11*4, 0);       // reserved
         endBuffer.putInt(12*4, frameCount);  // frames sent so far
         endBuffer.limit(endBuffer.capacity());
-    }
-
-
-
+        }
+     
     /**
      * Method to decode the command line used to start this application.
      * @param args command line arguments
@@ -390,19 +339,21 @@ public class ExampleConnector {
 
             if (connector.frameCount > 0) {
                 // Send frame to server
-                for (int i=0; i < connector.frameCount; i++) {
-                    if (connector.verbose) {
-                        System.out.println("connect: sent event " + i);
-                    }
-                    connector.send(connector.sendBuffer.array(), 0, connector.sendBuffer.capacity());
-
-                    connector.frameNumber++;
-                    connector.timestamp += 10;
-                    connector. updateTimeSliceBuffer(connector.sendBuffer, 32,
-                                                     connector.frameNumber,
-                                                     connector.timestamp);
+                    EvioReader reader = new EvioReader("/Users/ayan/Desktop/Projects/SRO-RTDP/src/utilities/cpp/evioSplitROC/build/ROCfiles/roc001.evio");
+                    //ByteBuffer templateBuffer = ByteBuffer.allocate(1000000);
+                    //
+                    int eventCount = reader.getEventCount();
+                    System.out.println("Number of events: "+eventCount);
+                    for (int i =1;i<=eventCount;i++){
+                        ByteBuffer templateBuffer = ByteBuffer.allocate(1000000);
+                        System.out.println("Event no: "+i);
+                        EventWriter writer = new EventWriter(templateBuffer);
+                        writer.writeEvent(reader.parseEvent(i));
+                        writer.close();
+                        templateBuffer.flip();
+                        connector.send(templateBuffer.array(),0,templateBuffer.limit());
+                    }               
                 }
-            }
 
             if (connector.sendControls) {
                 // Send END event
