@@ -3,9 +3,9 @@ cmake_policy(SET CMP0074 NEW)
 project(podio2tcpProject)
 
 # Optional: Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+#set(CMAKE_CXX_STANDARD 17)
+#set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ROOT REQUIRED)
 find_package(cppzmq REQUIRED)
