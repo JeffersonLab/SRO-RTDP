@@ -35,12 +35,12 @@ export LD_LIBRARY_PATH=${podio_ROOT}/lib:${LD_LIBRARY_PATH}
 
 ### podio2tcp
 
-The `podiotcp`and `tcp2podio` programs live in the SRO-RTDP repository for now. They are in a subdirectory with its own stand-alone CMakeLists.txt file. At the moment, the most up-to-date code is in the `davidl_podio2tcp` branch. Get it and compile it with the commands below. 
+The `podiotcp`and `tcp2podio` programs live in the SRO-RTDP repository for now. They are in a subdirectory with its own stand-alone CMakeLists.txt file. Get it and compile it with the commands below. 
 
 NOTE: despite the name, these programs do not actually use the podio package at all and rely only on ROOT.
 
 ~~~bash
-git clone git@github.com:JeffersonLab/SRO-RTDP -b davidl_podio2tcp
+git clone git@github.com:JeffersonLab/SRO-RTDP
 cmake -S SRO-RTDP/src/utilities/cpp/podio2tcp -B podio2tcp.build -DCMAKE_CXX_STANDARD=20
 cmake --build podio2tcp.build
 ~~~
