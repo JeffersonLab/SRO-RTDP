@@ -72,10 +72,11 @@ podiostreamSource::podiostreamSource(std::string resource_name, JApplication* ap
 
     LOG << "Creating podiostreamSource for \"" << resource_name << "\"" << LOG_END;
 
+    app->SetDefaultParameter("podiostream:host", m_host, "Host name of podio TCP stream source to connect to an pull events from");
+    app->SetDefaultParameter("podiostream:port", m_port, "Port number of podio TCP stream source to connect to an pull events from");
+
     // Setup network communication via zmq
-    std::string host = "ifarm180302";
-    std::string port = "5557";
-    std::string url  = "tcp://" + host + ":" + port;
+    std::string url  = "tcp://" + m_host + ":" + m_port;
     worker.set(zmq::sockopt::rcvhwm, 1); // Set High Water Mark for maximum number of messages to queue before stalling
     worker.connect(url);
     LOG << "<--> PODIO stream will connect to: " << url << LOG_END;
