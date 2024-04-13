@@ -59,7 +59,9 @@ protected:
 
     zmq::context_t context;
     zmq::socket_t worker;
-    // Long64_t m_event_in_tree = 0;
+
+    std::string m_host = "localhost";
+    std::string m_port = "5557";
 
     MyTMessage *m_myTM = nullptr;
     TMemFile *m_memfile = nullptr;
