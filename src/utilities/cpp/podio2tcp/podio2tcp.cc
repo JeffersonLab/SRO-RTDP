@@ -267,17 +267,78 @@ void ConvertPODIOtoStreamFile(std::string &podiofilename, std::string streamfile
 }
 
 //============================================================================================
+// UpdateStats
+void UpdateStats(size_t Nevents_read, size_t Nbytes_read, size_t Nbytes_sent)
+{
+    static size_t Nevents_read_period = 0;
+    static size_t Nevents_read_total  = 0;
+    static size_t Nevents_sent_period = 0;
+    static size_t Nevents_sent_total  = 0;
+    static size_t Nbytes_read_period  = 0;
+    static size_t Nbytes_read_total   = 0;
+    static size_t Nbytes_sent_period  = 0;
+    static size_t Nbytes_sent_total   = 0;
+    
+    auto Nevents_sent = Nbytes_sent>0 ? Nevents_read:0;
+
+    static double duration_period = 0.0;
+    static double duration_total = 0.0;
+    static auto last_time = std::chrono::high_resolution_clock::now();
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(now - last_time).count();
+    last_time = now;
+
+    Nevents_read_period += Nevents_read;
+    Nevents_sent_period += Nevents_sent;
+    Nbytes_read_period  += Nbytes_read;
+    Nbytes_sent_period  += Nbytes_sent;
+    duration_period     += duration;
+
+    // Only update totals and print to screen at most once per second
+    if( duration_period<1.0 ) return;
+
+    Nevents_read_total += Nevents_read_period;
+    Nevents_sent_total += Nevents_sent_period;
+    Nbytes_read_total  += Nbytes_read_period;
+    Nbytes_sent_total  += Nbytes_sent_period;
+    duration_total     += duration_period;
+
+    auto rateMbps_read_period = Nbytes_read_period/duration_period*8.0/1.0E6;
+    auto rateMbps_sent_period = Nbytes_sent_period/duration_period*8.0/1.0E6;
+    auto rateMbps_read_total  = Nbytes_read_total/duration_total*8.0/1.0E6;
+    auto rateMbps_sent_total  = Nbytes_sent_total/duration_total*8.0/1.0E6;
+
+    auto rateHz_read_period = Nevents_read_period/duration_period;
+    auto rateHz_sent_period = Nevents_sent_period/duration_period;
+    auto rateHz_read_total = Nevents_read_total/duration_total;
+    auto rateHz_sent_total = Nevents_sent_total/duration_total;
+    
+    auto savePrecision = std::cout.precision();
+    std::cout << "  " << std::fixed << std::setprecision(1)
+    << " read(sent): " << rateHz_read_period << " (" << rateHz_sent_period << ") Hz  " << rateMbps_read_period << " (" << rateMbps_sent_period << " Mbps)"
+    << " [AVG read/sent: " << rateHz_read_total << " (" << rateHz_sent_total << ") Hz  " << rateMbps_read_total << " (" << rateMbps_sent_total << " Mbps)]"
+    << std::endl;
+    std::cout.precision(savePrecision);
+
+    Nevents_read_period = 0;
+    Nevents_sent_period = 0 ;
+    Nbytes_read_period  = 0;
+    Nbytes_sent_period  = 0;
+    duration_period     = 0.0;
+}
+
+//============================================================================================
 // SendFromPodioRootFile
 void SendFromPodioRootFile(std::string &podiofilename, Long64_t Nevents_per_group=50)
 {
     OpenPODIOFile(podiofilename); // will throw exception if unsuccessful
 
-    auto last_time = std::chrono::high_resolution_clock::now();
+    // auto last_time = std::chrono::high_resolution_clock::now();
     Long64_t Nevents_sent = 0;
-    size_t Nbytes_sent = 0;
     auto Nevents = gevents_tree->GetEntries();
     std::vector<uint8_t> buff;
     while( Nevents_sent < Nevents ){
+        size_t Nbytes_sent = 0;
         auto Nevents_in_buffer = EventsToBuffer( Nevents_sent, Nevents_per_group, buff);
         zmq::message_t message(buff.data(), buff.size());
         bool sent = gventilator->send(message, zmq::send_flags::dontwait).has_value();
@@ -285,19 +346,12 @@ void SendFromPodioRootFile(std::string &podiofilename, Long64_t Nevents_per_grou
             Nevents_sent += Nevents_in_buffer;
             Nbytes_sent += buff.size();
         }else{
-            std::cout << "Unable to send (is receiver running?). Waiting 2 seconds..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            // std::cout << "Unable to send (is receiver running?). Waiting 2 seconds..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
         // Print ticker
-        auto now = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(now - last_time).count();
-        auto rateMbps = Nbytes_sent/duration*8.0/1.0E6;
-        auto rateHz = Nevents_in_buffer/duration;
-        auto savePrecision = std::cout.precision();
-        std::cout << "  " << std::fixed << std::setprecision(3) << rateHz << " Hz  (" << rateMbps << " Mbps)" << std::endl;
-        std::cout.precision(savePrecision);
-        last_time = now;
+        UpdateStats(Nevents_in_buffer, buff.size(), Nbytes_sent);
     }
 }
 
@@ -309,10 +363,10 @@ void SendFromPodioStreamFile(std::string &streamfilename)
     if( !streamfile.is_open() ) throw std::runtime_error("Failed to open file: " + streamfilename);
 
     auto last_time = std::chrono::high_resolution_clock::now();
-    size_t Nbytes_sent = 0;
     std::vector<uint8_t> buff;
     while( !streamfile.eof() ){
         
+        size_t Nbytes_sent = 0;
         auto Nevents_in_buffer  = ReadBufferFromStreamFile( streamfile, buff);
         if(buff.empty()) break;
         zmq::message_t message(buff.data(), buff.size());
@@ -320,20 +374,13 @@ void SendFromPodioStreamFile(std::string &streamfilename)
         if( sent ){
             Nbytes_sent += buff.size();
         }else{
-            std::cout << "Unable to send (is receiver running?). Waiting 2 seconds..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(2));
+            // std::cout << "Unable to send (is receiver running?). Waiting 2 seconds..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
         // Print ticker
-        auto now = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(now - last_time).count();
-        auto rateMbps = Nbytes_sent/duration*8.0/1.0E6;
-        auto rateHz = Nevents_in_buffer/duration;
-        auto savePrecision = std::cout.precision();
-        std::cout << "  " << std::fixed << std::setprecision(3) << rateHz << " Hz  (" << rateMbps << " Mbps)" << std::endl;
-        std::cout.precision(savePrecision);
-        last_time = now;
-    }
+        UpdateStats(Nevents_in_buffer, buff.size(), Nbytes_sent);
+     }
 }
 
 //-------------------------------------------------------------
