@@ -15,7 +15,6 @@ package org.jlab.epsci.rtdp;
 import org.jlab.coda.cMsg.cMsgConstants;
 import org.jlab.coda.emu.EmuUtilities;
 import org.jlab.coda.emu.support.data.*;
-import org.jlab.coda.emu.support.transport.TransportType;
 import org.jlab.coda.jevio.*;
 
 import java.io.BufferedInputStream;
@@ -206,9 +205,6 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
         // EBs release events sequentially if there's only 1 build thread,
         // else the release is NOT sequential.
         boolean sequentialRelease = true;
-
-        // NOT ER
-
 
 //System.out.println("      DataChannel TcpStream in: seq release of buffers = " + sequentialRelease);
 
@@ -405,8 +401,6 @@ if (debug) System.out.println("      DataChannel TcpStream in: GOT item " + item
                     // Reading a long assumes big endian so cmd, which is sent
                     // first, should appear in most significant bytes.
 
-                    // Assuming "direct = false" here!
-
                     //System.out.println("      DataChannel TcpStream in: Try reading buffer hdr words");
                     word = inStream.readLong();
                     cmd  = (int) ((word >>> 32) & 0xffL);
@@ -455,12 +449,6 @@ if (debug) {
                     return;
                 }
                 e.printStackTrace();
-                // If error msg already set, this will not
-                // set it again. It will send it to rc.
-                String errString = "DataChannel TcpStream in: error reading " + name;
-                if (e.getMessage() != null) {
-                    errString += ' ' + e.getMessage();
-                }
             }
         }
     }
@@ -529,35 +517,16 @@ if (debug) {
             ByteBuffer buf = item.getBuffer();
 //Utilities.printBytes(buf, 0, 500, "Incoming buf");
 
-//            // Do this for possibly compressed data. Make sure the buffer we got from the
-//            // supply is big enough to hold the uncompressed data. If not, created a new,
-//            // bigger buffer and copy everything into it.
-//            ByteBuffer newBuf = EvioCompactReaderUnsync.ensureUncompressedCapacity(buf);
-//            item.setBuffer(newBuf);
-
             try {
                 // Pool of EvioNodes associated with this buffer which grows as needed
                 pool = (EvioNodePool)item.getMyObject();
                 // Each pool must be reset only once!
                 pool.reset();
                 if (reader == null) {
-//System.out.println("      DataChannel TcpStream in: create reader, buf's pos/lim = " + buf.position() + "/" + buf.limit());
                     reader = new EvioCompactReader(buf, pool, false, false);
-//System.out.println("      DataChannel TcpStream in: incoming data's evio version = " + reader.getEvioVersion());
                 }
                 else {
-//System.out.println("      DataChannel TcpStream in: set buffer, expected id = " + expectedRecordId);
                     reader.setBuffer(buf, pool);
-                }
-
-                // If buf contained compressed data
-                if (reader.isCompressed()) {
-                    // Data may have been uncompressed into a different, larger buffer.
-                    // If so, ditch the original and use the new one.
-                    ByteBuffer biggerBuf = reader.getByteBuffer();
-                    if (biggerBuf != buf) {
-                        item.setBuffer(biggerBuf);
-                    }
                 }
             }
             catch (EvioException e) {

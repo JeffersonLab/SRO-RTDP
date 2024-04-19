@@ -337,8 +337,8 @@ public class FakeRoc extends Thread {
         if (debug) System.out.println("STARTED Aggregator thread!!");
 
         // Create output file channel
-        DataChannelImplEmu emuChannel = new DataChannelImplEmu("emuChannel", codaId, expid,
-                                                               serverIP, tcpPort, debug, dataOrder);
+        DataChannelImplEmu emuChannel = new DataChannelImplEmu("emuChannel", debug, codaId, expid,
+                                                               serverIP, tcpPort, dataOrder);
 
         ArrayList<DataChannel> outputChannels = new ArrayList<DataChannel>();
         outputChannels.add(emuChannel);
@@ -350,12 +350,7 @@ public class FakeRoc extends Thread {
         RocSimulation sim = new RocSimulation("RocSim", debug, sendControls, frameCount, dataOrder);
         sim.addOutputChannels(outputChannels);
 
-        try {
-            emuChannel.prestart();
-        }
-        catch (CmdExecException e) {
-            e.printStackTrace();
-        }
+        emuChannel.prestart();
 
         // And get it running, sending PRESTART & GO if desired
         sim.prestart();

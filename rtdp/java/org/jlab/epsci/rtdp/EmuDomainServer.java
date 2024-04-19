@@ -15,6 +15,12 @@ class EmuDomainServer extends Thread {
     private final String name;
     private final boolean debug;
 
+    /** If this is true, then we use streaming format input channels,
+     * DataChannelImplTcpStream. If false, we use regular emu channels,
+     * DataChannelImplEmu.
+     */
+    private final boolean streaming;
+
     /** Expecting data input from ROCs over TCP only. */
     private final boolean tcp;
     /** Expecting data input from ROCs over UDP only. */
@@ -37,7 +43,7 @@ class EmuDomainServer extends Thread {
 
 
 
-    public EmuDomainServer(int port, ArrayList<DataChannel> inputChannels,
+    public EmuDomainServer(int port, ArrayList<DataChannel> inputChannels, boolean streaming,
                            String expid, String name, boolean tcp, CountDownLatch latch, boolean debug) {
 
         this.name = name;
@@ -47,6 +53,7 @@ class EmuDomainServer extends Thread {
         this.udp = !tcp;
         this.clientAttachLatch = latch;
         this.debug = debug;
+        this.streaming = streaming;
         this.inputChannels = inputChannels;
         this.clientCount = inputChannels.size();
     }
@@ -68,7 +75,8 @@ class EmuDomainServer extends Thread {
 
         try {
             // Start TCP server thread
-            tcpServer = new EmuDomainTcpServer(serverPort, inputChannels, clientAttachLatch, debug);
+            tcpServer = new EmuDomainTcpServer(serverPort, inputChannels,
+                                               clientAttachLatch, debug, streaming);
             tcpServer.start();
 
             // Wait for indication thread is running before continuing on

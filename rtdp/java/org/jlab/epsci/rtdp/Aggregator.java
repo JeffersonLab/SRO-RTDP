@@ -195,7 +195,7 @@ public class Aggregator extends Thread {
         //--------------------------------------------------------------------
 
         // Create the Aggregator module
-        StreamAggregator agg = new StreamAggregator("Aggregator", debug);
+        StreamAggregator agg = new StreamAggregator(name, debug);
         agg.setSingleVTPInputs(singleVTPinput);
         agg.addInputChannels(inputChannels);
         agg.addOutputChannels(outputChannels);
@@ -211,7 +211,9 @@ public class Aggregator extends Thread {
         // Start up the TCP server or UDP receivers.
         // The TCP server will create DataChannelImplTcpStream channels as connections are made.
         // (Haven't dealt with UDP yet ...)
-        EmuDomainServer server = new EmuDomainServer(tcpPort, inputChannels, expid, name, tcp, latch, debug);
+        // True means streaming channel
+        EmuDomainServer server = new EmuDomainServer(tcpPort, inputChannels, true,
+                                                     expid, name, tcp, latch, debug);
         if (debug) System.out.println("Created a TCP server and start it");
         server.start();
         if (debug) System.out.println("TCP server started");
