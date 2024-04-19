@@ -28,6 +28,12 @@ class EmuDomainTcpServer extends Thread {
     /** Level of debug output for this class. */
     private final boolean debug;
 
+    /** If this is true, then we use streaming format input channels,
+     * DataChannelImplTcpStream. If false, we use regular emu channels,
+     * DataChannelImplEmu.
+     */
+    private final boolean streaming;
+
     private final int serverPort;
 
     /** Number of clients expected to connect. */
@@ -63,14 +69,18 @@ class EmuDomainTcpServer extends Thread {
      * @param inputChannels channel objects to associated with incoming connections.
      * @param latch sync object to let caller know when all connections are made.
      * @param debug
+     * @param streaming if this is true, then we use streaming format input channels,
+     *                  DataChannelImplTcpStream. If false, we use regular emu channels,
+     *                  DataChannelImplEmu.
      */
     public EmuDomainTcpServer(int serverPort, ArrayList<DataChannel> inputChannels,
-                              CountDownLatch latch, boolean debug) {
+                              CountDownLatch latch, boolean debug, boolean streaming) {
         this.serverPort = serverPort;
         this.inputChannels = inputChannels;
         this.clientCount = inputChannels.size();
         this.clientAttachLatch = latch;
         this.debug = debug;
+        this.streaming = streaming;
 
         inputChannels = new ArrayList<>(20);
     }
@@ -87,7 +97,7 @@ class EmuDomainTcpServer extends Thread {
         Selector selector = null;
         ServerSocketChannel serverChannel = null;
 
-        int streamCount = 0;
+        int connectCount = 0;
 
         try {
             // Get things ready for a select call
@@ -275,26 +285,25 @@ if (debug) System.out.println("Got socket position = " + socketPosition);
                         // The emu (not socket) channel will start a
                         // thread to handle all further communication.
 
-
-//                        DataChannelImplTcpStream tcpStreamChannel =
-//                                new DataChannelImplTcpStream("VTP_" + streamCount, streamCount, debug);
-//                        streamCount++;
-//
-//                        // Store for later use by Aggregating module
-//                        inputChannels.add(tcpStreamChannel);
-
-                        // Will release aggregator to continue once last client is connected
+                        // Will release aggregator/builder to continue once last client is connected
                         clientAttachLatch.countDown();
 
                         try {
-                            // Create a new TCP streaming channel each with unique name, 2nd arg is only used to
-                            // distinguish between streams from one VTP. Don't care about that here.
-                            DataChannelImplTcpStream dc = (DataChannelImplTcpStream)inputChannels.get(streamCount);
+                            if (streaming) {
+                                // Create a new TCP streaming channel each with unique name, 2nd arg is only used to
+                                // distinguish between streams from one VTP. Don't care about that here.
+                                DataChannelImplTcpStream dc = (DataChannelImplTcpStream) inputChannels.get(connectCount);
 
-                            // Starts thread to handle socket input & thread to parse and
-                            // place banks into ring buffer for aggregation
-                            dc.attachToInput(channel, codaId, bufferSizeDesired);
-                            streamCount++;
+                                // Starts thread to handle socket input & thread to parse and
+                                // place banks into ring buffer for aggregation
+                                dc.attachToInput(channel, codaId, bufferSizeDesired);
+                            }
+                            else {
+                                // Create a new EMU (non-streaming) channel each with unique name
+                                DataChannelImplEmu ec = (DataChannelImplEmu) inputChannels.get(connectCount);
+                                ec.attachToInput(channel, codaId, bufferSizeDesired);
+                            }
+                            connectCount++;
                         }
                         catch (IOException e) {
                             if (debug) {
@@ -309,7 +318,7 @@ if (debug) System.out.println("Got socket position = " + socketPosition);
                             System.out.println("Agg TCP server: new connection");
                         }
 
-                        if (streamCount >= clientCount) {
+                        if (connectCount >= clientCount) {
                             // All clients have connected so shut down server
                             System.out.println("Agg TCP server: all clients connected, shut down TCP server");
                             return;
