@@ -330,7 +330,7 @@ public class RTDPConnector {
 
             // Writing into this buf for sending to aggregator
             ByteBuffer sendingBuf = ByteBuffer.allocate(4000000);
-            EventWriter writer = new EventWriter(sendingBuf);
+            EventWriterV4 writer = new EventWriterV4(sendingBuf);
             writer.close(); // don't worry about this close
 
             // Connect to server
@@ -375,7 +375,7 @@ public class RTDPConnector {
 
                     // Set limits properly for reading
                     sendingBuf.flip();
-                    sendingBuf.limit(writer.getBytesWrittenToBuffer());
+                    sendingBuf.limit((int)writer.getBytesWrittenToBuffer());
 
                     // send to server
                     connector.send(sendingBuf.array(), 0, sendingBuf.limit());
