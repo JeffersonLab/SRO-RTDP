@@ -13,8 +13,6 @@ package org.jlab.epsci.rtdp;
 
 
 import org.jlab.coda.cMsg.cMsgNetworkConstants;
-import org.jlab.coda.emu.EmuException;
-import org.jlab.coda.emu.support.control.CmdExecException;
 import org.jlab.coda.emu.support.data.*;
 import org.jlab.coda.hipo.CompressionType;
 import org.jlab.coda.jevio.*;
@@ -22,8 +20,6 @@ import org.jlab.coda.jevio.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.concurrent.CountDownLatch;
 
 
 /**

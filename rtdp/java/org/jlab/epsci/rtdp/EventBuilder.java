@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.*;
 
-import static com.lmax.disruptor.RingBuffer.createSingleProducer;
 import static org.jlab.epsci.rtdp.StreamAggregator.checkInput;
 
 

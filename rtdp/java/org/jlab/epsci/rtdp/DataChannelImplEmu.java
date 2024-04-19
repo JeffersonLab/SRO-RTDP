@@ -12,24 +12,12 @@
 package org.jlab.epsci.rtdp;
 
 
-import com.lmax.disruptor.LiteTimeoutBlockingWaitStrategy;
-import com.lmax.disruptor.SpinCountBackoffWaitStrategy;
 import org.jlab.coda.cMsg.*;
 import org.jlab.coda.cMsg.common.cMsgMessageFull;
-
-//import org.jlab.coda.emu.Emu;
 import org.jlab.coda.emu.EmuException;
-//import org.jlab.coda.emu.EmuModule;
-//import org.jlab.coda.emu.EmuUtilities;
-//import org.jlab.coda.emu.support.codaComponent.CODAClass;
-//import org.jlab.coda.emu.support.codaComponent.CODAState;
-//import org.jlab.coda.emu.support.control.CmdExecException;
-//import org.jlab.coda.emu.support.data.*;
-
 import org.jlab.coda.emu.EmuUtilities;
 import org.jlab.coda.emu.support.data.*;
 import org.jlab.coda.jevio.*;
-
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -42,10 +30,8 @@ import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
 import java.util.BitSet;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-import static com.lmax.disruptor.RingBuffer.createSingleProducer;
 
 
 /**
