@@ -1,7 +1,6 @@
 package org.jlab.epsci.rtdp;
 
 
-import org.jlab.coda.emu.support.data.CODATag;
 import org.jlab.coda.jevio.*;
 
 import java.io.BufferedOutputStream;
