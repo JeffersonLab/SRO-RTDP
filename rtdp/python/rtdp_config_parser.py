@@ -27,10 +27,10 @@ class ConfigReader(ABC):
         """Parse the configuration file into a dictionary using the pyYAML module.
 
         Args:
-        - file_path (str): The path to the configuration file.
+            - file_path (str): The path to the configuration file.
 
         Returns:
-        - config_data : A dictionary containing the configuration data.
+            - config_data : A dictionary containing the configuration data.
         """
         with open(filepath, 'r', encoding="utf-8") as file:
             try:
@@ -79,7 +79,7 @@ class ERSAPFlowchartNode:
             extracting first).
 
         Args:
-        - item (dict): A dictionary entry parsed by pyYAML.
+            - item (dict): A dictionary entry parsed by pyYAML.
         """
         self._validate_required(item)
         self.name = item["name"]
@@ -115,7 +115,7 @@ class ERSAPReader(ConfigReader):
         """Extract the io-services and services in the ERSAP configuration.
         
         Returns:
-            node_list: A list where each element is an ERSAPFlowchartNode.
+            - node_list: A list where each element is an ERSAPFlowchartNode.
         """
         if not self._validate_ioservices():
             sys.exit(KeyError)

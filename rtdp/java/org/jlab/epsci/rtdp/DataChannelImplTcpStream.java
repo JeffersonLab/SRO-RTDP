@@ -15,7 +15,6 @@ package org.jlab.epsci.rtdp;
 import org.jlab.coda.cMsg.cMsgConstants;
 import org.jlab.coda.emu.EmuUtilities;
 import org.jlab.coda.emu.support.data.*;
-import org.jlab.coda.emu.support.transport.TransportType;
 import org.jlab.coda.jevio.*;
 
 import java.io.BufferedInputStream;
@@ -207,9 +206,6 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
         // else the release is NOT sequential.
         boolean sequentialRelease = true;
 
-        // NOT ER
-
-
 //System.out.println("      DataChannel TcpStream in: seq release of buffers = " + sequentialRelease);
 
         // Create the EvioNode pools,
@@ -398,14 +394,12 @@ class DataChannelImplTcpStream extends DataChannelAdapter {
 
                     // Sets the producer sequence
                     item = bbSupply.get();
-System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + " from ByteBuffer supply");
+if (debug) System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + " from ByteBuffer supply");
 
                     // First read the command & size with one read, into a long.
                     // These 2, 32-bit ints are sent in network byte order, cmd first.
                     // Reading a long assumes big endian so cmd, which is sent
                     // first, should appear in most significant bytes.
-
-                    // Assuming "direct = false" here!
 
                     //System.out.println("      DataChannel TcpStream in: Try reading buffer hdr words");
                     word = inStream.readLong();
@@ -415,12 +409,19 @@ System.out.println("      DataChannel TcpStream in: GOT item " + item.myIndex + 
                     buf = item.getBuffer();
                     buf.limit(size);
 
-System.out.println("      DataChannel TcpStream in: got cmd = " + cmd + ", size = " + size + ", now read in data ...");
+if (debug) System.out.println("      DataChannel TcpStream in: got cmd = " + cmd + ", size = " + size + ", now read in data ...");
                     inStream.readFully(item.getBuffer().array(), 0, size);
 //System.out.println("      DataChannel TcpStream in: done reading in data");
 
-System.out.println("      DataChannel TcpStream in: " + name + ", incoming buf size = " + size);
-Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + buf.limit());
+if (debug) System.out.println("      DataChannel TcpStream in: " + name + ", incoming buf size = " + size);
+
+if (debug) {
+    ByteOrder origOrder = buf.order();
+    buf.order(ByteOrder.LITTLE_ENDIAN);
+    Utilities.printBuffer(item.getBuffer(), 0, buf.limit() / 4, "BUFFER, lim = " + buf.limit());
+    buf.order(origOrder);
+}
+
                     bbSupply.publish(item);
 
                     // We just received the END event
@@ -448,12 +449,6 @@ Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + bu
                     return;
                 }
                 e.printStackTrace();
-                // If error msg already set, this will not
-                // set it again. It will send it to rc.
-                String errString = "DataChannel TcpStream in: error reading " + name;
-                if (e.getMessage() != null) {
-                    errString += ' ' + e.getMessage();
-                }
             }
         }
     }
@@ -485,7 +480,7 @@ Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + bu
                     // Sets the consumer sequence
                     ByteBufferItem item = bbSupply.consumerGet();
                     if (parseStreamingToRing(item, bbSupply)) {
-                        System.out.println("      DataChannel TcpStream in: 1 quit streaming parser/merger thread for END event from " + name);
+                        if (debug) System.out.println("      DataChannel TcpStream in: 1 quit streaming parser/merger thread for END event from " + name);
                         break;
                     }
                 }
@@ -520,13 +515,7 @@ Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + bu
 
             // Get buffer from an item from ByteBufferSupply - one per channel
             ByteBuffer buf = item.getBuffer();
-//Utilities.printBytes(buf, 0, 100, "Incoming buf");
-
-//            // Do this for possibly compressed data. Make sure the buffer we got from the
-//            // supply is big enough to hold the uncompressed data. If not, created a new,
-//            // bigger buffer and copy everything into it.
-//            ByteBuffer newBuf = EvioCompactReaderUnsync.ensureUncompressedCapacity(buf);
-//            item.setBuffer(newBuf);
+//Utilities.printBytes(buf, 0, 500, "Incoming buf");
 
             try {
                 // Pool of EvioNodes associated with this buffer which grows as needed
@@ -534,23 +523,10 @@ Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + bu
                 // Each pool must be reset only once!
                 pool.reset();
                 if (reader == null) {
-//System.out.println("      DataChannel TcpStream in: create reader, buf's pos/lim = " + buf.position() + "/" + buf.limit());
                     reader = new EvioCompactReader(buf, pool, false, false);
-//System.out.println("      DataChannel TcpStream in: incoming data's evio version = " + reader.getEvioVersion());
                 }
                 else {
-//System.out.println("      DataChannel TcpStream in: set buffer, expected id = " + expectedRecordId);
                     reader.setBuffer(buf, pool);
-                }
-
-                // If buf contained compressed data
-                if (reader.isCompressed()) {
-                    // Data may have been uncompressed into a different, larger buffer.
-                    // If so, ditch the original and use the new one.
-                    ByteBuffer biggerBuf = reader.getByteBuffer();
-                    if (biggerBuf != buf) {
-                        item.setBuffer(biggerBuf);
-                    }
                 }
             }
             catch (EvioException e) {
@@ -772,7 +748,7 @@ Utilities.printBuffer(item.getBuffer(), 0, 50, "PRESTART EVENT, buf lim = " + bu
                     // thread down.
                     haveInputEndEvent = true;
                     // Run callback saying we got end event
-                    System.out.println("      DataChannel TcpStream in: BREAK from loop, got END event");
+                    if (debug) System.out.println("      DataChannel TcpStream in: BREAK from loop, got END event");
                     break;
                 }
             }

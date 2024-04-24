@@ -1,0 +1,8 @@
+# commands.sh
+
+echo "Running program on ejfat-2"
+/home/ayan/tmpFiles/tcpreplay_script.sh
+
+echo "Running program on ejfat-4"
+/home/ayan/tmpFiles/tcpreplay_script.sh 
+

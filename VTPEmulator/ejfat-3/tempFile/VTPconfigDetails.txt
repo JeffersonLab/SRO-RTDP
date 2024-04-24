@@ -1,0 +1,2 @@
+ejfat-2 /home/ayan/tmpFiles/tcpreplay_script.sh
+ejfat-4 /home/ayan/tmpFiles/tcpreplay_script.sh
