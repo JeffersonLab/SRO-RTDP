@@ -1,0 +1,8 @@
+host: ayan   
+
+machines:
+  - name: ejfat-2
+    host: ayan
+    script_location: /home/ayan/tmpFiles/tcpreplay_script.sh
+  - name: ejfat-4
+    script_location: /home/ayan/tmpFiles/tcpreplay_script.sh

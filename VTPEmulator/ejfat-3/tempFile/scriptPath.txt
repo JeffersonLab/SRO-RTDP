@@ -1,0 +1,3 @@
+# script_paths.txt
+ayan@ejfat-2:/home/ayan/tmpFiles/tcpreplay_script.sh
+ayan@ejfat-4:/home/ayan/tmpFiles/tcpreplay_script.sh

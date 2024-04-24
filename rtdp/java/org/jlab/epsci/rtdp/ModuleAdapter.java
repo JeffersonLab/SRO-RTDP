@@ -57,6 +57,15 @@ public class ModuleAdapter  {
     /** Number of output channels. */
     protected int outputChannelCount;
 
+    /** Total number of evio events written to the outputs. */
+    protected long eventCountTotal;
+
+    /** Sum of the sizes, in 32-bit words, of all evio events written to the outputs. */
+    protected long wordCountTotal;
+
+    /** Total number of time slice frames (timestamps) written to the outputs if streaming. */
+    protected long frameCountTotal;
+
     /** User hit PAUSE button if {@code true}. */
     protected boolean paused;
 
