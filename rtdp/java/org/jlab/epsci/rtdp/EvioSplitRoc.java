@@ -3,36 +3,36 @@ package org.jlab.epsci.rtdp;
 import org.jlab.coda.jevio.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 
 public class EvioSplitRoc {
 
     private String fileName;
-
-    private ArrayList<Integer> rocNumList;
+    private HashSet<Integer> rocIdSet;
 
     // loop over all events in file, copy data, swap, then write
-
-
+    
     EvioSplitRoc(String file) {
         fileName = file;
+        rocIdSet = new HashSet<>();
     }
 
 
-    public void printRocIds(ArrayList<Integer> rocIdList) {
-        if (rocIdList.size() == 0) {
-            System.out.println("printRocIds: list is empty");
+    public static void printRocIds(Set<Integer> rocIds) {
+        if (rocIds.size() == 0) {
+            System.out.println("printRocIds: set is empty");
         }
 
         System.out.print("Rocs:");
-        for (int i : rocIdList) {
+        for (int i : rocIds) {
             System.out.print(" " + i);
         }
         System.out.println();
     }
-
-
+    
+    
     public void getRocNums() {
 
         // Get the complete list of ROC ids from the file
@@ -43,10 +43,12 @@ public class EvioSplitRoc {
             EvioReader reader = new EvioReader(fileName);
 
             System.out.println("Scanning " + fileName + " for Roc ids");
+            
+            EvioEvent ev;
+            int unChangedCount = 0;
 
-            int eventCount = reader.getEventCount();
-
-            for (int i=0; i < eventCount; i++) {
+            while ((ev = reader.parseNextEvent()) != null) {
+                //System.out.println("For event " + eventCount++);
 
                 // Each built event has:
                 //  1) bank of banks (event) which contains:
@@ -57,43 +59,59 @@ public class EvioSplitRoc {
                 //  1) segment of common data (skip over)
                 //  2) one segment for each ROC (tag = Roc id)
 
-                EvioEvent ev = reader.parseNextEvent();
                 int banksContained = ev.getChildCount();
 
+                // Filter out control and other small events
                 if ((ev.getTotalBytes() < 1000) || (banksContained < 2)) {
-                    // filter out control and other small events
                     System.out.println("Skipping over event with " + ev.getTotalBytes() +
                                        " bytes & " + banksContained + " banks");
                     continue;
                 }
 
                 EvioBank triggerBank = (EvioBank) ev.getChildAt(0);
-                int numRocs = triggerBank.getHeader().getTag();
                 int numSegments = triggerBank.getChildCount();
 
-                ArrayList<Integer> rocIdList = new ArrayList<Integer>();
+                DataType type = triggerBank.getHeader().getDataType();
+                int tag = triggerBank.getHeader().getTag();
 
-                // Skip over common data seg
+                // Filter out non-physics events
+                if ((type != DataType.SEGMENT) || (tag > 0xFF27 || tag < 0xFF20)) {
+                    System.out.println("Skipping over event with wrong format/tag");
+                    continue;
+                }
+
+                HashSet<Integer> rocIds = new HashSet<>();
+
+                // Skip over 2 common data segments
                 // Look for tag in each Roc segment in trigger bank
-                for (int j=1; j < numSegments; j++) {
+                for (int j=2; j < numSegments; j++) {
                     EvioSegment rocSeg = (EvioSegment) triggerBank.getChildAt(j);
                     int rocId = rocSeg.getHeader().getTag();
                     // Some events seem to have large tag values in
                     // events not containing valid ROC data. Ignore these.
                     if (rocId > 1000) continue;
-                    rocIdList.add(rocId);
+                    rocIds.add(rocId);
                 }
 
-                printRocIds(rocIdList);
 
-                // If we have already found some rocsnums but have not seen any
+                boolean changed = rocIdSet.addAll(rocIds);
+                if (changed) {
+                    unChangedCount = 0;
+                }
+                else {
+                    unChangedCount++;
+                }
+
+                // If we have already found some rocIds but have not seen any
                 // new ones for the last 1000 events then assume we've found them all
+                if (unChangedCount >= 1000) {
+                    break;
+                }
             }
 
             reader.close();
 
-         //   System.out.println("Found " + rocNumList.size() + " Roc ids in file");
-
+            printRocIds(rocIdSet);
         }
         catch (IOException e) {
             // can't read file
@@ -112,8 +130,7 @@ public class EvioSplitRoc {
         }
 
         EvioSplitRoc splitter = new EvioSplitRoc(args[0]);
-
-
+        splitter.getRocNums();
     }
 
 
