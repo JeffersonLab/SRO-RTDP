@@ -184,7 +184,7 @@ public class Builder extends Thread {
         //--------------------------------------------------------------------
 
         // Create the EventBuilder module
-        EventBuilder eb = new EventBuilder(name, debug);
+        TriggeredBuilder eb = new TriggeredBuilder(name, debug);
         eb.addInputChannels(inputChannels);
         eb.addOutputChannels(outputChannels);
 
