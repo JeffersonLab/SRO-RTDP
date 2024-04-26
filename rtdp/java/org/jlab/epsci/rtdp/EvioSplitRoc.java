@@ -230,8 +230,9 @@ public class EvioSplitRoc {
                 // Find out how much there is. To do this look at first roc-specific seg of trig bank
                 int intsToSkip = 0;
                 if (hasTimestamps && hasRocSpecificData) {
-                    EvioSegment firstRocSeg = (EvioSegment)triggerBank.getChildAt(10);
+                    EvioSegment firstRocSeg = (EvioSegment)triggerBank.getChildAt(22);
                     int dataIntsPerRocPerEvent = firstRocSeg.getIntData().length / eventCount;
+                    System.out.println("data ints in seg = " + firstRocSeg.getIntData().length);
                     System.out.println("dataIntsPerRocPerEvent = " + dataIntsPerRocPerEvent);
                     if (dataIntsPerRocPerEvent < 2) {
                         // There must be at least 2 ints to represent 1 timestamp.
@@ -339,9 +340,9 @@ public class EvioSplitRoc {
                         // This contains the timestamps of all physics events for this Roc
                         rocTsData = rocSeg.getIntData();
                         // Another sanity check
-                        if (rocTsData.length != 2 * eventCount) {
-                            System.out.println("ROC ts seg length = " + rocTsData.length + " NOT = 2*eventCount = " + (2 * eventCount));
-                            return;
+                        if (rocTsData.length != (2 * eventCount)) {
+                            System.out.println("ROC #" + i + " ts seg length = " + rocTsData.length + " NOT = 2*eventCount = " + (2 * eventCount));
+                            //return;
                         }
                     }
 
