@@ -19,6 +19,8 @@ public class EvioSplitRoc {
     EvioSplitRoc(String file) {
         fileName = file;
         rocIdSet = new HashSet<>();
+        writers = new HashMap<Integer, EventWriterUnsyncV4>();
+
     }
 
 
@@ -136,7 +138,7 @@ public class EvioSplitRoc {
     //------------------
     // ScanFile
     //------------------
-    private void scanFile() {
+    private void splitFile() {
 
         try {
             // Open input file
@@ -156,10 +158,16 @@ public class EvioSplitRoc {
                 writers.put(rocId, writer);
             }
 
+            int trackEvents = 0;
+
             // Loop over all buffers (evio "events" or top-level banks) in file
             EvioEvent ev;
 
             while ((ev = reader.parseNextEvent()) != null) {
+
+                if ( (++trackEvents) % 1000 ==0) {
+                    System.out.println("At event " + trackEvents);
+                }
                 
                 // Each built event (ev) is:
                 //  1) bank of banks (num = # of events) which contains:
@@ -173,12 +181,6 @@ public class EvioSplitRoc {
                 int banksContained = ev.getChildCount();
                 DataType evType = ev.getHeader().getDataType();
                 int eventCount = ev.getHeader().getNumber();
-                if (eventCount != banksContained - 1) {
-                    System.out.println("Event num = " + eventCount +
-                                       " does NOT match Roc data bank count =  " +
-                                       (banksContained - 1));
-                    continue;
-                }
 
                 // Filter out control and other small events
                 if ((ev.getTotalBytes() < 1000) || (banksContained < 2) || (!evType.isBank())) {
@@ -189,6 +191,7 @@ public class EvioSplitRoc {
                 }
 
                 EvioBank triggerBank = (EvioBank) ev.getChildAt(0);
+                int trigTag  = triggerBank.getHeader().getTag();
                 int rocCount = triggerBank.getHeader().getNumber();
                 int segCount = triggerBank.getChildCount();
                 if (rocCount != segCount - 2) {
@@ -196,6 +199,7 @@ public class EvioSplitRoc {
                                        " does NOT match trigger bank's roc seg count =  " +
                                        (segCount - 2));
                 }
+                System.out.println("Trigger Bank tag = 0x" + Integer.toHexString(trigTag));
 
                 DataType type = triggerBank.getHeader().getDataType();
                 // Filter out non-physics events
@@ -204,22 +208,49 @@ public class EvioSplitRoc {
                     continue;
                 }
 
+                
                 // Get useful CODA info out of this tag
-                CODATag codaTag = CODATag.getTagType(triggerBank.getHeader().getTag());
+                CODATag codaTag = CODATag.getTagType(trigTag);
                 if ((codaTag == null) || (!codaTag.isBuiltTrigger())) {
                     System.out.println("Skipping over event with wrong tag, " + triggerBank.getHeader().getTag());
                     continue;
                 }
-                
+
                 // Timestamps present?
                 boolean hasTimestamps = codaTag.hasTimestamp();
+                System.out.println("hasTimestamps = " + hasTimestamps);
+
+                // Roc specific data present in Roc data segments of trigger bank?
+                // Need this to extract Roc-specific timestamps from trigger bank.
+                boolean hasRocSpecificData = codaTag.hasRunData();
+                System.out.println("hasRocSpecificData = " + hasRocSpecificData);
+
+                // TODO: pick apart the ROC-segs to pull out timestamps correctly
+
+                // Find out how much there is. To do this look at first roc-specific seg of trig bank
+                int intsToSkip = 0;
+                if (hasTimestamps && hasRocSpecificData) {
+                    EvioSegment firstRocSeg = (EvioSegment)triggerBank.getChildAt(10);
+                    int dataIntsPerRocPerEvent = firstRocSeg.getIntData().length / eventCount;
+                    System.out.println("dataIntsPerRocPerEvent = " + dataIntsPerRocPerEvent);
+                    if (dataIntsPerRocPerEvent < 2) {
+                        // There must be at least 2 ints to represent 1 timestamp.
+                        // And furthermore, if there is additional roc-specific-data, then it must be > 2.
+                        // However, if == 2, we'll just assume timestamp is all that is present.
+                        System.out.println("Have timestamps and roc-specific data, but ints/roc = " + dataIntsPerRocPerEvent);
+                        return;
+                    }
+                    intsToSkip = dataIntsPerRocPerEvent - 2;
+                }
+                System.out.println("Ints to skip = " + intsToSkip);
+
 
                 // The trigger bank directly from a ROC contains segments, 1 for each event.
                 // Each segment contains 32 bit ints:
                 //  1) event number
                 //  2) lower 32 bits of timestamp
                 //  3) upper 32 bits of timestamp (only lower half valid)
-                //  4) miscellaneous data (not here)
+                //  4) miscellaneous data (roc specific data)
                 //
                 // The timestamp and misc. may not be present.
                 // What is present in the trigger bank will be indicated by the tag.
@@ -236,9 +267,9 @@ public class EvioSplitRoc {
                 //
                 // Each roc segment contains 32 bit ints:
                 //  1)  timestamp event 1
-                //  2)  misc event 1 (100% certain this is not here)
+                //  2)  misc event 1 (roc specific data)
                 //  3)  timestamp event 2
-                //  4)  misc event 2 (if any)        ETC.
+                //  4)  misc event 2 (roc specific data)        ETC.
                 //
 
                 // So, to reconstruct a ROC's trigger bank from a built trigger bank.
@@ -266,15 +297,7 @@ public class EvioSplitRoc {
                     //--------------------------------------------------
                     // First, get the physics data bank for this Roc
                     // (+1 to skip over built trigger bank)
-                    EvioBank rocDataBank = (EvioBank) triggerBank.getChildAt(i + 1);
-
-                    // Sanity check to see if contained banks = # events.
-                    // This will not be the case if multiple DMAs for one physics event.
-                    if (rocDataBank.getChildCount() != eventCount) {
-                        System.out.println("Problems, data bank contains more banks + " +
-                                           rocDataBank.getChildCount() + " than there are events " +
-                                           eventCount);
-                    }
+                    EvioBank rocDataBank = (EvioBank) ev.getChildAt(i + 1);
 
                     // The tag and num and type of this bank will be the same as the top level
                     // of the event we are generating so copy them here
@@ -317,7 +340,8 @@ public class EvioSplitRoc {
                         rocTsData = rocSeg.getIntData();
                         // Another sanity check
                         if (rocTsData.length != 2 * eventCount) {
-                            System.out.println("Either there is misc data coming from ROC or bad top-level format");
+                            System.out.println("ROC ts seg length = " + rocTsData.length + " NOT = 2*eventCount = " + (2 * eventCount));
+                            return;
                         }
                     }
 
@@ -419,6 +443,8 @@ public class EvioSplitRoc {
 
         EvioSplitRoc splitter = new EvioSplitRoc(args[0]);
         splitter.getRocNums();
+        splitter.splitFile();
+
     }
 
 
