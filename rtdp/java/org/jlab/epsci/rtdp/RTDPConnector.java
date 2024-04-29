@@ -155,7 +155,7 @@ public class RTDPConnector {
         goBuffer.putInt(9*4,  (0xFFD2 << 16 | 1 << 8));  // second bank word
         goBuffer.putInt(10*4, (int)(System.currentTimeMillis()));    // time
         goBuffer.putInt(11*4, 0);           // reserved
-        goBuffer.putInt(12*4, frameCount);  // frames sent so far
+        goBuffer.putInt(12*4, 1);  // frames sent so far
         goBuffer.limit(goBuffer.capacity());
 
 
@@ -184,7 +184,7 @@ public class RTDPConnector {
         endBuffer.putInt(9*4,  (0xFFD4 << 16 | 1 << 8));  // second bank word
         endBuffer.putInt(10*4, (int)(System.currentTimeMillis()));    // time
         endBuffer.putInt(11*4, 0);       // reserved
-        endBuffer.putInt(12*4, frameCount);  // frames sent so far
+        endBuffer.putInt(12*4, 1);  // frames sent so far
         endBuffer.limit(endBuffer.capacity());
     }
 
@@ -327,7 +327,12 @@ public class RTDPConnector {
             // For reading file containing events to send
             EvioReader reader = new EvioReader(connector.fileName);
 
-            // Writing into this buf for sending to aggregator
+            if (connector.frameCount < 1) {
+                connector.frameCount = reader.getEventCount();
+                System.out.println("Sending " + connector.frameCount + " events");
+            }
+
+                // Writing into this buf for sending to aggregator
             ByteBuffer sendingBuf = ByteBuffer.allocate(4000000);
             EventWriterV4 writer = new EventWriterV4(sendingBuf);
             writer.close(); // don't worry about this close
@@ -351,13 +356,15 @@ public class RTDPConnector {
                 connector.send(connector.goBuffer.array(), 0, connector.goBuffer.capacity());
             }
 
+            int trackEvents = 0;
+
             if (connector.frameCount > 0) {
 
                 // Send frame to server
                 for (int i=0; i < connector.frameCount; i++) {
 
-                    if (connector.verbose) {
-                        System.out.println("connect: sending event " + i);
+                    if (connector.verbose && ((++trackEvents) % 1000 == 0)) {
+                        System.out.println("At event " + trackEvents);
                     }
 
                     // read event from file
@@ -383,6 +390,7 @@ public class RTDPConnector {
 
             if (connector.sendControls) {
                 // Send END event
+                connector.endBuffer.putInt(12*4, connector.frameCount+2);  // # frames sent so far
                 // Put in a delay so aggregator can finish building all events, not strictly necessary
                 Thread.sleep(4000);
                 if (connector.verbose) {
