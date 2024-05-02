@@ -51,8 +51,9 @@ public class DataChannelImplFile extends DataChannelAdapter {
     /**
      * Constructor DataChannelImplFile creates a new DataChannelImplFile instance.
      *
-     * @param chName  name of file channel
+     * @param chName    name of file channel
      * @param fileName  name of file to create & write to
+     * @param debug     if true, printout debug statements.
      * @throws DataTransportException if unable to create file.
      */
     DataChannelImplFile(String chName, String fileName, boolean debug) throws DataTransportException {
