@@ -38,9 +38,10 @@ public class Builder extends Thread {
     private int tcpPort     = cMsgNetworkConstants.emuTcpPort;
     private int clientCount = 1;
     private String expid;
-    private String name     = "Builder";
-    private String fileName = "/tmp/rtdpTest.data";
-    private String etName   = "";
+    private String name        = "Builder";
+    private String defaultFile = "/tmp/rtdpTest.data";
+    private String fileName    = "";
+    private String etName      = "";
 
     /**
      * Constructor.
@@ -127,8 +128,15 @@ public class Builder extends Thread {
         }
 
         if (fileName.length() > 0 && etName.length() > 0) {
-            System.out.println("Choose either a file or ET output, but not both");
+            System.out.println("\n     Choose either a file or ET output, but not both\n");
             System.exit(-1);
+        }
+
+        if (etName.length() == 0 && fileName.length() == 0) {
+            System.out.println("\n    Neither file nor ET specified as output");
+            System.out.println("    By default write output to file: " + defaultFile);
+            System.out.println("");
+            fileName = defaultFile;
         }
 
     }
@@ -176,6 +184,7 @@ public class Builder extends Thread {
         if (useEt) {
             // Create output ET channel
             try {
+                if (debug) System.out.println("Create an ET channel for " + etName);
                 outChannel = new DataChannelImplEt("etChannel", etName, debug);
             }
             catch (DataTransportException e) {
@@ -186,6 +195,7 @@ public class Builder extends Thread {
         else {
             // Create output file channel
             try {
+                if (debug) System.out.println("Create a file channel for " + fileName);
                 outChannel = new DataChannelImplFile("fileChannel", fileName, debug);
             }
             catch (DataTransportException e) {
@@ -194,7 +204,7 @@ public class Builder extends Thread {
             }
         }
 
-        if (debug) System.out.println("Created a file channel for " + fileName);
+
         ArrayList<DataChannel> outputChannels = new ArrayList<DataChannel>();
         outputChannels.add(outChannel);
 
