@@ -102,7 +102,7 @@ public class DataChannelImplEt extends DataChannelAdapter {
 
         super(name, false, debug, 0);
 
-        System.out.println("DataChannel Et: creating output channel to " + name);
+        System.out.println("DataChannel Et: creating output channel to " + etName);
 
 
         try {
@@ -151,6 +151,8 @@ public class DataChannelImplEt extends DataChannelAdapter {
         // The first control word is this EB's coda id
         control[0] = id;
         isFinalEB = true;// ??
+
+        prestart();
 
     }
 
@@ -525,7 +527,7 @@ System.out.println("          DataChannel Et shutdown: " + name + " channel, wok
                         // All events have data unless otherwise specified
                         etContainer.setLastIndex(validEvents - 1);
 //System.out.println("      DataChannel Et out (" + name + "): filler, got container with " + validEvents +
-//                    " events, lastIndex = " + (validEvents - 1) + ", id = " + etContainer.getId());
+//                    " events, lastIndex = " + (validEvents - 1));
                     }
                     catch (InterruptedException e) {
                         // Told to wake up because we're ending or resetting
@@ -1053,7 +1055,7 @@ System.out.println("      DataChannel Et out: " + name + " Et connection closed"
                             while (true) {
                                 try {
 //System.out.println("      DataChannel Et out (" + name + "): GETTER try getting new events");
-                                    etSystem.newEvents(etContainer);
+                                    etSystem.newEventsNoGroup(etContainer);
 //System.out.println("      DataChannel Et out (" + name + "): GETTER got new events");
                                     break;
                                 }
@@ -1076,7 +1078,7 @@ System.out.println("      DataChannel Et out: " + name + " Et connection closed"
                             etContainer = rb.get(sequence);
 
                             etContainer.newEvents(attachment, Mode.SLEEP, 0, chunk, eventSize);
-                            etSystem.newEvents(etContainer);
+                            etSystem.newEventsNoGroup(etContainer);
 
                             rb.publish(sequence++);
                         }
