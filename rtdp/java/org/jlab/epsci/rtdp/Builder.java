@@ -33,12 +33,14 @@ public class Builder extends Thread {
 
     private boolean debug;
     private boolean tcp = true;  // always
+    private boolean useEt = false;
 
     private int tcpPort     = cMsgNetworkConstants.emuTcpPort;
     private int clientCount = 1;
     private String expid;
     private String name     = "Builder";
     private String fileName = "/tmp/rtdpTest.data";
+    private String etName   = "";
 
     /**
      * Constructor.
@@ -72,7 +74,7 @@ public class Builder extends Thread {
                     }
                 }
                 catch (NumberFormatException e) {
-                    e.printStackTrace();
+                    System.out.println("-p needs integer arg");
                     System.exit(-1);
                 }
             }
@@ -87,7 +89,7 @@ public class Builder extends Thread {
                     }
                 }
                 catch (NumberFormatException e) {
-                    e.printStackTrace();
+                    System.out.println("-c needs integer arg");
                     System.exit(-1);
                 }
             }
@@ -97,6 +99,11 @@ public class Builder extends Thread {
             }
             else if (args[i].equalsIgnoreCase("-f")) {
                 fileName = args[i + 1];
+                i++;
+            }
+            else if (args[i].equalsIgnoreCase("-et")) {
+                etName = args[i + 1];
+                useEt = true;
                 i++;
             }
             else if (args[i].equalsIgnoreCase("-n")) {
@@ -119,6 +126,11 @@ public class Builder extends Thread {
             }
         }
 
+        if (fileName.length() > 0 && etName.length() > 0) {
+            System.out.println("Choose either a file or ET output, but not both");
+            System.exit(-1);
+        }
+
     }
 
 
@@ -131,6 +143,7 @@ public class Builder extends Thread {
                 "        [-n <name>]          name of server's CODA component (can ignore, default Builder)\n" +
                 "        [-c <# of clients>]  number of ROCs sending data (default 1)\n" +
                 "        [-f <output file>]   name of output file (default /tmp/rtdpTest.dat)\n" +
+                "        [-et <ET name>]      name of output ET system file\n" +
                 "        [-v]                 turn on printout\n" +
                 "        [-h]                 print this help\n");
 
@@ -157,21 +170,33 @@ public class Builder extends Thread {
     public void run() {
         if (debug) System.out.println("STARTED Builder!");
 
-        // Create output file channel
-        DataChannelImplFile fileChannel = null;
-        try {
-            if (debug) System.out.println("Call channel constructor ");
-            fileChannel = new DataChannelImplFile("fileChannel", fileName, debug);
-            if (debug) System.out.println("Past channel creation ");
+        // Create output channel
+        DataChannel outChannel = null;
+
+        if (useEt) {
+            // Create output ET channel
+            try {
+                outChannel = new DataChannelImplEt("etChannel", etName, debug);
+            }
+            catch (DataTransportException e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
         }
-        catch (DataTransportException e) {
-            e.printStackTrace();
-            System.exit(1);
+        else {
+            // Create output file channel
+            try {
+                outChannel = new DataChannelImplFile("fileChannel", fileName, debug);
+            }
+            catch (DataTransportException e) {
+                e.printStackTrace();
+                System.exit(1);
+            }
         }
 
         if (debug) System.out.println("Created a file channel for " + fileName);
         ArrayList<DataChannel> outputChannels = new ArrayList<DataChannel>();
-        outputChannels.add(fileChannel);
+        outputChannels.add(outChannel);
 
         // Create input regular emu channels and store all channels created
         ArrayList<DataChannel> inputChannels = new ArrayList<>(clientCount);
