@@ -324,15 +324,30 @@ public class RTDPConnector {
             
             RTDPConnector connector = new RTDPConnector(args);
 
-            // For reading file containing events to send
-            EvioReader reader = new EvioReader(connector.fileName);
+            // For reading file containing events to send.
+            // Setup for 1) not checking record #s, 2) use sequential reads.
+            // Not using sequential reads means calling getEventCount has to scan the
+            // whole file is thus is not recommended.
+            EvioReader reader = new EvioReader(connector.fileName, false, true);
 
-            if (connector.frameCount < 1) {
-                connector.frameCount = reader.getEventCount();
-                System.out.println("Sending " + connector.frameCount + " events");
+            int eventLimit = 0;
+            boolean haveEventLimit = false;
+
+            if (connector.frameCount > 0) {
+                // User set limit on # of events to process
+                haveEventLimit = true;
+                eventLimit = connector.frameCount;
+                if (connector.verbose) {
+                    System.out.println("Send at most " + eventLimit + " events");
+                }
+            }
+            else {
+                if (connector.verbose) {
+                    System.out.println("Send all events");
+                }
             }
 
-                // Writing into this buf for sending to aggregator
+            // Writing into this buf for sending to aggregator/builder
             ByteBuffer sendingBuf = ByteBuffer.allocate(4000000);
             EventWriterV4 writer = new EventWriterV4(sendingBuf);
             writer.close(); // don't worry about this close
@@ -340,7 +355,7 @@ public class RTDPConnector {
             // Connect to server
             connector.directConnect();
 
-            // Put in a delay here to allow all the channels to be created for the Aggregator
+            // Put in a delay here to allow all the channels to be created for the Aggregator/Builder
             // and its main building thread to start. Not sure exactly what to do here since
             // in a DAQ system all this timing is controlled by the RunControl program.
             // When replaying packets this shouldn't be an issue either as it reflects the
@@ -356,36 +371,42 @@ public class RTDPConnector {
                 connector.send(connector.goBuffer.array(), 0, connector.goBuffer.capacity());
             }
 
-            int trackEvents = 0;
+            EvioEvent ev;
+            int evCount = 0;
+            long totalBytesWritten = 0L;
 
-            if (connector.frameCount > 0) {
+            // Send each event to server
+            while ((ev = reader.parseNextEvent()) != null) {
 
-                // Send frame to server
-                for (int i=0; i < connector.frameCount; i++) {
+                evCount++;
 
-                    if (connector.verbose && ((++trackEvents) % 1000 == 0)) {
-                        System.out.println("At event " + trackEvents);
+                if (haveEventLimit) {
+                    if (evCount > eventLimit) {
+                        // We've processed up to user-set limit, time to quit
+                        break;
                     }
-
-                    // read event from file
-                    EvioEvent ev = reader.parseEvent(i+1);
-
-                    // reset buffer in which to place event
-                    sendingBuf.clear();
-                    // get ready to write into it
-                    writer.setBuffer(sendingBuf);
-                    // write event
-                    writer.writeEvent(ev);
-                    // flush data and get ready to read
-                    writer.close();
-
-                    // Set limits properly for reading
-                    sendingBuf.flip();
-                    sendingBuf.limit((int)writer.getBytesWrittenToBuffer());
-
-                    // send to server
-                    connector.send(sendingBuf.array(), 0, sendingBuf.limit());
                 }
+
+                if (connector.verbose && ((evCount) % 1000 == 0)) {
+                    System.out.println("At event " + evCount);
+                }
+
+                // reset buffer in which to place event
+                sendingBuf.clear();
+                // get ready to write into it
+                writer.setBuffer(sendingBuf);
+                // write event
+                writer.writeEvent(ev);
+                // flush data and get ready to read
+                writer.close();
+
+                // Set limits properly for reading
+                sendingBuf.flip();
+                sendingBuf.limit((int)writer.getBytesWrittenToBuffer());
+ totalBytesWritten += sendingBuf.limit();
+
+                // send to server
+                connector.send(sendingBuf.array(), 0, sendingBuf.limit());
             }
 
             if (connector.sendControls) {
@@ -394,7 +415,7 @@ public class RTDPConnector {
                 // Put in a delay so aggregator can finish building all events, not strictly necessary
                 Thread.sleep(4000);
                 if (connector.verbose) {
-                    System.out.println("connect: sent end");
+                    System.out.println("connect: sent " + totalBytesWritten + " bytes, then end");
                 }
                 connector.send(connector.endBuffer.array(), 0, connector.endBuffer.capacity());
             }
