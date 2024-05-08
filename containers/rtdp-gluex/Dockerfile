@@ -22,15 +22,22 @@ RUN update-ca-certificates \
 
 COPY run_build.sh /opt/run_build.sh
 COPY version.xml /opt/version.xml
-COPY setenv.sh /opt/setenv.sh
 
 RUN chmod +x /opt/run_build.sh \
     && /opt/run_build.sh
+
+COPY setenv.sh /opt/setenv.sh
+RUN chmod +x /opt/setenv.sh
 
 COPY Dockerfile /container/Dockerfile
 RUN ln -s /root /home/root
 RUN ln -s /root /home/0
 
 ENV BMS_OSNAME_OVERRIDE Linux_Ubuntu20.04-x86_64-gcc9.4.0
+COPY entrypoint.sh /container/entrypoint.sh
+RUN chmod +x /container/entrypoint.sh
+ENTRYPOINT ["/container/entrypoint.sh"]
+# RUN ln -s /opt/setenv.sh /etc/profile.d/setenv.sh
 
-CMD ["/bin/bash"]
+# CMD ["/bin/bash", "-c", "source /opt/setenv.sh; exec /bin/bash"]
+CMD ["/bin/bash", "-l"]
