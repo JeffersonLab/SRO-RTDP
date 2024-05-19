@@ -15,8 +15,10 @@ export CMSGROOT=$CODA/Linux-x86_64
 export ROOTSPY=$GLUEX_TOP/rootspy/latest/${BMS_OSNAME}
 export HALLD_RECON_HOME=$GLUEX_TOP/halld_recon/latest
 
+export PATH=${PATH}:${GLUEX_TOP}/halld_recon/latest/${BMS_OSNAME}/bin
 export PATH=${PATH}:${GLUEX_TOP}/hddm/hddm/bin:${GLUEX_TOP}/hdds/hdds-*/Linux_Ubuntu20.04-x86_64-gcc9.4.0/bin
 export PATH=${PATH}:${GLUEX_TOP}/monitoring/${BMS_OSNAME}/bin
+export PATH=${PATH}:${GLUEX_TOP}/rootspy/latest/${BMS_OSNAME}/bin
 export PATH=${PATH}:${GLUEX_TOP}/etUtils/${BMS_OSNAME}/bin
 export PATH=${PATH}:${GLUEX_TOP}/et/et-16.3/Linux-x86_64/bin
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$GLUEX_TOP/et/et-16.3/Linux-x86_64/lib

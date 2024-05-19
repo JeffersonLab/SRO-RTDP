@@ -100,13 +100,25 @@ ln -s libcMsgxx.so $GLUEX_TOP/coda/Linux-x86_64/lib/libcmsgxx.so
 # ln -s /usr/lib/x86_64-linux-gnu/libprotobuf.so $GLUEX_TOP/coda/Linux-x86_64/lib/libcodaObject.so
 
 
-# xMsg
+# xMsg-cpp
 mkdir -p $GLUEX_TOP/xmsg
 cd $GLUEX_TOP/xmsg
 git clone --depth 1 https://github.com/JeffersonLab/xmsg-cpp -b v2.3 $GLUEX_TOP/xmsg/xmsg-cppv2.3.src
 cmake -S xmsg-cppv2.3.src -B xmsg-cppv2.3.build -DXMSG_BUILD_TESTS=OFF
 cmake --build xmsg-cppv2.3.build --target install -j $NTHREADS
 export XMSG_ROOT=/usr/local
+
+# xmsg-java
+cd $GLUEX_TOP/xmsg
+git clone --depth 1 https://github.com/JeffersonLab/xmsg-java -b v2.3 $GLUEX_TOP/xmsg/xmsg-javav2.3.src
+cd xmsg-javav2.3.src
+sed -i 's/http/https/g' build.gradle
+export JAVA_HOME_SAVE=$JAVA_HOME
+export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
+./gradlew -PciMode=true build jar
+export JAVA_HOME=$JAVA_HOME_SAVE
+mkdir -p xmsg-javav2.3/jars
+cp -f ./build/libs/xmsg-2.3.jar xmsg-javav2.3/jars
 
 # RootSpy
 mkdir -p $GLUEX_TOP/rootspy
@@ -118,6 +130,7 @@ sed -i '/#include <TROOT.h>/a #include <TObjString.h>' src/libRootSpy/DRootSpy.c
 sed -i 's/->connect(bind_to)/->connect(xmsg::ProxyAddress(bind_to))/g' src/libRootSpy-client/rs_xmsg.cc
 sed -i 's/->connect(bind_to)/->connect(xmsg::ProxyAddress(bind_to))/g' src/libRootSpy/DRootSpy.cc
 sed -i '/#include <TROOT.h>/a #include <TVirtualX.h>' src/RootSpy/rs_mainframe.cc
+sed -i '/^env.PrependUnique(LIBS/a env.AppendUnique(LIBS=['\''xmsg'\'', '\''protobuf'\''])' src/RSAI/SConscript
 # sed -i '/codaObject/d' src/RSAI/SConscript
 # sed -i '/codaObject/d' src/RSTimeSeries/SConscript
 unset CODA
@@ -126,6 +139,7 @@ python2 /usr/local/bin/scons -j $NTHREADS Linux_Ubuntu20.04-x86_64-gcc9.4.0/plug
 python2 /usr/local/bin/scons -j $NTHREADS Linux_Ubuntu20.04-x86_64-gcc9.4.0/lib/libRootSpy-client.a 
 python2 /usr/local/bin/scons -j $NTHREADS Linux_Ubuntu20.04-x86_64-gcc9.4.0/lib/libRootSpy.a 
 python2 /usr/local/bin/scons -j $NTHREADS Linux_Ubuntu20.04-x86_64-gcc9.4.0/bin/RSAI
+python2 /usr/local/bin/scons -j $NTHREADS Linux_Ubuntu20.04-x86_64-gcc9.4.0/bin/RSMonitor
 python2 /usr/local/bin/scons -j $NTHREADS Linux_Ubuntu20.04-x86_64-gcc9.4.0/include
 export ROOTSPY=$GLUEX_TOP/rootspy/latest/${BMS_OSNAME}
 
@@ -139,6 +153,7 @@ ln -s lib $SQLITECPP_HOME/lib64
 mkdir -p ${GLUEX_TOP}/halld_recon
 git clone --depth 1 https://github.com/JeffersonLab/halld_recon ${GLUEX_TOP}/halld_recon/latest
 cd ${GLUEX_TOP}/halld_recon/latest/src
+# sed -i 's/host\.find("239\.")==0/true/' libraries/DAQ/HDET.cc  # patch to always connect via tcp and not via shared memfile
 scons -j $NTHREADS ../$BMS_OSNAME/bin/hd_root
 scons -j $NTHREADS ../$BMS_OSNAME/plugins/occupancy_online.so
 scons -j $NTHREADS ../$BMS_OSNAME/plugins/highlevel_online.so
@@ -169,11 +184,5 @@ python2 /usr/local/bin/scons -j $NTHREADS $BMS_OSNAME/bin/file2et
 # Remove some of the build files
 rm -rf  $GLUEX_TOP/jana/latest/.Linux*
 rm -rf  $GLUEX_TOP/halld_recon/latest/src/.Linux*
+rm -rf  $GLUEX_TOP/xmsg/xmsg-javav2.3.src
 
-# To run cMsg and ET servers:
-# java -cp java/jars/java8/cMsg-5.2.jar -server -Dtimeorder -Ddebug=info org/jlab/coda/cMsg/cMsgDomain/server/cMsgNameServer >& /dev/null &
-# $GLUEX_TOP/et/et-16.3/Linux-x86_64/bin/et_start -f /tmp/et_mon >& /dev/null &
-
-# To run hdmon
-# export ROOTSPY_UDL="cMsg://127.0.0.1/cMsg/rootspy"
-# hdmon ET:/tmp/et_mon
