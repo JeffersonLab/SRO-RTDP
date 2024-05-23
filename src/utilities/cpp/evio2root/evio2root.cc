@@ -175,16 +175,6 @@ int main(int narg, char* argv[]){
     tree_dcrb.Branch("slot", &thit_dcrb.slot, "slot/i");
     tree_dcrb.Branch("chan", &thit_dcrb.chan, "chan/i");
     tree_dcrb.Branch("t", &thit_dcrb.t, "t/i");
-
-	// // F250 hits output file
-	// std::string ofname_f250 = fname + "_f250.csv";
-	// std::ofstream ofs_f250( ofname_f250.c_str() );
-	// ofs_f250 << "frame_number,frame_timestamp,rocid,slot,chan,q,t\n";
-
-	// // DCRB hits output file
-	// std::string ofname_dcrb = fname + "_dcrb.csv";
-	// std::ofstream ofs_dcrb( ofname_dcrb.c_str() );
-	// ofs_dcrb << "frame_number,frame_timestamp,rocid,slot,chan,t\n";
 	
 	std::cout << " In file: " <<  fname      << std::endl;
 	std::cout << "Out file: " << ofname << std::endl;
@@ -262,8 +252,6 @@ int main(int narg, char* argv[]){
 		}
 		
 		// Loop over payload data (both F250 and DCRB)
-		// std::vector<F250Hit> f250_hits;
-		// std::vector<DCRBHit> dcrb_hits;
 		for(auto ppb : rtsb.databank){
 		
 			for( size_t i=0; i<ppb.payload_len-1; i++){
@@ -271,8 +259,8 @@ int main(int narg, char* argv[]){
 				auto w = ppb.data[i];
 
 				if( ppb.module_id == 0 ) { // F250
-					// who pointed me to this code on Github in ersap-actor repository:
-					// FADC250 SRO format is not documented. Dave A. pointed me to Vardan 
+					// FADC250 SRO format is not documented. 
+					// Dave A. pointed me to Vardan  who pointed me to this code on Github in ersap-actor repository:
 					// src/main/java/org/jlab/ersap/actor/coda/source/file/CodaOutputFileReader.java
 					F250Hit &hit = thit_f250;
 					hit.frame_number = rtsbh->frame_num;
@@ -284,8 +272,6 @@ int main(int narg, char* argv[]){
 					hit.t    = ((w>>17) & 0x3FFF)*4;
 					tree_f250.Fill();
 					Nhits_f250++;
-				
-					// f250_hits.push_back(hit);
 				}else if(ppb.module_id == 1) { // DCRB
 					// DCRB uses two 32bit words to encode hit pattern of 48 (of the 96) inputs to the module
 					auto w2 = ppb.data[++i];
@@ -312,8 +298,6 @@ int main(int narg, char* argv[]){
 						hit.t = ((w2>>19) & 0x7FF) * 32; // multiply by 32 to convert to ns
 						tree_dcrb.Fill();
 						Nhits_dcrb++;
-
-						// dcrb_hits.push_back( hit );
 					}
 				}else{
 					std::cerr << "Unknown module type id (" << ppb.module_id << "). Should be 0 or 1!" << std::endl;
@@ -321,33 +305,6 @@ int main(int narg, char* argv[]){
 				}
 			}
 		}
-		
-		// Loop over F250 hits, writing to CSV file
-		//std::cout << "Writing " << f250_hits.size() << " hits to CSV file ..." << std::endl;
-		// Nhits_f250 += f250_hits.size();
-		// for( auto &hit : f250_hits ){
-		// 	ofs_f250
-		// 		<< hit.frame_number << ","
-		// 		<< hit.frame_timestamp << ","
-		// 		<< hit.rocid << ","
-		// 		<< hit.slot << ","
-		// 		<< hit.chan << ","
-		// 		<< hit.q << ","
-		// 		<< hit.t << "\n";
-		// }
-
-		// Loop over DCRB hits, writing to CSV file
-		//std::cout << "Writing " << dcrb_hits.size() << " hits to CSV file ..." << std::endl;
-		// Nhits_dcrb += dcrb_hits.size();
-		// for( auto &hit : dcrb_hits ){
-		// 	ofs_dcrb
-		// 		<< hit.frame_number << ","
-		// 		<< hit.frame_timestamp << ","
-		// 		<< hit.rocid << ","
-		// 		<< hit.slot << ","
-		// 		<< hit.chan << ","
-		// 		<< hit.t << "\n";
-		// }
 
 		auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> elapsed_seconds = now - last_update;
@@ -357,8 +314,6 @@ int main(int narg, char* argv[]){
             last_update = now;
         }
 
-		// size_t Nwords = (ptr - buff);
-		//std::cout << "Nwords: parsed="<< Nwords << "  NTH=" << nth.block_len-8 << std::endl;
 	}
 	
 	// Close input and output files
