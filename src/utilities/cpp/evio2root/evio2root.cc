@@ -1,14 +1,11 @@
 //
-// This will convert the SRO formatted evio data (non-aggregated) into a CSV
+// This will convert the SRO formatted evio data (non-aggregated) into a ROOT
 // file. This works for the May 2024 CLAS12 RTDP beam test data and converts
 // both F250 and DCRB hits. (Any particular crate will only have one type
 // though.)
 //
-// This will blow up the original file size by about x3.5 so it is not very
-// efficient at storage. The evio2root program is preferred which is essentially
-// a copy of this.
 //
-// g++ -g -std=c++2a evio2csv.cc -o evio2csv
+// g++ -g evio2root.cc -o evio2root `root-config --cflags --libs`
 //
 
 #include <iostream>
@@ -16,9 +13,10 @@
 #include <string>
 #include <vector>
 #include <filesystem>
-#include <sys/stat.h>
 #include <chrono>
-
+#include <cstdint>
+#include <TFile.h>
+#include <TTree.h>
 using namespace std;
 
 typedef struct{
@@ -153,19 +151,33 @@ int main(int narg, char* argv[]){
     size_t total_size = std::filesystem::file_size(fname);
     size_t processed_size = 0;
 	
-	// F250 hits output file
-	std::string ofname_f250 = fname + "_f250.csv";
-	std::ofstream ofs_f250( ofname_f250.c_str() );
-	ofs_f250 << "frame_number,frame_timestamp,rocid,slot,chan,q,t\n";
+	// Open output file
+	std::string ofname = fname + ".root";
+	TFile file( ofname.c_str(), "RECREATE");
 
-	// DCRB hits output file
-	std::string ofname_dcrb = fname + "_dcrb.csv";
-	std::ofstream ofs_dcrb( ofname_dcrb.c_str() );
-	ofs_dcrb << "frame_number,frame_timestamp,rocid,slot,chan,t\n";
+	// Define F250 tree
+    TTree tree_f250("f250", "F250 Hits Data");
+	F250Hit thit_f250;
+	tree_f250.Branch("frame_number", &thit_f250.frame_number, "frame_number/i");
+    tree_f250.Branch("frame_timestamp", &thit_f250.frame_timestamp, "frame_timestamp/l");
+    tree_f250.Branch("rocid", &thit_f250.rocid, "rocid/i");
+    tree_f250.Branch("slot", &thit_f250.slot, "slot/i");
+    tree_f250.Branch("chan", &thit_f250.chan, "chan/i");
+    tree_f250.Branch("q", &thit_f250.q, "q/i");
+    tree_f250.Branch("t", &thit_f250.t, "t/i");
+
+	// Define DCRB tree
+    TTree tree_dcrb("dcrb", "DCRB Hits Data");
+	DCRBHit thit_dcrb;
+	tree_dcrb.Branch("frame_number", &thit_dcrb.frame_number, "frame_number/i");
+    tree_dcrb.Branch("frame_timestamp", &thit_dcrb.frame_timestamp, "frame_timestamp/l");
+    tree_dcrb.Branch("rocid", &thit_dcrb.rocid, "rocid/i");
+    tree_dcrb.Branch("slot", &thit_dcrb.slot, "slot/i");
+    tree_dcrb.Branch("chan", &thit_dcrb.chan, "chan/i");
+    tree_dcrb.Branch("t", &thit_dcrb.t, "t/i");
 	
 	std::cout << " In file: " <<  fname      << std::endl;
-	std::cout << "Out file: " << ofname_f250 << std::endl;
-	std::cout << "Out file: " << ofname_dcrb << std::endl;
+	std::cout << "Out file: " << ofname << std::endl;
 
 	uint32_t Nhits_f250 = 0;
 	uint32_t Nhits_dcrb = 0;
@@ -240,8 +252,6 @@ int main(int narg, char* argv[]){
 		}
 		
 		// Loop over payload data (both F250 and DCRB)
-		std::vector<F250Hit> f250_hits;
-		std::vector<DCRBHit> dcrb_hits;
 		for(auto ppb : rtsb.databank){
 		
 			for( size_t i=0; i<ppb.payload_len-1; i++){
@@ -249,10 +259,10 @@ int main(int narg, char* argv[]){
 				auto w = ppb.data[i];
 
 				if( ppb.module_id == 0 ) { // F250
-					// who pointed me to this code on Github in ersap-actor repository:
-					// FADC250 SRO format is not documented. Dave A. pointed me to Vardan 
+					// FADC250 SRO format is not documented. 
+					// Dave A. pointed me to Vardan  who pointed me to this code on Github in ersap-actor repository:
 					// src/main/java/org/jlab/ersap/actor/coda/source/file/CodaOutputFileReader.java
-					F250Hit hit;
+					F250Hit &hit = thit_f250;
 					hit.frame_number = rtsbh->frame_num;
 					hit.frame_timestamp = (uint64_t)rtsbh->timestamp1 + (((uint64_t)rtsbh->timestamp2)<<32);
 					hit.rocid = rtsbh->rocid_type_ss >> 16;
@@ -260,8 +270,8 @@ int main(int narg, char* argv[]){
 					hit.chan = (w>>13) & 0x000F;
 					hit.q    = (w>>0 ) & 0x1FFF;
 					hit.t    = ((w>>17) & 0x3FFF)*4;
-				
-					f250_hits.push_back(hit);
+					tree_f250.Fill();
+					Nhits_f250++;
 				}else if(ppb.module_id == 1) { // DCRB
 					// DCRB uses two 32bit words to encode hit pattern of 48 (of the 96) inputs to the module
 					auto w2 = ppb.data[++i];
@@ -279,47 +289,21 @@ int main(int narg, char* argv[]){
 					for( int i=0; i<48; i++ ){
 						if( ! ((pattern>>i) & 0x1) ) continue;  // skip wires that weren't hit
 
-						DCRBHit hit;
+						DCRBHit &hit = thit_dcrb;
 						hit.frame_number = rtsbh->frame_num;
 						hit.frame_timestamp = (uint64_t)rtsbh->timestamp1 + (((uint64_t)rtsbh->timestamp2)<<32);
 						hit.rocid = rtsbh->rocid_type_ss >> 16;
 						hit.slot = ppb.head >> 16;
 						hit.chan = i + (ch*48); // chan will be 0-95
 						hit.t = ((w2>>19) & 0x7FF) * 32; // multiply by 32 to convert to ns
-						dcrb_hits.push_back( hit );
+						tree_dcrb.Fill();
+						Nhits_dcrb++;
 					}
 				}else{
 					std::cerr << "Unknown module type id (" << ppb.module_id << "). Should be 0 or 1!" << std::endl;
 					return -2;
 				}
 			}
-		}
-		
-		// Loop over F250 hits, writing to CSV file
-		//std::cout << "Writing " << f250_hits.size() << " hits to CSV file ..." << std::endl;
-		Nhits_f250 += f250_hits.size();
-		for( auto &hit : f250_hits ){
-			ofs_f250
-				<< hit.frame_number << ","
-				<< hit.frame_timestamp << ","
-				<< hit.rocid << ","
-				<< hit.slot << ","
-				<< hit.chan << ","
-				<< hit.q << ","
-				<< hit.t << "\n";
-		}
-
-		// Loop over DCRB hits, writing to CSV file
-		//std::cout << "Writing " << dcrb_hits.size() << " hits to CSV file ..." << std::endl;
-		Nhits_dcrb += dcrb_hits.size();
-		for( auto &hit : dcrb_hits ){
-			ofs_dcrb
-				<< hit.frame_number << ","
-				<< hit.frame_timestamp << ","
-				<< hit.rocid << ","
-				<< hit.slot << ","
-				<< hit.chan << ","
-				<< hit.t << "\n";
 		}
 
 		auto now = std::chrono::steady_clock::now();
@@ -330,14 +314,12 @@ int main(int narg, char* argv[]){
             last_update = now;
         }
 
-		// size_t Nwords = (ptr - buff);
-		//std::cout << "Nwords: parsed="<< Nwords << "  NTH=" << nth.block_len-8 << std::endl;
 	}
 	
 	// Close input and output files
 	ifs.close();
-	ofs_f250.close();
-	ofs_dcrb.close();
+	file.Write();
+    file.Close();
 
 	// Ensure final progress is 100%
     show_progress(total_size, total_size);
