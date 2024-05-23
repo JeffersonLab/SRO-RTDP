@@ -1,3 +1,4 @@
+
 //
 //  g++ pcap2evio.cc -o pcap2evio -lpcap
 //
@@ -44,8 +45,9 @@ void packet_handler(u_char *user_data, const struct pcap_pkthdr *pkthdr, const u
 			uint64_t Nbytes_to_write = payload_length;
 			
 			// The first 14 bytes have an unknown format so we drop them.
-			if( Nbytes_written<14 ){
-				uint64_t Nskip = 14 - Nbytes_written; // bytes left to skip
+            const uint64_t bytes_to_skip = 14;
+			if( Nbytes_written<bytes_to_skip ){
+				uint64_t Nskip = bytes_to_skip - Nbytes_written; // bytes left to skip
 				if( Nskip > Nbytes_to_write) Nskip = Nbytes_to_write;
 				payload += Nskip;
 				Nbytes_to_write -= Nskip;
@@ -93,6 +95,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "pcap_open_offline() failed: " << errbuf << "\n";
         return 2;
     }
+    std::cout << "Opened file: " << infile << "  (snaplen=" << pcap_snapshot(handle) << ")" << std::endl;
 
 	// Open output file
     std::ofstream ofile(outfile.c_str(), std::ios::out | std::ios::binary);
