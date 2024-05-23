@@ -9,7 +9,7 @@ encountered in the input file.
 
 Build like this:
 ~~~bash
-g++ -g -std=c++20 -o pcapSplit pcapSplit.cc -lpcap
+g++ -g -std=c++2a -o pcapSplit pcapSplit.cc -lpcap
 ~~~
 
 Example:
