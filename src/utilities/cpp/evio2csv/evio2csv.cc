@@ -1,3 +1,6 @@
+//
+// g++ evio2csv.cc -o evio2csv
+//
 
 #include <iostream>
 #include <fstream>
@@ -108,8 +111,9 @@ void swap( uint32_t *buff, size_t Nwords){
 //---------------------------------------
 int main(int narg, char* argv[]){
 
+	if( narg<2 ){ std::cout << "Usage:  evio2csv file.evio" << std::endl;}
 	
-	std::string fname = "port7001.evio";
+	std::string fname = argv[1];
 	std::ifstream ifs(fname.c_str(), std::ifstream::binary);
 	if(! ifs.is_open() ){
 		std:cerr << "Unable to open file: " << fname << std::endl;
