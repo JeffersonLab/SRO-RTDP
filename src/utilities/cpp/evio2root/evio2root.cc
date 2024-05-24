@@ -226,6 +226,7 @@ int main(int narg, char* argv[]){
 		
 		// Index the Payload Port banks for each port.
 		// Each bank here corresponds to a 16bit AIS payload word from above
+		bool abort_block = false;
 		for(auto ainfo : rtsb.ais_payload){
 			//std::cout << "buff: 0x" << std::hex << buff << "  ptr: 0x" << ptr << std::dec << "  payload_len: " << *ptr << std::endl;
 			TimeSlicePortDataBank payload_port_bank;
@@ -244,12 +245,14 @@ int main(int narg, char* argv[]){
 			uint8_t ppid_bank_head = (payload_port_bank.head >> 16) & 0xFF;
 			if( ppid_ais != ppid_bank_head ){
 				std::cerr << "ERROR: The AIS payload word port # differs from the corresponding PP ID in the data bank!" << std::endl;
-				std::cerr << "AIS=0x" << std::hex << ppid_ais << "  databank=0x" << ppid_bank_head << std::dec << std::endl;
-				return -1;
+				std::cerr << "AIS=0x" << std::hex << (uint32_t)ppid_ais << "  databank=0x" << (uint32_t)ppid_bank_head << std::dec << std::endl;
+				abort_block = true;
+				break;
 			}
 
 			ptr += payload_port_bank.payload_len - 1;			
 		}
+		if( abort_block ) continue;
 		
 		// Loop over payload data (both F250 and DCRB)
 		for(auto ppb : rtsb.databank){
