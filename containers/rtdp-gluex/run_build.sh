@@ -117,8 +117,11 @@ export JAVA_HOME_SAVE=$JAVA_HOME
 export JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64
 ./gradlew -PciMode=true build jar
 export JAVA_HOME=$JAVA_HOME_SAVE
-mkdir -p xmsg-javav2.3/jars
-cp -f ./build/libs/xmsg-2.3.jar xmsg-javav2.3/jars
+mkdir -p ../xmsg-javav2.3/jars
+cp -f ./build/libs/xmsg-2.3.jar ../xmsg-javav2.3/jars
+cp -f `find ~/.gradle/caches -name "jeromq*.jar"` ../xmsg-javav2.3/jars
+cp -f `find ~/.gradle/caches -name "jopt-simple*.jar"` ../xmsg-javav2.3/jars
+cp -f `find ~/.gradle/caches -name "protobuf-java*.jar"` ../xmsg-javav2.3/jars
 
 # RootSpy
 mkdir -p $GLUEX_TOP/rootspy

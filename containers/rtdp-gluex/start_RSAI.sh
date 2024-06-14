@@ -10,11 +10,12 @@ echo "Making directory: ${PWD}/rootspy_links"
 mkdir -p rootspy_links
 
 
-export ROOTSPY_UDL="cMsg://192.168.65.6/cMsg/rootspy"
+# export ROOTSPY_UDL="cMsg://192.168.65.6/cMsg/rootspy"
+export ROOTSPY_UDL="xMsg://192.168.65.6/xMsg/rootspy"
 
 
 # Run server in background
-docker run -v ${PWD}:/work -it --rm --net host --name RSAI rtdp-gluex:latest ${CMD}
+docker run -v ${PWD}:/work -it --rm --net host --name RSAI rtdp-gluex:latest bash -c ROOTSPY_UDL="xMsg://192.168.65.6/xMsg/rootspy" ${CMD}
 
 
 
