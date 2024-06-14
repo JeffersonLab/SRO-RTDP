@@ -8,6 +8,11 @@ To build the image with Docker:
 docker build -t rtdp-gluex -f Dockerfile .
 ~~~
 
+
+
+
+<hr>
+
 RootSpy can communicate via cMsg or xMsg. xMsg is newer and preferred. 
 
 n.b. At this time neither cMsg or xMsg seems to be fully working. Below are some preliminary instructions for starting up the cMsg server and trying to use that.
@@ -26,3 +31,5 @@ To run the hdmon program in the same container:
 export ROOTSPY_UDL="cMsg://127.0.0.1/cMsg/rootspy"
 hdmon ET:/tmp/et_mon
 ~~~
+
+![RTDP GlueX Diagram](RTDP_GlueX.png)
