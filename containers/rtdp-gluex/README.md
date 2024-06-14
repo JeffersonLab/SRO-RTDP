@@ -8,6 +8,10 @@ To build the image with Docker:
 docker build -t rtdp-gluex -f Dockerfile .
 ~~~
 
+RootSpy can communicate via cMsg or xMsg. xMsg is newer and preferred. 
+
+n.b. At this time neither cMsg or xMsg seems to be fully working. Below are some preliminary instructions for starting up the cMsg server and trying to use that.
+
 To run the cMsg server (n.b. this runs it in the background):
 
 ~~~bash
