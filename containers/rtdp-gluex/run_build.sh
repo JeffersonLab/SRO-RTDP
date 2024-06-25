@@ -32,6 +32,13 @@ mkdir -p /group/halld
 # sed -i 's|refs/tags/|refs/tags/v|g' $BUILD_SCRIPTS/Makefile_jana
 # sed -i 's|TARFILE\ =\ |TARFILE\ =\ v|g' $BUILD_SCRIPTS/Makefile_jana
 
+
+# The hddm build requires hdf5 and hdf5_hl libraries. For some strange reason, these are
+# not installed someplace the system finds them. (Maybe I'm missing a package?).
+# Manually create symlinks for them.
+ln -s /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5.so /usr/lib64/libhdf5.so
+ln -s /usr/lib/x86_64-linux-gnu/hdf5/serial/libhdf5_hl.so /usr/lib64/libhdf5_hl.so
+
 # Build packages
 export NTHREADS=12
 mkdir -p $GLUEX_TOP
