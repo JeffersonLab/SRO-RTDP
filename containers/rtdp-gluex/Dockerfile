@@ -14,7 +14,7 @@ RUN update-ca-certificates \
                       git libboost-dev bc subversion scons autoconf libtool \
                       python2 python3-pip libbz2-dev libxerces-c-dev \
                       default-jdk openjdk-8-jdk libczmq-dev libprotobuf-dev protobuf-compiler \
-                      libcurl4-openssl-dev doxygen \
+                      libcurl4-openssl-dev doxygen libhdf5-dev python-dev \
     && pip3 install future \
     && ln -s /usr/bin/cmake /usr/bin/cmake3 \
     && ln -s /usr/lib/x86_64-linux-gnu/libxerces-c.so /usr/lib/libxerces-c.so \
@@ -52,39 +52,39 @@ RUN cd /group/halld/Software/builds/${BMS_OSNAME}/halld_recon/latest/${BMS_OSNAM
     && rm -rf junk
 
 # Stage 2: Final stage
-# FROM ubuntu:20.04
-# # FROM rootproject/root:6.26.14-ubuntu20.04 
+FROM ubuntu:20.04
+# FROM rootproject/root:6.26.14-ubuntu20.04 
 
 
-# ADD https://pki.jlab.org/JLabCA.crt /usr/local/share/ca-certificates
+ADD https://pki.jlab.org/JLabCA.crt /usr/local/share/ca-certificates
 
-# # Allow the timezone to be set during the build
-# ENV DEBIAN_FRONTEND=noninteractive
-# ARG TZ=America/New_York
-# ENV TZ=$TZ
+# Allow the timezone to be set during the build
+ENV DEBIAN_FRONTEND=noninteractive
+ARG TZ=America/New_York
+ENV TZ=$TZ
 
-# RUN apt update \
-#     && apt-get install -y tzdata \
-#     && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
-#     && dpkg-reconfigure --frontend noninteractive tzdata \
-#     && apt install -y ca-certificates \
-#         libc6 \
-#         libxml-simple-perl  libfile-slurp-perl \
-#         libxerces-c3.2 \
-#         libmysqlclient21 \
-#         libblas3 \
-#         libfreetype6 \
-#         libprotobuf17 \
-#         libczmq-dev \
-#         openjdk-8-jre-headless \
-#         build-essential \
-#     && update-ca-certificates \
-#     && mkdir -p /group \
-#     && mkdir -p /usr/local
+RUN apt update \
+    && apt-get install -y tzdata \
+    && ln -fs /usr/share/zoneinfo/$TZ /etc/localtime \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
+    && apt install -y ca-certificates \
+        libc6 \
+        libxml-simple-perl  libfile-slurp-perl \
+        libxerces-c3.2 \
+        libmysqlclient21 \
+        libblas3 \
+        libfreetype6 \
+        libprotobuf17 \
+        libczmq-dev \
+        openjdk-8-jre-headless \
+        build-essential \
+    && update-ca-certificates \
+    && mkdir -p /group \
+    && mkdir -p /usr/local
 
-# COPY --from=builder /opt /opt
-# COPY --from=builder /group /group
-# COPY --from=builder /usr/local /usr
+COPY --from=builder /opt /opt
+COPY --from=builder /group /group
+COPY --from=builder /usr/local /usr
 
 
 COPY setenv.sh /opt/setenv.sh
