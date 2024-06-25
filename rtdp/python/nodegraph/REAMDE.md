@@ -14,5 +14,5 @@ $ . /path/to/venv/bin/activate  # activate the virtual env
 Case 1: SSH password-free connection
 ```
 # Activate the virtual environment first. Then install the dependencies.
-$ pip install fabric
+(venv) $ pip install fabric
 ```
