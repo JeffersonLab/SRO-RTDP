@@ -1,0 +1,96 @@
+
+# networks:
+#   my_bridge_network:
+#     driver: bridge
+    
+services:
+  et_server:
+    image: rtdp-gluex:latest
+    container_name: et_server
+    command: et_start -f /work/tmp/et_sys_mon
+    platform: linux/amd64
+    network_mode: host
+    # networks:
+    #   - my_bridge_network
+    volumes:
+      - .:/work
+    environment:
+      - GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
+    # depends_on:
+    #   - xmsg_server
+
+  file2et:
+    image: rtdp-gluex:latest
+    container_name: file2et
+    command: /bin/sh -c '/opt/start_after 2 file2et -H localhost -p 11111 -loop -f /work/tmp/et_sys_mon /data/hd_rawdata_121090_050_100MB.evio >> /dev/null'
+    # command: /bin/sh -c '/opt/start_after 2 file2et -H localhost -p 11111 -loop -f /work/tmp/et_sys_mon /data/hd_rawdata_121090_050_100MB.evio'
+    platform: linux/amd64
+    network_mode: host
+    # networks:
+    #   - my_bridge_network
+    volumes:
+      - .:/work
+      - /Users/davidl/work/2024.02.23.DataReduction:/data
+    environment:
+      - GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
+      - ET_HOST=localhost
+    depends_on:
+      - et_server
+    logging:
+      driver: "none"
+
+  # run_recon:
+  #   image: rtdp-gluex-dev:latest
+  #   container_name: run_recon
+  #   command: /opt/start_after 2 /work/run_recon.sh
+  #   platform: linux/amd64
+  #   privileged: true
+  #   network_mode: host
+  #   volumes:
+  #     - .:/work    # networks:
+  #   #   - my_bridge_network
+  #   # environment:
+  #   #   - GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
+
+  xmsg_server:
+    image: rtdp-gluex:latest
+    container_name: xmsg_server
+    command: /group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0/xmsg/xmsg-cppv2.3.build/bin/cx_proxy
+    platform: linux/amd64
+    network_mode: host
+    # networks:
+    #   - my_bridge_network
+    environment:
+      - GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
+
+  # hdmon:
+  #   image: rtdp-gluex:latest
+  #   container_name: hdmon
+  #   # command: /opt/start_after 2 hdmon -PPLUGINS=occupancy_online ET:/work/tmp/et_sys_mon:MON:localhost:11111
+  #   command: /opt/start_after 2 hdmon -PPLUGINS=occupancy_online -PRUNNUMBER=121090 ET:/work/tmp/et_sys_mon:MON:127.0.0.1:11111
+  #   platform: linux/amd64
+  #   network_mode: host
+  #   # networks:
+  #   #   - my_bridge_network
+  #   environment:
+  #     - GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
+  #     # - ROOTSPY_UDL="xMsg://localhost"
+  #     - ROOTSPY_UDL="xMsg://127.0.0.1"
+  #   depends_on:
+  #     - xmsg_server
+
+  # RSAI:
+  #   image: rtdp-gluex:latest
+  #   container_name: RSAI
+  #   command: bash -c 'mkdir -p /work/rootspy_out /work/rootspy_links && /opt/start_after 60 RSAI -v -v -v -d /work/rootspy_out -l /work/rootspy_links -R 121090 -u xMsg://127.0.0.1'
+  #   platform: linux/amd64
+  #   network_mode: host
+  #   # networks:
+  #   #   - my_bridge_network
+  #   volumes:
+  #     - .:/work
+  #   environment:
+  #     - GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
+  #     - ROOTSPY_UDL="xMsg://localhost"
+  #   depends_on:
+  #     - hdmon

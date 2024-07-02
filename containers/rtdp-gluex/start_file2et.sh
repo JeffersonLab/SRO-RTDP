@@ -15,8 +15,6 @@ export GLUEX_TOP=/group/halld/Software/builds/Linux_Ubuntu20.04-x86_64-gcc9.4.0
 export CMD="file2et -H ${ET_HOST} -p 11111 -loop -f /work/et_sys_mon /data/${EVIO_FILE}"
 
 # Run in foreground
-# exec docker exec -it et_server ${CMD}
-# exec docker exec -it et_server /bin/bash -c "source /opt/setenv.sh && file2et -f /work/et_sys_mon /work/${EVIO_FILE}"
 exec docker run -v ${PWD}:/work -v ${EVIO_FILE_DIR}:/data -it --rm --net host --name file2et rtdp-gluex:latest ${CMD}
 
 
