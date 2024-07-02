@@ -11,8 +11,8 @@ export CMD="hdmon -PPLUGINS=occupancy_online ET:/work/et_sys_mon:MON:192.168.65.
 
 # Run in foreground
 # exec docker run -v ${PWD}:/work -it --rm --net host --name hdmon rtdp-gluex:latest ${CMD}
-exec docker run -it --rm --net host --name hdmon rtdp-gluex:latest ${CMD}
-# exec docker run -v ${PWD}:/work -it --rm --name hdmon rtdp-gluex:latest ${CMD}
+# exec docker run -it --rm --net host --name hdmon rtdp-gluex:latest ${CMD}
+exec docker exec -it xmsg_server ${CMD}
 
 
 

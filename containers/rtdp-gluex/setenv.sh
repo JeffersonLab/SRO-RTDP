@@ -27,7 +27,7 @@ export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib
 
 source $GLUEX_TOP/jana/latest/${BMS_OSNAME}/setenv.sh 
 
-export ROOTSPY_UDL="cMsg://127.0.0.1/cMsg/rootspy"
+export ROOTSPY_UDL="xMsg://127.0.0.1"
 
 # For ET
 export SESSION=mon
