@@ -139,11 +139,56 @@ def fetch_cont_stats_by_host(hostname: str, cont_ids: List[str]):
 
     for _id in cont_ids:
         # print(hostname, _id)
+        # Make sure the file exists on the remote host!
         raw_res = conn.run(f'sh /tmp/fetch_cont_stats.sh {_id}', warn=True, hide=True)
         if raw_res.ok:
             """
-            Result based on RHEL system:
-            {"read":"2024-07-02T12:22:47.517567987-04:00","preread":"0001-01-01T00:00:00Z","pids_stats":{"current":47},"blkio_stats":{"io_service_bytes_recursive":[],"io_serviced_recursive":null,"io_queue_recursive":null,"io_service_time_recursive":null,"io_wait_time_recursive":null,"io_merged_recursive":null,"io_time_recursive":null,"sectors_recursive":null},"num_procs":0,"storage_stats":{},"cpu_stats":{"cpu_usage":{"total_usage":0,"usage_in_kernelmode":0,"usage_in_usermode":0},"system_cpu_usage":24256226138203,"online_cpus":64,"cpu":0,"throttling_data":{"periods":0,"throttled_periods":0,"throttled_time":0}},"precpu_stats":{"cpu_usage":{"total_usage":0,"usage_in_kernelmode":0,"usage_in_usermode":0},"cpu":0,"throttling_data":{"periods":0,"throttled_periods":0,"throttled_time":0}},"memory_stats":{"usage":45731840,"limit":540118855680},"name":"unruffled_maxwell","id":"b7ce4c5652ccf36a44489183c928952a1a598c1e7d07974e1763cfaa69aa7418","networks":{"network":{"rx_bytes":0,"rx_packets":0,"rx_errors":0,"rx_dropped":0,"tx_bytes":0,"tx_packets":0,"tx_errors":0,"tx_dropped":0}}}
+            Result returned from RHEL system:
+            {
+                "read":"2024-07-02T12:22:47.517567987-04:00",
+                "preread":"0001-01-01T00:00:00Z",  # No meaning
+                "pids_stats":{"current":47},
+                "blkio_stats":{
+                    "io_service_bytes_recursive":[],
+                    "io_serviced_recursive":null,
+                    "io_queue_recursive":null,
+                    "io_service_time_recursive":null,
+                    "io_wait_time_recursive":null,
+                    "io_merged_recursive":null,
+                    "io_time_recursive":null,
+                    "sectors_recursive":null
+                    },
+                "num_procs":0,
+                "storage_stats":{},
+                "cpu_stats":{
+                    "cpu_usage":{"total_usage":0,"usage_in_kernelmode":0,"usage_in_usermode":0},
+                    # the cumulative CPU time used by all CPUs on the host system, measured in nanoseconds
+                    "system_cpu_usage":24256226138203,
+                    "online_cpus":64,
+                    "cpu":0,
+                    "throttling_data":{"periods":0,"throttled_periods":0,"throttled_time":0}
+                    },
+                "precpu_stats":{  # looks like no meaning
+                    "cpu_usage":{"total_usage":0,"usage_in_kernelmode":0,"usage_in_usermode":0},
+                    "cpu":0,
+                    "throttling_data":{"periods":0,"throttled_periods":0,"throttled_time":0}
+                    },
+                "memory_stats":{"usage":45731840,"limit":540118855680},
+                "name":"unruffled_maxwell",
+                "id":"b7ce4c5652ccf36a44489183c928952a1a598c1e7d07974e1763cfaa69aa7418",
+                "networks":{
+                    "network":{
+                        "rx_bytes":0,
+                        "rx_packets":0,
+                        "rx_errors":0,
+                        "rx_dropped":0,
+                        "tx_bytes":0,
+                        "tx_packets":0,
+                        "tx_errors":0,
+                        "tx_dropped":0
+                        }
+                    }
+                }
             """
             print(raw_res.stdout.strip())
         else:
@@ -168,8 +213,17 @@ if __name__ == "__main__":
     ####
     # NOTE & TODO: the contents sit in-between ####...#### are based on RHEL podman returns.
     #       Debian docker returns and to be explored.
+
+    # Get all the container ids on all the hosts
     target_cont_ids = get_cont_ids_all(target_hosts=HOST_LIST, target_image_ids=TARGET_IMGAE_IDS)
 
-    get_cont_stats_all(target_cont_ids)
-    ###
+    # Fetch the stats every x seconds
+    i = 0
+    while( i != 10):
+        get_cont_stats_all(target_cont_ids)
+        time.sleep(15)  # sleep for x seconds
+        i += 1
+        print()
+    ####
+
     delete_remote_files(target_hosts=HOST_LIST, remote_path_list=REMOTE_PATH_LIST)
