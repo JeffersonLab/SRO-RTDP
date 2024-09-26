@@ -4,10 +4,11 @@
 # DONOT comment at the end of the line!
 
 process_names:
-  - name: {{.ExeBase}}:{{.Username}}:{{.PID}}
+  - name: "{{.ExeBase}}:{{.PID}}"
     # Above "name" defines what will show in metrics 'namedprocess_namegroup_memory_bytes{groupname="xxx"}''
     comm:
       # Commands can be seen in the second field of /proc/<pid>/stat minus parens.
       # Trucated at 15 chars so "process-exporter" is trucated as "process-exporte".
       - iperf3
       - process-exporte
+      - prometheus

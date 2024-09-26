@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=iperf-client           # Job name
-#SBATCH --output=slurm_%j.log
-#SBATCH --error=slurm_%j.log
+#SBATCH --output=slurm_client_%j.log
+#SBATCH --error=slurm_client_%j.log
 #SBATCH --ntasks=1           # Number of tasks (usually 1 for container jobs)
 #SBATCH --cpus-per-task=4                         # Number of CPU cores per task
 #SBATCH --mem=8G                                  # Memory per node
@@ -14,20 +14,19 @@ set -x
 # --------------------------- #
 #      Define Variables       #
 # --------------------------- #
-LOG_LABEL=$1
 iperf3_server_hostname=$2
 
-CONT_1="process-exporter.sif"     # Path to the 1st apptainer/singularity container
-CONT_1_PORT="32801"    # TCP port only
+PROCESS_EXPORTER_SIF="process-exporter.sif"
+PROCESS_EXPORTER_PORT=$1
 
-CONT_2="iperf3.sif"     # Path to the 2nd apptainer/singularity container
-CONT_2_PORT="32901"    # TCP port only
+APP_SIF="iperf3.sif"
+APP_PORT="32901"    # TCP port only
 
 ## UPDATE THIS LOCATION
 WORKDIR_PREFIX="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
 
-PROCESS_EXPORTER_SIF=${WORKDIR_PREFIX}/sifs/${CONT_1}
-IPERF3_CONTAINER_SIF=${WORKDIR_PREFIX}/sifs/${CONT_2}
+PROCESS_EXPORTER_SIF=${WORKDIR_PREFIX}/sifs/${PROCESS_EXPORTER_SIF}
+IPERF3_CONTAINER_SIF=${WORKDIR_PREFIX}/sifs/${APP_PORT}
 
 node_name=$(hostname)
 node_ip=$(hostname -i)
@@ -45,12 +44,12 @@ echo -e "The iperf3 server is at: ${iperf3_server_hostname}\n"
 
 # Replace the following command with the appropriate command for your second container
 # For example, running a simple web server or any other application
-# singularity exec $IPERF3_CONTAINER_SIF iperf3 --server -p ${CONT_2_PORT} &
+# singularity exec $IPERF3_CONTAINER_SIF iperf3 --server -p ${APP_PORT} &
 
 # A bare-metal iperf3 client instance
 /w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 -c \
   ${iperf3_server_hostname} \
-  -p ${CONT_2_PORT} \
+  -p ${APP_PORT} \
   -t 3600 &   # run for 3600 seconds
 
 IPERF3_PID=$!
@@ -76,9 +75,9 @@ apptainer exec \
   process-exporter \
     -procfs /host_proc \
     -config.path /config/process-exporter-config.yml \
-    -web.listen-address=:${CONT_1_PORT} &
+    -web.listen-address=:${PROCESS_EXPORTER_PORT} &
 PROCESS_EXPORTER_PID=$!
-echo -e "Process-Exporter started with PID $PROCESS_EXPORTER_PID on port ${CONT_1_PORT}.\n"
+echo -e "Process-Exporter started with PID $PROCESS_EXPORTER_PID on port ${PROCESS_EXPORTER_PORT}.\n"
 
 # -----------------------------#
 #     Keep processes running   #
