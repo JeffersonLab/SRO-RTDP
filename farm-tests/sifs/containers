@@ -1,0 +1,21 @@
+## The apptainer/singularity containers pulled from docker hub
+## Run the commands to save the contaienrs locally
+
+# Process-exporter
+apptainer pull process-exporter.sif docker://ncabatoff/process-exporter:master
+
+# node-exporter
+apptainer pull node-exporter.sif docker://prom/node-exporter:latest
+
+# iperf3
+apptainer pull iperf3.sif docker://networkstatic/iperf3:latest
+
+# Prometheus
+apptainer pull prom.sif docker://prom/prometheus:latest
+
+
+# [xmei@ifarm2402 sifs]$ ls -lah *.sif
+# -rwxr-xr-x. 1 xmei itd  30M Sep 23 11:32 iperf3.sif
+# -rwxr-xr-x. 1 xmei itd  12M Sep 23 11:31 node-exporter.sif
+# -rwxr-xr-x. 1 xmei itd 8.1M Sep 23 11:30 process-exporter.sif
+# -rwxr-xr-x. 1 xmei itd 103M Sep 26 12:41 prom.sif
