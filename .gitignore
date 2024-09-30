@@ -23,4 +23,4 @@ SRO-RTDP.iml
 *.sif
 
 # Prometheus data
-prom-data
+prom-data*

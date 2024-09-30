@@ -13,8 +13,11 @@ export PROMETHEUS_PORT=32900
 
 CURR_DIR="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
 cd $CURR_DIR
-rm -rf prom-data
-mkdir -p prom-data
+PROM_DATA_TIMESIG=$(date -u +%s)   # UTC seconds
+PROM_DATA=prom-data-${PROM_DATA_TIMESIG}
+mkdir -p ${PROM_DATA}
+
+WORKER_NODES=worker.log
 
 ########################### Helper functions for Slurm ####################################
 function slurm_get_nodelist() {
@@ -49,6 +52,7 @@ server_nodename=$(slurm_get_nodelist ${job_id})
 
 # echo -e for special character "\n"
 echo -e "The SERVER node is: ${server_nodename}\n"
+echo ${server_nodename} > ${WORKER_NODES}
 
 #---------------------------------------
 
@@ -64,6 +68,7 @@ client_nodename=$(slurm_get_nodelist ${job_id})
 
 # echo -e for special character "\n"
 echo -e "The CLIENT node is: ${client_nodename}\n"
+echo ${client_nodename} >> ${WORKER_NODES}
 
 #---------------------------------------
 
@@ -81,8 +86,17 @@ scrape_configs:
   - job_name: 'process-exporter'
     static_configs:
       - targets:
-        - '${server_nodename}:${PROCESS_EXPORTER_PORT}'
-        - '${client_nodename}:${PROCESS_EXPORTER_PORT}'
+EOL
+
+# Generate Process-exporter targets of the worker ndoes
+
+# Remove the duplicates of the worker nodes
+sort -u ${WORKER_NODES} -o ${WORKER_NODES}
+while read -r node; do
+  echo "        - '${node}:${PROCESS_EXPORTER_PORT}'" >> ${prom_config_file_path}
+done < ${WORKER_NODES}
+
+cat >> ${prom_config_file_path} <<EOL
         - 'localhost:${PROCESS_EXPORTER_PORT}'
         labels:
           group: 'process-exporter'
@@ -114,7 +128,7 @@ EOL
 
 apptainer exec \
   --bind config:/config \
-  --bind prom-data:/prometheus \
+  --bind ${PROM_DATA}:/prometheus \
   sifs/prom.sif \
   prometheus \
     --web.listen-address=":32900" \

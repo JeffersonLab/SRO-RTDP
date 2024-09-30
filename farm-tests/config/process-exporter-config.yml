@@ -4,7 +4,7 @@
 # DONOT comment at the end of the line!
 
 process_names:
-  - name: "{{.ExeBase}}:{{.PID}}"
+  - name: "{{.ExeBase}}"
     # Above "name" defines what will show in metrics 'namedprocess_namegroup_memory_bytes{groupname="xxx"}''
     comm:
       # Commands can be seen in the second field of /proc/<pid>/stat minus parens.
