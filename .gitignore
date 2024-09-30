@@ -18,3 +18,9 @@ build
 # IDE files
 .idea
 SRO-RTDP.iml
+
+# Singularity binary files
+*.sif
+
+# Prometheus data
+prom-data*
