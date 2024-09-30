@@ -26,6 +26,7 @@ TTree* gpodio_metadata_tree = nullptr;
 
 // zmq socket to stream events through
 zmq::socket_t *gventilator = nullptr;
+int DEFAULT_ZMQ_PORT = 55577;
 
 // Number of seconds to ignore read/send stats in order to allow zmq buffers to fill
 double warm_up_time = 5.0;
@@ -36,7 +37,7 @@ class CommandLineOptions {
 public:
     std::string inputFilename;
     std::string outfile;
-    int port = -1; // Unset
+    int port = DEFAULT_ZMQ_PORT; // Default
     int groupevents = 50;
     bool loop = false;
     double rate = 0.0; // Unset
@@ -85,7 +86,7 @@ public:
                   << "Usage: podio2tcp [options] inputfilename\n"
                   << "\n"
                   << "-h, --help   Print this help statement\n"
-                  << "-p, --port <port> Set ZMQ port to listen on\n"
+                  << "-p, --port <port> Set ZMQ port to listen on (default is 55577)\n"
                   << "-o, --outfile <filename> Convert input podio root file to podio stream file with this filename\n"
                   << "-g, --groupevents <num> Group this many events together in buffer when serializing\n"
                   << "-l, --loop When sending, loop over the input file forever\n"
@@ -410,7 +411,7 @@ int main(int argc, char *argv[]){
     // Print summary
     std::cout << "Input Filename: " << options.inputFilename << "\n";
     if (!options.outfile.empty()) std::cout << "Output Filename: " << options.outfile << "\n";
-    if (options.port != -1) std::cout << "Port: " << options.port << "\n";
+    if (options.port != DEFAULT_ZMQ_PORT) std::cout << "Port: " << options.port << "\n";
     if (options.loop) std::cout << "Loop: enabled\n";
     if (options.rate > 0.0) std::cout << "Rate: " << options.rate << " Hz\n";
 
@@ -430,7 +431,8 @@ int main(int argc, char *argv[]){
     zmq::socket_t ventilator(context, ZMQ_PUSH);
     gventilator = &ventilator; // (yes, I know, this is a bad way to do this)
     ventilator.set(zmq::sockopt::sndhwm, 100); // Set High Water Mark for maximum number of messages to queue before stalling
-    ventilator.bind("tcp://*:5557");
+    // ventilator.bind("tcp://*:55577");
+    ventilator.bind(("tcp://*:" + std::to_string(options.port)).c_str());
 
     // Determine if input file is root or stream form. (Just check the suffix.)
     bool input_is_root = false;
