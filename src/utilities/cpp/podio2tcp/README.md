@@ -14,7 +14,7 @@ apptainer shell \
 
 Setup the full environment inside the container with:
 ~~~bash
-source /opt/detector/setup.sh
+source /opt/detector/epic-main/bin/thisepic.sh
 ~~~
 
 This should put root, jana, eicrecon, etc. in your path.
@@ -80,7 +80,7 @@ Start the example receiver program like this:
 ./podio2tcp.build/tcp2podio
 ~~~
 
-The rate at which events may be prepared and sent is limited. On ifarm9 only about 30Hz-40Hz could be sustained. This is almost entirely due to the ROOT method used to copy a subset of events from a TTree into another. This can be sped up considerably by saving the serialized buffers to a separate file and reading from that instead. A mechanism for doing this exists in podio2tcp for doing this.
+The rate at which events may be prepared and sent is limited. On ifarm2402 only about 130Hz (580Mbps) could be sustained. This is almost entirely due to the ROOT method used to copy a subset of events from a TTree into another. This can be sped up considerably by saving the serialized buffers to a separate file and reading from that instead. A mechanism for doing this exists in podio2tcp for doing this.
 
 ~~~bash
 # Convert the podio file into a file of pre-serialized buffers of 10 events each
