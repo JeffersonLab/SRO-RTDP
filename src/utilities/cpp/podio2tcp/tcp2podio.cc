@@ -62,12 +62,6 @@ public:
            }
         }
 
-        if (options.inputFilename.empty()) {
-            std::cerr << "Error: inputfilename is required.\n";
-            PrintUsage();
-            exit(1);
-        }
-
         return options;
     }
 
