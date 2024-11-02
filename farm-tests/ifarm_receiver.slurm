@@ -59,7 +59,7 @@ cd $WORKDIR_PREFIX
 #    Run App receiver         #
 # --------------------------- #
 apptainer exec $APP_CONTAINER_SIF \
-  bash -c "source /etc/profile && ./podio2tcp.build/tcp2podio &"
+  bash -c "podio2tcp.build/tcp2podio &"
 
 RECEV_PID=$!
 echo -e "Receiver process started with PID $RECV_PID \n"
