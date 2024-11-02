@@ -60,10 +60,9 @@ COPY run-EICrecon.bash /app/run-EICrecon.bash
 # make it executable
 RUN chmod +x /app/run-EICrecon.bash
 
-
 COPY run-sender.bash /app/run-sender.bash
 # make it executable
 RUN chmod +x /app/run-sender.bash
 
-# # Set the entrypoint
-CMD source /etc/profile && /bin/bash
+RUN source /etc/profile
+    

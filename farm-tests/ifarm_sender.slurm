@@ -16,7 +16,7 @@ set -x
 PROCESS_EXPORTER_SIF="process-exporter.sif"
 PROCESS_EXPORTER_PORT=$1
 
-APP_SIF="iperf3.sif"
+APP_SIF="rtdp-eicrecon.sif"  # <====  Update sif name here
 APP_PORT="32901"    # TCP port only
 
 ## UPDATE THIS LOCATION
@@ -45,13 +45,22 @@ cd $WORKDIR_PREFIX
 # singularity exec $IPERF3_CONTAINER_SIF iperf3 --server -p ${APP_PORT} &
 
 # A bare-metal instance
-/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 --server -p ${APP_PORT} &
+# /w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 --server -p ${APP_PORT} &
 
-IPERF3_PID=$!
-echo -e "iperf3 process started with PID $IPERF3_PID \n"
+# IPERF3_PID=$!
+# echo -e "iperf3 process started with PID $IPERF3_PID \n"
 
 # --------------------------- #
-#    Run Process Exporter        #
+#    Run App receiver         #
+# --------------------------- #
+apptainer exec $APP_CONTAINER_SIF \
+  bash -c "source /etc/profile && ./run-sender.bash &"
+
+RECEV_PID=$!
+echo -e "Receiver process started with PID $RECV_PID \n"
+
+# --------------------------- #
+#    Run Process Exporter     #
 # --------------------------- #
 
 # The docker command to run process-exporter:

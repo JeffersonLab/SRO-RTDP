@@ -1,9 +1,9 @@
 #!/bin/bash
 
-## Run this script on the Interactive node
+## Run this script on a farm compute node in the interactive mode.
 
 # For debug
-set -xe  # -e: exit on first error; -x: echo the command
+set -xe  pipefail # -e: exit on first error; -x: echo the command
 
 ## Script to submit 3 jobs to 3 nodes on ifarm.
 
@@ -44,31 +44,31 @@ function slurm_get_nodelist() {
 #+++++++++++++++++++++++++++++++++++++++
 # Step 1: Submit the first job
 
-sbatch_output=$(sbatch ifarm_iperf3Server.slurm ${PROCESS_EXPORTER_PORT})
+sbatch_output=$(sbatch ifarm_receiver.slurm ${PROCESS_EXPORTER_PORT})
 # Extract the job ID
 # After calling sbatch, it outputs "Submitted batch job xxxxxxx"
 job_id=$(echo $sbatch_output | awk '{print $4}')
-server_nodename=$(slurm_get_nodelist ${job_id})
+recv_nodename=$(slurm_get_nodelist ${job_id})
 
 # echo -e for special character "\n"
-echo -e "The SERVER node is: ${server_nodename}\n"
-echo ${server_nodename} > ${WORKER_NODES}
+echo -e "The RECV node is: ${recv_nodename}\n"
+echo ${recv_nodename} > ${WORKER_NODES}
 
 #---------------------------------------
 
 #+++++++++++++++++++++++++++++++++++++++
 # Step 2: Submit the second job
-#         We need the SERVER's nodename
+#         We need the RECEIVER's nodename
 
-sbatch_output=$(sbatch ifarm_iperf3Client.slurm ${PROCESS_EXPORTER_PORT} ${server_nodename})
+sbatch_output=$(sbatch ifarm_sender.slurm ${PROCESS_EXPORTER_PORT} ${recv_nodename})
 # Extract the job ID
 # After calling sbatch, it outputs "Submitted batch job xxxxxxx"
 job_id=$(echo $sbatch_output | awk '{print $4}')
-client_nodename=$(slurm_get_nodelist ${job_id})
+send_nodename=$(slurm_get_nodelist ${job_id})
 
 # echo -e for special character "\n"
-echo -e "The CLIENT node is: ${client_nodename}\n"
-echo ${client_nodename} >> ${WORKER_NODES}
+echo -e "The CLIE node is: ${send_nodename}\n"
+echo ${send_nodename} >> ${WORKER_NODES}
 
 #---------------------------------------
 
@@ -126,6 +126,7 @@ EOL
 # On the Interactive node
 # ssh -fN -R 9200:localhost:32900 xmei@scilogin  # port forwarding requires 2FA
 
+# Curl localhost:32900/metrics to read the metrics
 apptainer exec \
   --bind config:/config \
   --bind ${PROM_DATA}:/prometheus \
