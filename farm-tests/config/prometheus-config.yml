@@ -9,3 +9,4 @@ global:
     monitor: 'ifarm-prom-monitor'
 
 # "scrape_configs" will be automatically updated by bash script.
+# Delete all the contexts below each run

@@ -12,3 +12,5 @@ process_names:
       - iperf3
       - process-exporte
       - prometheus
+      - tcp2podio
+      - podio2tcp
