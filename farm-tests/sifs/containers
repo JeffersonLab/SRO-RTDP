@@ -13,6 +13,9 @@ apptainer pull iperf3.sif docker://networkstatic/iperf3:latest
 # Prometheus
 apptainer pull prom.sif docker://prom/prometheus:latest
 
+# SRO-RTDP-EICrecon
+apptainer pull rtdp-eicrecon.sif docker://jlabtsai/eic:latest
+
 
 # [xmei@ifarm2402 sifs]$ ls -lah *.sif
 # -rwxr-xr-x. 1 xmei itd  30M Sep 23 11:32 iperf3.sif
