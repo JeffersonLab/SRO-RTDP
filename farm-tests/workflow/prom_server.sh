@@ -1,27 +1,28 @@
 #!/bin/bash
-#SBATCH --job-name=prometheus           # Job name
-#SBATCH --output=slurm_prom_%j.log
-#SBATCH --error=slurm_prom_%j.log
-#SBATCH --ntasks=1           # Number of tasks (usually 1 for container jobs)
-#SBATCH --cpus-per-task=4                         # Number of CPU cores per task
-#SBATCH --mem=8G                                  # Memory per node
-#SBATCH --time=02:00:00                           # Time limit hrs:min:sec
-#SBATCH --partition=ifarm                        # Partition name (adjust as needed)
+
+# Parse command line arguments
+PROMETHEUS_PORT=$1
+WORKDIR_PREFIX=$2
+PROMETHEUS_SIF=$3
+PROM_DATA_DIR=$4
+CONFIG_DIR=${5:-"config"}
+
+# Validate required parameters
+if [ -z "$PROMETHEUS_PORT" ] || [ -z "$WORKDIR_PREFIX" ] || [ -z "$PROMETHEUS_SIF" ] || [ -z "$PROM_DATA_DIR" ]; then
+    echo "Usage: $0 <prometheus_port> <workdir_prefix> <prometheus_sif> <prom_data_dir> [config_dir]"
+    exit 1
+fi
 
 # For debug usage
 set -x
 
-## UPDATE THIS LOCATION
-WORKDIR_PREFIX="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
-PROMETHEUS_SIF=$WORKDIR_PREFIX/sifs/prom.sif
-PROMETHEUS_PORT=$1
+PROMETHEUS_SIF_PATH=${WORKDIR_PREFIX}/sifs/${PROMETHEUS_SIF}
 
 apptainer exec \
-  --bind ${WORKDIR_PREFIX}/config:/config \
-  --bind ${WORKDIR_PREFIX}/prom-data:/prometheus \
-  ${PROMETHEUS_SIF} \
+  --bind ${WORKDIR_PREFIX}/${CONFIG_DIR}:/config \
+  --bind ${WORKDIR_PREFIX}/${PROM_DATA_DIR}:/prometheus \
+  ${PROMETHEUS_SIF_PATH} \
   prometheus \
     --web.listen-address=":${PROMETHEUS_PORT}" \
     --config.file=/config/prometheus-config.yml \
-    --storage.tsdb.path=/prometheus \
-    > prom.log 2>&1 &
+    --storage.tsdb.path=/prometheus
