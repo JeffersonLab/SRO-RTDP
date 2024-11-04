@@ -1,0 +1,41 @@
+fws:
+  - fw_id: 1
+    name: prometheus_server
+    spec:
+      _tasks:
+        - _fw_name: PrometheusTask
+          prometheus_port: 9090
+
+  - fw_id: 2
+    name: iperf_server
+    spec:
+      _tasks:
+        - _fw_name: IperfServerTask
+          process_exporter_port: 9256
+
+  - fw_id: 3
+    name: iperf_client
+    spec:
+      _tasks:
+        - _fw_name: IperfClientTask
+          process_exporter_port: 9257
+          server_hostname: "%server_hostname%"
+
+links:
+  2:
+    - 3
+  3:
+    - 1
+  2:
+    - 1
+
+metadata:
+  name: iperf3_test_workflow
+
+common_spec: {} 
+
+#iperf_server -> iperf_client -> prometheus_server
+    #  \________________________^
+
+# 1. Iperf server (fw_id: 2) must run before client (fw_id: 3)
+# 2. Both iperf server (fw_id: 2) AND client (fw_id: 3) must complete before Prometheus server (fw_id: 1) starts
