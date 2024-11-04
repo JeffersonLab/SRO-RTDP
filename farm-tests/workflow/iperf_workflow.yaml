@@ -5,6 +5,8 @@ fws:
       _tasks:
         - _fw_name: PrometheusTask
           prometheus_port: 9090
+          workdir_prefix: "/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+          config_dir: "config"
 
   - fw_id: 2
     name: iperf_server
@@ -12,6 +14,11 @@ fws:
       _tasks:
         - _fw_name: IperfServerTask
           process_exporter_port: 9256
+          app_port: 32901
+          workdir_prefix: "/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+          process_exporter_sif: "process-exporter.sif"
+          iperf3_path: "/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3"
+          config_dir: "config"
 
   - fw_id: 3
     name: iperf_client
@@ -20,6 +27,12 @@ fws:
         - _fw_name: IperfClientTask
           process_exporter_port: 9257
           server_hostname: "%server_hostname%"
+          app_port: 32901
+          workdir_prefix: "/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+          process_exporter_sif: "process-exporter.sif"
+          iperf3_path: "/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3"
+          test_duration: 3600
+          config_dir: "config"
 
 links:
   2:
