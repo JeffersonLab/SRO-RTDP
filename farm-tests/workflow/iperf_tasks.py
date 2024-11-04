@@ -134,3 +134,22 @@ class PrometheusTask(FiretaskBase):
             f'{config_dir}'
         )
         prom_script.run_task(fw_spec)
+
+        # configure should look like:
+        # scrape_configs:
+        # - job_name: 'process-exporter'
+        #     static_configs:
+        #     - targets:
+        #         - 'ifarm-node1:32801'  # Server node
+        #         - 'ifarm-node2:32801'  # Client node
+        #         - 'localhost:32801'    # Local process-exporter
+        #         labels:
+        #         group: 'process-exporter'
+        #         cluster: 'ifarm'
+
+        # - job_name: 'prometheus'
+        #     static_configs:
+        #     - targets: ['localhost:32900']
+        #         labels:
+        #         group: 'prometheus'
+        #         cluster: 'ifarm'
