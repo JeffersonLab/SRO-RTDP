@@ -1,60 +1,52 @@
+#!/bin/bash
+
 # --------------------------- #
 #      Define Variables       #
 # --------------------------- #
-PROCESS_EXPORTER_SIF="process-exporter.sif"
+# Parse command line arguments
 PROCESS_EXPORTER_PORT=$1
+APP_PORT=$2
+WORKDIR_PREFIX=$3
+PROCESS_EXPORTER_SIF=$4
+IPERF3_PATH=$5
+CONFIG_DIR=${6:-"config"}  # Default to "config" if not provided
 
-APP_SIF="iperf3.sif"
-APP_PORT="32901"    # TCP port only
+# Validate required parameters
+if [ -z "$PROCESS_EXPORTER_PORT" ] || [ -z "$APP_PORT" ] || [ -z "$WORKDIR_PREFIX" ] || \
+   [ -z "$PROCESS_EXPORTER_SIF" ] || [ -z "$IPERF3_PATH" ]; then
+    echo "Usage: $0 <process_exporter_port> <app_port> <workdir_prefix> <process_exporter_sif> <iperf3_path> [config_dir]"
+    exit 1
+fi
 
-## UPDATE THIS LOCATION
-WORKDIR_PREFIX="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
-
-PROCESS_EXPORTER_SIF=${WORKDIR_PREFIX}/sifs/${PROCESS_EXPORTER_SIF}
-IPERF3_CONTAINER_SIF=${WORKDIR_PREFIX}/sifs/${APP_PORT}
+# Set derived variables
+PROCESS_EXPORTER_SIF_PATH=${WORKDIR_PREFIX}/sifs/${PROCESS_EXPORTER_SIF}
 
 node_name=$(hostname)
 node_ip=$(hostname -i)
 echo "Hostname: $node_name"
 echo -e "IPv4 address: $node_ip\n"
 
-# WORKDIR=${WORKDIR_PREFIX}/job_${SLURM_JOB_ID}
-# mkdir -p $WORKDIR
 cd $WORKDIR_PREFIX
 
 # --------------------------- #
-#   Run iperf server #
+#   Run iperf server         #
 # --------------------------- #
-
-# echo "Starting iperf3 server container..."
-
-# Replace the following command with the appropriate command for your second container
-# For example, running a simple web server or any other application
-# singularity exec $IPERF3_CONTAINER_SIF iperf3 --server -p ${APP_PORT} &
-
 # A bare-metal instance
-/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 --server -p ${APP_PORT} &
+${IPERF3_PATH} --server -p ${APP_PORT} &
 
 IPERF3_PID=$!
 echo -e "iperf3 process started with PID $IPERF3_PID \n"
 
 # --------------------------- #
-#    Run Process Exporter        #
+#    Run Process Exporter    #
 # --------------------------- #
-
-# The docker command to run process-exporter:
-#  docker run -d --rm -p 9256:9256 --privileged\
-#       -v /proc:/host/proc -v `pwd`:/config ncabatoff/process-exporter\
-#       --procfs /host/proc -config.path /config/filename.yml
-
-# Start process-exporter with the updated configuration
 echo "Starting Process Exporter container..."
 
 # Must use `apptainer exec` other than `apptainer run`
 apptainer exec \
   --bind /proc:/host_proc \
-  --bind ${WORKDIR_PREFIX}/config:/config \
-  ${PROCESS_EXPORTER_SIF} \
+  --bind ${WORKDIR_PREFIX}/${CONFIG_DIR}:/config \
+  ${PROCESS_EXPORTER_SIF_PATH} \
   process-exporter \
     -procfs /host_proc \
     -config.path /config/process-exporter-config.yml \
