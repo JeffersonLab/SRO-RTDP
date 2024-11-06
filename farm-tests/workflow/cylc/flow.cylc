@@ -35,7 +35,10 @@
             CONFIG_DIR = "$CYLC_WORKFLOW_RUN_DIR/etc/config"
             PROCESS_EXPORTER_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/process-exporter.sif"
             PROMETHEUS_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/prom.sif"
-                        IPERF3_PATH = "/home/tsai/jeng/iperf3/iperf3_latest.sif"
+            # IPERF3_PATH = "/home/tsai/jeng/iperf3/iperf3_latest.sif"
+            IPERF3_PATH = "/home/tsai/jeng/iperf3/bin/iperf3"
+            IPERF3_LIB_PATH = "/home/tsai/jeng/iperf3/lib"
+ 
 
             # Path to iperf3 binary
 
@@ -54,9 +57,10 @@
             bash $IPERF3_SERVER_SCRIPT \
                 "${PROCESS_EXPORTER_PORT}" \
                 "${APP_PORT}" \
-                "${CYLC_TASK_WORK_DIR}" \
+                "${CYLC_TASK_WORK_DIR}" \       
                 "${PROCESS_EXPORTER_SIF}" \
                 "${IPERF3_PATH}" \
+                "${IPERF3_LIB_PATH}" \
                 "${CONFIG_DIR}"
         """
         [[[directives]]]
@@ -77,11 +81,12 @@
             echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/client_hostname
             bash $IPERF3_CLIENT_SCRIPT \
                 "${PROCESS_EXPORTER_PORT}" \
-                "${SERVER_HOSTNAME}" \
+                "${SERVER_HOSTNAME}" \      
                 "${APP_PORT}" \
                 "${CYLC_TASK_WORK_DIR}" \
                 "${PROCESS_EXPORTER_SIF}" \
                 "${IPERF3_PATH}" \
+                "${IPERF3_LIB_PATH}" \
                 "3600" \
                 "${CONFIG_DIR}"
         """
@@ -101,26 +106,29 @@
                 
                 # Ensure directories exist
                 mkdir -p "${CYLC_TASK_WORK_DIR}/${PROM_DATA_DIR}"
-                mkdir -p "${CYLC_WORKFLOW_RUN_DIR}/${CONFIG_DIR}"
                 
-                # Generate Prometheus config
+                # Create prometheus config file directly
                 cat > "${CONFIG_DIR}/prometheus-config.yml" << EOF
+                global:
+                  scrape_interval: 15s
+                  external_labels:
+                    monitor: 'ifarm-prom-monitor'
                 scrape_configs:
-                - job_name: 'process-exporter'
+                  - job_name: 'process-exporter'
                     static_configs:
-                    - targets:
-                        - '${SERVER_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
-                        - '${CLIENT_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
-                        - 'localhost:${PROCESS_EXPORTER_PORT}'
+                      - targets:
+                          - '${SERVER_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
+                          - '${CLIENT_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
+                          - 'localhost:${PROCESS_EXPORTER_PORT}'
                         labels:
-                        group: 'process-exporter'
-                        cluster: 'ifarm'
-                - job_name: 'prometheus'
+                          group: 'process-exporter'
+                          cluster: 'ifarm'
+                  - job_name: 'prometheus'
                     static_configs:
-                    - targets: ['localhost:32900']
+                      - targets: ['localhost:32900']
                         labels:
-                        group: 'prometheus'
-                        cluster: 'ifarm'
+                          group: 'prometheus'
+                          cluster: 'ifarm'
                 EOF
                 
                 bash $PROM_SERVER_SCRIPT \
