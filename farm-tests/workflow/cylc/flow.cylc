@@ -1,0 +1,138 @@
+[scheduler]
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            iperf_server:started => iperf_client
+            iperf_server:started & iperf_client:started => prometheus_server
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --cpus-per-task = 4
+            --mem = 8G
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Ports configuration
+            PROCESS_EXPORTER_PORT = "32801"
+            APP_PORT = "32901"
+            
+            CONFIG_DIR = "$CYLC_WORKFLOW_RUN_DIR/etc/config"
+            PROCESS_EXPORTER_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/process-exporter.sif"
+            PROMETHEUS_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/prom.sif"
+                        IPERF3_PATH = "/home/tsai/jeng/iperf3/iperf3_latest.sif"
+
+            # Path to iperf3 binary
+
+            # iperf3 shell scripts
+            IPERF3_SERVER_SCRIPT = "$CYLC_WORKFLOW_RUN_DIR/scripts/ifarm_iperf3Server.sh"
+            IPERF3_CLIENT_SCRIPT = "$CYLC_WORKFLOW_RUN_DIR/scripts/ifarm_iperf3Client.sh"
+
+            # prometheus shell script
+            PROM_SERVER_SCRIPT = "$CYLC_WORKFLOW_RUN_DIR/scripts/prom_server.sh"
+
+    [[iperf_server]]
+        script = """
+            # Store hostname for other tasks
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/server_hostname   
+            echo "Current working directory: $(pwd)"
+            bash $IPERF3_SERVER_SCRIPT \
+                "${PROCESS_EXPORTER_PORT}" \
+                "${APP_PORT}" \
+                "${CYLC_TASK_WORK_DIR}" \
+                "${PROCESS_EXPORTER_SIF}" \
+                "${IPERF3_PATH}" \
+                "${CONFIG_DIR}"
+        """
+        [[[directives]]]
+            --job-name = iperf-server
+            --output = iperf_test_server_%j.log
+            --error = iperf_test_server_%j.log
+
+        [[[environment]]]
+            CYLC_TASK_MESSAGE_PRIORITY = "WARNING"
+
+
+        
+
+    [[iperf_client]]
+       script = """
+            SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
+            # Store hostname for prometheus
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/client_hostname
+            bash $IPERF3_CLIENT_SCRIPT \
+                "${PROCESS_EXPORTER_PORT}" \
+                "${SERVER_HOSTNAME}" \
+                "${APP_PORT}" \
+                "${CYLC_TASK_WORK_DIR}" \
+                "${PROCESS_EXPORTER_SIF}" \
+                "${IPERF3_PATH}" \
+                "3600" \
+                "${CONFIG_DIR}"
+        """
+        [[[directives]]]
+            --job-name = iperf-client
+            --output = iperf_test_client_%j.log
+            --error = iperf_test_client_%j.log
+
+    [[prometheus_server]]
+        script = """
+                # Generate Prometheus config
+                SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
+                CLIENT_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/client_hostname)
+                
+                # Create timestamp for data directory
+                PROM_DATA_DIR="prom-data-$(date +%s)"
+                
+                # Ensure directories exist
+                mkdir -p "${CYLC_TASK_WORK_DIR}/${PROM_DATA_DIR}"
+                mkdir -p "${CYLC_WORKFLOW_RUN_DIR}/${CONFIG_DIR}"
+                
+                # Generate Prometheus config
+                cat > "${CONFIG_DIR}/prometheus-config.yml" << EOF
+                scrape_configs:
+                - job_name: 'process-exporter'
+                    static_configs:
+                    - targets:
+                        - '${SERVER_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
+                        - '${CLIENT_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
+                        - 'localhost:${PROCESS_EXPORTER_PORT}'
+                        labels:
+                        group: 'process-exporter'
+                        cluster: 'ifarm'
+                - job_name: 'prometheus'
+                    static_configs:
+                    - targets: ['localhost:32900']
+                        labels:
+                        group: 'prometheus'
+                        cluster: 'ifarm'
+                EOF
+                
+                bash $PROM_SERVER_SCRIPT \
+                    "32900" \
+                    "${CYLC_TASK_WORK_DIR}" \
+                    "${PROMETHEUS_SIF}" \
+                    "${PROM_DATA_DIR}" \
+                    "${CONFIG_DIR}"
+            """
+        [[[directives]]]
+            --job-name = prometheus-server
+            --output = iperf_test_prom_%j.log
+            --error = iperf_test_prom_%j.log
+            --cpus-per-task = 2    # Override root setting for less CPU
+        

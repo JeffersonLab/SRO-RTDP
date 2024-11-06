@@ -22,7 +22,6 @@ if [ -z "$PROCESS_EXPORTER_PORT" ] || [ -z "$IPERF3_SERVER_HOSTNAME" ] || [ -z "
 fi
 
 # Set derived variables
-PROCESS_EXPORTER_SIF_PATH=${WORKDIR_PREFIX}/sifs/${PROCESS_EXPORTER_SIF}
 
 node_name=$(hostname)
 node_ip=$(hostname -i)
@@ -37,7 +36,7 @@ cd $WORKDIR_PREFIX
 echo -e "The iperf3 server is at: ${IPERF3_SERVER_HOSTNAME}\n"
 
 # A bare-metal iperf3 client instance
-${IPERF3_PATH} -c \
+apptainer run ${IPERF3_PATH} -c \
   ${IPERF3_SERVER_HOSTNAME} \
   -p ${APP_PORT} \
   -t ${TEST_DURATION} &
@@ -53,8 +52,8 @@ echo "Starting Process Exporter container..."
 # Must use `apptainer exec` other than `apptainer run`
 apptainer exec \
   --bind /proc:/host_proc \
-  --bind ${WORKDIR_PREFIX}/${CONFIG_DIR}:/config \
-  ${PROCESS_EXPORTER_SIF_PATH} \
+  --bind ${CONFIG_DIR}:/config \
+  ${PROCESS_EXPORTER_SIF} \
   process-exporter \
     -procfs /host_proc \
     -config.path /config/process-exporter-config.yml \

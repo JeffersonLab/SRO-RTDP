@@ -16,12 +16,10 @@ fi
 # For debug usage
 set -x
 
-PROMETHEUS_SIF_PATH=${WORKDIR_PREFIX}/sifs/${PROMETHEUS_SIF}
-
 apptainer exec \
-  --bind ${WORKDIR_PREFIX}/${CONFIG_DIR}:/config \
-  --bind ${WORKDIR_PREFIX}/${PROM_DATA_DIR}:/prometheus \
-  ${PROMETHEUS_SIF_PATH} \
+  --bind ${CONFIG_DIR}:/config \
+  --bind ${PROM_DATA_DIR}:/prometheus \
+  ${PROMETHEUS_SIF} \
   prometheus \
     --web.listen-address=":${PROMETHEUS_PORT}" \
     --config.file=/config/prometheus-config.yml \

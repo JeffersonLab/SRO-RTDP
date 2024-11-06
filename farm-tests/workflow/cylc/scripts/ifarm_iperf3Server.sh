@@ -19,7 +19,6 @@ if [ -z "$PROCESS_EXPORTER_PORT" ] || [ -z "$APP_PORT" ] || [ -z "$WORKDIR_PREFI
 fi
 
 # Set derived variables
-PROCESS_EXPORTER_SIF_PATH=${WORKDIR_PREFIX}/sifs/${PROCESS_EXPORTER_SIF}
 
 node_name=$(hostname)
 node_ip=$(hostname -i)
@@ -27,12 +26,14 @@ echo "Hostname: $node_name"
 echo -e "IPv4 address: $node_ip\n"
 
 cd $WORKDIR_PREFIX
+# cat current working directory to a file
+echo "$(pwd)" > current_working_directory.txt
 
 # --------------------------- #
 #   Run iperf server         #
 # --------------------------- #
 # A bare-metal instance
-${IPERF3_PATH} --server -p ${APP_PORT} &
+apptainer run ${IPERF3_PATH} --server -p ${APP_PORT} &
 
 IPERF3_PID=$!
 echo -e "iperf3 process started with PID $IPERF3_PID \n"
@@ -45,8 +46,8 @@ echo "Starting Process Exporter container..."
 # Must use `apptainer exec` other than `apptainer run`
 apptainer exec \
   --bind /proc:/host_proc \
-  --bind ${WORKDIR_PREFIX}/${CONFIG_DIR}:/config \
-  ${PROCESS_EXPORTER_SIF_PATH} \
+  --bind ${CONFIG_DIR}:/config \
+  ${PROCESS_EXPORTER_SIF} \
   process-exporter \
     -procfs /host_proc \
     -config.path /config/process-exporter-config.yml \
@@ -54,6 +55,11 @@ apptainer exec \
 PROCESS_EXPORTER_PID=$!
 echo -e "Process-Exporter started with PID $PROCESS_EXPORTER_PID on port ${PROCESS_EXPORTER_PORT}.\n"
 
+# curl localhost:${PROCESS_EXPORTER_PORT}/metrics every 10 seconds
+while true; do
+  curl -s localhost:${PROCESS_EXPORTER_PORT}/metrics
+  sleep 10
+done &
 # -----------------------------#
 #     Keep processes running   #
 # -----------------------------#
