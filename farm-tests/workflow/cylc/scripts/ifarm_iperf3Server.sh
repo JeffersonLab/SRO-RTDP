@@ -30,10 +30,15 @@ cd $WORKDIR_PREFIX
 # --------------------------- #
 #   Run iperf server         #
 # --------------------------- #
+# Create log file
+LOG_FILE="${WORKDIR_PREFIX}/iperf_server.log"
+echo "Iperf Server Log - Started at $(date)" > ${LOG_FILE}
+echo "----------------------------------------" >> ${LOG_FILE}
+
 export LD_LIBRARY_PATH=${IPERF3_LIB_PATH}:$LD_LIBRARY_PATH
-${IPERF3_PATH} --server -p ${APP_PORT} &
+${IPERF3_PATH} --server -p ${APP_PORT} >> ${LOG_FILE} 2>&1 &
 IPERF3_PID=$!
-echo "iperf3 process started with PID $IPERF3_PID"
+echo "iperf3 process started with PID $IPERF3_PID" | tee -a ${LOG_FILE}
 
 # Wait for iperf3 to start listening
 COUNTER=0
@@ -41,17 +46,15 @@ while ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; do
     sleep 1
     ((COUNTER++))
     if [ $COUNTER -ge 10 ]; then
-        echo "ERROR: iperf3 server failed to start within 10 seconds"
+        echo "ERROR: iperf3 server failed to start within 10 seconds" | tee -a ${LOG_FILE}
         kill $IPERF3_PID
         exit 1
     fi
 done
-echo "iperf3 server is listening on port ${APP_PORT}"
+echo "iperf3 server is listening on port ${APP_PORT}" | tee -a ${LOG_FILE}
 
 # Signal that the server is ready for clients
-echo "SERVER_READY=true" > $CYLC_WORKFLOW_SHARE_DIR/server_status
 cylc message -- "The iperf server is ready for connections"
-cylc__job__complete_signal
 
 # Send server information to client
 cat > $CYLC_WORKFLOW_SHARE_DIR/server_info.txt << EOF
@@ -69,27 +72,33 @@ $(ip addr show)
 EOF
 
 # Print detailed server status
-echo "----------------------------------------"
-echo "IPERF3 SERVER STATUS"
-echo "----------------------------------------"
-echo "Server hostname: $(hostname)"
-echo "Server IP: $(hostname -i)"
-echo "Server port: ${APP_PORT}"
-echo "Process ID: ${IPERF3_PID}"
-echo "Library path: ${LD_LIBRARY_PATH}"
-echo "Working directory: $(pwd)"
-echo
-echo "Network ports in use:"
-netstat -tuln | grep LISTEN
-echo
-echo "Process status:"
-ps -f -p ${IPERF3_PID}
-echo "----------------------------------------"
+{
+    echo "----------------------------------------"
+    echo "IPERF3 SERVER STATUS"
+    echo "----------------------------------------"
+    echo "Server hostname: $(hostname)"
+    echo "Server IP: $(hostname -i)"
+    echo "Server port: ${APP_PORT}"
+    echo "Process ID: ${IPERF3_PID}"
+    echo "Library path: ${LD_LIBRARY_PATH}"
+    echo "Working directory: $(pwd)"
+    echo
+    echo "Network ports in use:"
+    netstat -tuln | grep LISTEN
+    echo
+    echo "Process status:"
+    ps -f -p ${IPERF3_PID}
+    echo "----------------------------------------"
+} >> ${LOG_FILE}
 
 # --------------------------- #
 #    Run Process Exporter    #
 # --------------------------- #
-echo "Starting Process Exporter container..."
+# Create exporter log file
+EXPORTER_LOG="${WORKDIR_PREFIX}/process_exporter.log"
+echo "Process Exporter Log - Started at $(date)" > ${EXPORTER_LOG}
+echo "----------------------------------------" >> ${EXPORTER_LOG}
+echo "Starting Process Exporter container..." | tee -a ${EXPORTER_LOG}
 
 # Create process-exporter config if it doesn't exist
 mkdir -p "${CONFIG_DIR}"
@@ -117,58 +126,64 @@ while ! curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null;
     sleep 1
     ((COUNTER++))
     if [ $COUNTER -ge 10 ]; then
-        echo "ERROR: Process-exporter failed to start within 10 seconds"
+        echo "ERROR: Process-exporter failed to start within 10 seconds" | tee -a ${EXPORTER_LOG}
         kill $IPERF3_PID $PROCESS_EXPORTER_PID
         exit 1
     fi
 done
-echo "Process-Exporter started successfully on port ${PROCESS_EXPORTER_PORT}"
+echo "Process-Exporter started successfully on port ${PROCESS_EXPORTER_PORT}" | tee -a ${EXPORTER_LOG}
 
 # Print process-exporter status
-echo "----------------------------------------"
-echo "PROCESS EXPORTER STATUS"
-echo "----------------------------------------"
-echo "Process ID: ${PROCESS_EXPORTER_PID}"
-echo "Port: ${PROCESS_EXPORTER_PORT}"
-echo "Config directory: ${CONFIG_DIR}"
-echo
-echo "Process status:"
-ps -f -p ${PROCESS_EXPORTER_PID}
-echo "----------------------------------------"
+{
+    echo "----------------------------------------"
+    echo "PROCESS EXPORTER STATUS"
+    echo "----------------------------------------"
+    echo "Process ID: ${PROCESS_EXPORTER_PID}"
+    echo "Port: ${PROCESS_EXPORTER_PORT}"
+    echo "Config directory: ${CONFIG_DIR}"
+    echo
+    echo "Process status:"
+    ps -f -p ${PROCESS_EXPORTER_PID}
+    echo "----------------------------------------"
+} >> ${EXPORTER_LOG}
 
 # Print initial metrics
-echo "Initial metrics from process-exporter:"
-curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" | grep -E "process_name|namedprocess"
-echo "----------------------------------------"
+{
+    echo "Initial metrics from process-exporter:"
+    curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" | grep -E "process_name|namedprocess"
+    echo "----------------------------------------"
+} >> ${EXPORTER_LOG}
 
 # Monitor both processes
 while kill -0 $IPERF3_PID 2>/dev/null && kill -0 $PROCESS_EXPORTER_PID 2>/dev/null; do
     # Verify iperf3 is still listening
     if ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; then
-        echo "ERROR: iperf3 server stopped listening on port ${APP_PORT}"
+        echo "ERROR: iperf3 server stopped listening on port ${APP_PORT}" | tee -a ${LOG_FILE}
         kill $IPERF3_PID $PROCESS_EXPORTER_PID
         exit 1
     fi
     
     # Verify process-exporter is responding
     if ! curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
-        echo "ERROR: Process-exporter stopped responding"
+        echo "ERROR: Process-exporter stopped responding" | tee -a ${EXPORTER_LOG}
         kill $IPERF3_PID $PROCESS_EXPORTER_PID
         exit 1
     fi
     
     # Print periodic status update every 60 seconds
     if [ $((SECONDS % 60)) -eq 0 ]; then
-        echo "----------------------------------------"
-        echo "STATUS UPDATE ($(date))"
-        echo "----------------------------------------"
-        echo "iperf3 server status:"
-        ps -f -p ${IPERF3_PID}
-        echo "Current connections:"
-        netstat -tn | grep ":${APP_PORT}"
-        echo "Process-exporter status:"
-        ps -f -p ${PROCESS_EXPORTER_PID}
-        echo "----------------------------------------"
+        {
+            echo "----------------------------------------"
+            echo "STATUS UPDATE ($(date))"
+            echo "----------------------------------------"
+            echo "iperf3 server status:"
+            ps -f -p ${IPERF3_PID}
+            echo "Current connections:"
+            netstat -tn | grep ":${APP_PORT}"
+            echo "Process-exporter status:"
+            ps -f -p ${PROCESS_EXPORTER_PID}
+            echo "----------------------------------------"
+        } >> ${LOG_FILE}
     fi
     
     sleep 5

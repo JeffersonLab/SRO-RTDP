@@ -34,18 +34,31 @@ cd $WORKDIR_PREFIX
 # --------------------------- #
 #   Run iperf client
 # --------------------------- #
-echo "----------------------------------------"
-echo "IPERF CLIENT STARTUP INFORMATION"
-echo "----------------------------------------"
-echo "Current time: $(date)"
-echo -e "The iperf3 server is at: ${IPERF3_SERVER_HOSTNAME}\n"
-echo "Client hostname: $(hostname)"
-echo "Client IP: $(hostname -i)"
-echo "Target port: ${APP_PORT}"
-echo "Test duration: ${TEST_DURATION} seconds"
-echo "Working directory: $(pwd)"
-echo "LD_LIBRARY_PATH will be set to: ${IPERF3_LIB_PATH}:$LD_LIBRARY_PATH"
-echo "----------------------------------------"
+# Create log files
+LOG_FILE="${WORKDIR_PREFIX}/iperf_client.log"
+EXPORTER_LOG="${WORKDIR_PREFIX}/process_exporter.log"
+
+# Initialize iperf client log
+echo "Iperf Client Log - Started at $(date)" > ${LOG_FILE}
+echo "----------------------------------------" >> ${LOG_FILE}
+
+# Initialize process exporter log
+echo "Process Exporter Log - Started at $(date)" > ${EXPORTER_LOG}
+echo "----------------------------------------" >> ${EXPORTER_LOG}
+
+# {
+#     echo "IPERF CLIENT STARTUP INFORMATION"
+#     echo "----------------------------------------"
+#     echo "Current time: $(date)"
+#     echo "The iperf3 server is at: ${IPERF3_SERVER_HOSTNAME}"
+#     echo "Client hostname: $(hostname)"
+#     echo "Client IP: $(hostname -i)"
+#     echo "Target port: ${APP_PORT}"
+#     echo "Test duration: ${TEST_DURATION} seconds"
+#     echo "Working directory: $(pwd)"
+#     echo "LD_LIBRARY_PATH: ${IPERF3_LIB_PATH}:$LD_LIBRARY_PATH"
+#     echo "----------------------------------------"
+# } >> ${LOG_FILE}
 
 # add lib to LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${IPERF3_LIB_PATH}:$LD_LIBRARY_PATH
@@ -61,7 +74,7 @@ if ! ${IPERF3_PATH} --version; then
 fi
 
 echo "Starting iperf3 client with command:"
-echo "${IPERF3_PATH} -c ${IPERF3_SERVER_HOSTNAME} -p ${APP_PORT} -t ${TEST_DURATION} -i 1 -V -f m --json"
+echo "${IPERF3_PATH} -c ${IPERF3_SERVER_HOSTNAME} -p ${APP_PORT} -t ${TEST_DURATION} -i 1 -V -f m --json" | tee -a ${LOG_FILE}
 
 ${IPERF3_PATH} -c \
   ${IPERF3_SERVER_HOSTNAME} \
@@ -71,20 +84,10 @@ ${IPERF3_PATH} -c \
   -V \
   -f m \
   --json \
-  2>&1 | while IFS= read -r line; do
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $line"
-      echo "$line" >> iperf3_client.log
-      # Check if we're receiving data
-      if [[ $line == *"bits/sec"* ]]; then
-          echo "----------------------------------------"
-          echo "DATA TRANSFER DETECTED!"
-          echo "Current transfer rate: $line"
-          echo "----------------------------------------"
-      fi
-  done &
+  >> ${LOG_FILE} 2>&1 &
 
 IPERF3_PID=$!
-echo "iperf3 process started with PID $IPERF3_PID"
+echo "iperf3 process started with PID $IPERF3_PID" | tee -a ${LOG_FILE}
 
 # Verify the process started
 if ! ps -p $IPERF3_PID > /dev/null; then
@@ -157,67 +160,55 @@ done
 
 # Test initial metrics collection
 echo "Testing initial metrics collection..."
-curl -v "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > initial_metrics 2>curl_debug.log
+curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null
 if [ $? -eq 0 ]; then
-    echo "Successfully connected to process-exporter"
-    echo "Sample of available metrics:"
-    grep -E "namedprocess_namegroup_(cpu|memory|io|thread)" initial_metrics | head -n 5
+    echo "Successfully connected to process-exporter" | tee -a ${EXPORTER_LOG}
     # Signal that the client and its exporter are ready
     cylc message -- "The iperf client and exporter are ready"
 else
-    echo "Failed to get initial metrics"
-    echo "Curl debug output:"
-    cat curl_debug.log
+    echo "Failed to get initial metrics" | tee -a ${EXPORTER_LOG}
     exit 1
 fi
 
 # Monitor processes and log status
 echo "Starting process monitoring..."
 
-# Initialize exporter log file
-echo "Process Exporter Metrics Log - Started at $(date)" > exporter.log
-echo "----------------------------------------" >> exporter.log
-
 while kill -0 $IPERF3_PID 2>/dev/null && kill -0 $PROCESS_EXPORTER_PID 2>/dev/null; do
     # Log status every 30 seconds
     if [ $((SECONDS % 30)) -eq 0 ]; then
-        echo "----------------------------------------"
-        echo "STATUS UPDATE ($(date))"
-        echo "----------------------------------------"
-        echo "iperf3 client process status:"
-        ps -f -p $IPERF3_PID
-        echo
-        echo "Recent iperf3 output:"
-        tail -n 5 iperf3_client.log
-        echo
-        echo "Process-exporter status:"
-        ps -f -p $PROCESS_EXPORTER_PID
-        echo
-        echo "Network connections:"
-        netstat -tn | grep ${IPERF3_SERVER_HOSTNAME}
-        echo "----------------------------------------"
+        {
+            echo "----------------------------------------"
+            echo "STATUS UPDATE ($(date))"
+            echo "----------------------------------------"
+            echo "iperf3 client process status:"
+            ps -f -p $IPERF3_PID
+            echo "Recent iperf3 output:"
+            tail -n 5 ${LOG_FILE}
+            echo "Network connections:"
+            netstat -tn | grep ${IPERF3_SERVER_HOSTNAME}
+            echo "----------------------------------------"
+        } >> ${LOG_FILE}
 
         # Fetch and log process-exporter metrics
-        echo -e "\n----------------------------------------" >> exporter.log
-        echo "Metrics at $(date)" >> exporter.log
-        echo "----------------------------------------" >> exporter.log
-        if curl -v "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > temp_metrics 2>>curl_debug.log; then
-            # Filter and format relevant metrics
-            grep -E "namedprocess_namegroup_(cpu|memory|io|thread)" temp_metrics | \
-            while IFS= read -r line; do
-                echo "[$(date '+%Y-%m-%d %H:%M:%S')] $line" >> exporter.log
-            done
-            rm temp_metrics
-            echo "Process-exporter metrics collected successfully" >> exporter.log
-        else
-            echo "Failed to fetch metrics from process-exporter at $(date)" >> exporter.log
-            echo "Curl debug output:" >> exporter.log
-            tail -n 10 curl_debug.log >> exporter.log
-            echo "Process-exporter status:" >> exporter.log
-            ps -f -p $PROCESS_EXPORTER_PID >> exporter.log
-            echo "Port status:" >> exporter.log
-            netstat -tuln | grep ${PROCESS_EXPORTER_PORT} >> exporter.log
-        fi
+        {
+            echo -e "\n----------------------------------------"
+            echo "Metrics at $(date)"
+            echo "----------------------------------------"
+            echo "Process-exporter status:"
+            ps -f -p $PROCESS_EXPORTER_PID
+            echo "Current metrics:"
+            if curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
+                # Filter and format relevant metrics
+                curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" | \
+                grep -E "namedprocess_namegroup_(cpu|memory|io|thread)"
+                echo "Process-exporter metrics collected successfully"
+            else
+                echo "Failed to fetch metrics from process-exporter"
+                echo "Port status:"
+                netstat -tuln | grep ${PROCESS_EXPORTER_PORT}
+            fi
+            echo "----------------------------------------"
+        } >> ${EXPORTER_LOG}
     fi
     sleep 5
 done
