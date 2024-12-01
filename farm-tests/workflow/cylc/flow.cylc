@@ -78,23 +78,43 @@
     [[iperf_client]]
         script = """
             SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
-            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/client_hostname
+            echo "Starting iperf client..."
+            echo "Server hostname from shared directory: ${SERVER_HOSTNAME}"
             
             # Test connection to server before starting client
+            echo "Testing connection to server ${SERVER_HOSTNAME}:${APP_PORT}..."
             COUNTER=0
             while ! nc -z $SERVER_HOSTNAME ${APP_PORT}; do
                 sleep 1
                 ((COUNTER++))
                 if [ $COUNTER -ge 30 ]; then
                     echo "ERROR: Cannot connect to iperf server at ${SERVER_HOSTNAME}:${APP_PORT}"
+                    echo "Current network status:"
+                    netstat -tuln
+                    echo "Attempting to ping server:"
+                    ping -c 3 ${SERVER_HOSTNAME}
                     exit 1
+                fi
+                if [ $((COUNTER % 5)) -eq 0 ]; then
+                    echo "Still trying to connect to server... Attempt ${COUNTER}/30"
                 fi
             done
             
             echo "Successfully connected to iperf server at ${SERVER_HOSTNAME}:${APP_PORT}"
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/client_hostname
             
-            # Start the client
-            bash $IPERF3_CLIENT_SCRIPT \
+            # Start the client with detailed logging
+            echo "Starting iperf client with following parameters:"
+            echo "Process Exporter Port: ${PROCESS_EXPORTER_PORT}"
+            echo "Server Hostname: ${SERVER_HOSTNAME}"
+            echo "App Port: ${APP_PORT}"
+            echo "Work Directory: ${CYLC_TASK_WORK_DIR}"
+            echo "Process Exporter SIF: ${PROCESS_EXPORTER_SIF}"
+            echo "Iperf3 Path: ${IPERF3_PATH}"
+            echo "Iperf3 Lib Path: ${IPERF3_LIB_PATH}"
+            echo "Config Directory: ${CONFIG_DIR}"
+            
+            bash -x $IPERF3_CLIENT_SCRIPT \
                 "${PROCESS_EXPORTER_PORT}" \
                 "${SERVER_HOSTNAME}" \      
                 "${APP_PORT}" \

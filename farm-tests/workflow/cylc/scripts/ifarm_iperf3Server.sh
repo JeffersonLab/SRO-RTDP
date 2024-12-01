@@ -48,6 +48,28 @@ while ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; do
 done
 echo "iperf3 server is listening on port ${APP_PORT}"
 
+# Signal that the server is ready for clients
+echo "SERVER_READY=true" > $CYLC_WORKFLOW_SHARE_DIR/server_status
+cylc message -- "The iperf server is ready for connections"
+
+# Print detailed server status
+echo "----------------------------------------"
+echo "IPERF3 SERVER STATUS"
+echo "----------------------------------------"
+echo "Server hostname: $(hostname)"
+echo "Server IP: $(hostname -i)"
+echo "Server port: ${APP_PORT}"
+echo "Process ID: ${IPERF3_PID}"
+echo "Library path: ${LD_LIBRARY_PATH}"
+echo "Working directory: $(pwd)"
+echo
+echo "Network ports in use:"
+netstat -tuln | grep LISTEN
+echo
+echo "Process status:"
+ps -f -p ${IPERF3_PID}
+echo "----------------------------------------"
+
 # --------------------------- #
 #    Run Process Exporter    #
 # --------------------------- #
@@ -86,6 +108,23 @@ while ! curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null;
 done
 echo "Process-Exporter started successfully on port ${PROCESS_EXPORTER_PORT}"
 
+# Print process-exporter status
+echo "----------------------------------------"
+echo "PROCESS EXPORTER STATUS"
+echo "----------------------------------------"
+echo "Process ID: ${PROCESS_EXPORTER_PID}"
+echo "Port: ${PROCESS_EXPORTER_PORT}"
+echo "Config directory: ${CONFIG_DIR}"
+echo
+echo "Process status:"
+ps -f -p ${PROCESS_EXPORTER_PID}
+echo "----------------------------------------"
+
+# Print initial metrics
+echo "Initial metrics from process-exporter:"
+curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" | grep -E "process_name|namedprocess"
+echo "----------------------------------------"
+
 # Monitor both processes
 while kill -0 $IPERF3_PID 2>/dev/null && kill -0 $PROCESS_EXPORTER_PID 2>/dev/null; do
     # Verify iperf3 is still listening
@@ -100,6 +139,20 @@ while kill -0 $IPERF3_PID 2>/dev/null && kill -0 $PROCESS_EXPORTER_PID 2>/dev/nu
         echo "ERROR: Process-exporter stopped responding"
         kill $IPERF3_PID $PROCESS_EXPORTER_PID
         exit 1
+    fi
+    
+    # Print periodic status update every 60 seconds
+    if [ $((SECONDS % 60)) -eq 0 ]; then
+        echo "----------------------------------------"
+        echo "STATUS UPDATE ($(date))"
+        echo "----------------------------------------"
+        echo "iperf3 server status:"
+        ps -f -p ${IPERF3_PID}
+        echo "Current connections:"
+        netstat -tn | grep ":${APP_PORT}"
+        echo "Process-exporter status:"
+        ps -f -p ${PROCESS_EXPORTER_PID}
+        echo "----------------------------------------"
     fi
     
     sleep 5
