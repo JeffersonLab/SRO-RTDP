@@ -51,6 +51,22 @@ echo "iperf3 server is listening on port ${APP_PORT}"
 # Signal that the server is ready for clients
 echo "SERVER_READY=true" > $CYLC_WORKFLOW_SHARE_DIR/server_status
 cylc message -- "The iperf server is ready for connections"
+cylc__job__complete_signal
+
+# Send server information to client
+cat > $CYLC_WORKFLOW_SHARE_DIR/server_info.txt << EOF
+Server Status Information:
+------------------------
+Server Hostname: $(hostname)
+Server IP: $(hostname -i)
+Server Port: ${APP_PORT}
+Process ID: ${IPERF3_PID}
+Start Time: $(date)
+Working Directory: $(pwd)
+Network Interfaces:
+$(ip addr show)
+------------------------
+EOF
 
 # Print detailed server status
 echo "----------------------------------------"

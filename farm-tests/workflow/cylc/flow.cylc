@@ -8,7 +8,8 @@
 
     [[graph]]
         R1 = """
-            iperf_server => iperf_client => prometheus_server
+            iperf_server:ready => iperf_client
+            iperf_client:ready => prometheus_server
         """
 
 [runtime]
@@ -72,19 +73,45 @@
         [[[environment]]]
             CYLC_TASK_MESSAGE_PRIORITY = "WARNING"
 
-
-        
+        [[[outputs]]]
+            ready = "The iperf server is ready for connections"
 
     [[iperf_client]]
         script = """
             SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
+            if [ ! -s "$CYLC_WORKFLOW_SHARE_DIR/server_hostname" ]; then
+                echo "ERROR: Server hostname file is empty or missing"
+                echo "Contents of shared directory:"
+                ls -la $CYLC_WORKFLOW_SHARE_DIR
+                exit 1
+            fi
+            
+            # Display server information if available
+            echo "----------------------------------------"
+            echo "Reading server information..."
+            echo "----------------------------------------"
+            if [ -f "$CYLC_WORKFLOW_SHARE_DIR/server_info.txt" ]; then
+                echo "Server information found:"
+                cat "$CYLC_WORKFLOW_SHARE_DIR/server_info.txt"
+            else
+                echo "No server information file found"
+            fi
+            echo "----------------------------------------"
+            
+            echo "Network configuration:"
+            echo "Client hostname: $(hostname)"
+            echo "Client IP: $(hostname -i)"
+            echo "Server hostname: ${SERVER_HOSTNAME}"
+            echo "Attempting to resolve server hostname:"
+            getent hosts ${SERVER_HOSTNAME} || echo "Failed to resolve hostname"
+            
             echo "Starting iperf client..."
             echo "Server hostname from shared directory: ${SERVER_HOSTNAME}"
             
             # Test connection to server before starting client
             echo "Testing connection to server ${SERVER_HOSTNAME}:${APP_PORT}..."
             COUNTER=0
-            while ! nc -z $SERVER_HOSTNAME ${APP_PORT}; do
+            while ! timeout 1 bash -c "</dev/tcp/${SERVER_HOSTNAME}/${APP_PORT}" 2>/dev/null; do
                 sleep 1
                 ((COUNTER++))
                 if [ $COUNTER -ge 30 ]; then
@@ -93,10 +120,14 @@
                     netstat -tuln
                     echo "Attempting to ping server:"
                     ping -c 3 ${SERVER_HOSTNAME}
+                    echo "Attempting direct TCP connection:"
+                    timeout 5 telnet ${SERVER_HOSTNAME} ${APP_PORT}
                     exit 1
                 fi
                 if [ $((COUNTER % 5)) -eq 0 ]; then
                     echo "Still trying to connect to server... Attempt ${COUNTER}/30"
+                    echo "Server hostname: ${SERVER_HOSTNAME}"
+                    echo "Server port: ${APP_PORT}"
                 fi
             done
             
@@ -130,11 +161,31 @@
             --output = iperf_test_client_%j.log
             --error = iperf_test_client_%j.log
 
+        [[[outputs]]]
+            ready = "The iperf client and exporter are ready"
+
     [[prometheus_server]]
         script = """
                 # Generate Prometheus config
                 SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
                 CLIENT_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/client_hostname)
+                
+                # Verify both exporters are accessible before starting
+                echo "Verifying connection to exporters..."
+                
+                # Test server exporter
+                if ! curl -s "http://${SERVER_HOSTNAME}:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
+                    echo "ERROR: Cannot connect to server exporter"
+                    exit 1
+                fi
+                echo "Successfully connected to server exporter"
+                
+                # Test client exporter
+                if ! curl -s "http://${CLIENT_HOSTNAME}:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
+                    echo "ERROR: Cannot connect to client exporter"
+                    exit 1
+                fi
+                echo "Successfully connected to client exporter"
                 
                 # Create timestamp for data directory
                 PROM_DATA_DIR="prom-data-$(date +%s)"
