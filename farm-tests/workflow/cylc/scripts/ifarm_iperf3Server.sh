@@ -20,52 +20,92 @@ if [ -z "$PROCESS_EXPORTER_PORT" ] || [ -z "$APP_PORT" ] || [ -z "$WORKDIR_PREFI
 fi
 
 # Set derived variables
-
 node_name=$(hostname)
 node_ip=$(hostname -i)
 echo "Hostname: $node_name"
 echo -e "IPv4 address: $node_ip\n"
 
 cd $WORKDIR_PREFIX
-# cat current working directory to a file
-echo "$(pwd)" > current_working_directory.txt
 
 # --------------------------- #
 #   Run iperf server         #
 # --------------------------- #
-# A bare-metal instance
-# apptainer run ${IPERF3_PATH} --server -p ${APP_PORT} &
-# add lib to LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=${IPERF3_LIB_PATH}:$LD_LIBRARY_PATH
 ${IPERF3_PATH} --server -p ${APP_PORT} &
-
 IPERF3_PID=$!
-echo -e "iperf3 process started with PID $IPERF3_PID \n"
+echo "iperf3 process started with PID $IPERF3_PID"
+
+# Wait for iperf3 to start listening
+COUNTER=0
+while ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; do
+    sleep 1
+    ((COUNTER++))
+    if [ $COUNTER -ge 10 ]; then
+        echo "ERROR: iperf3 server failed to start within 10 seconds"
+        kill $IPERF3_PID
+        exit 1
+    fi
+done
+echo "iperf3 server is listening on port ${APP_PORT}"
 
 # --------------------------- #
 #    Run Process Exporter    #
 # --------------------------- #
 echo "Starting Process Exporter container..."
 
-# Must use `apptainer exec` other than `apptainer run`
+# Create process-exporter config if it doesn't exist
+mkdir -p "${CONFIG_DIR}"
+cat > "${CONFIG_DIR}/process-exporter-config.yml" << EOF
+process_names:
+  - name: "{{.Comm}}"
+    cmdline:
+    - '.+'
+EOF
+
+# Start process-exporter
 apptainer exec \
-  --bind /proc:/host_proc \
-  --bind ${CONFIG_DIR}:/config \
-  ${PROCESS_EXPORTER_SIF} \
-  process-exporter \
+    --bind /proc:/host_proc \
+    --bind ${CONFIG_DIR}:/config \
+    ${PROCESS_EXPORTER_SIF} \
+    process-exporter \
     -procfs /host_proc \
     -config.path /config/process-exporter-config.yml \
     -web.listen-address=:${PROCESS_EXPORTER_PORT} &
 PROCESS_EXPORTER_PID=$!
-echo -e "Process-Exporter started with PID $PROCESS_EXPORTER_PID on port ${PROCESS_EXPORTER_PORT}.\n"
 
-# curl localhost:${PROCESS_EXPORTER_PORT}/metrics every 10 seconds
-while true; do
-  curl -s localhost:${PROCESS_EXPORTER_PORT}/metrics
-  sleep 10
-done &
-# -----------------------------#
-#     Keep processes running   #
-# -----------------------------#
-ps
-wait $IPERF3_PID $PROCESS_EXPORTER_PID
+# Wait for process-exporter to start
+COUNTER=0
+while ! curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; do
+    sleep 1
+    ((COUNTER++))
+    if [ $COUNTER -ge 10 ]; then
+        echo "ERROR: Process-exporter failed to start within 10 seconds"
+        kill $IPERF3_PID $PROCESS_EXPORTER_PID
+        exit 1
+    fi
+done
+echo "Process-Exporter started successfully on port ${PROCESS_EXPORTER_PORT}"
+
+# Monitor both processes
+while kill -0 $IPERF3_PID 2>/dev/null && kill -0 $PROCESS_EXPORTER_PID 2>/dev/null; do
+    # Verify iperf3 is still listening
+    if ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; then
+        echo "ERROR: iperf3 server stopped listening on port ${APP_PORT}"
+        kill $IPERF3_PID $PROCESS_EXPORTER_PID
+        exit 1
+    fi
+    
+    # Verify process-exporter is responding
+    if ! curl -s "http://localhost:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
+        echo "ERROR: Process-exporter stopped responding"
+        kill $IPERF3_PID $PROCESS_EXPORTER_PID
+        exit 1
+    fi
+    
+    sleep 5
+done
+
+# If we get here, one of the processes died
+echo "ERROR: A required process has terminated unexpectedly"
+ps -f -p $IPERF3_PID $PROCESS_EXPORTER_PID
+exit 1

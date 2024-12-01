@@ -54,7 +54,7 @@
             echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/server_hostname   
             echo "Current working directory: $(pwd)"
             
-            # Start the iperf server in background
+            # Run the server script (it handles its own monitoring)
             bash $IPERF3_SERVER_SCRIPT \
                 "${PROCESS_EXPORTER_PORT}" \
                 "${APP_PORT}" \
@@ -62,59 +62,7 @@
                 "${PROCESS_EXPORTER_SIF}" \
                 "${IPERF3_PATH}" \
                 "${IPERF3_LIB_PATH}" \
-                "${CONFIG_DIR}" 2>&1 &
-            
-            # Store the PID
-            SERVER_PID=$!
-            
-            # Wait for server to start listening (max 30 seconds)
-            COUNTER=0
-            while ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; do
-                sleep 1
-                ((COUNTER++))
-                if [ $COUNTER -ge 30 ]; then
-                    echo "ERROR: iperf server failed to start within 30 seconds"
-                    kill $SERVER_PID
-                    exit 1
-                fi
-                # Print status every 5 seconds
-                if [ $((COUNTER % 5)) -eq 0 ]; then
-                    echo "Waiting for iperf server to start... (${COUNTER}s)"
-                    echo "Current ports in use:"
-                    netstat -tuln
-                    echo "Process status:"
-                    ps -f -p $SERVER_PID
-                fi
-            done
-            
-            echo "iperf server is running and listening on port ${APP_PORT}"
-            
-            # Write PID to a file so we can terminate it later if needed
-            echo $SERVER_PID > $CYLC_WORKFLOW_SHARE_DIR/iperf_server.pid
-            
-            # Monitor both the iperf server and process-exporter
-            while kill -0 $SERVER_PID 2>/dev/null; do
-                # Check if process-exporter is running
-                if ! curl -s http://localhost:${PROCESS_EXPORTER_PORT}/metrics > /dev/null; then
-                    echo "ERROR: Process-exporter is not responding"
-                    echo "Diagnostic information:"
-                    ps aux | grep process-exporter
-                    netstat -tuln | grep ${PROCESS_EXPORTER_PORT}
-                    exit 1
-                fi
-                
-                # Check if iperf3 is still listening
-                if ! netstat -tuln | grep ":${APP_PORT}" > /dev/null; then
-                    echo "ERROR: iperf3 server is no longer listening on port ${APP_PORT}"
-                    exit 1
-                fi
-                
-                sleep 5
-            done
-            
-            # If we get here, the server process has died
-            echo "ERROR: iperf server process has terminated unexpectedly"
-            exit 1
+                "${CONFIG_DIR}"
         """
         [[[directives]]]
             --job-name = iperf-server
