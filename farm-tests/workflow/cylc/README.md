@@ -108,25 +108,55 @@ cylc validate .
 cylc play iperf-test
 ```
 
-## Workflow Tasks
+## Workflow Tasks and Dependencies
+
+The workflow follows this dependency chain:
+```
+iperf_server:ready => iperf_client => iperf_client:ready => prometheus_server
+```
 
 1. **iperf_server**: 
    - Starts iperf3 server
    - Launches process exporter
-   - Stores server hostname for other tasks
+   - Stores server hostname in `$CYLC_WORKFLOW_SHARE_DIR/server_hostname`
    - Monitors server performance
+   - Signals readiness with `iperf_server:ready` message
 
 2. **iperf_client**:
-   - Connects to iperf3 server
-   - Runs performance tests (3600 seconds default)
-   - Launches process exporter
-   - Monitors client performance
+   - Start conditions:
+     * Waits for `iperf_server:ready` message
+     * Server must be accessible on APP_PORT (tries 30 times, 1s apart)
+     * Server hostname must be available in shared directory
+   - Startup sequence:
+     1. Reads server hostname from shared directory
+     2. Tests connection to server
+     3. Stores client hostname in `$CYLC_WORKFLOW_SHARE_DIR/client_hostname`
+     4. Launches process exporter
+     5. Starts iperf3 client test (3600s duration)
+   - Signals readiness with `iperf_client:ready` message
 
 3. **prometheus_server**:
-   - Generates Prometheus configuration
-   - Starts Prometheus server
-   - Collects metrics from both exporters
-   - Stores metrics in time-series database
+   - Start conditions:
+     * Waits for `iperf_client:ready` message
+     * Both server and client hostnames must be in shared directory
+     * Both process exporters must be accessible
+   - Startup sequence:
+     1. Reads server and client hostnames from shared directory
+     2. Verifies connection to both process exporters
+     3. Creates timestamp-based data directory
+     4. Generates dynamic Prometheus configuration
+     5. Starts Prometheus server
+   - Collects metrics from:
+     * Server process exporter (port 32801)
+     * Client process exporter (port 32801)
+     * Prometheus itself (port 32900)
+
+## Shared Resources
+
+The workflow uses `$CYLC_WORKFLOW_SHARE_DIR` to share information between tasks:
+- `server_hostname`: Written by iperf_server, read by iperf_client and prometheus_server
+- `client_hostname`: Written by iperf_client, read by prometheus_server
+- `server_info.txt`: Contains detailed server configuration (optional)
 
 ## Local Prometheus Setup
 
