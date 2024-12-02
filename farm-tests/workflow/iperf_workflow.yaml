@@ -1,0 +1,57 @@
+fws:
+  - fw_id: 1
+    name: prometheus_server
+    spec:
+      _tasks:
+        - _fw_name: PrometheusTask
+          prometheus_port: 32900
+          process_exporter_port: 32801
+          workdir_prefix: "/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+          prometheus_sif: "prom.sif"
+          config_dir: "config"
+          prom_data_dir: "prom-data"
+
+  - fw_id: 2
+    name: iperf_server
+    spec:
+      _tasks:
+        - _fw_name: IperfServerTask
+          process_exporter_port: 32801
+          app_port: 32901
+          workdir_prefix: "/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+          process_exporter_sif: "process-exporter.sif"
+          iperf3_path: "/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3"
+          config_dir: "config"
+
+  - fw_id: 3
+    name: iperf_client
+    spec:
+      _tasks:
+        - _fw_name: IperfClientTask
+          process_exporter_port: 32801
+          server_hostname: "%server_hostname%"
+          app_port: 32901
+          workdir_prefix: "/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+          process_exporter_sif: "process-exporter.sif"
+          iperf3_path: "/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3"
+          test_duration: 3600
+          config_dir: "config"
+
+links:
+  2:
+    - 3
+  3:
+    - 1
+  2:
+    - 1
+
+metadata:
+  name: iperf3_test_workflow
+
+common_spec: {} 
+
+#iperf_server -> iperf_client -> prometheus_server
+    #  \________________________^
+
+# 1. Iperf server (fw_id: 2) must run before client (fw_id: 3)
+# 2. Both iperf server (fw_id: 2) AND client (fw_id: 3) must complete before Prometheus server (fw_id: 1) starts
