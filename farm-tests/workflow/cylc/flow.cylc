@@ -1,0 +1,232 @@
+[scheduler]
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            iperf_server:ready => iperf_client
+            iperf_client:ready => prometheus_server
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --cpus-per-task = 4
+            --mem = 8G
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Ports configuration
+            PROCESS_EXPORTER_PORT = "32801"
+            APP_PORT = "32901"
+            
+            CONFIG_DIR = "$CYLC_WORKFLOW_RUN_DIR/etc/config"
+            PROCESS_EXPORTER_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/process-exporter.sif"
+            PROMETHEUS_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/prom.sif"
+            # IPERF3_PATH = "/home/tsai/jeng/iperf3/iperf3_latest.sif"
+            IPERF3_PATH = "/home/tsai/jeng/iperf3/bin/iperf3"
+            IPERF3_LIB_PATH = "/home/tsai/jeng/iperf3/lib"
+ 
+
+            # Path to iperf3 binary
+
+            # iperf3 shell scripts
+            IPERF3_SERVER_SCRIPT = "$CYLC_WORKFLOW_RUN_DIR/scripts/ifarm_iperf3Server.sh"
+            IPERF3_CLIENT_SCRIPT = "$CYLC_WORKFLOW_RUN_DIR/scripts/ifarm_iperf3Client.sh"
+
+            # prometheus shell script
+            PROM_SERVER_SCRIPT = "$CYLC_WORKFLOW_RUN_DIR/scripts/prom_server.sh"
+
+    [[iperf_server]]
+        script = """
+            # Store hostname for other tasks
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/server_hostname   
+            echo "Current working directory: $(pwd)"
+            
+            # Run the server script (it handles its own monitoring)
+            bash $IPERF3_SERVER_SCRIPT \
+                "${PROCESS_EXPORTER_PORT}" \
+                "${APP_PORT}" \
+                "${CYLC_TASK_WORK_DIR}" \       
+                "${PROCESS_EXPORTER_SIF}" \
+                "${IPERF3_PATH}" \
+                "${IPERF3_LIB_PATH}" \
+                "${CONFIG_DIR}"
+        """
+        [[[directives]]]
+            --job-name = iperf-server
+            --output = iperf_test_server_%j.log
+            --error = iperf_test_server_%j.log
+
+        [[[environment]]]
+            CYLC_TASK_MESSAGE_PRIORITY = "WARNING"
+
+        [[[outputs]]]
+            ready = "The iperf server is ready for connections"
+
+    [[iperf_client]]
+        script = """
+            SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
+            if [ ! -s "$CYLC_WORKFLOW_SHARE_DIR/server_hostname" ]; then
+                echo "ERROR: Server hostname file is empty or missing"
+                echo "Contents of shared directory:"
+                ls -la $CYLC_WORKFLOW_SHARE_DIR
+                exit 1
+            fi
+            
+            # Display server information if available
+            echo "----------------------------------------"
+            echo "Reading server information..."
+            echo "----------------------------------------"
+            if [ -f "$CYLC_WORKFLOW_SHARE_DIR/server_info.txt" ]; then
+                echo "Server information found:"
+                cat "$CYLC_WORKFLOW_SHARE_DIR/server_info.txt"
+            else
+                echo "No server information file found"
+            fi
+            echo "----------------------------------------"
+            
+            echo "Network configuration:"
+            echo "Client hostname: $(hostname)"
+            echo "Client IP: $(hostname -i)"
+            echo "Server hostname: ${SERVER_HOSTNAME}"
+            echo "Attempting to resolve server hostname:"
+            getent hosts ${SERVER_HOSTNAME} || echo "Failed to resolve hostname"
+            
+            echo "Starting iperf client..."
+            echo "Server hostname from shared directory: ${SERVER_HOSTNAME}"
+            
+            # Test connection to server before starting client
+            echo "Testing connection to server ${SERVER_HOSTNAME}:${APP_PORT}..."
+            COUNTER=0
+            while ! timeout 1 bash -c "</dev/tcp/${SERVER_HOSTNAME}/${APP_PORT}" 2>/dev/null; do
+                sleep 1
+                ((COUNTER++))
+                if [ $COUNTER -ge 30 ]; then
+                    echo "ERROR: Cannot connect to iperf server at ${SERVER_HOSTNAME}:${APP_PORT}"
+                    echo "Current network status:"
+                    netstat -tuln
+                    echo "Attempting to ping server:"
+                    ping -c 3 ${SERVER_HOSTNAME}
+                    echo "Attempting direct TCP connection:"
+                    timeout 5 telnet ${SERVER_HOSTNAME} ${APP_PORT}
+                    exit 1
+                fi
+                if [ $((COUNTER % 5)) -eq 0 ]; then
+                    echo "Still trying to connect to server... Attempt ${COUNTER}/30"
+                    echo "Server hostname: ${SERVER_HOSTNAME}"
+                    echo "Server port: ${APP_PORT}"
+                fi
+            done
+            
+            echo "Successfully connected to iperf server at ${SERVER_HOSTNAME}:${APP_PORT}"
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/client_hostname
+            
+            # Start the client with detailed logging
+            echo "Starting iperf client with following parameters:"
+            echo "Process Exporter Port: ${PROCESS_EXPORTER_PORT}"
+            echo "Server Hostname: ${SERVER_HOSTNAME}"
+            echo "App Port: ${APP_PORT}"
+            echo "Work Directory: ${CYLC_TASK_WORK_DIR}"
+            echo "Process Exporter SIF: ${PROCESS_EXPORTER_SIF}"
+            echo "Iperf3 Path: ${IPERF3_PATH}"
+            echo "Iperf3 Lib Path: ${IPERF3_LIB_PATH}"
+            echo "Config Directory: ${CONFIG_DIR}"
+            
+            bash -x $IPERF3_CLIENT_SCRIPT \
+                "${PROCESS_EXPORTER_PORT}" \
+                "${SERVER_HOSTNAME}" \      
+                "${APP_PORT}" \
+                "${CYLC_TASK_WORK_DIR}" \
+                "${PROCESS_EXPORTER_SIF}" \
+                "${IPERF3_PATH}" \
+                "${IPERF3_LIB_PATH}" \
+                "3600" \
+                "${CONFIG_DIR}"
+        """
+        [[[directives]]]
+            --job-name = iperf-client
+            --output = iperf_test_client_%j.log
+            --error = iperf_test_client_%j.log
+
+        [[[outputs]]]
+            ready = "The iperf client and exporter are ready"
+
+    [[prometheus_server]]
+        script = """
+                # Generate Prometheus config
+                SERVER_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/server_hostname)
+                CLIENT_HOSTNAME=$(cat $CYLC_WORKFLOW_SHARE_DIR/client_hostname)
+                
+                # Verify both exporters are accessible before starting
+                echo "Verifying connection to exporters..."
+                
+                # Test server exporter
+                if ! curl -s "http://${SERVER_HOSTNAME}:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
+                    echo "ERROR: Cannot connect to server exporter"
+                    exit 1
+                fi
+                echo "Successfully connected to server exporter"
+                
+                # Test client exporter
+                if ! curl -s "http://${CLIENT_HOSTNAME}:${PROCESS_EXPORTER_PORT}/metrics" > /dev/null; then
+                    echo "ERROR: Cannot connect to client exporter"
+                    exit 1
+                fi
+                echo "Successfully connected to client exporter"
+                
+                # Create timestamp for data directory
+                PROM_DATA_DIR="prom-data-$(date +%s)"
+                
+                # Ensure directories exist
+                mkdir -p "${CYLC_TASK_WORK_DIR}/${PROM_DATA_DIR}"
+                
+                # Create prometheus config file directly
+                cat > "${CONFIG_DIR}/prometheus-config.yml" << EOF
+                global:
+                  scrape_interval: 15s
+                  external_labels:
+                    monitor: 'ifarm-prom-monitor'
+                scrape_configs:
+                  - job_name: 'process-exporter'
+                    static_configs:
+                      - targets:
+                          - '${SERVER_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
+                          - '${CLIENT_HOSTNAME}:${PROCESS_EXPORTER_PORT}'
+                          - 'localhost:${PROCESS_EXPORTER_PORT}'
+                        labels:
+                          group: 'process-exporter'
+                          cluster: 'ifarm'
+                  - job_name: 'prometheus'
+                    static_configs:
+                      - targets: ['localhost:32900']
+                        labels:
+                          group: 'prometheus'
+                          cluster: 'ifarm'
+                EOF
+                
+                bash $PROM_SERVER_SCRIPT \
+                    "32900" \
+                    "${CYLC_TASK_WORK_DIR}" \
+                    "${PROMETHEUS_SIF}" \
+                    "${PROM_DATA_DIR}" \
+                    "${CONFIG_DIR}"
+            """
+        [[[directives]]]
+            --job-name = prometheus-server
+            --output = iperf_test_prom_%j.log
+            --error = iperf_test_prom_%j.log
+            --cpus-per-task = 2    # Override root setting for less CPU
+        

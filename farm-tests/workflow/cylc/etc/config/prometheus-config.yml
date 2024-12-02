@@ -1,0 +1,12 @@
+# Prometheus configuration file
+
+global:
+  scrape_interval:     15s
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+    monitor: 'ifarm-prom-monitor'
+
+# "scrape_configs" will be automatically updated by bash script.
+# Delete all the contexts below each run
