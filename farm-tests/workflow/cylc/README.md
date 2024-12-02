@@ -1,18 +1,20 @@
 # Cylc-based iperf3 Testing Workflow
 
-This workflow automates the process of running iperf3 performance tests with Prometheus monitoring using Cylc workflow automation tool.
+This workflow automates iperf3 performance tests with Prometheus monitoring using Cylc workflow automation tool on JLab's ifarm cluster.
 
 ## Directory Structure
 
 ```
 cylc-run/iperf-test/
 ├── flow.cylc                     # Main Cylc workflow definition
+├── global.cylc                   # Global Cylc platform configuration
 ├── install.sh                    # Installation script
 ├── README.md                     # This file
 ├── scripts/                      # Script directory
 │   ├── ifarm_iperf3Server.sh    # iperf3 server script
 │   ├── ifarm_iperf3Client.sh    # iperf3 client script
-│   └── prom_server.sh           # Prometheus server script
+│   ├── prom_server.sh           # Prometheus server script
+│   └── run-local-prom.sh        # Script for local Prometheus setup
 ├── etc/
 │   └── config/                  # Configuration directory
 │       ├── process-exporter-config.yml    # Process exporter configuration
@@ -24,18 +26,32 @@ cylc-run/iperf-test/
 
 ## Prerequisites
 
-1. Cylc workflow engine installed (version 8 or higher)
-2. Singularity/Apptainer installed for container execution
-3. Required container images in your workflow's `sifs` directory:
+1. Access to JLab's ifarm cluster
+2. Cylc workflow engine installed (version 8 or higher)
+3. Singularity/Apptainer installed for container execution
+4. Required container images in your workflow's `sifs` directory:
    - `process-exporter.sif`
    - `prom.sif`
-4. iperf3 binary installed and accessible
+5. iperf3 binary and libraries installed and accessible
+
+## Platform Configuration
+
+The workflow uses JLab's SLURM cluster. Configure your global Cylc settings in `~/.cylc/flow/global.cylc`:
+
+```
+[platforms]
+    [[jlab_slurm]]
+        cylc path = /path/to/your/cylc-env/bin/
+        hosts = tsai@ifarm2402
+        job runner = slurm
+        install target = localhost
+```
 
 ## Configuration
 
-The workflow uses Cylc environment variables for configuration. The main settings are defined in `flow.cylc`:
+The workflow uses Cylc environment variables for configuration. Key settings in `flow.cylc`:
 
-```yaml
+```
 [runtime]
     [[root]]
         [[[environment]]]
@@ -43,18 +59,20 @@ The workflow uses Cylc environment variables for configuration. The main setting
             PROCESS_EXPORTER_PORT = "32801"
             APP_PORT = "32901"
             
-            # Directory structure (relative to workflow run directory)
-            CONFIG_DIR = "etc/config"
-            PROCESS_EXPORTER_SIF = "sifs/process-exporter.sif"
-            PROMETHEUS_SIF = "sifs/prom.sif"
+            # Directory paths
+            CONFIG_DIR = "$CYLC_WORKFLOW_RUN_DIR/etc/config"
+            PROCESS_EXPORTER_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/process-exporter.sif"
+            PROMETHEUS_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/prom.sif"
             
-            # Path to iperf3 binary
+            # iperf3 configuration
             IPERF3_PATH = "/path/to/iperf3"
+            IPERF3_LIB_PATH = "/path/to/iperf3/lib"
 ```
 
-You only need to modify:
-- `IPERF3_PATH`: Set to your iperf3 binary location
-- Ports if needed: `PROCESS_EXPORTER_PORT`, `APP_PORT`
+Required modifications:
+- `IPERF3_PATH`: Path to your iperf3 binary
+- `IPERF3_LIB_PATH`: Path to iperf3 libraries
+- Adjust ports if needed: `PROCESS_EXPORTER_PORT`, `APP_PORT`
 
 ## Installation
 
@@ -64,21 +82,13 @@ mkdir -p ~/cylc-run/iperf-test
 cd ~/cylc-run/iperf-test
 ```
 
-2. Copy the workflow files:
-```bash
-cp -r /path/to/cylc-iperf/* .
-```
+2. Copy all workflow files to this directory
 
 3. Run the installation script:
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
-
-The install script will:
-- Create necessary directories (`etc/config`, `sifs`, `scripts`)
-- Install and validate the workflow
-- Provide instructions for next steps
 
 4. Copy container images to the sifs directory:
 ```bash
@@ -98,162 +108,92 @@ cylc validate .
 cylc play iperf-test
 ```
 
-## Monitoring
+## Workflow Tasks
 
-You can monitor the workflow using either:
+1. **iperf_server**: 
+   - Starts iperf3 server
+   - Launches process exporter
+   - Stores server hostname for other tasks
+   - Monitors server performance
+
+2. **iperf_client**:
+   - Connects to iperf3 server
+   - Runs performance tests (3600 seconds default)
+   - Launches process exporter
+   - Monitors client performance
+
+3. **prometheus_server**:
+   - Generates Prometheus configuration
+   - Starts Prometheus server
+   - Collects metrics from both exporters
+   - Stores metrics in time-series database
+
+## Local Prometheus Setup
+
+Use `run-local-prom.sh` to:
+1. Copy Prometheus data from remote cluster
+2. Set up local Prometheus instance
+3. View metrics locally
+
+## Monitoring
 
 1. Terminal UI:
 ```bash
 cylc tui
 ```
 
-2. Web-based UI:
+2. Web UI:
 ```bash
 cylc gui
 ```
 
-## Workflow Steps
-
-1. **iperf_server**: 
-   - Starts the iperf3 server
-   - Launches process exporter for monitoring
-   - Stores server hostname for other tasks
-
-2. **iperf_client**:
-   - Connects to the iperf3 server
-   - Runs performance tests for 1 hour (3600 seconds)
-   - Launches process exporter for monitoring
-   - Stores client hostname for Prometheus
-
-3. **prometheus_server**:
-   - Generates Prometheus configuration
-   - Starts Prometheus server
-   - Collects metrics from both server and client
+3. Prometheus metrics:
+   - Remote: `http://localhost:32900`
+   - Local: Set up using `run-local-prom.sh`
 
 ## Output and Data
 
-All data is stored in the workflow run directory:
-- Performance test results: Created by iperf3 tasks
+- Task logs: `~/cylc-run/iperf-test/runN/log/job/`
+- Performance data: `~/cylc-run/iperf-test/runN/work/1/`
 - Prometheus data: `prom-data-<timestamp>/`
-- Configuration files: `etc/config/`
+- Configuration: `etc/config/`
 
 ## Troubleshooting
 
-1. If the workflow fails to start:
-   - Check if container images exist in `sifs/` directory
-   - Verify file permissions
-   - Ensure ports are available
-
-2. If tasks fail:
-   - Check Cylc logs: `cylc cat-log iperf-test//1/task_name`
-   - Verify network connectivity between nodes
+1. Task Failures:
+   - Check logs: `cylc cat-log iperf-test//1/task_name`
+   - Verify network connectivity
    - Check process exporter and Prometheus logs
 
-3. Common issues:
+2. Common Issues:
    - Port conflicts: Change ports in flow.cylc
-   - Permission denied: Check file and directory permissions
-   - Missing containers: Verify container paths in `sifs/` directory
+   - Library path issues: Verify IPERF3_LIB_PATH
+   - Container errors: Check Singularity/Apptainer installation
 
-## Cleaning Up
-
-To stop the workflow:
+3. Debug Commands:
 ```bash
-cylc stop iperf-test
+# Check task status
+cylc show iperf-test
+
+# View job logs
+cylc cat-log iperf-test//1/iperf_server
+cylc cat-log iperf-test//1/iperf_client
+cylc cat-log iperf-test//1/prometheus_server
+
+# Check network connectivity
+netstat -tuln | grep -E "32801|32901|32900"
 ```
-
-To remove the workflow:
-```bash
-cylc clean iperf-test
-```
-
-## Additional Notes
-
-- The workflow is designed to run once (non-cycling)
-- All tasks use Cylc's shared directory (`$CYLC_WORKFLOW_SHARE_DIR`) for communication
-- Prometheus configuration is generated dynamically
-- Task dependencies ensure proper execution order
-- Monitor Prometheus metrics at `http://localhost:32900`
 
 ## Support
 
-For issues related to:
-- Workflow configuration: Check Cylc documentation
-- iperf3 testing: Refer to iperf3 documentation
+- Workflow issues: Check Cylc documentation
+- iperf3 issues: Refer to iperf3 documentation
 - Monitoring: Check Prometheus documentation
+- JLab specific: Contact facility support
 
 ## References
 
 - [Cylc Documentation](https://cylc.github.io/)
 - [iperf3 Documentation](https://iperf.fr/)
 - [Prometheus Documentation](https://prometheus.io/docs/)
-
-## Cylc Installation Guide
-
-### Prerequisites
-- Python 3.7 or later
-- pip (Python package installer)
-- Git
-
-### Method 1: Using pip (Recommended for users)
-
-1. Create and activate a virtual environment:
-```bash
-python3 -m venv ~/cylc-env
-source ~/cylc-env/bin/activate
-```
-
-2. Install Cylc Flow and its UI:
-```bash
-pip install cylc-flow cylc-uiserver
-```
-
-3. Configure your shell environment (add to ~/.bashrc):
-```bash
-export PATH=$HOME/cylc-env/bin:$PATH
-```
-
-### Method 2: From Source (For developers)
-
-1. Create and enter a directory for Cylc:
-```bash
-mkdir -p ~/cylc
-cd ~/cylc
-```
-
-2. Clone the repositories:
-```bash
-git clone https://github.com/cylc/cylc-flow.git
-git clone https://github.com/cylc/cylc-uiserver.git
-```
-
-3. Create and activate a virtual environment:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-4. Install in development mode:
-```bash
-cd cylc-flow
-pip install -e .
-cd ../cylc-uiserver
-pip install -e .
-```
-
-### Verify Installation
-
-Test your installation:
-```bash
-cylc version  # Should show Cylc version
-cylc help     # Should show help message
-```
-
-### Additional Components (Optional)
-
-For enhanced functionality:
-```bash
-pip install cylc-rose    # For Rose suite support
-pip install cylc-doc     # For offline documentation
-```
-
-For more detailed installation instructions and troubleshooting, visit the [Cylc Installation Guide](https://cylc.github.io/cylc-doc/stable/html/installation.html).
+- [JLab Computing](https://scicomp.jlab.org/)
