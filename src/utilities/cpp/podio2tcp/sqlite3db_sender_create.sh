@@ -3,7 +3,7 @@
 # Check if a database prefix is provided
 if [ -z "$1" ]; then
     echo "Usage: $0 <DB_PREFIX>"
-    echo "Example: $0 my_database"
+    echo "Example: $0 my_database_prefix"
     exit 1
 fi
 
@@ -23,8 +23,8 @@ TABLE_NAME="rate_logs"
 sqlite3 "$DB_NAME" <<EOF
 CREATE TABLE $TABLE_NAME (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp_utc INTEGER,
-    pid INTEGER,
+    timestamp_utc_ms INTEGER,
+    pid STRING,
     rateHz_read_period REAL,
     rateHz_sent_period REAL,
     rateMbps_read_period REAL,
@@ -43,3 +43,5 @@ else
     echo "Failed to create the database or table."
     exit 1
 fi
+
+export RTDP_PODIO_SENDER_DB_NAME=${DB_NAME}
