@@ -95,6 +95,7 @@ int main(int narg, char *argv[]){
     zmq::socket_t worker(context, ZMQ_PULL);
     worker.set(zmq::sockopt::rcvhwm, 10); // Set High Water Mark for maximum number of messages to queue before stalling
     // worker.connect("tcp://localhost:55577");
+    /// TODO: How to establish 2-node communication via ZeroMQ
     worker.connect(("tcp://localhost:" + std::to_string(options.port)).c_str());
 
     std::cout << "Waiting for data ..." << std::endl;
@@ -127,6 +128,7 @@ int main(int narg, char *argv[]){
             }
 
             // Print ticker
+            /// TODO: Also write to SQLite3 DB
             auto Nbytes_received = task.size();
             Long64_t Nevents_in_buffer = 0;
             if( events_tree ) Nevents_in_buffer = events_tree->GetEntries();
