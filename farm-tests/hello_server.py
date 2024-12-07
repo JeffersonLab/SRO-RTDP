@@ -1,5 +1,5 @@
 '''
- A file to easily detect whether a port is available for remote connection.
+A file to easily detect whether a port is available for remote connection.
 '''
 
 from flask import Flask

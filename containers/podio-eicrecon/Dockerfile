@@ -65,4 +65,3 @@ COPY run-sender.bash /app/run-sender.bash
 RUN chmod +x /app/run-sender.bash
 
 RUN source /etc/profile
-    

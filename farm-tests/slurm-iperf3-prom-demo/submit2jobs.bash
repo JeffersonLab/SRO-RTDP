@@ -11,7 +11,7 @@ set -xe  pipefail # -e: exit on first error; -x: echo the command
 export PROCESS_EXPORTER_PORT=32801
 export PROMETHEUS_PORT=32900
 
-CURR_DIR="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
+CURR_DIR="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests/slurm-iperf3-prom-demo"
 cd $CURR_DIR
 PROM_DATA_TIMESIG=$(date -u +%s)   # UTC seconds
 PROM_DATA=prom-data-${PROM_DATA_TIMESIG}
