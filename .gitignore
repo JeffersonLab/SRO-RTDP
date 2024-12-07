@@ -29,3 +29,4 @@ prom-data*
 
 # SQLite3 DB files
 *.db
+.nfs*

@@ -7,15 +7,19 @@ apptainer pull process-exporter.sif docker://ncabatoff/process-exporter:master
 # node-exporter
 apptainer pull node-exporter.sif docker://prom/node-exporter:latest
 
-# iperf3
-apptainer pull iperf3.sif docker://networkstatic/iperf3:latest
-
 # Prometheus
 apptainer pull prom.sif docker://prom/prometheus:latest
 
+# SRO-RTDP-EICrecon
+apptainer pull rtdp-eicrecon.sif docker://jlabtsai/eic:latest
 
-# [xmei@ifarm2402 sifs]$ ls -lah *.sif
-# -rwxr-xr-x. 1 xmei itd  30M Sep 23 11:32 iperf3.sif
-# -rwxr-xr-x. 1 xmei itd  12M Sep 23 11:31 node-exporter.sif
-# -rwxr-xr-x. 1 xmei itd 8.1M Sep 23 11:30 process-exporter.sif
-# -rwxr-xr-x. 1 xmei itd 103M Sep 26 12:41 prom.sif
+
+<!-- bash-5.1$ ls -lah
+total 3.3G
+drwxr-xr-x. 2 xmei itd    7 Nov  2 01:31 .
+drwxr-xr-x. 5 xmei itd   15 Nov  2 01:28 ..
+-rw-r--r--. 1 xmei itd  796 Nov  2 01:24 containers
+-rwxr-xr-x. 1 xmei itd  12M Sep 23 11:31 node-exporter.sif
+-rwxr-xr-x. 1 xmei itd 8.1M Sep 23 11:30 process-exporter.sif
+-rwxr-xr-x. 1 xmei itd 103M Sep 26 12:41 prom.sif
+-rwxr-xr-x. 1 xmei itd 3.2G Nov  2 01:31 rtdp-eicrecon.sif -->

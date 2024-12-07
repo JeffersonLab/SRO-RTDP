@@ -19,14 +19,14 @@ iperf3_server_hostname=$2
 PROCESS_EXPORTER_SIF="process-exporter.sif"
 PROCESS_EXPORTER_PORT=$1
 
-APP_SIF="iperf3.sif"
+APP_SIF="rtdp-eicrecon.sif"  # <====  Update sif name here
 APP_PORT="32901"    # TCP port only
 
 ## UPDATE THIS LOCATION
 WORKDIR_PREFIX="/w/epsci-sciwork18/xmei/projects/SRO-RTDP/farm-tests"
 
 PROCESS_EXPORTER_SIF=${WORKDIR_PREFIX}/sifs/${PROCESS_EXPORTER_SIF}
-IPERF3_CONTAINER_SIF=${WORKDIR_PREFIX}/sifs/${APP_PORT}
+APP_CONTAINER_SIF=${WORKDIR_PREFIX}/sifs/${APP_PORT}
 
 node_name=$(hostname)
 node_ip=$(hostname -i)
@@ -40,23 +40,32 @@ cd $WORKDIR_PREFIX
 # --------------------------- #
 #   Run iperf client
 # --------------------------- #
-echo -e "The iperf3 server is at: ${iperf3_server_hostname}\n"
+# echo -e "The iperf3 server is at: ${iperf3_server_hostname}\n"
 
 # Replace the following command with the appropriate command for your second container
 # For example, running a simple web server or any other application
 # singularity exec $IPERF3_CONTAINER_SIF iperf3 --server -p ${APP_PORT} &
 
 # A bare-metal iperf3 client instance
-/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 -c \
-  ${iperf3_server_hostname} \
-  -p ${APP_PORT} \
-  -t 3600 &   # run for 3600 seconds
+# /w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 -c \
+#   ${iperf3_server_hostname} \
+#   -p ${APP_PORT} \
+#   -t 3600 &   # run for 3600 seconds
 
-IPERF3_PID=$!
-echo -e "iperf3 process started with PID $IPERF3_PID \n"
+# IPERF3_PID=$!
+# echo -e "iperf3 process started with PID $IPERF3_PID \n"
 
 # --------------------------- #
-#    Run Process Exporter        #
+#    Run App receiver         #
+# --------------------------- #
+apptainer exec $APP_CONTAINER_SIF \
+  bash -c "podio2tcp.build/tcp2podio &"
+
+RECEV_PID=$!
+echo -e "Receiver process started with PID $RECV_PID \n"
+
+# --------------------------- #
+#    Run Process Exporter     #
 # --------------------------- #
 
 # The docker command to run process-exporter:
@@ -65,7 +74,7 @@ echo -e "iperf3 process started with PID $IPERF3_PID \n"
 #       --procfs /host/proc -config.path /config/filename.yml
 
 # Start process-exporter with the updated configuration
-echo "Starting Process Exporter container..."
+echo "Starting Process Exporter containmmer..."
 
 # Must use `apptainer exec` other than `apptainer run`
 apptainer exec \

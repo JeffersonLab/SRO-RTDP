@@ -23,9 +23,9 @@ TIMESTAMP=$(date +%s%3N)
 
 # Set the DB name according to the sender/receiver.
 if [ "$OPTION" == "-s" ]; then
-    DB_NAME="${DB_NAME_PREFIX}_recv_${TIMESTAMP}.db"
+    DB_NAME="${DB_NAME_PREFIX}_recv_${TIMESTAMP}_$(hostname)$.db"
 elif [ "$OPTION" == "-c" ]; then
-    DB_NAME="${DB_NAME_PREFIX}_send_${TIMESTAMP}.db"
+    DB_NAME="${DB_NAME_PREFIX}_send_${TIMESTAMP}_$(hostname).db"
 fi
 
 # Create the SQLite database with the appropriate schema based on the option.
