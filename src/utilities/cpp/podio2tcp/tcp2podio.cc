@@ -9,14 +9,14 @@
 // and they will each receive a fraction of the published events
 // via round-robin load balancing.
 //
-//
+// It's the server end.
 //---------------------------------------------------------------------------
 
 #include <iostream>
 #include <thread>
 #include <string>
 #include <chrono>
-
+#include <unistd.h> // For getpid()
 
 #include <TFile.h>
 #include <TMemFile.h>
@@ -29,6 +29,23 @@
 #include <zmq.hpp>
 
 int DEFAULT_ZMQ_PORT = 55577;  // must keep aligned with value in podio2tcp.cc !!
+
+#include "SQLiteRateLogger.h"
+
+// Global SQlite Rate logger
+/// NOTE: data schema for the receiver DB
+sqlite> .schema rate_logs
+CREATE TABLE rate_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp_utc_ms INTEGER,
+    pid STRING,
+    rateHz_recv_period REAL,
+    rateMbps_recv_period REAL
+);
+SQLiteRateLogger rate_logger;
+std::string RATE_DB_COLUMNS = "timestamp_utc_ms, pid, "
+                            "rateHz_recv_period, "
+                            "rateMbps_recv_period";
 
 
 // special class needed to expose protected TMessage constructor
@@ -47,6 +64,8 @@ public:
     int groupevents = 50;
     bool loop = false;
     double rate = 0.0; // Unset
+    std::string sqliteFilename;      // SQL file parameter
+    std::string ipAddress = "localhost";
 
     static CommandLineOptions Parse(int argc, char* argv[]) {
         CommandLineOptions options;
@@ -59,22 +78,34 @@ public:
                 if (i + 1 < argc) {
                     options.port = std::stoi(argv[++i]);
                 }
-           }
+            } else if (arg == "-i" || arg == "--ip-address") {
+                if (i + 1 < argc) {
+                    options.ipAddress = argv[++i];
+                }
+            } else if (arg == "-s" || arg == "--sqlfile") {
+                if (i + 1 < argc) {
+                    options.sqliteFilename = argv[++i];
+                }
+            }
         }
 
         return options;
     }
 
     static void PrintUsage() {
-        std::cout << "\n"
+        std::cout << "\n" 
                   << "Usage: tcp2podio [-p port]\n"
                   << "\n"
                   << "-h, --help   Print this help statement\n"
+                  << "-i, --ip-address <ip> Set the local IP address ZMQ to listen (default is 'localhost')\n"
                   << "-p, --port <port> Set ZMQ port to listen on (default is 55577)\n"
+                  << "-s, --sqlfile <file> Specify the SQL rate logger file\n"
                   << "\n"
                   << "This is used to listen for events coming from an instance of podio2tcp\n."
                   << "It is only for testing the rate at which data is transferred and unmarshalled\n"
                   << "into TTrees. The data is discarded after that."
+                  << "\n"
+                  << "If --sqlfile is used, it specifies the SQLite database output.\n"
                   << "\n";
     }
 };
@@ -94,11 +125,22 @@ int main(int narg, char *argv[]){
     zmq::context_t context(1);
     zmq::socket_t worker(context, ZMQ_PULL);
     worker.set(zmq::sockopt::rcvhwm, 10); // Set High Water Mark for maximum number of messages to queue before stalling
-    // worker.connect("tcp://localhost:55577");
-    /// TODO: How to establish 2-node communication via ZeroMQ
-    worker.connect(("tcp://localhost:" + std::to_string(options.port)).c_str());
+    std::string bindAddress = "tcp://" + options.ipAddress + ":" + std::to_string(options.port);
+    try {
+        worker.bind(bindAddress.c_str());
+        std::cout << "ZeroMQ SERVER binded to: " << bindAddress << "\n";
+    } catch (const zmq::error_t& e) {
+        std::cout << "Error: Failed to bind to the address [" << bindAddress << "]:" << e.what() << "\n";
+        return 1;
+    }
+    std::cout << "\nWaiting for data ..." << std::endl;
 
-    std::cout << "Waiting for data ..." << std::endl;
+    // Setup SQLite3 database connection
+    if (!options.sqliteFilename.empty() && !rate_logger.openDB(options.sqliteFilename)) {
+        std::cerr << "Failed to open database: " << options.sqliteFilename << std::endl;
+        return 1;
+    }
+
     auto last_time = std::chrono::high_resolution_clock::now();
     while (true) {
             zmq::message_t task;
@@ -128,7 +170,6 @@ int main(int narg, char *argv[]){
             }
 
             // Print ticker
-            /// TODO: Also write to SQLite3 DB
             auto Nbytes_received = task.size();
             Long64_t Nevents_in_buffer = 0;
             if( events_tree ) Nevents_in_buffer = events_tree->GetEntries();
@@ -140,12 +181,29 @@ int main(int narg, char *argv[]){
             auto savePrecision = std::cout.precision();
             std::cout << "  " << std::fixed << std::setprecision(3) << rateHz << " Hz  (" << rateMbps << " Mbps)" << std::endl;
             std::cout.precision(savePrecision);
+
+            // Log to SQLite DB
+            auto utc_timestamp_in_ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+            std::string pid_str = std::to_string(getpid());
+            std::ostringstream values;
+            values << std::to_string(utc_timestamp_in_ms) << ", "
+                << pid_str << ", "
+                << std::fixed << std::setprecision(3)  // Ensure consistent floating-point precision
+                << rateHz << ", "
+                << rateMbps;
+            if (!rate_logger.insertRateLog(RATE_DB_COLUMNS, values.str())) {
+                std::cerr << "Failed to insert record into the database." << std::endl;
+            }
+
             last_time = now;
 
             delete f;
 
             // std::this_thread::sleep_for(std::chrono::seconds(1));
     }
+    // Close SQLite3 DB
+    rate_logger.closeDB();
 
     return 0;
 }

@@ -28,6 +28,21 @@ TTree* gmetadata_tree = nullptr;
 TTree* gpodio_metadata_tree = nullptr;
 
 // Global SQlite Rate logger
+/// NOTE: data format for the sender DB
+// sqlite>.schema rate_logs
+// CREATE TABLE rate_logs (
+//     id INTEGER PRIMARY KEY AUTOINCREMENT,
+//     timestamp_utc_ms INTEGER,
+//     pid STRING,
+//     rateHz_read_period REAL,
+//     rateHz_sent_period REAL,
+//     rateMbps_read_period REAL,
+//     rateMbps_sent_period REAL,
+//     rateHz_read_total REAL,
+//     rateHz_sent_total REAL,
+//     rateMbps_read_total REAL,
+//     rateMbps_sent_total REAL
+// );
 SQLiteRateLogger rate_logger;
 std::string RATE_DB_COLUMNS = "timestamp_utc_ms, pid, rateHz_read_period, rateHz_sent_period, "
                           "rateMbps_read_period, rateMbps_sent_period, rateHz_read_total, "
@@ -46,6 +61,7 @@ class CommandLineOptions {
 public:
     std::string inputFilename;
     std::string outfile;
+    std::string remoteIP = "localhost";
     std::string sqliteFilename; // SQLite DB name
     int port = DEFAULT_ZMQ_PORT; // Default
     int groupevents = 50;
@@ -62,6 +78,10 @@ public:
             } else if (arg == "-p" || arg == "--port") {
                 if (i + 1 < argc) {
                     options.port = std::stoi(argv[++i]);
+                }
+            } else if (arg == "-i" || arg == "--ip-address") {
+                if (i + 1 < argc) {
+                    options.remoteIP = argv[++i];
                 }
             } else if (arg == "-g" || arg == "--groupevents") {
                 if (i + 1 < argc) {
@@ -101,6 +121,7 @@ public:
                   << "Usage: podio2tcp [options] inputfilename\n"
                   << "\n"
                   << "-h, --help   Print this help statement\n"
+                  << "-i, --ip-address <ip> Specify the remote IP address to connect to (default is 'localhost')\n"
                   << "-p, --port <port> Set ZMQ port to listen on (default is 55577)\n"
                   << "-o, --outfile <filename> Convert input podio root file to podio stream file with this filename\n"
                   << "-g, --groupevents <num> Group this many events together in buffer when serializing\n"
@@ -111,7 +132,7 @@ public:
                   << "inputfilename represents either a podio root file (e.g. simout.edm4hep.root)\n"
                   << "or a podio stream file (e.g. simout.edm4hep.root.podiostr).\n"
                   << "\n"
-                  << "If --sqlfile is used, it specifies the SQLite database input.\n"
+                  << "If --sqlfile is used, it specifies the SQLite database output.\n"
                   << "\n";
     }
 };
@@ -290,8 +311,8 @@ void ConvertPODIOtoStreamFile(std::string &podiofilename, std::string streamfile
 
 //============================================================================================
 // UpdateStats
-void UpdateStats(size_t Nevents_read, size_t Nbytes_read, size_t Nbytes_sent, bool log2db=false)
-{
+void UpdateStats(size_t Nevents_read, size_t Nbytes_read, size_t Nbytes_sent,
+                    const std::string& pid_str, bool log2db=false) {
     static size_t Nevents_read_period = 0;
     static size_t Nevents_read_total  = 0;
     static size_t Nevents_sent_period = 0;
@@ -357,12 +378,12 @@ void UpdateStats(size_t Nevents_read, size_t Nbytes_read, size_t Nbytes_sent, bo
     
     // Log to SQLite DB
     if (log2db) {
-        auto utc_timestamp_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now.time_since_epoch()).count();
+        auto utc_timestamp_in_ms = 
+            std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 
         std::ostringstream values;
         values << std::to_string(utc_timestamp_in_ms) << ", "
-            << std::to_string(getpid()) << ", "
+            << pid_str << ", "
             << std::fixed << std::setprecision(1)  // Ensure consistent floating-point precision
             << rateHz_read_period << ", "
             << rateHz_sent_period << ", "
@@ -410,8 +431,9 @@ void SendFromPodioRootFile(CommandLineOptions &options, Long64_t Nevents_per_gro
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
-        // Print ticker. TODO: Also write to SQLite3 DB.
-        UpdateStats(Nevents_in_buffer, buff.size(), Nbytes_sent, !options.sqliteFilename.empty());
+        // Print ticker. Also write to SQLite3 DB.
+        UpdateStats(Nevents_in_buffer, buff.size(), Nbytes_sent, std::to_string(getpid()),
+                    !options.sqliteFilename.empty());
     }
 }
 
@@ -438,8 +460,9 @@ void SendFromPodioStreamFile(CommandLineOptions &options) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
-        // Print ticker. TODO: Also write to SQLite3 DB.
-        UpdateStats(Nevents_in_buffer, buff.size(), Nbytes_sent);
+        // Print ticker. Also write to SQLite3 DB.
+        UpdateStats(Nevents_in_buffer, buff.size(), Nbytes_sent, std::to_string(getpid()),
+                    !options.sqliteFilename.empty());
      }
 }
 
@@ -483,13 +506,21 @@ int main(int argc, char *argv[]){
     zmq::socket_t ventilator(context, ZMQ_PUSH);
     gventilator = &ventilator; // (yes, I know, this is a bad way to do this)
     ventilator.set(zmq::sockopt::sndhwm, 100); // Set High Water Mark for maximum number of messages to queue before stalling
-    ventilator.bind(("tcp://*:" + std::to_string(options.port)).c_str());
+    std::string connectAddress = "tcp://" + options.remoteIP + ":" + std::to_string(options.port);
+    try {
+        ventilator.connect(connectAddress.c_str());
+        std::cout << "ZeroMQ CLIENT connected to: " << connectAddress << "\n";
+    } catch (const zmq::error_t& e) {
+        std::cout << "Error: Failed to connect to the address [" << connectAddress << "]:" << e.what() << "\n";
+        return 1;
+    }
 
     // Setup SQLite3 database connection
-    if (!rate_logger.openDB(options.sqliteFilename)) {
+    if (!options.sqliteFilename.empty() && !rate_logger.openDB(options.sqliteFilename)) {
         std::cerr << "Failed to open database: " << options.sqliteFilename << std::endl;
         return 1;
     }
+
     // Determine if input file is root or stream form. (Just check the suffix.)
     bool input_is_root = false;
     std::string suffix = ".root";
@@ -498,13 +529,13 @@ int main(int argc, char *argv[]){
     }
 
     // Stream events from podio ROOT or stream file
-    do{
+    do {
         if( input_is_root ){
             SendFromPodioRootFile(options, options.groupevents);
         }else{
             SendFromPodioStreamFile(options);
         }
-    }while( options.loop ); // loop runs once if loop is false or infinitely if true.
+    } while( options.loop ); // loop runs once if loop is false or infinitely if true.
 
     // Close SQLite3 DB
     rate_logger.closeDB();
