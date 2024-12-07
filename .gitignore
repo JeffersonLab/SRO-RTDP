@@ -14,13 +14,18 @@ __pycache__
 
 # built files
 build
+*.build
 
 # IDE files
 .idea
 SRO-RTDP.iml
+.vscode
 
 # Singularity binary files
 *.sif
 
 # Prometheus data
 prom-data*
+
+# SQLite3 DB files
+*.db
