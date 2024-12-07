@@ -7,23 +7,6 @@
 #include <sstream>
 #include <stdexcept>
 
-/// NOTE: data format for the sender DB
-// sqlite>.schema rate_logs
-// CREATE TABLE rate_logs (
-//     id INTEGER PRIMARY KEY AUTOINCREMENT,
-//     timestamp_utc_ms INTEGER,
-//     pid STRING,
-//     rateHz_read_period REAL,
-//     rateHz_sent_period REAL,
-//     rateMbps_read_period REAL,
-//     rateMbps_sent_period REAL,
-//     rateHz_read_total REAL,
-//     rateHz_sent_total REAL,
-//     rateMbps_read_total REAL,
-//     rateMbps_sent_total REAL
-// );
-
-
 /**
  * This class manages a SQLite3 DB for writing and querying the "rate_logs" table.
  */
