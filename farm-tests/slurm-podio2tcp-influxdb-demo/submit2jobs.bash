@@ -29,16 +29,13 @@ function slurm_get_nodelist() {
   done
 }
 ######################################################
-
-# TODO: Launch Grafana DB etc
-
-
+## <==== Update the paths here!!!
 SCRIPTS_PATH=farm-tests/slurm-podio2tcp-influxdb-demo
 APPTAINER_WRAPPER=apptainer_sbatch_wrapper.slurm
 RECV_SCRIPT=podio2tcp-receiver.bash
 SEND_SCRIPT=podio2tcp-sender.bash
 
-# 2. Sumbit the receiver job
+# 1. Sumbit the receiver job
 sbatch_output=$(sbatch --partition ifarm \
        --output slurm_%j_%N_recv.log \
        --job-name podio2tcp-recv \
@@ -46,10 +43,9 @@ sbatch_output=$(sbatch --partition ifarm \
 
 job_id=$(echo $sbatch_output | awk '{print $4}')
 recv_nodename=$(slurm_get_nodelist ${job_id})
+echo -e "The receiver node is: ${recv_nodename} \n"
 
-# echo ${recv_nodename}
-
-# 3. Submit the sender job
+# 2. Submit the sender job
 sbatch --partition ifarm \
        --output slurm_%j_%N_sender.log \
        --job-name podio2tcp-send \

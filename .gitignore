@@ -24,8 +24,9 @@ SRO-RTDP.iml
 # Singularity binary files
 *.sif
 
-# Prometheus data
-prom-data*
+# Prometheus and InfluxDB data
+prom-data/
+influxdb-data/
 
 # SQLite3 DB files
 *.db
