@@ -2,8 +2,8 @@
 
 # if WORKDIR is set, run copy the app to the WORKDIR
 if [ -n "$WORKDIR" ]; then
-    cp -r /app $WORKDIR/eic # make sure the WORKDIR is set when running the container. WORKDIR is writable by the user.
-c   d $WORKDIR/eic
+    cp -r /app $WORKDIR/eic; # make sure the WORKDIR is set when running the container. WORKDIR is writable by the user.
+    cd $WORKDIR/eic
 fi
 
 source /opt/detector/epic-main/bin/thisepic.sh
@@ -18,5 +18,8 @@ export JANA_PLUGIN_PATH=${PWD}/podiostream.build:${JANA_PLUGIN_PATH}
 
 export DETECTOR_PATH=/opt/detector/epic-main/share/epic
 export DD4hepINSTALL="/usr/local"
+
+# Some bug fix for EICrecon
+cp -r /opt/local/DDDetectors /usr/local/
 
 eicrecon -Pplugins=podiostream podiostreamSource
