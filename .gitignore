@@ -27,6 +27,7 @@ SRO-RTDP.iml
 # Prometheus and InfluxDB data
 prom-data/
 influxdb-data/
+influxdb-config/
 
 # SQLite3 DB files
 *.db

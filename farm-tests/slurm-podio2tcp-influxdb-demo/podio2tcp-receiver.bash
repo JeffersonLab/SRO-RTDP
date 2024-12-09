@@ -24,3 +24,5 @@ echo "SQLite DB name is: ${dbname}"
 # Launch the tcp2podio app with SQLite DB name
 # "-i $(hostname)" is a must-have for accepting remote connection
 ./podio2tcp.build/tcp2podio -p $ZMQ_PORT_NUM -s ${dbname} -i "$(hostname)"
+
+# Setup the scraper

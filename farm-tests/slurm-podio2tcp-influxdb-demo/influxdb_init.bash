@@ -1,20 +1,31 @@
 #!/bin/bash
+set -x
 
-INFLUXDB_USERNAME=epsci
-INFLUXDB_PASSWORD=epsci_EPSCI
-INFLUXDB_ORG=epsci
-INFLUXDB_BUCKET=bucket_podio2tcp
-INFLUXDB_RETENTION=7d  # Retain for 7 days
+# Confirm mount
+mount | grep -E 'influxdb' 
+
+INFLUXDB_LOGFILE=influxdb_$(date -u +%s).log  # logfile ends with timestamp in seconds
+touch ${INFLUXDB_LOGFILE}
+
+# Set InfluxDB params via env vars
+WORKDIR_PREFIX="${HOME}/projects/SRO-RTDP/farm-tests"
+source ${WORKDIR_PREFIX}/slurm-podio2tcp-influxdb-demo/influxdb_setenv.bash
 
 node_ip=$(hostname -I | awk '{print $1}')
 
 # Start InfluxDB in the background with custom HTTP port
-influxd --http-bind-address=:43900 &
+# Need "&" at the end
+influxd --log-level=debug \
+        --bolt-path /var/lib/influxdb2/influxd.bolt \
+        --engine-path /var/lib/influxdb2/engine \
+        --http-bind-address=:43900 > "${INFLUXDB_LOGFILE}" 2>&1 &
+influxd_pid=$!
 
 # Wait for InfluxDB to be fully up
 sleep 10
 
-# Initialize InfluxDB with environment variables
+# Initialize InfluxDB with necessary variables.
+# This will create an auth file at etc/influxdb2/influx-configs
 influx setup \
   --username "${INFLUXDB_USERNAME}" \
   --password "${INFLUXDB_PASSWORD}" \
@@ -23,4 +34,8 @@ influx setup \
   --retention "${INFLUXDB_RETENTION}" \
   --host http://${node_ip}:43900 \
   --force
-  
+
+echo -e "\nInfluxDB setup completed, see logs at: ${INFLUXDB_LOGFILE}\n"
+
+# Must-have to keep all apptainer & influxd threads alive
+wait $influxd_pid

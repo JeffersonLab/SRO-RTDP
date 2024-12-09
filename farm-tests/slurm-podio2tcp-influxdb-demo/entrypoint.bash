@@ -6,11 +6,12 @@
 set -xe  pipefail # -e: exit on first error; -x: echo the command
 
 ZMQ_PORT_NUM=55577
+INFLUX_DB_IFARM_PORT=42900
 
 cd ${HOME}/projects/SRO-RTDP   # <==== Update ROOT dir
 
 
-################### Helper functions for Slurm #####
+############ Helper functions for Slurm ############
 function slurm_get_nodelist() {
   # Kernel function of extracting "NodeList" based on a Slurm job_id
 
@@ -29,6 +30,8 @@ function slurm_get_nodelist() {
   done
 }
 ######################################################
+
+#################### Sbatch scripts ##################
 ## <==== Update the paths here!!!
 SCRIPTS_PATH=farm-tests/slurm-podio2tcp-influxdb-demo
 APPTAINER_WRAPPER=apptainer_sbatch_wrapper.slurm
