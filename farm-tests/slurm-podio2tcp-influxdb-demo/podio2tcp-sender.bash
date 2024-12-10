@@ -27,3 +27,5 @@ echo "SQLite DB name is: ${dbname}"
 # Send to remote node
 ROOT_FILE=${PWD}/containers/podio-eicrecon/simout.100.edm4hep.root
 ./podio2tcp.build/podio2tcp -p $ZMQ_PORT_NUM -l -s ${dbname} -i "${RECV_NODENAME}.jlab.org" ${ROOT_FILE} &
+
+# TODO: Setup the scraper

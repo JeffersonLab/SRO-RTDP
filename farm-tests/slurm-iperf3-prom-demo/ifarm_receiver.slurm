@@ -74,7 +74,7 @@ echo -e "Receiver process started with PID $RECV_PID \n"
 #       --procfs /host/proc -config.path /config/filename.yml
 
 # Start process-exporter with the updated configuration
-echo "Starting Process Exporter containmmer..."
+echo "Starting Process Exporter container..."
 
 # Must use `apptainer exec` other than `apptainer run`
 apptainer exec \
