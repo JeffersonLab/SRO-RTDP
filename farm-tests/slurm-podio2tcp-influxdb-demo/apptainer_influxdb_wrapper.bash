@@ -21,13 +21,14 @@ INFLUXDB_INIT_SCRIPT=$WORKDIR_PREFIX/slurm-podio2tcp-influxdb-demo/influxdb_init
 
 influxdb_fast_access_path=/tmp/influxdb-data   # tmp is much faster than NFS!!!
 
-## Killing existing influxd instances
+# Killing existing influxd instances
 pids=$(pgrep influxd)
 if [[ -n "$pids" ]]; then
   echo "Killing 'influxd' processes with PIDs: $pids"
   kill -9 $pids
   echo -e "'influxd' processes have been terminated.\n\n"
 fi
+
 ## Deleting all existing influxdb setup
 rm -rf ~/.influxdbv2
 rm -rf ${WORKDIR_PREFIX}/influxdb-config/* # config files etc
@@ -46,7 +47,7 @@ apptainer exec \
   --bind ${WORKDIR_PREFIX}/config/influxdb-config.yml:/var/config \
   --bind ${WORKDIR_PREFIX}/influxdb-config:/etc/influxdb2 \
   ${INFLUXDB_SIF} \
-  bash ${INFLUXDB_INIT_SCRIPT} &
+  bash ${INFLUXDB_INIT_SCRIPT} ${INFLUXDB_PORT} &
 
 # Inside the container, run
 # Apptainer> pwd

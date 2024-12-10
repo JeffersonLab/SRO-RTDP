@@ -4,7 +4,8 @@
 
 #====================== Inside the container
 ZMQ_PORT_NUM=$1
-RECV_NODENAME=$2
+INFLUXDB_PORT=$2
+RECV_NODENAME=$3
 
 # Activate env
 . /opt/detector/epic-main/bin/thisepic.sh
@@ -26,6 +27,6 @@ echo "SQLite DB name is: ${dbname}"
 # Launch the tcp2podio app with SQLite DB name
 # Send to remote node
 ROOT_FILE=${PWD}/containers/podio-eicrecon/simout.100.edm4hep.root
-./podio2tcp.build/podio2tcp -p $ZMQ_PORT_NUM -l -s ${dbname} -i "${RECV_NODENAME}.jlab.org" ${ROOT_FILE} &
+./podio2tcp.build/podio2tcp -p $ZMQ_PORT_NUM -l -s ${dbname} -i "${RECV_NODENAME}.jlab.org" ${ROOT_FILE}
 
 # TODO: Setup the scraper

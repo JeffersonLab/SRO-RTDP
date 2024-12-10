@@ -4,6 +4,7 @@
 
 #====================== Inside the container
 ZMQ_PORT_NUM=$1
+INFLUXDB_PORT=$2
 
 # Activate env
 . /opt/detector/epic-main/bin/thisepic.sh
@@ -21,8 +22,9 @@ fi
 dbname=$(echo $output | sed -n "s/.*'\([^']*\)'.*/\1/p")
 echo "SQLite DB name is: ${dbname}"
 
+# Setup the scraper
+bash ${SCRIPTS_PATH_PREFIX}/sqlite3db_receiver_scraper.bash $dbname ${INFLUXDB_PORT} &
+
 # Launch the tcp2podio app with SQLite DB name
 # "-i $(hostname)" is a must-have for accepting remote connection
 ./podio2tcp.build/tcp2podio -p $ZMQ_PORT_NUM -s ${dbname} -i "$(hostname)"
-
-# TODO: Setup the scraper

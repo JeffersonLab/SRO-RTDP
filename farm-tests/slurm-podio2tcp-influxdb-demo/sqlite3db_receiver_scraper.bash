@@ -22,13 +22,21 @@
 # NOTE: for all the lines below double-quote or single-quote is a must-have and very SENSITIVE!!!
 
 SQLITE_DBNAME=$1
-INFLUXDB_URL=http://129.57.70.25:43900  # ifarm2401 address
+INFLUXDB_PORT=$2
+
+INFLUXDB_URL=http://129.57.70.25:${INFLUXDB_PORT}  # ifarm2401 address
 INFLUXDB_MEASUREMENT_NAME=podio2tcp
 
 SCRIPTS_PREFIX=${HOME}/projects/SRO-RTDP/farm-tests/slurm-podio2tcp-influxdb-demo
 token=$(bash ${SCRIPTS_PREFIX}/influxdb_get_token.bash)
+while [[ -z "$token" ]]; do
+    echo "Token is null. Try again after 5 seconds..."
+    sleep 5
+    
+    token=$(bash ${SCRIPTS_PREFIX}/influxdb_get_token.bash)
+done
 export INFLUXDB_TOKEN=$token
-echo $INFLUXDB_TOKEN
+# echo $INFLUXDB_TOKEN
 
 # Activate InfluxDB env vars
 source ${SCRIPTS_PREFIX}/influxdb_setenv.bash

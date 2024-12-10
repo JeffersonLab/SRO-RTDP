@@ -1,55 +1,18 @@
 #!/bin/bash
 
-## Run this script on a farm compute node in the interactive mode.
-
 # For debug
-set -xe  pipefail # -e: exit on first error; -x: echo the command
+set -x # -e: exit on first error; -x: echo the command
 
-ZMQ_PORT_NUM=55577
-INFLUX_DB_IFARM_PORT=42900
+INFLUXDB_IFARM_PORT=42900
 
 cd ${HOME}/projects/SRO-RTDP   # <==== Update ROOT dir
-
-
-############ Helper functions for Slurm ############
-function slurm_get_nodelist() {
-  # Kernel function of extracting "NodeList" based on a Slurm job_id
-
-  local job_id=$1
-
-  while true; do
-    # Run scontrol show job and extract the line start with "   Nodelist="
-    local node_list=$(scontrol show job $job_id | grep -oP '(?<=\s|^)NodeList=\K\S+');
-
-    # Check if node_list is not empty
-    if [[ -n "$node_list" ]]; then
-        echo "$node_list";  # Output the node list
-        break;
-    fi
-    sleep 5 # Wait for 5 second before checking again
-  done
-}
-######################################################
 
 #################### Sbatch scripts ##################
 ## <==== Update the paths here!!!
 SCRIPTS_PATH=farm-tests/slurm-podio2tcp-influxdb-demo
-APPTAINER_WRAPPER=apptainer_sbatch_wrapper.slurm
-RECV_SCRIPT=podio2tcp-receiver.bash
-SEND_SCRIPT=podio2tcp-sender.bash
+APPTAINER_INFLUXDB_WRAPPER=apptainer_influxdb_wrapper.bash
 
-# 1. Sumbit the receiver job
-sbatch_output=$(sbatch --partition ifarm \
-       --output slurm_%j_%N_recv.log \
-       --job-name podio2tcp-recv \
-       ${SCRIPTS_PATH}/${APPTAINER_WRAPPER} ${SCRIPTS_PATH}/${RECV_SCRIPT} ${ZMQ_PORT_NUM})
+# Init the InfluxDB locally
+bash ${SCRIPTS_PATH}/${APPTAINER_INFLUXDB_WRAPPER} ${INFLUXDB_IFARM_PORT} &
 
-job_id=$(echo $sbatch_output | awk '{print $4}')
-recv_nodename=$(slurm_get_nodelist ${job_id})
-echo -e "The receiver node is: ${recv_nodename} \n"
-
-# 2. Submit the sender job
-sbatch --partition ifarm \
-       --output slurm_%j_%N_sender.log \
-       --job-name podio2tcp-send \
-       ${SCRIPTS_PATH}/${APPTAINER_WRAPPER} ${SCRIPTS_PATH}/${SEND_SCRIPT} ${ZMQ_PORT_NUM} ${recv_nodename}
+bash ${SCRIPTS_PATH}/submit2jobs.bash ${INFLUXDB_IFARM_PORT}
