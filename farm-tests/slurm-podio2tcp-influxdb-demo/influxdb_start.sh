@@ -16,4 +16,10 @@ APPTAINER_INFLUXDB_WRAPPER=apptainer_influxdb_wrapper.bash
 bash ${SCRIPTS_PATH}/${APPTAINER_INFLUXDB_WRAPPER} ${INFLUXDB_IFARM_PORT}
 # sleep 120  # time to prepare InfluxDB
 
+## Confirm influxdb is correctly running by looking for ALL of the below processes
+# 2102445 pts/280  00:00:00 starter
+# 2102521 pts/280  00:00:00 squashfuse_ll
+# 2102565 pts/280  00:00:00 influxd
+
+# TODO: Automatical lauching this is always stuck caused by wait <influxd_pid>
 # bash ${SCRIPTS_PATH}/submit2jobs.bash ${INFLUXDB_IFARM_PORT}

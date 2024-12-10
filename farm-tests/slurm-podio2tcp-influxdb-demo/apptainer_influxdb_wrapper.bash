@@ -19,7 +19,7 @@ INFLUXDB_SIF=$WORKDIR_PREFIX/sifs/influxdb.sif
 INFLUXDB_PORT=$1
 INFLUXDB_INIT_SCRIPT=$WORKDIR_PREFIX/slurm-podio2tcp-influxdb-demo/influxdb_init.bash
 
-# influxdb_access_path=/tmp/influxdb-data   # tmp is much faster than NFS!!!
+# influxdb_access_path=/tmp/influxdb-data   # tmp is faster than NFS!!!
 influxdb_access_path=${WORKDIR_PREFIX}/influxdb-data   # NFS space on ifarm
 
 # Killing existing influxd instances
