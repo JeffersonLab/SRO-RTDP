@@ -48,8 +48,8 @@ sbatch_output=$(sbatch --partition ifarm \
 )
 send_job_id=$(echo $sbatch_output | awk '{print $4}')
 send_nodename=$(slurm_get_nodelist ${send_job_id})
-echo -e "The receiver node is: ${send_nodename} \n"
+echo -e "The sender node is: ${send_nodename} \n"
 
-sleep 1200
+sleep 600  # Hold for 10 mins
 scancel $recv_job_id
 scancel $send_job_id

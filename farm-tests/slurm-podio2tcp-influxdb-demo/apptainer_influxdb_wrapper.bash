@@ -19,7 +19,8 @@ INFLUXDB_SIF=$WORKDIR_PREFIX/sifs/influxdb.sif
 INFLUXDB_PORT=$1
 INFLUXDB_INIT_SCRIPT=$WORKDIR_PREFIX/slurm-podio2tcp-influxdb-demo/influxdb_init.bash
 
-influxdb_fast_access_path=/tmp/influxdb-data   # tmp is much faster than NFS!!!
+# influxdb_access_path=/tmp/influxdb-data   # tmp is much faster than NFS!!!
+influxdb_access_path=${WORKDIR_PREFIX}/influxdb-data   # NFS space on ifarm
 
 # Killing existing influxd instances
 pids=$(pgrep influxd)
@@ -32,18 +33,19 @@ fi
 ## Deleting all existing influxdb setup
 rm -rf ~/.influxdbv2
 rm -rf ${WORKDIR_PREFIX}/influxdb-config/* # config files etc
-rm -rf $influxdb_fast_access_path
+rm -rf ${WORKDIR_PREFIX}/influxdb-data/*
+rm -rf $influxdb_access_path
 
 # Create new instance
-mkdir -p $influxdb_fast_access_path
-chmod 755 $influxdb_fast_access_path
+mkdir -p $influxdb_access_path
+chmod 755 $influxdb_access_path
 
 # Start InfluxDB container
 # Needs "&" at the end
 echo "Starting InfluxDB container..."
 apptainer exec \
   -B /cache,/volatile,/scratch,/work,/w \
-  --bind ${influxdb_fast_access_path}:/var/lib/influxdb2 \
+  --bind ${influxdb_access_path}:/var/lib/influxdb2 \
   --bind ${WORKDIR_PREFIX}/config/influxdb-config.yml:/var/config \
   --bind ${WORKDIR_PREFIX}/influxdb-config:/etc/influxdb2 \
   ${INFLUXDB_SIF} \

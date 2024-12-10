@@ -27,21 +27,30 @@ INFLUXDB_PORT=$2
 INFLUXDB_URL=http://129.57.70.25:${INFLUXDB_PORT}  # ifarm2401 address
 INFLUXDB_MEASUREMENT_NAME=podio2tcp
 
+# Activate InfluxDB env vars
 SCRIPTS_PREFIX=${HOME}/projects/SRO-RTDP/farm-tests/slurm-podio2tcp-influxdb-demo
+source ${SCRIPTS_PREFIX}/influxdb_setenv.bash
+
+## Get the InfluxDB token
 token=$(bash ${SCRIPTS_PREFIX}/influxdb_get_token.bash)
 while [[ -z "$token" ]]; do
-    echo "Token is null. Try again after 5 seconds..."
-    sleep 5
+    echo "Token is null. Try again after 15 seconds..."
+    sleep 15
     
     token=$(bash ${SCRIPTS_PREFIX}/influxdb_get_token.bash)
 done
 export INFLUXDB_TOKEN=$token
 # echo $INFLUXDB_TOKEN
 
-# Activate InfluxDB env vars
-source ${SCRIPTS_PREFIX}/influxdb_setenv.bash
-LAST_ID=0
+## Check if the InfluxDB url accessible
+if ! curl -fsS "${INFLUXDB_URL}/health"; then
+  echo "InfluxDB health check failed. Exiting."
+  exit 1
+fi
 
+sleep 5
+
+LAST_ID=0
 # Helper function to transfer the sql res into influxdb line protocol lines.
 ### RUN on the receiver node to get the correct hostname.
 transfer_recv_sql_records() {
@@ -63,14 +72,6 @@ transfer_recv_sql_records() {
     
     echo "${influxdb_data}"
 }
-
-## Check if the InfluxDB url accessible
-if ! curl -fsS "${INFLUXDB_URL}/health"; then
-  echo "InfluxDB health check failed. Exiting."
-  exit 1
-fi
-
-sleep 5
 
 ## Main loop
 set -e # Exit up on fail
@@ -102,5 +103,5 @@ while true; do
         --header "Accept: application/json" \
         --data-binary "${influxdb_data}"
 
-    sleep 10
+    sleep 15
 done
