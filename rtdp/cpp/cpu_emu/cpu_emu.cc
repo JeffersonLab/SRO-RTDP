@@ -102,7 +102,8 @@ int main (int argc, char *argv[])
     if(DBG) std::cout << endl;
     if(!passedI) { Usage(); exit(1); }
 
-    int sockfd, connfd, len; 
+    int sockfd, connfd;
+    socklen_t len;
     struct sockaddr_in servaddr, cli; 
   
     // socket create and verification 
