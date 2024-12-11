@@ -26,13 +26,14 @@ void   Usage()
 {
     char usage_str[] =
         "\nUsage: \n\
+        -r receive port (default = 8888)  \n\
         -i destination address (string)  \n\
         -p destination port (default = 8888)  \n\
         -t num threads (default = 10)  \n\
         -v verbose (= 0/1 - default = false (0))  \n\
         -h help \n\n";
         std::cout <<  usage_str;
-        std::cout <<  "Required: -i -p\n";
+        std::cout <<  "Required: -i\n";
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
@@ -53,13 +54,14 @@ int main (int argc, char *argv[])
 { 
     int optc;
 
-    bool passedI=false, passedP=false, passedT=false, passedV=false;
+    bool passedR=false, passedI=false, passedP=false, passedT=false, passedV=false;
     char     dst_ip[INET6_ADDRSTRLEN];	// target ip
+    uint16_t rcv_prt = 8888;			// receive port default
     uint16_t dst_prt = 8888;			// target port default
     auto nmThrds = 10;					// default
     bool vrbs = false;
 
-    while ((optc = getopt(argc, argv, "v:t:i:p:h")) != -1)
+    while ((optc = getopt(argc, argv, "v:t:r:i:p:h")) != -1)
     {
         switch (optc)
         {
@@ -70,6 +72,11 @@ int main (int argc, char *argv[])
             strcpy(dst_ip, (const char *) optarg) ;
             passedI = true;
             if(DBG) std::cout << "-i " << dst_ip;
+            break;
+        case 'r':
+            rcv_prt = (uint16_t) atoi((const char *) optarg) ;
+            passedR = true;
+            if(DBG) std::cout << "-r " << rcv_prt;
             break;
         case 'p':
             dst_prt = (uint16_t) atoi((const char *) optarg) ;
@@ -93,6 +100,7 @@ int main (int argc, char *argv[])
         }
     }
     if(DBG) std::cout << endl;
+    if(!passedI) { Usage(); exit(1); }
 
     int sockfd, connfd, len; 
     struct sockaddr_in servaddr, cli; 
@@ -110,7 +118,7 @@ int main (int argc, char *argv[])
     // assign IP, PORT 
     servaddr.sin_family = AF_INET; 
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY); 
-    servaddr.sin_port = htons(dst_prt); 
+    servaddr.sin_port = htons(rcv_prt); 
   
     // Binding newly created socket to given IP and verification 
     if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) { 
