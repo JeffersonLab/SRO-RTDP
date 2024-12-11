@@ -23,9 +23,9 @@ TIMESTAMP=$(date +%s%3N)
 
 # Set the DB name according to the sender/receiver.
 if [ "$OPTION" == "-s" ]; then
-    DB_NAME="${DB_NAME_PREFIX}_recv_${TIMESTAMP}.db"
+    DB_NAME="${DB_NAME_PREFIX}_recv_${TIMESTAMP}_$(hostname).db"
 elif [ "$OPTION" == "-c" ]; then
-    DB_NAME="${DB_NAME_PREFIX}_send_${TIMESTAMP}.db"
+    DB_NAME="${DB_NAME_PREFIX}_send_${TIMESTAMP}_$(hostname).db"
 fi
 
 # Create the SQLite database with the appropriate schema based on the option.
@@ -45,7 +45,7 @@ CREATE TABLE $TABLE_NAME (
     rateMbps_sent_total REAL
 );
 EOF
-    echo "Receiver/SERVER database created successfully: '$DB_NAME' with table '$TABLE_NAME'."
+    echo "Sender/CLIENT database created successfully: '$DB_NAME'."
 
 elif [ "$OPTION" == "-s" ]; then
     TABLE_NAME="rate_logs"
@@ -58,11 +58,11 @@ CREATE TABLE $TABLE_NAME (
     rateMbps_recv_period REAL
 );
 EOF
-    echo "Sender/CLIENT database created successfully: '$DB_NAME' with table '$TABLE_NAME'."
+    echo "Receiver/SERVER database created successfully: '$DB_NAME'."
 fi
 
 # Check if the database was created successfully
 if [ $? -ne 0 ]; then
-    echo "Failed to create the database or table."
+    echo "Failed to create the database."
     exit 1
 fi
