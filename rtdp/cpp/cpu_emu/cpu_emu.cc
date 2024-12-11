@@ -43,7 +43,7 @@ void func(char* buff, ssize_t nmrd, bool vrbs=false)
     if(vrbs) std::cout << "Threading ..." << endl;
     auto cmpScl = 1e3;
     double* x = new double[nmrd]; //mem allocation test
-    for (ssize_t k = 0; k<cmpScl; k++) for (ssize_t i = 0; i<nmrd; i++) x[i] = tanh(0.1234);///////////////////////////////
+    for (ssize_t k = 0; k<cmpScl; k++) for (ssize_t i = 0; i<nmrd; i++) x[i] = tanh(i);
     if(vrbs) std::cout << "Threading Done" << endl;
 
 } 
