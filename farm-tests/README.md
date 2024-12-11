@@ -17,9 +17,9 @@ Demos for a 3-node system where all the 3 nodes are `ifarm` compute nodes:
 May need minor updates (such as path) to run the scripts on ifarm.
 
 #### Demo list
-- [slurm-iperf3-prom-demo/](./slurm-iperf3-prom-demo/): The centralized metric DB is Prometheus. Node-exporters run the sender (native `iperf3` client) and receiver (native `iperf3` server) node. 
+- [slurm-iperf3-prom-demo/](./slurm-iperf3-prom-demo/): The centralized metric DB is Prometheus. Node-exporters run on the sender (native `iperf3` client) and receiver (native `iperf3` server) node.
 
-- [slurm-podio2tcp-influxdb-demo/](./slurm-podio2tcp-influxdb-demo/): The centralized metric DB is InfluxDB. The sender node runs `podio2tcp`. The receiver node runs `tcp2podio`. 
+- [slurm-podio2tcp-influxdb-demo/](./slurm-podio2tcp-influxdb-demo/): The centralized metric DB is InfluxDB. The sender node runs `podio2tcp`. The receiver node runs `tcp2podio`.
 
 
 ### Containers
