@@ -8,15 +8,21 @@
 # timestamp: Integer value after the second unescaped whitespace.
 # Lines are separated by the newline character (\n). Line protocol is whitespace sensitive.
 
-# InfluxDB receiver schema
-# - measurement: tcp2podio
+# InfluxDB sender schema
+# - measurement: podio2tcp
 # - tags
 # hostname: ${HOSTNAME}
 # pid: pid in SQL
-# role: RECV
+# role: SEND
 # - fields
-# rateHz_period: rateHz_period in SQL (float)
-# rateMbps_period: rateMbps_period in SQL (float)
+# rateHz_read_period: rateHz_read_period in SQL (float)
+# rateHz_sent_period: rateHz_sent_period in SQL (float)
+# rateMbps_read_period: rateMbps_read_period in SQL (float)
+# rateMbps_sent_period: rateMbps_sent_period in SQL (float)
+# rateHz_read_total: rateHz_read_total in SQL (float)
+# rateHz_sent_total: rateHz_sent_total in SQL (float)
+# rateMbps_read_total: rateMbps_read_total in SQL (float)
+# rateMbps_sent_total: rateMbps_sent_total in SQL (float)
 # - timestamp: Unix timestamp in millisecond precision
 
 # NOTE: for all the lines below double-quote or single-quote is a must-have and very SENSITIVE!!!
@@ -25,7 +31,7 @@ SQLITE_DBNAME=$1
 INFLUXDB_PORT=$2
 
 INFLUXDB_URL=http://129.57.70.25:${INFLUXDB_PORT}  # ifarm2401 address
-INFLUXDB_MEASUREMENT_NAME=tcp2podio
+INFLUXDB_MEASUREMENT_NAME=podio2tcp
 
 # Activate InfluxDB env vars
 SCRIPTS_PREFIX=${HOME}/projects/SRO-RTDP/farm-tests/slurm-podio2tcp-influxdb-demo
@@ -53,18 +59,22 @@ sleep 5
 LAST_ID=0
 # Helper function to transfer the sql res into influxdb line protocol lines.
 ### RUN on the receiver node to get the correct hostname.
-transfer_recv_sql_records() {
+transfer_send_sql_records() {
     local sql_res="$1"
     # echo $sql_res
     local influxdb_data=""
 
-    # Sample $sql_res: 517|1733772184881|629190|38.168|115.265 516|1733772183571|629190|38.959|117.653
-    while IFS='|' read -r id timestamp_utc_ms pid rateHz_period rateMbps_period; do
-        # NOTE: CASE and WHITESPACE sensitive!!!
+    # NOTE: CASE and WHITESPACE sensitive!!!
+    while IFS='|' read -r id timestamp_utc_ms pid \
+    rateHz_read_period rateHz_sent_period rateMbps_read_period rateMbps_sent_period \
+    rateHz_read_total rateHz_sent_total rateMbps_read_total rateMbps_sent_total; do
         # InfluxDB line protocol: measurement, tags
-        influxdb_data+="${INFLUXDB_MEASUREMENT_NAME},hostname=${HOSTNAME},pid=${pid},role=RECV "
+        influxdb_data+="${INFLUXDB_MEASUREMENT_NAME},hostname=${HOSTNAME},pid=${pid},role=SEND "
         # InfluxDB line protocol: fields
-        influxdb_data+="rateHz_period=${rateHz_period},rateMbps_period=${rateMbps_period} "
+        influxdb_data+="rateHz_read_period=${rateHz_read_period},rateHz_sent_period=${rateHz_sent_period},"
+        influxdb_data+="rateMbps_read_period=${rateMbps_read_period},rateMbps_sent_period=${rateMbps_sent_period},"
+        influxdb_data+="rateHz_read_total=${rateHz_read_total},rateHz_sent_total=${rateHz_sent_total},"
+        influxdb_data+="rateMbps_read_total=${rateMbps_read_total},rateMbps_sent_total=${rateMbps_sent_total} "
         # InfluxDB line protocol: timestamp in ms.
         # DONOT use "${timestamp_utc_ms}\n" since it will add "\\n" instead of '\n' and cause bugs.
         influxdb_data+="${timestamp_utc_ms}"$'\n'
@@ -90,13 +100,13 @@ while true; do
         continue
     fi
 
-    influxdb_data=$(transfer_recv_sql_records "$sql_query_res")
+    influxdb_data=$(transfer_send_sql_records "$sql_query_res")
 
     ## Query the DB to verify:
     # curl --request POST "$INFLUXDB_URL/query?org=$INFLUXDB_ORG&bucket=${INFLUXDB_BUCKET}" \
     #     --header "Authorization: Token $INFLUXDB_TOKEN" \
     #     --data-urlencode "rp=autogen" --data-urlencode "db=bucket_podio2tcp" \
-    #     --data-urlencode "q=SELECT * FROM tcp2podio WHERE time >= '2024-12-09T08:00:00Z'"
+    #     --data-urlencode "q=SELECT * FROM podio2tcp WHERE time >= '2024-12-09T08:00:00Z'"
     curl -X POST "${INFLUXDB_URL}/api/v2/write?org=${INFLUXDB_ORG}&bucket=${INFLUXDB_BUCKET}&precision=ms" \
         --header "Authorization: Token ${INFLUXDB_TOKEN}" \
         --header "Content-Type: text/plain; charset=utf-8" \

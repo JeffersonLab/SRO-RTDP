@@ -2,7 +2,14 @@
 
 set -xe
 
+# Check if a port number is provided
+if [ -z "$1" ]; then
+    echo "Error: Port number must be provided."
+    echo "Usage: $0 <influxdb_port_number>"
+    exit 1
+fi
 INFLUXDB_PORT=$1
+
 ZMQ_PORT_NUM=55577
 
 SCRIPTS_PATH=farm-tests/slurm-podio2tcp-influxdb-demo

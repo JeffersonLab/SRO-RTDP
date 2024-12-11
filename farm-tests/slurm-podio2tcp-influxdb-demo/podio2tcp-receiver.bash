@@ -22,7 +22,7 @@ fi
 dbname=$(echo $output | sed -n "s/.*'\([^']*\)'.*/\1/p")
 echo "SQLite DB name is: ${dbname}"
 
-# Setup the scraper
+# Setup the scraper at the background
 bash ${SCRIPTS_PATH_PREFIX}/sqlite3db_receiver_scraper.bash $dbname ${INFLUXDB_PORT} &
 
 # Launch the tcp2podio app with SQLite DB name
