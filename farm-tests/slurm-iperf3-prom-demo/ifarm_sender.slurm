@@ -1,25 +1,22 @@
 #!/bin/bash
-#SBATCH --job-name=iperf-client           # Job name
-#SBATCH --output=slurm_client_%j.log
-#SBATCH --error=slurm_client_%j.log
+#SBATCH --job-name=iperf-server           # Job name
+#SBATCH --output=slurm_server_%j.log
+#SBATCH --error=slurm_server_%j.log
 #SBATCH --ntasks=1           # Number of tasks (usually 1 for container jobs)
 #SBATCH --cpus-per-task=4                         # Number of CPU cores per task
 #SBATCH --mem=8G                                  # Memory per node
 #SBATCH --time=02:00:00                           # Time limit hrs:min:sec
 #SBATCH --partition=ifarm                        # Partition name (adjust as needed)
 
-# For debug usage
 set -x
 
 # --------------------------- #
 #      Define Variables       #
 # --------------------------- #
-iperf3_server_hostname=$2
-
 PROCESS_EXPORTER_SIF="process-exporter.sif"
 PROCESS_EXPORTER_PORT=$1
 
-APP_SIF="iperf3.sif"
+APP_SIF="rtdp-eicrecon.sif"  # <====  Update sif name here
 APP_PORT="32901"    # TCP port only
 
 ## UPDATE THIS LOCATION
@@ -38,25 +35,32 @@ echo -e "IPv4 address: $node_ip\n"
 cd $WORKDIR_PREFIX
 
 # --------------------------- #
-#   Run iperf client
+#   Run iperf server #
 # --------------------------- #
-echo -e "The iperf3 server is at: ${iperf3_server_hostname}\n"
+
+# echo "Starting iperf3 server container..."
 
 # Replace the following command with the appropriate command for your second container
 # For example, running a simple web server or any other application
 # singularity exec $IPERF3_CONTAINER_SIF iperf3 --server -p ${APP_PORT} &
 
-# A bare-metal iperf3 client instance
-/w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 -c \
-  ${iperf3_server_hostname} \
-  -p ${APP_PORT} \
-  -t 3600 &   # run for 3600 seconds
+# A bare-metal instance
+# /w/epsci-sciwork18/xmei/projects/iperf3/bin/iperf3 --server -p ${APP_PORT} &
 
-IPERF3_PID=$!
-echo -e "iperf3 process started with PID $IPERF3_PID \n"
+# IPERF3_PID=$!
+# echo -e "iperf3 process started with PID $IPERF3_PID \n"
 
 # --------------------------- #
-#    Run Process Exporter        #
+#    Run App receiver         #
+# --------------------------- #
+apptainer exec $APP_CONTAINER_SIF \
+  bash -c "source /etc/profile && ./run-sender.bash &"
+
+RECEV_PID=$!
+echo -e "Receiver process started with PID $RECV_PID \n"
+
+# --------------------------- #
+#    Run Process Exporter     #
 # --------------------------- #
 
 # The docker command to run process-exporter:
