@@ -27,15 +27,16 @@ void   Usage()
 {
     char usage_str[] =
         "\nUsage: \n\
-        -r receive port (default = 8888)  \n\
+        -h help  \n\
         -i destination address (string)  \n\
         -p destination port (default = 8888)  \n\
-        -t num threads (default = 10)  \n\
+        -r receive port (default = 8888)  \n\
         -s sleep (seconds) versus burn cpu  \n\
-        -v verbose (= 0/1 - default = false (0))  \n\
-        -h help \n\n";
-        std::cout <<  usage_str;
-        std::cout <<  "Required: -i\n";
+        -t num threads (default = 10)  \n\
+        -v verbose (= 0/1 - default = false (0))  \n\n";
+
+    std::cout <<  usage_str;
+    std::cout <<  "Required: -i\n";
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
