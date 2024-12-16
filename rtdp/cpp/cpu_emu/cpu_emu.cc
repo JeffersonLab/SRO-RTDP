@@ -28,28 +28,31 @@ void   Usage()
     char usage_str[] =
         "\nUsage: \n\
         -h help  \n\
+        -b seconds thread latency per GB input \n\
         -i destination address (string)  \n\
+        -m thread memory footprint in GB  \n\
+        -o output size in GB  \n\
         -p destination port (default = 8888)  \n\
         -r receive port (default = 8888)  \n\
-        -s sleep (seconds) versus burn cpu  \n\
+        -s sleep versus burn cpu  \n\
         -t num threads (default = 10)  \n\
         -v verbose (= 0/1 - default = false (0))  \n\n";
 
     std::cout <<  usage_str;
-    std::cout <<  "Required: -i\n";
+    std::cout <<  "Required: -b -i -m -o -t \n\n";
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
-void func(char* buff, ssize_t nmrd, ssize_t nptm, bool tslp, bool vrbs=false) 
+void func(char* buff, ssize_t nmrd, ssize_t scs_GB, bool psdS, bool vrbs=false) 
 { 
 
     //usefull work emeulation 
     if(vrbs) std::cout << "Threading ..." << endl;
     auto cmpScl = 1e3;
     double* x = new double[nmrd]; //mem allocation test
-    if(tslp) {
+    if(psdS) {
         if(vrbs) std::cout << "Sleeping ..." << endl;
-        std::this_thread::sleep_for (std::chrono::seconds(nptm));
+        std::this_thread::sleep_for (std::chrono::seconds(scs_GB));
     }else{
         if(vrbs) std::cout << "Burning ..." << endl;
         for (ssize_t k = 0; k<cmpScl; k++) for (ssize_t i = 0; i<nmrd; i++) x[i] = tanh(i);
@@ -63,26 +66,43 @@ int main (int argc, char *argv[])
 { 
     int optc;
 
-    bool psdI=false, psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
+    bool     psdB=false, psdI=false, psdM=false, psdO=false;
+    bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
     char     dst_ip[INET6_ADDRSTRLEN];	// target ip
     uint16_t rcv_prt = 8888; // receive port default
     uint16_t dst_prt = 8888; // target port default
-    ssize_t  nptm = 0;       // nap duration
     auto     nmThrds = 10;   // default
     bool     vrbs = false;   // verbode ?
-    bool     tslp = false;   // to sleep or burn cpu
+    double   scs_GB  = 0;    // seconds/(input GB) thread latency
+    double   memGB   = 0;    // thread memory footprint in GB
+    double   otmemGB = 0;    // program putput in GB
 
-    while ((optc = getopt(argc, argv, "hi:p:r:s:t:v:")) != -1)
+    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:")) != -1)
     {
         switch (optc)
         {
         case 'h':
             Usage();
             exit(1);
+        case 'b':
+            scs_GB = (double) atof((const char *) optarg) ;
+            psdB = true;
+            if(DBG) std::cout << "-b " << scs_GB;
+            break;
         case 'i':
             strcpy(dst_ip, (const char *) optarg) ;
             psdI = true;
             if(DBG) std::cout << "-i " << dst_ip;
+            break;
+        case 'm':
+            memGB = (double) atof((const char *) optarg) ;
+            psdM = true;
+            if(DBG) std::cout << "-m " << memGB;
+            break;
+        case 'o':
+            otmemGB = (double) atof((const char *) optarg) ;
+            psdO = true;
+            if(DBG) std::cout << "-o " << otmemGB;
             break;
         case 'p':
             dst_prt = (uint16_t) atoi((const char *) optarg) ;
@@ -95,10 +115,8 @@ int main (int argc, char *argv[])
             if(DBG) std::cout << "-r " << rcv_prt;
             break;
         case 's':
-            nptm = (ssize_t) atoi((const char *) optarg) ;
             psdS = true;
-            tslp = true;
-            if(DBG) std::cout << "-s " << nptm;
+            if(DBG) std::cout << "-s ";
             break;
         case 't':
             nmThrds = (uint16_t) atoi((const char *) optarg) ;
@@ -117,7 +135,7 @@ int main (int argc, char *argv[])
         }
     }
     if(DBG) std::cout << endl;
-    if(!psdI) { Usage(); exit(1); }
+    if(!(psdB && psdI && psdM && psdO && psdT)) { Usage(); exit(1); }
 
     int sockfd, connfd;
     socklen_t len;
@@ -183,7 +201,7 @@ int main (int argc, char *argv[])
 	std::vector<std::thread> threads;
 
 	for (int i=1; i<=nmThrds; ++i)
-		threads.push_back(std::thread(func, buff, nmrd, nptm, tslp, vrbs));
+		threads.push_back(std::thread(func, buff, nmrd, scs_GB, psdS, vrbs));
     //std::thread second func(buff, nmrd); 
 	if(vrbs) std::cout << "synchronizing all threads..." << endl;
 	for (auto& th : threads) th.join();
