@@ -62,7 +62,7 @@ int main (int argc, char *argv[])
 { 
     int optc;
 
-    bool psdR=false, psdI=false, psdP=false, psdT=false, psdV=false, psdS=false;
+    bool psdI=false, psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
     char     dst_ip[INET6_ADDRSTRLEN];	// target ip
     uint16_t rcv_prt = 8888; // receive port default
     uint16_t dst_prt = 8888; // target port default
@@ -71,7 +71,7 @@ int main (int argc, char *argv[])
     bool     vrbs = false;   // verbode ?
     bool     tslp = false;   // to sleep or burn cpu
 
-    while ((optc = getopt(argc, argv, "s:v:t:r:i:p:h")) != -1)
+    while ((optc = getopt(argc, argv, "hi:p:r:s:t:v:")) != -1)
     {
         switch (optc)
         {
@@ -83,26 +83,26 @@ int main (int argc, char *argv[])
             psdI = true;
             if(DBG) std::cout << "-i " << dst_ip;
             break;
-        case 'r':
-            rcv_prt = (uint16_t) atoi((const char *) optarg) ;
-            psdR = true;
-            if(DBG) std::cout << "-r " << rcv_prt;
-            break;
         case 'p':
             dst_prt = (uint16_t) atoi((const char *) optarg) ;
             psdP = true;
             if(DBG) std::cout << "-p " << dst_prt;
             break;
-        case 't':
-            nmThrds = (uint16_t) atoi((const char *) optarg) ;
-            psdT = true;
-            if(DBG) std::cout << "-t " << nmThrds;
+        case 'r':
+            rcv_prt = (uint16_t) atoi((const char *) optarg) ;
+            psdR = true;
+            if(DBG) std::cout << "-r " << rcv_prt;
             break;
         case 's':
             nptm = (ssize_t) atoi((const char *) optarg) ;
             psdS = true;
             tslp = true;
             if(DBG) std::cout << "-s " << nptm;
+            break;
+        case 't':
+            nmThrds = (uint16_t) atoi((const char *) optarg) ;
+            psdT = true;
+            if(DBG) std::cout << "-t " << nmThrds;
             break;
         case 'v':
             vrbs = (bool) atoi((const char *) optarg) ;
