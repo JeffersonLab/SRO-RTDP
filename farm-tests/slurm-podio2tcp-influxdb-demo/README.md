@@ -4,11 +4,11 @@ This directory is to demonstrate how to launch a sender/client and a receiver/se
 
 - Receiver node: a `tcp2podio` instance and a SQLite3 database scraper;
 - Sender node: a `podio2tcp` instance and a SQLite3 database scraper;
-- InfluxDB node: receive the realtime metrics from the scrapers. Here it's possible to use the login node `ifarm2401` to setup the InfluxDB instance with apptainer.
+- InfluxDB node: receive the realtime metrics from the scrapers. Here it's possible to use the login node `ifarm2401` to setup the InfluxDB instance with Apptainer.
 
 ### Prerequisites
 
-- Built `podio2tcp` within eic-shell as guided [here](../../src/utilities/cpp/podio2tcp/README.md). This will create a `podio2tcp.build` folder at top directory.
+- Built `podio2tcp` within `eic-shell` as guided [here](../../src/utilities/cpp/podio2tcp/README.md). This will create a `podio2tcp.build` folder at top directory.
 
     ```bash
     [xmei@ifarm2401 SRO-RTDP]$ ls podio2tcp.build/
@@ -17,7 +17,7 @@ This directory is to demonstrate how to launch a sender/client and a receiver/se
 
 - A ROOT file to send. We use the 50MB file [simout.100.edm4hep.root](../../containers/podio-eicrecon/simout.100.edm4hep.root).
 - The InfluxDB Apptainer [container](../sifs/containers) created by `apptainer pull infludb.sif docker://influxdb:latest`.
-- Setup 2 blank directories `influxdb-data` and `influxdb-config` under farm-tests for the InfluxDB.
+- Create 2 empty directories `influxdb-data` and `influxdb-config` under `farm-tests` for the InfluxDB.
 
     ```bash
     [xmei@ifarm2401 SRO-RTDP]$ ls farm-tests/
@@ -98,7 +98,7 @@ All the below steps are lauched under the project top directory `SRO-RTDP`.
 
   [Query](https://docs.influxdata.com/influxdb/cloud/get-started/query/?t=InfluxDB+API) the InfluxDB with API as below:
 
-  - Receeiver side - `tcp2podio` measurement.
+  - Receiver side - `tcp2podio` measurement.
     ```bash
     bash-5.1$ curl --request POST "$INFLUXDB_URL/query?org=$INFLUXDB_ORG&bucket=${INFLUXDB_BUCKET}" --header "Authorization: Token $INFLUXDB_TOKEN" --data-urlencode "rp=autogen" --data-urlencode "db=bucket_podio2tcp" --data-urlencode "q=SELECT * FROM tcp2podio WHERE time >= '2024-12-11T04:04:24Z'"
     {"results":[{"statement_id":0,"series":[{"name":"tcp2podio","columns":["time","hostname","pid","rateHz_period","rateMbps_period","role"],"values":[["2024-12-11T04:18:15.009Z","farm180228","1380783",0.633,1.912,"RECV"]]}]}]}
