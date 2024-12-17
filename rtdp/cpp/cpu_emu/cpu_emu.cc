@@ -14,8 +14,14 @@
 #include <math.h>
 #include <vector>
 #include <chrono>
+#include <csignal>
+#include <sys/time.h>
 
-unsigned int sleep(unsigned int seconds);
+volatile bool timeoutExpired = false;
+
+void alarmHandler(int signum) {
+    timeoutExpired = true;
+}
 
 using namespace std;
 
@@ -46,6 +52,7 @@ void   Usage()
 void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
 
+
     if(vrbs) std::cout << "Threading ..." << endl;
     uint64_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) std::cout << "Allocating " << memSz << " bytes ..." << endl;
@@ -56,7 +63,22 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
         std::this_thread::sleep_for (std::chrono::microseconds(uint32_t(scs_GB*nmrd*1e-3)));
     }else{
         if(vrbs) std::cout << "Burning ..." << endl;
-        for (ssize_t i = 0; i<memSz; i++) x[i] = tanh(i);
+        signal(SIGALRM, alarmHandler);
+    
+        /* Start a timer that expires after 2.5 seconds */
+        
+        double musecs, fracsecs, secs;
+        musecs = scs_GB*nmrd*1e-9; //raw microseconds
+        fracsecs = modf (musecs , &secs);
+        if(vrbs) std::cout << "secs = " << secs << " fracsecs = " << fracsecs << endl;
+      
+        struct itimerval timer;
+        timer.it_value.tv_sec = secs;
+        timer.it_value.tv_usec = uint32_t(fracsecs*1e6);
+        timer.it_interval.tv_sec = 0;
+        timer.it_interval.tv_usec = 0;
+        setitimer (ITIMER_REAL, &timer, 0);
+        while (!timeoutExpired) for (ssize_t i = 0; i<memSz; i++) x[i] = tanh(i);
     }
     if(vrbs) std::cout << "Threading Done" << endl;
 
