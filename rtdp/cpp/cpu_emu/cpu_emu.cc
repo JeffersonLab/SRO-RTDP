@@ -52,7 +52,7 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, bool psdS, bool vrbs=false)
     double* x = new double[nmrd]; //mem allocation test
     if(psdS) {
         if(vrbs) std::cout << "Sleeping ..." << endl;
-        std::this_thread::sleep_for (std::chrono::seconds(scs_GB));
+        std::this_thread::sleep_for (std::chrono::microseconds(uint32_t(scs_GB*nmrd*1e-3)));
     }else{
         if(vrbs) std::cout << "Burning ..." << endl;
         for (ssize_t k = 0; k<cmpScl; k++) for (ssize_t i = 0; i<nmrd; i++) x[i] = tanh(i);
