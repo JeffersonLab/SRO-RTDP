@@ -43,19 +43,20 @@ void   Usage()
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
-void func(char* buff, ssize_t nmrd, ssize_t scs_GB, bool psdS, bool vrbs=false) 
+void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
 
-    //usefull work emeulation 
     if(vrbs) std::cout << "Threading ..." << endl;
-    auto cmpScl = 1e3;
-    double* x = new double[nmrd]; //mem allocation test
+    uint64_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
+    if(vrbs) std::cout << "Allocating " << memSz << " bytes ..." << endl;
+    double* x = new double[memSz];
+    //usefull work emeulation 
     if(psdS) {
         if(vrbs) std::cout << "Sleeping ..." << endl;
         std::this_thread::sleep_for (std::chrono::microseconds(uint32_t(scs_GB*nmrd*1e-3)));
     }else{
         if(vrbs) std::cout << "Burning ..." << endl;
-        for (ssize_t k = 0; k<cmpScl; k++) for (ssize_t i = 0; i<nmrd; i++) x[i] = tanh(i);
+        for (ssize_t i = 0; i<memSz; i++) x[i] = tanh(i);
     }
     if(vrbs) std::cout << "Threading Done" << endl;
 
@@ -87,46 +88,46 @@ int main (int argc, char *argv[])
         case 'b':
             scs_GB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) std::cout << "-b " << scs_GB;
+            if(DBG) std::cout << " -b " << scs_GB;
             break;
         case 'i':
             strcpy(dst_ip, (const char *) optarg) ;
             psdI = true;
-            if(DBG) std::cout << "-i " << dst_ip;
+            if(DBG) std::cout << " -i " << dst_ip;
             break;
         case 'm':
             memGB = (double) atof((const char *) optarg) ;
             psdM = true;
-            if(DBG) std::cout << "-m " << memGB;
+            if(DBG) std::cout << " -m " << memGB;
             break;
         case 'o':
             otmemGB = (double) atof((const char *) optarg) ;
             psdO = true;
-            if(DBG) std::cout << "-o " << otmemGB;
+            if(DBG) std::cout << " -o " << otmemGB;
             break;
         case 'p':
             dst_prt = (uint16_t) atoi((const char *) optarg) ;
             psdP = true;
-            if(DBG) std::cout << "-p " << dst_prt;
+            if(DBG) std::cout << " -p " << dst_prt;
             break;
         case 'r':
             rcv_prt = (uint16_t) atoi((const char *) optarg) ;
             psdR = true;
-            if(DBG) std::cout << "-r " << rcv_prt;
+            if(DBG) std::cout << " -r " << rcv_prt;
             break;
         case 's':
             psdS = true;
-            if(DBG) std::cout << "-s ";
+            if(DBG) std::cout << " -s ";
             break;
         case 't':
             nmThrds = (uint16_t) atoi((const char *) optarg) ;
             psdT = true;
-            if(DBG) std::cout << "-t " << nmThrds;
+            if(DBG) std::cout << " -t " << nmThrds;
             break;
         case 'v':
             vrbs = (bool) atoi((const char *) optarg) ;
             psdV = true;
-            if(DBG) std::cout << "-v " << vrbs;
+            if(DBG) std::cout << " -v " << vrbs;
             break;
         case '?':
             std::cout << "Unrecognised option: " << optopt;
@@ -203,7 +204,7 @@ int main (int argc, char *argv[])
 	std::vector<std::thread> threads;
 
 	for (int i=1; i<=nmThrds; ++i)
-		threads.push_back(std::thread(func, buff, nmrd, scs_GB, psdS, vrbs));
+		threads.push_back(std::thread(func, buff, nmrd, scs_GB, memGB, psdS, vrbs));
     //std::thread second func(buff, nmrd); 
 	if(vrbs) std::cout << "synchronizing all threads..." << endl;
 	for (auto& th : threads) th.join();
