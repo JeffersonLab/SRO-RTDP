@@ -195,6 +195,8 @@ int main (int argc, char *argv[])
 	} while(nmrd0>0);
 	close(sockfd); 
 	if(vrbs) std::cout << "Num read " << nmrd  << endl;
+	
+	// if(otmemGB*(1024*1024*1024) > nmrd) { cerr << "Output cannot exceed input size\n"; exit(EXIT_FAILURE); }
     
     //load (or emulate load on) system with ensuing work
 
@@ -240,8 +242,9 @@ int main (int argc, char *argv[])
 	    else 
 	        if(vrbs) std::cout << "connected to the server.." << endl;   
 
-		double* x = new double[nmrd/10]; //harvested data
-	    write(sockfd, x, nmrd/10);
+        uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
+        double* x = new double[outSz]; //harvested data
+        write(sockfd, x, outSz);
 	    // close the socket 
 	    close(sockfd);
 	} 
