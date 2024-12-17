@@ -2,20 +2,17 @@
 
 # Default values
 INPUT_FILE=""
-CPU_EMU_HOST="127.0.0.1"
 PORT=18888
 CONTAINER_PATH="cpu_emu.sif"
 
 # Parse command line arguments
-while getopts "f:h:p:c:?" opt; do
+while getopts "f:p:c:?" opt; do
     case $opt in
         f) INPUT_FILE="$OPTARG" ;;
-        h) CPU_EMU_HOST="$OPTARG" ;;
         p) PORT="$OPTARG" ;;
         c) CONTAINER_PATH="$OPTARG" ;;
-        ?) echo "Usage: $0 -f input_file [-h cpu_emu_host] [-p port] [-c container_path]"
+        ?) echo "Usage: $0 -f input_file [-p port] [-c container_path]"
            echo "  -f: Input file to send (required)"
-           echo "  -h: CPU emulator host (default: 127.0.0.1)"
            echo "  -p: Port to send to (default: 18888)"
            echo "  -c: Path to Apptainer container (default: cpu_emu.sif)"
            exit 1
@@ -35,9 +32,21 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 1
 fi
 
-echo "Sending file '$INPUT_FILE' to ${CPU_EMU_HOST}:${PORT}"
+
+echo -e "\nAttempting to send file '${INPUT_FILE}' to localhost:${PORT}"
 apptainer exec \
     --bind $(pwd):/data \
     --pwd /data \
     ${CONTAINER_PATH} \
-    sh -c "cat /data/$(basename ${INPUT_FILE}) | nc -N -q 0 ${CPU_EMU_HOST} ${PORT}" 
+    sh -c "cat /data/$(basename ${INPUT_FILE}) | nc -v -N -q 0 127.0.0.1 ${PORT}"
+
+status=$?
+if [ $status -eq 0 ]; then
+    echo "File sent successfully"
+else
+    echo "Error: Failed to send file (exit code: $status)"
+    echo "Troubleshooting tips:"
+    echo "1. Verify that cpu_emu sender is running"
+    echo "2. Check if port ${PORT} is open: nc -zv 127.0.0.1 ${PORT}"
+    echo "3. Make sure all components are running on this machine"
+fi
