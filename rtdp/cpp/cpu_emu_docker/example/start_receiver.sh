@@ -23,4 +23,6 @@ while getopts "p:o:h" opt; do
 done
 
 echo "Starting receiver on port $PORT, saving to $OUTPUT_FILE"
-nc -l $PORT > "$OUTPUT_FILE" 
+
+# Run the container with tty allocation to prevent immediate exit
+docker run -i --rm --network host cpu-emu receive "$PORT" > "$OUTPUT_FILE" 

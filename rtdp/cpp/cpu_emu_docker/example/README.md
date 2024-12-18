@@ -2,9 +2,14 @@
 
 This directory contains example scripts to demonstrate the usage of the CPU emulator Docker container. The scripts provide a complete testing setup with source, CPU emulator, and receiver components.
 
+## Prerequisites
+
+- Docker installed on your system
+- The CPU emulator Docker image (built using `../build.sh`)
+
 ## Scripts Overview
 
-1. `start_receiver.sh`: Starts a netcat listener to receive processed data
+1. `start_receiver.sh`: Starts a netcat listener using the container to receive processed data
 2. `start_cpu_emu.sh`: Runs the CPU emulator Docker container
 3. `send_data.sh`: Sends test data to the CPU emulator
 
@@ -83,3 +88,9 @@ The scripts use high port numbers by default:
 - CPU emulator receive port: 50888
 
 These high port numbers (above 49152) are in the dynamic/private port range and are less likely to conflict with other services.
+
+## Container Notes
+- The same container image is used for both CPU emulator and receiver functionality
+- The container includes all necessary dependencies (netcat, etc.)
+- Network ports are exposed using Docker's host networking mode
+- For production use, consider setting resource limits using Docker's runtime flags
