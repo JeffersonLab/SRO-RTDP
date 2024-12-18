@@ -44,6 +44,8 @@ Options:
 - `-s`: Use sleep mode instead of CPU burn
 - `-v`: Enable verbose mode
 
+The CPU emulator will create an `output` directory in the current working directory to store its output files. This directory is automatically bound to the container's `/output` directory.
+
 ### 3. Send Test Data
 
 ```bash
@@ -97,3 +99,5 @@ These high port numbers (above 49152) are in the dynamic/private port range and 
 - Apptainer automatically handles network and filesystem access
 - No special privileges are required to run these scripts
 - The same container is used for both CPU emulator and receiver functionality
+- The container's `/output` directory is bound to `./output` in your current working directory
+- All output files will be created with your user permissions in the output directory
