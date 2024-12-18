@@ -2,9 +2,14 @@
 
 This directory contains example scripts to demonstrate the usage of the CPU emulator using Apptainer. The scripts provide a complete testing setup with source, CPU emulator, and receiver components.
 
+## Prerequisites
+
+- Apptainer installed on your system
+- The CPU emulator SIF file (built using `../build.sh`)
+
 ## Scripts Overview
 
-1. `start_receiver.sh`: Starts a netcat listener to receive processed data
+1. `start_receiver.sh`: Starts a netcat listener using the container to receive processed data
 2. `start_cpu_emu.sh`: Runs the CPU emulator using Apptainer
 3. `send_data.sh`: Sends test data to the CPU emulator
 
@@ -19,6 +24,7 @@ This directory contains example scripts to demonstrate the usage of the CPU emul
 Options:
 - `-p PORT`: Port to listen on (default: 50080)
 - `-o FILE`: Output file (default: received_data.bin)
+- `-f SIF_PATH`: Path to the SIF file (default: ../cpu-emu.sif)
 
 ### 2. Start the CPU Emulator
 
@@ -87,6 +93,7 @@ These high port numbers (above 49152) are in the dynamic/private port range and 
 
 ## Apptainer-specific Notes
 - The scripts assume the SIF file is located at `../cpu-emu.sif`
-- Use the `-f` option with `start_cpu_emu.sh` if your SIF file is in a different location
+- Use the `-f` option with any script if your SIF file is in a different location
 - Apptainer automatically handles network and filesystem access
-- No special privileges are required to run these scripts 
+- No special privileges are required to run these scripts
+- The same container is used for both CPU emulator and receiver functionality
