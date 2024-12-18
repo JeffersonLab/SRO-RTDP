@@ -36,4 +36,5 @@ if [ ! -f "$SIF_PATH" ]; then
 fi
 
 echo "Starting receiver on $BIND_IP:$PORT, saving to $OUTPUT_FILE"
-apptainer run "$SIF_PATH" receive "$PORT" "$BIND_IP" > "$OUTPUT_FILE" 
+apptainer run --net --network-args "portmap=$PORT:$PORT/tcp" \
+    "$SIF_PATH" receive "$PORT" "$BIND_IP" > "$OUTPUT_FILE" 
