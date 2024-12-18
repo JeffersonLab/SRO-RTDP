@@ -1,34 +1,26 @@
 # CPU Emulator Apptainer Setup
 
-This directory contains scripts to convert a CPU emulator Docker image from a container registry to Apptainer SIF format and run it using Apptainer.
+This directory contains scripts to convert the CPU emulator Docker image from Docker Hub to Apptainer SIF format and run it using Apptainer.
 
 ## Prerequisites
 
 - Apptainer (formerly Singularity) installed on your system
-- Access to the Docker image in a container registry (e.g., Docker Hub, Azure Container Registry, etc.)
+- Internet access to pull from Docker Hub
 
 ## Converting Docker Image to SIF
 
-To convert a Docker image to Apptainer SIF format, run:
+To convert the Docker image to Apptainer SIF format, run:
 
 ```bash
-./build.sh -i <docker-image>
+./build.sh
 ```
-
-Required:
-- `-i DOCKER_IMAGE`: Full path to Docker image (e.g., 'username/cpu-emu:latest')
 
 Optional:
 - `-o SIF_NAME`: Output SIF file name (default: cpu-emu.sif)
 
-Examples:
-```bash
-# Pull from Docker Hub
-./build.sh -i docker.io/username/cpu-emu:latest
-
-```
-
-This will create a `cpu-emu.sif` file that can be used with Apptainer.
+This will:
+1. Pull the image `jlabtsai/rtdp-cpu_emu:latest` from Docker Hub
+2. Convert it to a SIF file named `cpu-emu.sif`
 
 ## Example Scripts
 
@@ -61,7 +53,14 @@ See the README in the example directory for more detailed usage instructions.
 ## Notes
 
 - The SIF file contains all necessary dependencies
-- Network ports and filesystem access are automatically handled by Apptainer
+- Network ports are accessed directly from the host (no network isolation)
+- No root privileges required to run the container
 - The SIF file is portable and can be moved to other systems with Apptainer installed
-- No root privileges are required to run the container
-- Make sure you have proper authentication if pulling from a private registry
+- Make sure you have access to Docker Hub to pull the image
+
+## HPC Environment Notes
+- Designed to work in unprivileged HPC environments
+- No special network configuration required
+- Works with standard user permissions
+- Compatible with job scheduler environments (Slurm, PBS, etc.)
+- Uses standard TCP/IP networking available on compute nodes
