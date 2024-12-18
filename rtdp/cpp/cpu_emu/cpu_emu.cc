@@ -51,8 +51,6 @@ void   Usage()
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
 void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
-
-
     if(vrbs) std::cout << "Threading ..." << endl;
     uint64_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) std::cout << "Allocating " << memSz << " bytes ..." << endl;
@@ -65,7 +63,7 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
         if(vrbs) std::cout << "Burning ..." << endl;
         signal(SIGALRM, alarmHandler);
     
-        /* Start a timer that expires after 2.5 seconds */
+        /* Start a timer that expires after required latency */
         
         double musecs, fracsecs, secs;
         musecs = scs_GB*nmrd*1e-9; //raw microseconds
@@ -84,7 +82,6 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
 
 } 
   
-// Driver function 
 int main (int argc, char *argv[])
 { 
     int optc;
@@ -95,7 +92,7 @@ int main (int argc, char *argv[])
     uint16_t rcv_prt = 8888; // receive port default
     uint16_t dst_prt = 8888; // target port default
     auto     nmThrds = 10;   // default
-    bool     vrbs = false;   // verbode ?
+    bool     vrbs = false;   // verbose ?
     double   scs_GB  = 0;    // seconds/(input GB) thread latency
     double   memGB   = 0;    // thread memory footprint in GB
     double   otmemGB = 0;    // program putput in GB
@@ -188,7 +185,7 @@ int main (int argc, char *argv[])
         if(vrbs) std::cout << "Socket successfully binded.." << endl; 
   
     // Now server is ready to listen and verification 
-    if ((listen(sockfd, 5)) != 0) { 
+    if ((listen(sockfd, 5)) != 0) {  // backlog = 5 is arbitrary - what's a good value ?
         std::cout << "Listen failed..." << endl; 
         exit(0); 
     } 
@@ -205,8 +202,8 @@ int main (int argc, char *argv[])
     else
         if(vrbs) std::cout << "server accept the client..." << endl; 
   
-    // Function for chatting between client and server 
-    char buff[MAX]; 
+    // Read in event data 
+    char buff[MAX]; // buffer size is arbitrary - what's a good value ?
     ssize_t nmrd = 0;
     ssize_t nmrd0 = 0;
     // loop for input event 
@@ -218,26 +215,27 @@ int main (int argc, char *argv[])
 	} while(nmrd0>0);
 	close(sockfd); 
 	if(vrbs) std::cout << "Num read " << nmrd  << endl;
-	
+
+	// if output size should not exceed input size
 	// if(otmemGB*(1024*1024*1024) > nmrd) { cerr << "Output cannot exceed input size\n"; exit(EXIT_FAILURE); }
     
-    //load (or emulate load on) system with ensuing work
+        //load (or emulate load on) system with ensuing work
 
 	std::vector<std::thread> threads;
 
-	for (int i=1; i<=nmThrds; ++i)
+	for (int i=1; i<=nmThrds; ++i)  //start the threads
 		threads.push_back(std::thread(func, buff, nmrd, scs_GB, memGB, psdS, vrbs));
-    //std::thread second func(buff, nmrd); 
+
 	if(vrbs) std::cout << "synchronizing all threads..." << endl;
 	for (auto& th : threads) th.join();
    
-    //forward to next hop    
+        //forward to next hop    
 	{ 
 
 	    int sockfd, connfd; 
 	    struct sockaddr_in servaddr, cli;  
 
-    	// socket create and verification 
+    	    // socket create and verification 
 
 	    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
 
@@ -265,10 +263,9 @@ int main (int argc, char *argv[])
 	    else 
 	        if(vrbs) std::cout << "connected to the server.." << endl;   
 
-        uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
-        double* x = new double[outSz]; //harvested data
-        write(sockfd, x, outSz);
-	    // close the socket 
+            uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
+            double* x = new double[outSz]; //harvested data
+            write(sockfd, x, outSz);
 	    close(sockfd);
 	} 
 }
