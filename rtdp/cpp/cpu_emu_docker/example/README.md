@@ -11,7 +11,7 @@ This directory contains example scripts to demonstrate the usage of the CPU emul
 
 1. `start_receiver.sh`: Starts a netcat listener using the container to receive processed data
 2. `start_cpu_emu.sh`: Runs the CPU emulator Docker container
-3. `send_data.sh`: Sends test data to the CPU emulator
+3. `send_data.sh`: Sends test data using the container
 
 ## Example Usage
 
@@ -62,6 +62,8 @@ Options:
 - `-f FILE`: Input file to send
 - `-s SIZE`: Size of random data to generate if no input file (default: 10M)
 
+The script will create an `input` directory in the current working directory for temporary files when generating random data.
+
 ## Complete Test Example
 
 1. In terminal 1 (receiver):
@@ -92,8 +94,9 @@ The scripts use high port numbers by default:
 These high port numbers (above 49152) are in the dynamic/private port range and are less likely to conflict with other services.
 
 ## Container Notes
-- The same container image is used for both CPU emulator and receiver functionality
+- The same container image is used for CPU emulator, receiver, and sender functionality
 - The container includes all necessary dependencies (netcat, etc.)
 - Network ports are exposed using Docker's host networking mode
 - For production use, consider setting resource limits using Docker's runtime flags
 - The container creates an output directory at `/output` which is mapped to `./output` in the current working directory
+- Input files are mounted into the container at `/data` when sending data
