@@ -22,6 +22,23 @@ RUN chmod +x buildp
 # Build the application
 RUN ./buildp cpu_emu
 
+# Create a script that can act as both CPU emulator and receiver
+RUN echo '#!/bin/bash\n\
+if [ "$1" = "receive" ]; then\n\
+    shift\n\
+    PORT="$1"\n\
+    echo "Starting netcat listener on port $PORT..."\n\
+    # Use netcat-traditional for better compatibility\n\
+    if command -v nc.traditional >/dev/null 2>&1; then\n\
+        exec nc.traditional -l -p "$PORT"\n\
+    else\n\
+        exec nc -l "$PORT"\n\
+    fi\n\
+else\n\
+    exec ./cpu_emu "$@"\n\
+fi' > /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
+
 # Default command (can be overridden via command line)
-ENTRYPOINT ["./cpu_emu"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["-h"] 
