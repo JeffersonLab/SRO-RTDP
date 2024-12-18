@@ -30,12 +30,13 @@ RUN echo '#!/bin/bash\n\
 if [ "$1" = "receive" ]; then\n\
     shift\n\
     PORT="$1"\n\
-    echo "Starting netcat listener on port $PORT..."\n\
+    BIND_IP="${2:-0.0.0.0}"\n\
+    echo "Starting netcat listener on $BIND_IP:$PORT..."\n\
     # Use netcat-traditional for better compatibility\n\
     if command -v nc.traditional >/dev/null 2>&1; then\n\
-        exec nc.traditional -l -p "$PORT"\n\
+        exec nc.traditional -l -p "$PORT" -s "$BIND_IP"\n\
     else\n\
-        exec nc -l "$PORT"\n\
+        exec nc -l "$BIND_IP" "$PORT"\n\
     fi\n\
 elif [ "$1" = "send" ]; then\n\
     shift\n\
