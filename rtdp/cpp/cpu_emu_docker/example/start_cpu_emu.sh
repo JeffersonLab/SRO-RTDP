@@ -44,8 +44,17 @@ while getopts "t:b:m:o:r:p:i:svh" opt; do
     esac
 done
 
-# Construct the command
-CMD="docker run --network host cpu-emu -t $THREADS -b $LATENCY -m $MEM_FOOTPRINT -o $OUTPUT_SIZE -r $RECV_PORT -p $DEST_PORT -i $DEST_IP"
+# Create output directory if it doesn't exist
+OUTPUT_DIR="./output"
+mkdir -p "$OUTPUT_DIR"
+
+# Construct the command with explicit port mapping
+CMD="docker run -i --rm \
+    -p $RECV_PORT:$RECV_PORT \
+    -v $OUTPUT_DIR:/output \
+    cpu-emu --output-dir /output \
+    -t $THREADS -b $LATENCY -m $MEM_FOOTPRINT -o $OUTPUT_SIZE \
+    -r $RECV_PORT -p $DEST_PORT -i $DEST_IP"
 
 # Add optional flags
 if [ $SLEEP_MODE -eq 1 ]; then
