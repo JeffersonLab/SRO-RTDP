@@ -1,26 +1,35 @@
 # CPU Emulator Apptainer Setup
 
-This directory contains scripts to convert the CPU emulator Docker image from Docker Hub to Apptainer SIF format and run it using Apptainer.
+This directory contains scripts to convert a CPU emulator Docker image from Docker Hub to Apptainer SIF format and run it using Apptainer.
 
 ## Prerequisites
 
 - Apptainer (formerly Singularity) installed on your system
 - Internet access to pull from Docker Hub
+- Docker Hub image location (e.g., username/image:tag)
 
 ## Converting Docker Image to SIF
 
 To convert the Docker image to Apptainer SIF format, run:
 
 ```bash
-./build.sh
+./build.sh -i <docker-hub-image>
 ```
+
+Required:
+- `-i DOCKER_IMAGE`: Docker Hub image location (e.g., 'username/image:tag')
 
 Optional:
 - `-o SIF_NAME`: Output SIF file name (default: cpu-emu.sif)
 
+Example:
+```bash
+./build.sh -i jlabtsai/rtdp-cpu_emu:latest
+```
+
 This will:
-1. Pull the image `jlabtsai/rtdp-cpu_emu:latest` from Docker Hub
-2. Convert it to a SIF file named `cpu-emu.sif`
+1. Pull the specified image from Docker Hub
+2. Convert it to a SIF file (default name: cpu-emu.sif)
 
 ## Example Scripts
 
@@ -56,7 +65,7 @@ See the README in the example directory for more detailed usage instructions.
 - Network ports are accessed directly from the host (no network isolation)
 - No root privileges required to run the container
 - The SIF file is portable and can be moved to other systems with Apptainer installed
-- Make sure you have access to Docker Hub to pull the image
+- Make sure you have access to the Docker Hub image you're trying to pull
 
 ## HPC Environment Notes
 - Designed to work in unprivileged HPC environments
