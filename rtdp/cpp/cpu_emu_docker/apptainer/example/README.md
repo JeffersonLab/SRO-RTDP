@@ -18,12 +18,13 @@ This directory contains example scripts to demonstrate the usage of the CPU emul
 ### 1. Start the Receiver
 
 ```bash
-./start_receiver.sh -p 50080 -o output.bin
+./start_receiver.sh -p 50080 -o output.bin -b 0.0.0.0
 ```
 
 Options:
 - `-p PORT`: Port to listen on (default: 50080)
 - `-o FILE`: Output file (default: received_data.bin)
+- `-b BIND_IP`: IP address to bind to (default: 0.0.0.0)
 - `-f SIF_PATH`: Path to the SIF file (default: ../cpu-emu.sif)
 
 ### 2. Start the CPU Emulator
@@ -67,7 +68,9 @@ Options:
 
 The script will create an `input` directory in the current working directory for temporary files when generating random data.
 
-## Complete Test Example
+## Example Test Setups
+
+### Single Machine Test
 
 1. In terminal 1 (receiver):
 ```bash
@@ -89,6 +92,48 @@ This will:
 2. Start the CPU emulator with 4 threads, 50 seconds latency per GB, and 0.2GB memory footprint
 3. Send 100MB of random test data through the system
 
+### Multi-Machine Test
+
+Assume we have three machines:
+- Machine A (IP: 192.168.1.10) - Will run the sender
+- Machine B (IP: 192.168.1.20) - Will run the CPU emulator
+- Machine C (IP: 192.168.1.30) - Will run the receiver
+
+First, ensure the SIF file is copied to all machines:
+```bash
+# Copy SIF file to each machine (run from the build machine)
+scp ../cpu-emu.sif user@192.168.1.10:~/cpu-emu.sif
+scp ../cpu-emu.sif user@192.168.1.20:~/cpu-emu.sif
+scp ../cpu-emu.sif user@192.168.1.30:~/cpu-emu.sif
+```
+
+Then run the components:
+
+1. On Machine C (receiver):
+```bash
+./start_receiver.sh -p 50080 -b 192.168.1.30 -f ~/cpu-emu.sif
+```
+
+2. On Machine B (CPU emulator):
+```bash
+./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -i "192.168.1.30" -p 50080 -r 50888 -v -f ~/cpu-emu.sif
+```
+
+3. On Machine A (sender):
+```bash
+./send_data.sh -h 192.168.1.20 -p 50888 -s 100M -f ~/cpu-emu.sif
+```
+
+This setup:
+1. Starts a receiver on Machine C:
+   - Binds to its IP (192.168.1.30) on port 50080
+   - Only accepts connections to its specific IP
+2. Starts the CPU emulator on Machine B:
+   - Listens on port 50888 for incoming data from the sender
+   - Forwards processed data to Machine C (192.168.1.30) on port 50080
+3. Sends data from Machine A to Machine B's CPU emulator
+4. The CPU emulator processes the data and forwards it to the receiver
+
 ## Note on Port Numbers
 The scripts use high port numbers by default:
 - Receiver port: 50080
@@ -105,3 +150,9 @@ These high port numbers (above 49152) are in the dynamic/private port range and 
 - The container's `/output` directory is bound to `./output` in your current working directory
 - Input files are bound to `/data` in the container when sending data
 - All files will be created with your user permissions in the input and output directories
+
+## Network Requirements
+- Ensure the firewall on each machine allows the required ports (50080 and 50888 by default)
+- All machines must have network connectivity to each other
+- Each machine must have Apptainer installed
+- The SIF file must be accessible on each machine
