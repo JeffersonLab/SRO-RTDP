@@ -11,9 +11,28 @@ This directory contains example scripts to demonstrate the usage of the CPU emul
 
 1. `start_receiver.sh`: Starts a netcat listener using the container to receive processed data
 2. `start_cpu_emu.sh`: Runs the CPU emulator using Apptainer
-3. `send_data.sh`: Sends test data using the container
+3. `send_data.sh`: Sends test data using netcat from inside the container
+4. `test_connectivity.sh`: Tests network connectivity from inside the container
 
 ## Example Usage
+
+### 1. Test Network Connectivity (Optional but Recommended)
+
+Before running the actual components, you can test network connectivity:
+
+```bash
+./test_connectivity.sh -h remote_host -p 50888
+```
+
+Options:
+- `-h HOST`: Target host to test (default: localhost)
+- `-p PORT`: Target port to test (default: 50888)
+- `-i SIF_PATH`: Path to the SIF file (default: ../cpu-emu.sif)
+
+The script will:
+1. Test ping connectivity (if target is not localhost)
+2. Test TCP connectivity to the specified port
+3. Provide detailed error messages if connectivity fails
 
 ### 1. Start the Receiver
 
@@ -147,10 +166,17 @@ The scripts expose the following ports:
   - Machine B: Inbound on port 50888 (for receiving data from sender)
   - Machine C: Inbound on port 50080 (for receiving processed data)
 - All machines must have network connectivity to each other
-- Each machine must have Apptainer installed
-- The SIF file must be accessible on each machine
+- All machines must have Apptainer installed
+- The SIF file must be accessible on all machines (sender, CPU emulator, and receiver)
 - The exposed ports must not be in use by other applications
 - For security, consider restricting the bind IP addresses to specific network interfaces
+
+## Troubleshooting
+
+1. Use `test_connectivity.sh` to verify network connectivity between components
+2. Check firewall settings if connectivity tests fail
+3. Ensure all required ports are open and not in use
+4. Verify that the SIF file is accessible and valid on all machines
 
 ## Apptainer-specific Notes
 - Uses host networking (no network isolation required)
