@@ -27,5 +27,7 @@ done
 
 echo "Starting receiver on $BIND_IP:$PORT, saving to $OUTPUT_FILE"
 
-# Run the container with tty allocation to prevent immediate exit
-docker run -i --rm --network host cpu-emu receive "$PORT" "$BIND_IP" > "$OUTPUT_FILE" 
+# Run the container with explicit port mapping
+docker run -i --rm \
+    -p $PORT:$PORT \
+    cpu-emu receive "$PORT" "$BIND_IP" > "$OUTPUT_FILE"

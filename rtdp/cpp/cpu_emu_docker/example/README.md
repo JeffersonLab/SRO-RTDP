@@ -97,7 +97,7 @@ These high port numbers (above 49152) are in the dynamic/private port range and 
 ## Container Notes
 - The same container image is used for CPU emulator, receiver, and sender functionality
 - The container includes all necessary dependencies (netcat, etc.)
-- Network ports are exposed using Docker's host networking mode
+- Ports are explicitly exposed using Docker's port mapping (-p flag)
 - For production use, consider setting resource limits using Docker's runtime flags
 - The container creates an output directory at `/output` which is mapped to `./output` in the current working directory
 - Input files are mounted into the container at `/data` when sending data
@@ -113,11 +113,13 @@ Assume we have three machines:
 ```bash
 ./start_receiver.sh -p 50080 -b 192.168.1.30
 ```
+This exposes port 50080 on Machine C and binds it to 192.168.1.30.
 
 2. On Machine B (CPU emulator):
 ```bash
 ./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -i "192.168.1.30" -p 50080 -r 50888 -v
 ```
+This exposes port 50888 on Machine B for receiving data.
 
 3. On Machine A (sender):
 ```bash
@@ -126,10 +128,24 @@ Assume we have three machines:
 
 This setup:
 1. Starts a receiver on Machine C:
-   - Binds to its IP (192.168.1.30) on port 50080
+   - Exposes port 50080 to accept connections
+   - Binds to its IP (192.168.1.30)
    - Only accepts connections to its specific IP
 2. Starts the CPU emulator on Machine B:
-   - Listens on port 50888 for incoming data from the sender
-   - Forwards processed data to Machine C (192.168.1.30) on port 50080
+   - Exposes port 50888 to receive data from the sender
+   - Forwards processed data to Machine C (192.168.1.30:50080)
 3. Sends data from Machine A to Machine B's CPU emulator
-4. The CPU emulator processes the data and forwards it to the receiver
+
+## Port Exposure
+The scripts expose the following ports:
+- Receiver: Exposes the receiving port (default: 50080)
+- CPU Emulator: Exposes the input port (default: 50888)
+- Sender: No ports exposed (only makes outbound connections)
+
+## Network Requirements
+- Ensure the firewall on each machine allows the required ports:
+  - Machine B: Inbound on port 50888 (for receiving data from sender)
+  - Machine C: Inbound on port 50080 (for receiving processed data)
+- All machines must have network connectivity to each other
+- The exposed ports must not be in use by other applications
+- For security, consider restricting the bind IP addresses to specific network interfaces
