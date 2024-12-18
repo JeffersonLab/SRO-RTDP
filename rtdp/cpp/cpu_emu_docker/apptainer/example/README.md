@@ -11,7 +11,7 @@ This directory contains example scripts to demonstrate the usage of the CPU emul
 
 1. `start_receiver.sh`: Starts a netcat listener using the container to receive processed data
 2. `start_cpu_emu.sh`: Runs the CPU emulator using Apptainer
-3. `send_data.sh`: Sends test data to the CPU emulator
+3. `send_data.sh`: Sends test data using the container
 
 ## Example Usage
 
@@ -63,6 +63,9 @@ Options:
 - `-p PORT`: Target port (default: 50888)
 - `-f FILE`: Input file to send
 - `-s SIZE`: Size of random data to generate if no input file (default: 10M)
+- `-i SIF_PATH`: Path to the SIF file (default: ../cpu-emu.sif)
+
+The script will create an `input` directory in the current working directory for temporary files when generating random data.
 
 ## Complete Test Example
 
@@ -98,6 +101,7 @@ These high port numbers (above 49152) are in the dynamic/private port range and 
 - Use the `-f` option with any script if your SIF file is in a different location
 - Apptainer automatically handles network and filesystem access
 - No special privileges are required to run these scripts
-- The same container is used for both CPU emulator and receiver functionality
+- The same container is used for CPU emulator, receiver, and sender functionality
 - The container's `/output` directory is bound to `./output` in your current working directory
-- All output files will be created with your user permissions in the output directory
+- Input files are bound to `/data` in the container when sending data
+- All files will be created with your user permissions in the input and output directories

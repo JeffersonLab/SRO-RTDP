@@ -25,7 +25,7 @@ RUN ./buildp cpu_emu
 # Create output directory
 RUN mkdir -p /output && chmod 777 /output
 
-# Create a script that can act as both CPU emulator and receiver
+# Create a script that can act as CPU emulator, receiver, and sender
 RUN echo '#!/bin/bash\n\
 if [ "$1" = "receive" ]; then\n\
     shift\n\
@@ -36,6 +36,17 @@ if [ "$1" = "receive" ]; then\n\
         exec nc.traditional -l -p "$PORT"\n\
     else\n\
         exec nc -l "$PORT"\n\
+    fi\n\
+elif [ "$1" = "send" ]; then\n\
+    shift\n\
+    FILE="$1"\n\
+    HOST="$2"\n\
+    PORT="$3"\n\
+    echo "Sending $FILE to $HOST:$PORT..."\n\
+    if command -v nc.traditional >/dev/null 2>&1; then\n\
+        cat "$FILE" | nc.traditional -N -q 0 "$HOST" "$PORT"\n\
+    else\n\
+        cat "$FILE" | nc -N -q 0 "$HOST" "$PORT"\n\
     fi\n\
 else\n\
     # Parse arguments for output directory\n\
