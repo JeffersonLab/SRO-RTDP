@@ -2,26 +2,40 @@
 
 # Default values
 SIF_NAME="cpu-emu.sif"
-DOCKER_IMAGE="jlabtsai/rtdp-cpu_emu:latest"
 
 # Help message
 show_help() {
-    echo "Usage: $0 [-o SIF_NAME]"
+    echo "Usage: $0 -i DOCKER_IMAGE [-o SIF_NAME]"
+    echo "  -i DOCKER_IMAGE  Docker Hub image (e.g., 'username/image:tag')"
     echo "  -o SIF_NAME     Output SIF file name (default: cpu-emu.sif)"
     echo "  -h             Show this help message"
     echo
-    echo "This script pulls the CPU emulator image from Docker Hub"
-    echo "and converts it to Apptainer SIF format"
+    echo "Example:"
+    echo "  $0 -i jlabtsai/rtdp-cpu_emu:latest"
 }
 
+# Check if no arguments were provided
+if [ $# -eq 0 ]; then
+    show_help
+    exit 1
+fi
+
 # Parse command line options
-while getopts "o:h" opt; do
+while getopts "i:o:h" opt; do
     case $opt in
+        i) DOCKER_IMAGE="$OPTARG" ;;
         o) SIF_NAME="$OPTARG" ;;
         h) show_help; exit 0 ;;
         ?) show_help; exit 1 ;;
     esac
 done
+
+# Check if Docker image is provided
+if [ -z "$DOCKER_IMAGE" ]; then
+    echo "Error: Docker Hub image must be provided with -i flag"
+    show_help
+    exit 1
+fi
 
 echo "Converting Docker image $DOCKER_IMAGE to Apptainer SIF format: $SIF_NAME"
 
