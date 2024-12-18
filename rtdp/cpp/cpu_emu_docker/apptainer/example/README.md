@@ -28,11 +28,14 @@ Options:
 - `-h HOST`: Target host to test (default: localhost)
 - `-p PORT`: Target port to test (default: 50888)
 - `-i SIF_PATH`: Path to the SIF file (default: ../cpu-emu.sif)
+- `-t TEST_IMAGE`: Test container image (default: docker://ubuntu:22.04)
 
 The script will:
-1. Test ping connectivity (if target is not localhost)
-2. Test TCP connectivity to the specified port
+1. Test ping connectivity (if target is not localhost) using a clean Ubuntu container
+2. Test TCP connectivity to the specified port using netcat
 3. Provide detailed error messages if connectivity fails
+
+Note: The script uses a clean Ubuntu container by default to ensure reliable network testing with all required tools (ping, netcat) available. You can specify a different test image using the `-t` option if needed.
 
 ### 1. Start the Receiver
 
