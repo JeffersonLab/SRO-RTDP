@@ -153,8 +153,17 @@ The scripts expose the following ports:
 - For security, consider restricting the bind IP addresses to specific network interfaces
 
 ## Apptainer-specific Notes
-- Apptainer uses `--net` and `--network-args` for port mapping
-- Port mapping format: `portmap=HOST_PORT:CONTAINER_PORT/tcp`
-- Network isolation is handled by Apptainer's CNI plugins
+- Uses host networking (no network isolation required)
+- No root privileges or special network configuration needed
+- Network ports are accessed directly from the host
 - User permissions are preserved for all file operations
-- No root privileges required for network or file operations
+- The container's `/output` directory is bound to `./output` in your current working directory
+- Input files are bound to `/data` in the container when sending data
+- All files will be created with your user permissions
+
+## HPC Environment Notes
+- Designed to work in unprivileged HPC environments
+- No special network configuration required
+- Works with standard user permissions
+- Compatible with job scheduler environments (Slurm, PBS, etc.)
+- Uses standard TCP/IP networking available on compute nodes
