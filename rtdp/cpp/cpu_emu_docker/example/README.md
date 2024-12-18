@@ -42,6 +42,8 @@ Options:
 - `-s`: Use sleep mode instead of CPU burn
 - `-v`: Enable verbose mode
 
+The CPU emulator will create an `output` directory in the current working directory to store its output files.
+
 ### 3. Send Test Data
 
 ```bash
@@ -94,3 +96,4 @@ These high port numbers (above 49152) are in the dynamic/private port range and 
 - The container includes all necessary dependencies (netcat, etc.)
 - Network ports are exposed using Docker's host networking mode
 - For production use, consider setting resource limits using Docker's runtime flags
+- The container creates an output directory at `/output` which is mapped to `./output` in the current working directory
