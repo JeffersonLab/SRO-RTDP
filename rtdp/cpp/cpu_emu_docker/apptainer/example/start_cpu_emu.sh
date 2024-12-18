@@ -58,9 +58,8 @@ fi
 OUTPUT_DIR="./output"
 mkdir -p "$OUTPUT_DIR"
 
-# Construct the command with explicit port mapping
-CMD="apptainer run --net --network-args \"portmap=$RECV_PORT:$RECV_PORT/tcp\" \
-    --bind $OUTPUT_DIR:/output \
+# Construct the command
+CMD="apptainer run --bind $OUTPUT_DIR:/output \
     $SIF_PATH --output-dir /output \
     -t $THREADS -b $LATENCY -m $MEM_FOOTPRINT -o $OUTPUT_SIZE \
     -r $RECV_PORT -p $DEST_PORT -i $DEST_IP"
