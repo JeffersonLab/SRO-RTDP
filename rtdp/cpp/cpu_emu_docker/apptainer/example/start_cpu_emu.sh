@@ -54,8 +54,12 @@ if [ ! -f "$SIF_PATH" ]; then
     exit 1
 fi
 
-# Construct the command
-CMD="apptainer run $SIF_PATH -t $THREADS -b $LATENCY -m $MEM_FOOTPRINT -o $OUTPUT_SIZE -r $RECV_PORT -p $DEST_PORT -i $DEST_IP"
+# Create output directory if it doesn't exist
+OUTPUT_DIR="./output"
+mkdir -p "$OUTPUT_DIR"
+
+# Construct the command with bind mount
+CMD="apptainer run --bind $OUTPUT_DIR:/output $SIF_PATH -t $THREADS -b $LATENCY -m $MEM_FOOTPRINT -o $OUTPUT_SIZE -r $RECV_PORT -p $DEST_PORT -i $DEST_IP --output-dir /output"
 
 # Add optional flags
 if [ $SLEEP_MODE -eq 1 ]; then
