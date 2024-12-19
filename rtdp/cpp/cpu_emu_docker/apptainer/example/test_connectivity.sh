@@ -41,15 +41,15 @@ echo "Using test image: $TEST_DEF"
 
 # Install required packages first
 echo "Installing required packages..."
-if ! apptainer exec "$TEST_DEF" bash -c "apt-get update -qq && apt-get install -qq -y iputils-ping netcat-openbsd > /dev/null 2>&1"; then
+if ! apptainer exec --writable-tmpfs "$TEST_DEF" bash -c "
+    mkdir -p /tmp/apt/partial /tmp/apt/lists/partial && 
+    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists update -qq && 
+    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists install -qq -y iputils-ping netcat-openbsd > /dev/null 2>&1
+    "; then
     echo "Warning: Failed to install required packages"
     exit 1
 fi
-
-# Test using ping first (if host is not localhost)
-if [ "$HOST" != "localhost" ] && [ "$HOST" != "127.0.0.1" ]; then
-    echo "Testing ping to $HOST..."
-    if ! apptainer exec "$TEST_DEF" ping -c 1 -W 2 "$HOST" 2>&1; then
+    if ! apptainer exec --writable-tmpfs "$TEST_DEF" ping -c 1 -W 2 "$HOST" 2>&1; then
         echo "Warning: Unable to ping $HOST"
         echo "Note: This might be normal if ICMP is blocked"
     else
@@ -59,7 +59,7 @@ fi
 
 # Test TCP connectivity using netcat
 echo "Testing TCP connection to $HOST:$PORT..."
-if apptainer exec "$TEST_DEF" nc -zv "$HOST" "$PORT" 2>&1; then
+if apptainer exec --writable-tmpfs "$TEST_DEF" nc -zv "$HOST" "$PORT" 2>&1; then
     echo "Success: TCP connection to $HOST:$PORT is possible"
     exit 0
 else
@@ -70,4 +70,8 @@ else
     echo "  - Target service is not running"
     echo "  - Network routing issues"
     exit 1
-fi 
+fi
+    echo "  - Target service is not running"
+    echo "  - Network routing issues"
+    exit 1
+fi
