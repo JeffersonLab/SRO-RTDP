@@ -41,7 +41,8 @@ echo "Using test image: $TEST_DEF"
 
 # Install required packages first
 echo "Installing required packages..."
-if ! apptainer exec --writable-tmpfs "$TEST_DEF" bash -c "
+if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" bash -c "
+    export DEBIAN_FRONTEND=noninteractive && \
     echo 'Creating temporary directories...' && \
     mkdir -p /tmp/apt/partial /tmp/apt/lists/partial && \
     echo 'Running apt-get update...' && \
@@ -53,7 +54,7 @@ if ! apptainer exec --writable-tmpfs "$TEST_DEF" bash -c "
     exit 1
 fi
 
-if ! apptainer exec --writable-tmpfs "$TEST_DEF" ping -c 1 -W 2 "$HOST" 2>&1; then
+if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" ping -c 1 -W 2 "$HOST" 2>&1; then
     echo "Warning: Unable to ping $HOST"
     echo "Note: This might be normal if ICMP is blocked"
 else
@@ -62,7 +63,7 @@ fi
 
 # Test TCP connectivity using netcat
 echo "Testing TCP connection to $HOST:$PORT..."
-if apptainer exec --writable-tmpfs "$TEST_DEF" nc -zv "$HOST" "$PORT" 2>&1; then
+if apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" nc -zv "$HOST" "$PORT" 2>&1; then
     echo "Success: TCP connection to $HOST:$PORT is possible"
     exit 0
 else
