@@ -42,19 +42,22 @@ echo "Using test image: $TEST_DEF"
 # Install required packages first
 echo "Installing required packages..."
 if ! apptainer exec --writable-tmpfs "$TEST_DEF" bash -c "
-    mkdir -p /tmp/apt/partial /tmp/apt/lists/partial && 
-    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists update -qq && 
-    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists install -qq -y iputils-ping netcat-openbsd > /dev/null 2>&1
+    echo 'Creating temporary directories...' && \
+    mkdir -p /tmp/apt/partial /tmp/apt/lists/partial && \
+    echo 'Running apt-get update...' && \
+    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists update && \
+    echo 'Installing packages...' && \
+    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists install -y iputils-ping netcat-openbsd
     "; then
-    echo "Warning: Failed to install required packages"
+    echo "Warning: Failed to install required packages. Check error messages above."
     exit 1
 fi
-    if ! apptainer exec --writable-tmpfs "$TEST_DEF" ping -c 1 -W 2 "$HOST" 2>&1; then
-        echo "Warning: Unable to ping $HOST"
-        echo "Note: This might be normal if ICMP is blocked"
-    else
-        echo "Ping to $HOST successful"
-    fi
+
+if ! apptainer exec --writable-tmpfs "$TEST_DEF" ping -c 1 -W 2 "$HOST" 2>&1; then
+    echo "Warning: Unable to ping $HOST"
+    echo "Note: This might be normal if ICMP is blocked"
+else
+    echo "Ping to $HOST successful"
 fi
 
 # Test TCP connectivity using netcat
@@ -67,10 +70,6 @@ else
     echo "Possible issues:"
     echo "  - Port is not open on target host"
     echo "  - Firewall is blocking the connection"
-    echo "  - Target service is not running"
-    echo "  - Network routing issues"
-    exit 1
-fi
     echo "  - Target service is not running"
     echo "  - Network routing issues"
     exit 1
