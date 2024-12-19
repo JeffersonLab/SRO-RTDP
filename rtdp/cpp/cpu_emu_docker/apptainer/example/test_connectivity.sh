@@ -54,16 +54,24 @@ if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" bash -c "
     exit 1
 fi
 
-if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" /bin/ping -c 1 -W 2 "$HOST" 2>&1; then
-    echo "Warning: Unable to ping $HOST"
-    echo "Note: This might be normal if ICMP is blocked"
-else
-    echo "Ping to $HOST successful"
+# Find the installed paths
+echo "Locating installed tools..."
+PING_PATH=$(apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" which ping)
+NC_PATH=$(apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" which nc)
+
+if [ "$HOST" != "localhost" ] && [ "$HOST" != "127.0.0.1" ]; then
+    echo "Testing ping to $HOST..."
+    if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" "$PING_PATH" -c 1 -W 2 "$HOST" 2>&1; then
+        echo "Warning: Unable to ping $HOST"
+        echo "Note: This might be normal if ICMP is blocked"
+    else
+        echo "Ping to $HOST successful"
+    fi
 fi
 
 # Test TCP connectivity using netcat
 echo "Testing TCP connection to $HOST:$PORT..."
-if apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" /bin/nc -zv "$HOST" "$PORT" 2>&1; then
+if apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" "$NC_PATH" -zv "$HOST" "$PORT" 2>&1; then
     echo "Success: TCP connection to $HOST:$PORT is possible"
     exit 0
 else
