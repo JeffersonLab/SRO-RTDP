@@ -41,7 +41,7 @@ echo "Using test image: $TEST_DEF"
 
 # Install required packages first
 echo "Installing required packages..."
-if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" bash -c "
+if ! apptainer exec --writable-tmpfs "$TEST_DEF" bash -c "
     export DEBIAN_FRONTEND=noninteractive && \
     echo 'Creating temporary directories...' && \
     mkdir -p /tmp/apt/partial /tmp/apt/lists/partial && \
@@ -54,14 +54,13 @@ if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" bash -c "
     exit 1
 fi
 
-# Find the installed paths
-echo "Locating installed tools..."
-PING_PATH=$(apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" which ping)
-NC_PATH=$(apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" which nc)
+# Use standard paths for ping and nc
+PING_PATH="/usr/bin/ping"
+NC_PATH="/usr/bin/nc.openbsd"
 
 if [ "$HOST" != "localhost" ] && [ "$HOST" != "127.0.0.1" ]; then
     echo "Testing ping to $HOST..."
-    if ! apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" "$PING_PATH" -c 1 -W 2 "$HOST" 2>&1; then
+    if ! apptainer exec --writable-tmpfs "$TEST_DEF" "$PING_PATH" -c 1 -W 2 "$HOST" 2>&1; then
         echo "Warning: Unable to ping $HOST"
         echo "Note: This might be normal if ICMP is blocked"
     else
@@ -71,7 +70,7 @@ fi
 
 # Test TCP connectivity using netcat
 echo "Testing TCP connection to $HOST:$PORT..."
-if apptainer exec --fakeroot --writable-tmpfs "$TEST_DEF" "$NC_PATH" -zv "$HOST" "$PORT" 2>&1; then
+if apptainer exec --writable-tmpfs "$TEST_DEF" "$NC_PATH" -zv "$HOST" "$PORT" 2>&1; then
     echo "Success: TCP connection to $HOST:$PORT is possible"
     exit 0
 else
