@@ -14,7 +14,7 @@ set -x
 RECV_PORT=$1
 DEST_PORT=$2
 DEST_IP=$3
-APP_SIF="../cpu-emu.sif"
+APP_SIF="../../cpu-emu.sif"
 
 # Reduced emulator parameters to use less memory
 THREADS=4                  # Reduced from 10
