@@ -21,8 +21,12 @@ node_ip=$(hostname -i)
 echo "Hostname: $node_name"
 echo -e "IPv4 address: $node_ip\n"
 
-# Record IP in node list file
-echo "RECV_IP=${node_ip}" > node_list.txt
+# Record IP in node info file
+cat > node_info.txt <<EOL
+Receiver Node: ${node_name}
+Receiver IP: ${node_ip}
+Receiver Job: ${SLURM_JOB_ID}
+EOL
 
 # Start receiver
 apptainer run ${APP_SIF} receive ${RECV_PORT} ${node_ip} > ${OUTPUT_FILE} &
