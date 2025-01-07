@@ -21,6 +21,9 @@ node_ip=$(hostname -i)
 echo "Hostname: $node_name"
 echo -e "IPv4 address: $node_ip\n"
 
+# Record IP in node list file
+echo "RECV_IP=${node_ip}" > node_list.txt
+
 # Start receiver
 apptainer run ${APP_SIF} receive ${RECV_PORT} ${node_ip} > ${OUTPUT_FILE} &
 RECV_PID=$!
