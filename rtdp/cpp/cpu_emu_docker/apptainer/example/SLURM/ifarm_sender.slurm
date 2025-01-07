@@ -22,6 +22,9 @@ node_ip=$(hostname -i)
 echo "Hostname: $node_name"
 echo -e "IPv4 address: $node_ip\n"
 
+# Record IP in node list file
+echo "SEND_IP=${node_ip}" >> node_list.txt
+
 # Create input directory
 mkdir -p input
 INPUT_FILE="input/random_data.bin"
