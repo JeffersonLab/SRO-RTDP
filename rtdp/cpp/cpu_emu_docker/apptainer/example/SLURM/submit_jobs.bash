@@ -19,34 +19,54 @@ function slurm_get_nodelist() {
     done
 }
 
+# Helper function to get IP address from node name
+function get_node_ip() {
+    local node=$1
+    local ip=$(ssh $node hostname -i)
+    echo $ip
+}
+
 # Submit receiver job
 echo "Submitting receiver job..."
 sbatch_output=$(sbatch ifarm_receiver.slurm ${RECV_PORT})
 recv_job_id=$(echo $sbatch_output | awk '{print $4}')
 recv_node=$(slurm_get_nodelist ${recv_job_id})
-echo "Receiver node: ${recv_node}"
+recv_ip=$(get_node_ip ${recv_node})
+echo "Receiver node: ${recv_node} (IP: ${recv_ip})"
 
 # Wait a moment for receiver to start
 sleep 5
 
 # Submit emulator job
 echo "Submitting emulator job..."
-sbatch_output=$(sbatch ifarm_emulator.slurm ${EMU_PORT} ${RECV_PORT} ${recv_node})
+sbatch_output=$(sbatch ifarm_emulator.slurm ${EMU_PORT} ${RECV_PORT} ${recv_ip})
 emu_job_id=$(echo $sbatch_output | awk '{print $4}')
 emu_node=$(slurm_get_nodelist ${emu_job_id})
-echo "Emulator node: ${emu_node}"
+emu_ip=$(get_node_ip ${emu_node})
+echo "Emulator node: ${emu_node} (IP: ${emu_ip})"
 
 # Wait a moment for emulator to start
 sleep 5
 
 # Submit sender job
 echo "Submitting sender job..."
-sbatch_output=$(sbatch ifarm_sender.slurm ${EMU_PORT} ${emu_node})
+sbatch_output=$(sbatch ifarm_sender.slurm ${EMU_PORT} ${emu_ip})
 send_job_id=$(echo $sbatch_output | awk '{print $4}')
 send_node=$(slurm_get_nodelist ${send_job_id})
-echo "Sender node: ${send_node}"
+send_ip=$(get_node_ip ${send_node})
+echo "Sender node: ${send_node} (IP: ${send_ip})"
 
 echo "All jobs submitted:"
-echo "Receiver: Job ${recv_job_id} on ${recv_node}"
-echo "Emulator: Job ${emu_job_id} on ${emu_node}"
-echo "Sender: Job ${send_job_id} on ${send_node}" 
+echo "Receiver: Job ${recv_job_id} on ${recv_node} (IP: ${recv_ip})"
+echo "Emulator: Job ${emu_job_id} on ${emu_node} (IP: ${emu_ip})"
+echo "Sender: Job ${send_job_id} on ${send_node} (IP: ${send_ip})"
+
+# Save node information to a file
+cat > node_info.txt <<EOL
+Receiver Node: ${recv_node}
+Receiver IP: ${recv_ip}
+Emulator Node: ${emu_node}
+Emulator IP: ${emu_ip}
+Sender Node: ${send_node}
+Sender IP: ${send_ip}
+EOL 
