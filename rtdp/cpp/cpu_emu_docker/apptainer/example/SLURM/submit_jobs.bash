@@ -19,10 +19,10 @@ function slurm_get_nodelist() {
     done
 }
 
-# Helper function to get IP address from node name
+# Helper function to get IP address from node name using srun
 function get_node_ip() {
     local node=$1
-    local ip=$(ssh $node hostname -i)
+    local ip=$(srun --nodelist=${node} hostname -i)
     echo $ip
 }
 
