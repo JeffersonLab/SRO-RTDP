@@ -13,16 +13,22 @@ apptainer pull prom.sif docker://prom/prometheus:latest
 # InfluxDB
 apptainer pull infludb.sif docker://influxdb:latest
 
+# Grafana
+apptainer pull grafana.sif docker://grafana/grafana:latest
+
 # SRO-RTDP-EICrecon
 # Use ifarm local env to save space!!!
 ### apptainer pull rtdp-eicrecon.sif docker://jlabtsai/eic:latest
 
 
 <!-- bash-5.1$ ls -lah
-total 3.3G
+total 348M
+drwxr-xr-x. 2 xmei itd    8 Jan  9 14:28 .
+drwxr-xr-x. 9 xmei itd   12 Jan  9 14:24 ..
+-rw-r--r--. 1 xmei itd  952 Jan  9 14:27 containers
+-rwxr-xr-x. 1 xmei itd 124M Jan  9 14:28 grafana.sif
 -rwxr-xr-x. 1 xmei itd 101M Dec  9 14:34 influxdb.sif
 -rwxr-xr-x. 1 xmei itd  12M Sep 23 11:31 node-exporter.sif
 -rwxr-xr-x. 1 xmei itd 8.1M Sep 23 11:30 process-exporter.sif
 -rwxr-xr-x. 1 xmei itd 103M Sep 26 12:41 prom.sif
--rwxr-xr-x. 1 xmei itd 3.2G Nov  2 01:31 rtdp-eicrecon.sif
 -->
