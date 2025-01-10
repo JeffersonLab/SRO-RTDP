@@ -42,7 +42,7 @@ All the below steps are lauched under the project top directory `SRO-RTDP`.
     epsci   epsci           bucket_podio2tcp
 
     # Create a new InfluxDB log file.
-    InfluxDB setup completed, see logs at: influxdb_1733885387.log
+    InfluxDB setup completed, see logs at: influxdb_xxxxxxxxxx.log
     ```
 
     Double check by printing the processes, we need to see ALL of the 3 processes below.
@@ -109,3 +109,36 @@ All the below steps are lauched under the project top directory `SRO-RTDP`.
     bash-5.1$ curl --request POST "$INFLUXDB_URL/query?org=$INFLUXDB_ORG&bucket=${INFLUXDB_BUCKET}" --header "Authorization: Token $INFLUXDB_TOKEN" --data-urlencode "rp=autogen" --data-urlencode "db=bucket_podio2tcp" --data-urlencode "q=SELECT * FROM podio2tcp WHERE time >= '2024-12-11T04:24:20Z'"
     {"results":[{"statement_id":0,"series":[{"name":"podio2tcp","columns":["time","hostname","pid","rateHz_read_period","rateHz_read_total","rateHz_sent_period","rateHz_sent_total","rateMbps_read_period","rateMbps_read_total","rateMbps_sent_period","rateMbps_sent_total","role"],"values":[["2024-12-11T04:24:20.292Z","farm1972","3773416",46.6,46.8,46.6,46.8,140.7,141.4,140.7,141.4,"SEND"]]}]}]}
     ```
+
+### Port InfluxDB to Grafana
+1. Create an empty folder for runtime Grafana data `grafana-data` under folder `farm-tests`. Run Grafana with apptainer on `ifarm2401`.
+    ```bash
+    $ apptainer exec --bind farm-tests/grafana-data:/var/lib/grafana farm-tests/sifs/grafana.sif grafana server --homepath=/usr/share/grafana &
+    ```
+   Make sure Grafana is running by curl to local host port 3000 (the default Grafana port).
+   ```bash
+   $ curl http://localhost:3000
+   $ <a href="/login">Found</a>.  # the expected output or Code 302 (for login first)
+   ```
+2. Port forwarding to the local computer for both Grafana and InfluxDB. Here I use the same local port numbers.
+   ```bash
+   ssh -J scilogin.jlab.org <user>@ifarm2401.jlab.org -L 3000:localhost:3000   # Grafana
+   ssh -J scilogin.jlab.org <user>@ifarm2401.jlab.org -L 42900:localhost:42900   # InfluxDB
+   ```
+3. Add InfluxDB as the data source of Grafana.
+   After login, go to "Home" --> "Connections" --> "Data sources" --> "Add data source", and select InfluxDB.
+
+   ![grafana data source](grafana_guides/grafana_add_data_source.png "Add InfluxDB as the data source")
+
+   Configure the data source follow the guides below. The InfluxDB credentials can be found at [influxdb_setenv.bash](influxdb_setenv.bash). The InfluxDB token string is in a file "influx-configs" under folder influxdb-config.
+
+   ![Configure data source 1](grafana_guides/set_ds_1.png "Configure InfluxDB 1")
+   ![Configure data source 2](grafana_guides/set_ds_2.png "Configure InfluxDB 2")
+   ![Configure data source 3](grafana_guides/set_ds_3.png "Configure InfluxDB 3")
+
+   Click the "Save & test" buttton at the bottom. We should be able to see success message as below.
+
+    ![Configure data source 4](grafana_guides/set_ds_4.png "Success message")
+
+4. Create the Grafana dashboards with InfluxDB's Flux query language. Below is a sample to show the Hz and Mbps numbers on both sending and receiving nodes.
+   ![Sample dashboard](grafana_guides/grafana_dashboard_podio2tcp.png "Sample dashboard")
