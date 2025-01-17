@@ -10,6 +10,7 @@
         R1 = """
             receiver:ready => emulator
             emulator:ready => sender
+            receiver:completed
         """
 
 [runtime]
@@ -145,6 +146,7 @@
             # Check final status
             if [ -s "${OUTPUT_DIR}/received_data.bin" ]; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully"
+                cylc message -- "receiver:completed"
                 kill $RECV_PID 2>/dev/null || true
                 exit 0
             else
@@ -162,7 +164,7 @@
         
         [[[outputs]]]
             ready = "receiver:ready"
-            succeeded = "Transfer completed successfully"
+            completed = "Transfer completed successfully"
 
     [[emulator]]
         script = """
