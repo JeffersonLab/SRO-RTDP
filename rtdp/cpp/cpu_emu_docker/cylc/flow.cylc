@@ -36,6 +36,7 @@
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
             
             # Emulator configuration
             EMU_THREADS = "4"              # Number of processing threads
@@ -48,39 +49,68 @@
 
     [[receiver]]
         script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/receiver
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            
             # Store hostname for other tasks
-            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
-            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
             
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
             # Start receiver
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
             apptainer run ${CPU_EMU_SIF} receive \
                 ${RECEIVER_PORT} \
-                $(hostname -i) \
-                > ${OUTPUT_DIR}/received_data.bin &
+                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin &
             
             RECV_PID=$!
-            echo "Receiver started with PID ${RECV_PID}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
             
             # Wait for port to be ready
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port ${RECEIVER_PORT} to be ready"
             COUNTER=0
             while ! netstat -tuln | grep -q ":${RECEIVER_PORT}"; do
                 sleep 1
                 ((COUNTER++))
                 if [ $COUNTER -ge 30 ]; then
-                    echo "ERROR: Receiver failed to start"
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver failed to start" >&2
                     kill $RECV_PID
                     exit 1
                 fi
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting... ($COUNTER/30)"
             done
             
-            # Signal readiness
-            cylc message -- "The receiver is ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${RECEIVER_PORT} is ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Network status:"
+            netstat -tuln | grep ":${RECEIVER_PORT}" || true
             
-            # Keep running until job is cancelled
-            wait $RECV_PID
+            # Signal readiness
+            cylc message -- "receiver:ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
+            
+            # Monitor the receiver process
+            while kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                sleep 30
+            done
+            
+            # Check if process died unexpectedly
+            if ! wait $RECV_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = cpu-emu-recv
@@ -88,56 +118,80 @@
             --mem = 8G
         
         [[[outputs]]]
-            ready = "The receiver is ready"
+            ready = "receiver:ready"
 
     [[emulator]]
         script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/emulator
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/emulator/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting emulator task"
+            
             # Get receiver information
             RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
             
-            # Store emulator information
-            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
-            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
             
             # Create output directory
-            mkdir -p ${OUTPUT_DIR}/emulator
+            mkdir -p ${OUTPUT_DIR}
             
             # Start CPU emulator
-            apptainer run --bind ${OUTPUT_DIR}/emulator:/output \
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
+            apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} --output-dir /output \
-                -t ${EMU_THREADS} \
-                -b ${EMU_LATENCY} \
-                -m ${EMU_MEM_FOOTPRINT} \
-                -o ${EMU_OUTPUT_SIZE} \
-                -r ${EMULATOR_PORT} \
-                -p ${RECEIVER_PORT} \
-                -i ${RECV_IP} \
-                -v 1 &
+                -t ${EMU_THREADS} -b ${EMU_LATENCY} \
+                -m ${EMU_MEM_FOOTPRINT} -o ${EMU_OUTPUT_SIZE} \
+                -r ${EMULATOR_PORT} -p ${RECEIVER_PORT} \
+                -i ${RECV_IP} -v 1 &
             
             EMU_PID=$!
-            echo "Emulator started with PID ${EMU_PID}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
             
             # Wait for port to be ready
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port ${EMULATOR_PORT} to be ready"
             COUNTER=0
             while ! netstat -tuln | grep -q ":${EMULATOR_PORT}"; do
                 sleep 1
                 ((COUNTER++))
                 if [ $COUNTER -ge 30 ]; then
-                    echo "ERROR: Emulator failed to start"
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator failed to start" >&2
                     kill $EMU_PID
                     exit 1
                 fi
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting... ($COUNTER/30)"
             done
             
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${EMULATOR_PORT} is ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Network status:"
+            netstat -tuln | grep ":${EMULATOR_PORT}" || true
+            
             # Signal readiness
-            cylc message -- "The emulator is ready"
+            cylc message -- "emulator:ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
             
             # Monitor memory usage
             while kill -0 $EMU_PID 2>/dev/null; do
-                echo "Memory usage at $(date):" >> ${OUTPUT_DIR}/memory_monitor.log
-                free -h >> ${OUTPUT_DIR}/memory_monitor.log
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/emulator/memory.log
+                free -h >> ${LOG_DIR}/emulator/memory.log
+                ps -o pid,ppid,%cpu,%mem,cmd -p $EMU_PID >> ${LOG_DIR}/emulator/memory.log
                 sleep 5
             done
+            
+            # Check if process died unexpectedly
+            if ! wait $EMU_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process failed" >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = cpu-emu
@@ -145,29 +199,48 @@
             --mem = 16G
         
         [[[outputs]]]
-            ready = "The emulator is ready"
+            ready = "emulator:ready"
 
     [[sender]]
         script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/sender
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            
             # Get emulator information
             EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
             
             # Create input directory
             mkdir -p ${INPUT_DIR}
             
             # Generate test data
             INPUT_FILE="${INPUT_DIR}/random_data.bin"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data: ${TEST_DATA_SIZE}"
             dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
             
             # Send data
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${EMU_IP}:${EMULATOR_PORT}"
             apptainer run --bind ${INPUT_DIR}:/data \
                 ${CPU_EMU_SIF} send \
                 "/data/$(basename ${INPUT_FILE})" \
                 ${EMU_IP} \
                 ${EMULATOR_PORT}
             
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+            
             # Clean up
             rm -f ${INPUT_FILE}
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
+            
+            # Exit with send status
+            exit ${SEND_STATUS}
         """
         [[[directives]]]
             --job-name = cpu-emu-send
