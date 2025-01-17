@@ -10,7 +10,8 @@
         R1 = """
             receiver:ready => emulator
             emulator:ready => sender
-            receiver:completed  # Just ensure completion
+            sender:succeeded => receiver:finish
+            receiver:completed => !receiver
         """
 
 [runtime]
@@ -125,6 +126,10 @@
             KEEP_RUNNING=1
             trap 'KEEP_RUNNING=0' TERM INT
             
+            # Create a flag file to track completion
+            COMPLETION_FILE="${CYLC_WORKFLOW_SHARE_DIR}/receiver_complete"
+            rm -f "${COMPLETION_FILE}"
+            
             # Monitor the receiver process
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
@@ -134,10 +139,10 @@
                 netstat -tuln | grep ":${RECEIVER_PORT}" >> ${LOG_DIR}/receiver/process.log 2>&1 || true
                 
                 # Check if data has been received (file size > 0)
-                if [ -s "${OUTPUT_DIR}/received_data.bin" ]; then
+                if [ -s "${OUTPUT_DIR}/received_data.bin" ] && [ ! -f "${COMPLETION_FILE}" ]; then
                     echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully"
-                    KEEP_RUNNING=0
-                    break
+                    cylc message -- "receiver:completed"
+                    touch "${COMPLETION_FILE}"
                 fi
                 
                 sleep 5
@@ -146,14 +151,11 @@
             # Check final status
             if [ -s "${OUTPUT_DIR}/received_data.bin" ]; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully"
-                cylc message -- "receiver:completed"
-                kill $RECV_PID 2>/dev/null || true
                 exit 0
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
                 echo "Last few lines of apptainer log:" >&2
                 tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
-                kill $RECV_PID 2>/dev/null || true
                 exit 1
             fi
         """
@@ -165,6 +167,7 @@
         [[[outputs]]]
             ready = "receiver:ready"
             completed = "Transfer completed successfully"
+            finish = "sender:succeeded"
 
     [[emulator]]
         script = """
@@ -284,6 +287,10 @@
             # Clean up
             rm -f ${INPUT_FILE}
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
+            
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:succeeded"
+            fi
             
             # Exit with send status
             exit ${SEND_STATUS}
