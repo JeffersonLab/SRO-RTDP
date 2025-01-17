@@ -16,7 +16,7 @@ scancel --name=cpu-emu-send
 
 # Stop any running workflows
 echo "Stopping Cylc workflows..."
-cylc stop --kill --now "${WORKFLOW_NAME}"
+cylc stop --now "${WORKFLOW_NAME}"
 
 # Wait a moment for jobs to clean up
 sleep 2
