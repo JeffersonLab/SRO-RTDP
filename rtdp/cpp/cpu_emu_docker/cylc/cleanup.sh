@@ -16,7 +16,17 @@ scancel --name=cpu-emu-send
 
 # Stop any running workflows
 echo "Stopping Cylc workflows..."
-cylc stop --now "${WORKFLOW_NAME}"
+if cylc scan "${WORKFLOW_NAME}" 2>/dev/null; then
+    # Get the host where the workflow is running
+    HOST=$(cylc scan "${WORKFLOW_NAME}" | awk '{print $2}')
+    if [ -n "${HOST}" ]; then
+        echo "Workflow running on ${HOST}"
+        # Stop the workflow on the correct host
+        ssh "${HOST}" "cylc stop --now ${WORKFLOW_NAME}"
+    else
+        cylc stop --now "${WORKFLOW_NAME}" || true
+    fi
+fi
 
 # Wait a moment for jobs to clean up
 sleep 2
@@ -41,7 +51,12 @@ rm -f core.*
 
 # Uninstall the Cylc workflow
 echo "Uninstalling Cylc workflow..."
-cylc clean "${WORKFLOW_NAME}"
+# Try to clean on the running host if available
+if [ -n "${HOST}" ]; then
+    ssh "${HOST}" "cylc clean ${WORKFLOW_NAME}" || cylc clean "${WORKFLOW_NAME}" || true
+else
+    cylc clean "${WORKFLOW_NAME}" || true
+fi
 
 echo "Cleanup complete!"
 
