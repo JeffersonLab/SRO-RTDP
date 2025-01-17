@@ -5,7 +5,7 @@ This workflow automates CPU emulator performance tests using Cylc workflow autom
 ## Directory Structure
 
 ```
-cylc-run/cpu-emu/
+cylc/
 ├── flow.cylc                     # Main Cylc workflow definition
 ├── build.sh                      # SIF file build script
 ├── cleanup.sh                    # Cleanup script
@@ -62,20 +62,17 @@ The workflow uses Cylc environment variables for configuration. Key settings in 
 
 ## Installation
 
-1. Create a new Cylc workflow directory:
+1. Create necessary directories:
 ```bash
-mkdir -p ~/cylc-run/cpu-emu
-cd ~/cylc-run/cpu-emu
+mkdir -p sifs etc/config scripts
 ```
 
-2. Copy all workflow files to this directory
-
-3. Build the SIF file:
+2. Build the SIF file:
 ```bash
 ./build.sh -i jlabtsai/rtdp-cpu_emu:latest
 ```
 
-4. Run the installation script:
+3. Run the installation script:
 ```bash
 chmod +x install.sh
 ./install.sh
@@ -90,7 +87,7 @@ cylc validate .
 
 2. Start the workflow:
 ```bash
-cylc play cpu-emu
+cylc play .
 ```
 
 ## Workflow Tasks and Dependencies
@@ -148,8 +145,8 @@ The workflow uses `$CYLC_WORKFLOW_SHARE_DIR` to share information between tasks:
 
 ## Output and Data
 
-- Task logs: `~/cylc-run/cpu-emu/runN/log/job/`
-- Performance data: `~/cylc-run/cpu-emu/runN/work/1/`
+- Task logs: `log/job/`
+- Performance data: `work/1/`
 - Received data: `output/received_data.bin`
 - Memory logs: `output/memory_monitor.log`
 
@@ -167,9 +164,9 @@ cylc gui
 
 3. View task logs:
 ```bash
-cylc cat-log cpu-emu//1/receiver
-cylc cat-log cpu-emu//1/emulator
-cylc cat-log cpu-emu//1/sender
+cylc cat-log .//1/receiver
+cylc cat-log .//1/emulator
+cylc cat-log .//1/sender
 ```
 
 ## Cleanup
@@ -188,7 +185,7 @@ This will:
 ## Troubleshooting
 
 1. Task Failures:
-   - Check logs: `cylc cat-log cpu-emu//1/task_name`
+   - Check logs: `cylc cat-log .//1/task_name`
    - Verify network connectivity
    - Check memory usage in `memory_monitor.log`
 
@@ -200,12 +197,12 @@ This will:
 3. Debug Commands:
 ```bash
 # Check task status
-cylc show cpu-emu
+cylc show .
 
 # View job logs
-cylc cat-log cpu-emu//1/receiver
-cylc cat-log cpu-emu//1/emulator
-cylc cat-log cpu-emu//1/sender
+cylc cat-log .//1/receiver
+cylc cat-log .//1/emulator
+cylc cat-log .//1/sender
 
 # Check network connectivity
 netstat -tuln | grep -E "50080|50888"
@@ -220,5 +217,5 @@ netstat -tuln | grep -E "50080|50888"
 ## References
 
 - [Cylc Documentation](https://cylc.github.io/)
-- [CPU Emulator Documentation](../../README.md)
+- [CPU Emulator Documentation](../README.md)
 - [JLab Computing](https://scicomp.jlab.org/) 
