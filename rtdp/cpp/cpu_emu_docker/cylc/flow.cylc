@@ -1,0 +1,175 @@
+[scheduler]
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            receiver:ready => emulator
+            emulator:ready => sender
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF file
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            
+            # Network configuration
+            RECEIVER_PORT = "50080"
+            EMULATOR_PORT = "50888"
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
+            
+            # Emulator configuration
+            EMU_THREADS = "4"              # Number of processing threads
+            EMU_LATENCY = "50"            # Processing latency per GB
+            EMU_MEM_FOOTPRINT = "0.05"    # Memory footprint in GB
+            EMU_OUTPUT_SIZE = "0.001"     # Output size in GB
+            
+            # Test data configuration
+            TEST_DATA_SIZE = "100M"       # Size of test data to send
+
+    [[receiver]]
+        script = """
+            # Store hostname for other tasks
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start receiver
+            apptainer run ${CPU_EMU_SIF} receive \
+                ${RECEIVER_PORT} \
+                $(hostname -i) \
+                > ${OUTPUT_DIR}/received_data.bin &
+            
+            RECV_PID=$!
+            echo "Receiver started with PID ${RECV_PID}"
+            
+            # Wait for port to be ready
+            COUNTER=0
+            while ! netstat -tuln | grep -q ":${RECEIVER_PORT}"; do
+                sleep 1
+                ((COUNTER++))
+                if [ $COUNTER -ge 30 ]; then
+                    echo "ERROR: Receiver failed to start"
+                    kill $RECV_PID
+                    exit 1
+                fi
+            done
+            
+            # Signal readiness
+            cylc message -- "The receiver is ready"
+            
+            # Keep running until job is cancelled
+            wait $RECV_PID
+        """
+        [[[directives]]]
+            --job-name = cpu-emu-recv
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "The receiver is ready"
+
+    [[emulator]]
+        script = """
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            
+            # Store emulator information
+            echo "$(hostname)" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
+            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}/emulator
+            
+            # Start CPU emulator
+            apptainer run --bind ${OUTPUT_DIR}/emulator:/output \
+                ${CPU_EMU_SIF} --output-dir /output \
+                -t ${EMU_THREADS} \
+                -b ${EMU_LATENCY} \
+                -m ${EMU_MEM_FOOTPRINT} \
+                -o ${EMU_OUTPUT_SIZE} \
+                -r ${EMULATOR_PORT} \
+                -p ${RECEIVER_PORT} \
+                -i ${RECV_IP} \
+                -v 1 &
+            
+            EMU_PID=$!
+            echo "Emulator started with PID ${EMU_PID}"
+            
+            # Wait for port to be ready
+            COUNTER=0
+            while ! netstat -tuln | grep -q ":${EMULATOR_PORT}"; do
+                sleep 1
+                ((COUNTER++))
+                if [ $COUNTER -ge 30 ]; then
+                    echo "ERROR: Emulator failed to start"
+                    kill $EMU_PID
+                    exit 1
+                fi
+            done
+            
+            # Signal readiness
+            cylc message -- "The emulator is ready"
+            
+            # Monitor memory usage
+            while kill -0 $EMU_PID 2>/dev/null; do
+                echo "Memory usage at $(date):" >> ${OUTPUT_DIR}/memory_monitor.log
+                free -h >> ${OUTPUT_DIR}/memory_monitor.log
+                sleep 5
+            done
+        """
+        [[[directives]]]
+            --job-name = cpu-emu
+            --cpus-per-task = 4
+            --mem = 16G
+        
+        [[[outputs]]]
+            ready = "The emulator is ready"
+
+    [[sender]]
+        script = """
+            # Get emulator information
+            EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
+            
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+            
+            # Generate test data
+            INPUT_FILE="${INPUT_DIR}/random_data.bin"
+            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
+            
+            # Send data
+            apptainer run --bind ${INPUT_DIR}:/data \
+                ${CPU_EMU_SIF} send \
+                "/data/$(basename ${INPUT_FILE})" \
+                ${EMU_IP} \
+                ${EMULATOR_PORT}
+            
+            # Clean up
+            rm -f ${INPUT_FILE}
+        """
+        [[[directives]]]
+            --job-name = cpu-emu-send
+            --cpus-per-task = 4
+            --mem = 8G 
