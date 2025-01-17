@@ -3,8 +3,8 @@
 # Set -e to exit on error
 set -e
 
-# Get the current directory name
-WORKFLOW_NAME=$(basename $(pwd))
+# Set fixed workflow name
+WORKFLOW_NAME="cpu-emu"
 
 # Create necessary directories
 mkdir -p sifs etc/config scripts
@@ -15,7 +15,7 @@ mkdir -p ${CYLC_RUN_DIR}
 
 # Install the workflow using Cylc
 echo "Installing workflow..."
-cylc install
+cylc install --workflow-name=${WORKFLOW_NAME}
 
 # Validate the workflow
 echo "Validating workflow..."
