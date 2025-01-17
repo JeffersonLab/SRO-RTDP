@@ -87,7 +87,7 @@ cylc validate .
 
 2. Start the workflow:
 ```bash
-cylc play .
+cylc play cpu-emu
 ```
 
 ## Workflow Tasks and Dependencies
@@ -164,9 +164,9 @@ cylc gui
 
 3. View task logs:
 ```bash
-cylc cat-log .//1/receiver
-cylc cat-log .//1/emulator
-cylc cat-log .//1/sender
+cylc cat-log cpu-emu//1/receiver
+cylc cat-log cpu-emu//1/emulator
+cylc cat-log cpu-emu//1/sender
 ```
 
 ## Cleanup
@@ -185,7 +185,7 @@ This will:
 ## Troubleshooting
 
 1. Task Failures:
-   - Check logs: `cylc cat-log .//1/task_name`
+   - Check logs: `cylc cat-log cpu-emu//1/task_name`
    - Verify network connectivity
    - Check memory usage in `memory_monitor.log`
 
@@ -197,12 +197,12 @@ This will:
 3. Debug Commands:
 ```bash
 # Check task status
-cylc show .
+cylc show cpu-emu
 
 # View job logs
-cylc cat-log .//1/receiver
-cylc cat-log .//1/emulator
-cylc cat-log .//1/sender
+cylc cat-log cpu-emu//1/receiver
+cylc cat-log cpu-emu//1/emulator
+cylc cat-log cpu-emu//1/sender
 
 # Check network connectivity
 netstat -tuln | grep -E "50080|50888"
