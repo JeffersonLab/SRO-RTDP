@@ -3,8 +3,8 @@
 # Set -e to exit on error, -x for debug output
 set -ex
 
-# Get workflow name from current directory
-WORKFLOW_NAME=$(basename $(pwd))
+# Set fixed workflow name (must match install.sh)
+WORKFLOW_NAME="cpu-emu"
 
 echo "Cleaning up SLURM jobs and data..."
 
