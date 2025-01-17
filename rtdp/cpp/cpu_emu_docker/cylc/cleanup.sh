@@ -3,6 +3,9 @@
 # Set -e to exit on error, -x for debug output
 set -ex
 
+# Get workflow name from current directory
+WORKFLOW_NAME=$(basename $(pwd))
+
 echo "Cleaning up SLURM jobs and data..."
 
 # Cancel any running jobs with matching names
@@ -13,7 +16,7 @@ scancel --name=cpu-emu-send
 
 # Stop any running workflows
 echo "Stopping Cylc workflows..."
-cylc stop --kill --now .
+cylc stop --kill --now "${WORKFLOW_NAME}"
 
 # Wait a moment for jobs to clean up
 sleep 2
@@ -38,7 +41,7 @@ rm -f core.*
 
 # Uninstall the Cylc workflow
 echo "Uninstalling Cylc workflow..."
-cylc clean .
+cylc clean "${WORKFLOW_NAME}"
 
 echo "Cleanup complete!"
 
