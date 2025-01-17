@@ -11,6 +11,10 @@ scancel --name=cpu-emu-recv
 scancel --name=cpu-emu
 scancel --name=cpu-emu-send
 
+# Stop any running workflows
+echo "Stopping Cylc workflows..."
+cylc stop --kill --now .
+
 # Wait a moment for jobs to clean up
 sleep 2
 
@@ -31,6 +35,10 @@ rm -f node_info.txt
 
 # Remove any core dumps if they exist
 rm -f core.*
+
+# Uninstall the Cylc workflow
+echo "Uninstalling Cylc workflow..."
+cylc clean .
 
 echo "Cleanup complete!"
 
