@@ -58,10 +58,17 @@
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
+            # Check if port is already in use
+            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
+                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
+                exit 1
+            fi
+            
             # Store hostname for other tasks
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
-            HOSTNAME=$(hostname)
-            IP=$(hostname -i)
+            HOSTNAME=$(hostname -f)  # Use fully qualified hostname
+            IP=$(hostname -i | awk '{print $1}')  # Use first IP if multiple
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
@@ -69,11 +76,12 @@
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
-            # Start receiver
+            # Start receiver with debug output
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run ${CPU_EMU_SIF} receive \
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${CPU_EMU_SIF} receive \
                 ${RECEIVER_PORT} \
-                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin &
+                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
@@ -86,7 +94,19 @@
                 ((COUNTER++))
                 if [ $COUNTER -ge 30 ]; then
                     echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver failed to start" >&2
-                    kill $RECV_PID
+                    echo "Last few lines of apptainer log:" >&2
+                    tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
+                    echo "Process status:" >&2
+                    ps -fp $RECV_PID >&2 || true
+                    echo "Network status:" >&2
+                    netstat -tuln >&2
+                    kill $RECV_PID 2>/dev/null || true
+                    exit 1
+                fi
+                if ! kill -0 $RECV_PID 2>/dev/null; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process died" >&2
+                    echo "Last few lines of apptainer log:" >&2
+                    tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
                     exit 1
                 fi
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting... ($COUNTER/30)"
@@ -103,12 +123,18 @@
             # Monitor the receiver process
             while kill -0 $RECV_PID 2>/dev/null; do
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "Process details:" >> ${LOG_DIR}/receiver/process.log
+                ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
+                echo "Network status:" >> ${LOG_DIR}/receiver/process.log
+                netstat -tuln | grep ":${RECEIVER_PORT}" >> ${LOG_DIR}/receiver/process.log 2>&1 || true
                 sleep 30
             done
             
             # Check if process died unexpectedly
             if ! wait $RECV_PID; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
+                echo "Last few lines of apptainer log:" >&2
+                tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
         """
