@@ -18,6 +18,36 @@ cylc/
     └── cpu-emu.sif              # CPU emulator container
 ```
 
+After installation, Cylc creates the following directory structure:
+```
+~/cylc-run/cpu-emu/             # CYLC_WORKFLOW_RUN_DIR
+├── runN/                       # Run directory for each workflow run
+│   ├── work/                   # CYLC_WORKFLOW_WORK_DIR (task working directories)
+│   │   └── 1/                 # Cycle point directory
+│   │       ├── receiver/      # Task working directories
+│   │       ├── emulator/
+│   │       └── sender/
+│   ├── share/                 # CYLC_WORKFLOW_SHARE_DIR (shared between tasks)
+│   │   ├── output/           # Shared output directory
+│   │   ├── input/            # Shared input directory
+│   │   └── logs/             # Shared logs directory
+│   └── log/                   # Cylc log directory
+│       └── job/              # Job logs
+└── share/                     # Workflow share directory (persists between runs)
+```
+
+### Important Environment Variables
+
+- `CYLC_WORKFLOW_RUN_DIR`: Base directory for the workflow (`~/cylc-run/cpu-emu/`)
+- `CYLC_WORKFLOW_WORK_DIR`: Working directory for tasks (`~/cylc-run/cpu-emu/runN/work/`)
+- `CYLC_WORKFLOW_SHARE_DIR`: Shared directory for all tasks (`~/cylc-run/cpu-emu/runN/share/`)
+
+The shared directory (`CYLC_WORKFLOW_SHARE_DIR`) is used to:
+- Store output files accessible by all tasks
+- Share information between tasks (hostname, IP addresses)
+- Store log files from all components
+- Maintain consistent data across workflow runs
+
 ## Prerequisites
 
 1. Access to JLab's ifarm cluster
