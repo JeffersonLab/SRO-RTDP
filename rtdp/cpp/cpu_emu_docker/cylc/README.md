@@ -78,6 +78,13 @@ chmod +x install.sh
 ./install.sh
 ```
 
+Note: The installation script will:
+- Create required directories
+- Install the workflow using `cylc install`
+- Validate the workflow
+
+The workflow will be installed to `~/cylc-run/cpu-emu/`.
+
 ## Running the Workflow
 
 1. Validate the workflow:
@@ -87,6 +94,8 @@ cylc validate .
 
 2. Start the workflow:
 ```bash
+# First time after installation:
+cylc install  # If not already installed
 cylc play cpu-emu
 ```
 
