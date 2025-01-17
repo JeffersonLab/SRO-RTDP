@@ -120,21 +120,38 @@
             cylc message -- "receiver:ready"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
             
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+            
             # Monitor the receiver process
-            while kill -0 $RECV_PID 2>/dev/null; do
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
                 echo "Process details:" >> ${LOG_DIR}/receiver/process.log
                 ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
                 echo "Network status:" >> ${LOG_DIR}/receiver/process.log
                 netstat -tuln | grep ":${RECEIVER_PORT}" >> ${LOG_DIR}/receiver/process.log 2>&1 || true
-                sleep 30
+                
+                # Check if data has been received (file size > 0)
+                if [ -s "${OUTPUT_DIR}/received_data.bin" ]; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully"
+                    KEEP_RUNNING=0
+                    break
+                fi
+                
+                sleep 5
             done
             
-            # Check if process died unexpectedly
-            if ! wait $RECV_PID; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
+            # Check final status
+            if [ -s "${OUTPUT_DIR}/received_data.bin" ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully"
+                kill $RECV_PID 2>/dev/null || true
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
                 echo "Last few lines of apptainer log:" >&2
                 tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
+                kill $RECV_PID 2>/dev/null || true
                 exit 1
             fi
         """
@@ -145,6 +162,7 @@
         
         [[[outputs]]]
             ready = "receiver:ready"
+            succeeded = "Transfer completed successfully"
 
     [[emulator]]
         script = """
