@@ -16,6 +16,8 @@
 #include <chrono>
 #include <csignal>
 #include <sys/time.h>
+#include <algorithm>    // std::min
+
 
 volatile bool timeoutExpired = false;
 
@@ -52,7 +54,7 @@ void   Usage()
 void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
     if(vrbs) std::cout << "Threading ..." << endl;
-    uint64_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
+    ssize_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) std::cout << "Allocating " << memSz << " bytes ..." << endl;
     double* x = new double[memSz];
     //usefull work emeulation 
@@ -76,7 +78,13 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
         timer.it_interval.tv_sec = 0;
         timer.it_interval.tv_usec = 0;
         setitimer (ITIMER_REAL, &timer, 0);
-        while (!timeoutExpired) for (ssize_t i = 0; i<memSz; i++) x[i] = tanh(i);
+	ssize_t sz1k = 1024;
+	ssize_t strtMem = 0;
+        while (!timeoutExpired) { 
+		for (ssize_t i = strtMem; i<std::min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
+		strtMem += sz1k;
+		if(strtMem > memSz - sz1k) strtMem = 0;
+	}
     }
     if(vrbs) std::cout << "Threading Done" << endl;
 
