@@ -78,16 +78,16 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
         timer.it_interval.tv_sec = 0;
         timer.it_interval.tv_usec = 0;
         setitimer (ITIMER_REAL, &timer, 0);
-	ssize_t sz1k = 1024;
-	ssize_t strtMem = 0;
+        ssize_t sz1k = 1024;
+        ssize_t strtMem = 0;
         while (!timeoutExpired) { 
-		for (ssize_t i = strtMem; i<std::min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
-		strtMem += sz1k;
-		if(strtMem > memSz - sz1k) strtMem = 0;
-	}
+            for (ssize_t i = strtMem; i<std::min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
+            strtMem += sz1k;
+            if(strtMem > memSz - sz1k) strtMem = 0;
+        }
     }
-    if(vrbs) std::cout << "Threading Done" << endl;
 
+    if(vrbs) std::cout << "Threading Done" << endl;
 } 
   
 int main (int argc, char *argv[])
@@ -162,6 +162,7 @@ int main (int argc, char *argv[])
             exit(1);
         }
     }
+
     if(DBG) std::cout << endl;
     if(!(psdB && psdI && psdM && psdO && psdT)) { Usage(); exit(1); }
 
@@ -176,7 +177,8 @@ int main (int argc, char *argv[])
         exit(0); 
     } 
     else
-        if(vrbs) std::cout << "Socket successfully created.." << endl; 
+        if(vrbs) std::cout << "Socket successfully created.." << endl;
+
     bzero(&servaddr, sizeof(servaddr)); 
   
     // assign IP, PORT 
@@ -198,7 +200,8 @@ int main (int argc, char *argv[])
         exit(0); 
     } 
     else
-        if(vrbs) std::cout << "Server listening.." << endl; 
+        if(vrbs) std::cout << "Server listening.." << endl;
+
     len = sizeof(cli); 
   
     // Accept the data packet from client and verification 
@@ -220,60 +223,62 @@ int main (int argc, char *argv[])
         // read the message from client and copy it in buffer 
         nmrd += nmrd0 = read(connfd, buff, sizeof(buff));
 
-	} while(nmrd0>0);
-	close(sockfd); 
-	if(vrbs) std::cout << "Num read " << nmrd  << endl;
+    } while(nmrd0>0);
 
-	// if output size should not exceed input size
-	// if(otmemGB*(1024*1024*1024) > nmrd) { cerr << "Output cannot exceed input size\n"; exit(EXIT_FAILURE); }
+    close(sockfd); 
+    if(vrbs) std::cout << "Num read " << nmrd  << endl;
+
+    // if output size should not exceed input size
+    // if(otmemGB*(1024*1024*1024) > nmrd) { cerr << "Output cannot exceed input size\n"; exit(EXIT_FAILURE); }
     
-        //load (or emulate load on) system with ensuing work
+    //load (or emulate load on) system with ensuing work
 
-	std::vector<std::thread> threads;
+    std::vector<std::thread> threads;
 
-	for (int i=1; i<=nmThrds; ++i)  //start the threads
-		threads.push_back(std::thread(func, buff, nmrd, scs_GB, memGB, psdS, vrbs));
+    for (int i=1; i<=nmThrds; ++i)  //start the threads
+        threads.push_back(std::thread(func, buff, nmrd, scs_GB, memGB, psdS, vrbs));
 
-	if(vrbs) std::cout << "synchronizing all threads..." << endl;
-	for (auto& th : threads) th.join();
+    if(vrbs) std::cout << "synchronizing all threads..." << endl;
+
+    for (auto& th : threads) th.join();
    
-        //forward to next hop    
-	{ 
+    //forward to next hop    
+    { 
 
-	    int sockfd, connfd; 
-	    struct sockaddr_in servaddr, cli;  
+        int sockfd, connfd; 
+        struct sockaddr_in servaddr, cli;  
 
-    	    // socket create and verification 
+        // socket create and verification 
 
-	    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+        sockfd = socket(AF_INET, SOCK_STREAM, 0); 
 
-	    if (sockfd == -1) { 
-	        std::cout << "socket creation failed...\n"; 
-	        exit(0); 
-	    } 
-	    else 
-	        if(vrbs) std::cout << "Socket successfully created.." << endl;
+        if (sockfd == -1) { 
+            std::cout << "socket creation failed...\n"; 
+            exit(0); 
+        } 
+        else 
+            if(vrbs) std::cout << "Socket successfully created.." << endl;
 	        
-	    bzero(&servaddr, sizeof(servaddr));   
+        bzero(&servaddr, sizeof(servaddr));   
 
-	    // assign IP, PORT 
+        // assign IP, PORT 
 
-	    servaddr.sin_family = AF_INET; 
-	    servaddr.sin_addr.s_addr = inet_addr(dst_ip);
-	    servaddr.sin_port = htons(dst_prt);  
+        servaddr.sin_family = AF_INET; 
+        servaddr.sin_addr.s_addr = inet_addr(dst_ip);
+        servaddr.sin_port = htons(dst_prt);  
 
-	    // connect the client socket to server socket 
+        // connect the client socket to server socket 
 
-	    if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
-	        std::cout << "connection with the server failed...\n"; 
-	        exit(0); 
-	    } 
-	    else 
-	        if(vrbs) std::cout << "connected to the server.." << endl;   
+        if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
+            std::cout << "connection with the server failed...\n"; 
+            exit(0); 
+        } 
+        else 
+            if(vrbs) std::cout << "connected to the server.." << endl;   
 
         uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
         double* x = new double[outSz]; //harvested data
         ssize_t nr = write(sockfd, x, outSz);
-	    close(sockfd);
-	} 
+        close(sockfd);
+    } 
 }
