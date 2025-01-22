@@ -271,9 +271,9 @@ int main (int argc, char *argv[])
 	    else 
 	        if(vrbs) std::cout << "connected to the server.." << endl;   
 
-            uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
-            double* x = new double[outSz]; //harvested data
-            write(sockfd, x, outSz);
+        uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
+        double* x = new double[outSz]; //harvested data
+        ssize_t nr = write(sockfd, x, outSz);
 	    close(sockfd);
 	} 
 }
