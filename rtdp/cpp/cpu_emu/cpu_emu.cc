@@ -27,9 +27,9 @@ void alarmHandler(int signum) {
 
 using namespace std;
 
-#define MAX (64*1024)
+#define MAX (64*1024)	// buffer size seems arbitrary - what's a good value ?
 #define SA struct sockaddr
-#define DBG 0
+#define DBG 0	//print extra verbosity apart from -v switch
   
 void   Usage()
 {
@@ -211,7 +211,7 @@ int main (int argc, char *argv[])
         if(vrbs) std::cout << "server accept the client..." << endl; 
   
     // Read in event data 
-    char buff[MAX]; // buffer size is arbitrary - what's a good value ?
+    char buff[MAX];
     ssize_t nmrd = 0;
     ssize_t nmrd0 = 0;
     // loop for input event 
