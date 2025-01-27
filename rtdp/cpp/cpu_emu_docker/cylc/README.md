@@ -31,66 +31,76 @@ After installation, Cylc creates the following directory structure:
 │   │   ├── output/           # Shared output directory
 │   │   ├── input/            # Shared input directory
 │   │   └── logs/             # Shared logs directory
+│   │       ├── receiver/     # Task-specific logs
+│   │       ├── emulator/
+│   │       └── sender/
 │   └── log/                   # Cylc log directory
 │       └── job/              # Job logs
 └── share/                     # Workflow share directory (persists between runs)
 ```
 
-### Important Environment Variables
+## Task Communication and Dependencies
 
-- `CYLC_WORKFLOW_RUN_DIR`: Base directory for the workflow (`~/cylc-run/cpu-emu/`)
-- `CYLC_WORKFLOW_WORK_DIR`: Working directory for tasks (`~/cylc-run/cpu-emu/runN/work/`)
-- `CYLC_WORKFLOW_SHARE_DIR`: Shared directory for all tasks (`~/cylc-run/cpu-emu/runN/share/`)
+The workflow uses Cylc's message system for task coordination:
 
-The shared directory (`CYLC_WORKFLOW_SHARE_DIR`) is used to:
-- Store output files accessible by all tasks
-- Share information between tasks (hostname, IP addresses)
-- Store log files from all components
-- Maintain consistent data across workflow runs
+1. **Receiver Task**:
+   - Starts and initializes the receiver process
+   - Sends "ready" message when process is running
+   - Monitors received data by tracking file size changes
+   - Sends "completed" message when data is received
 
-## Prerequisites
+2. **Emulator Task**:
+   - Waits for receiver's "ready" message
+   - Starts the CPU emulator process
+   - Sends "ready" message when process is running
+   - Monitors memory usage throughout execution
 
-1. Access to JLab's ifarm cluster
-2. Cylc workflow engine installed (version 8 or higher)
-3. Apptainer installed for container execution
-4. Docker image of CPU emulator available (e.g., jlabtsai/rtdp-cpu_emu:latest)
+3. **Sender Task**:
+   - Waits for emulator's "ready" message
+   - Generates and sends test data
+   - Sends "succeeded" message on successful transfer
 
-## Platform Configuration
+## Task Outputs and Messages
 
-The workflow uses JLab's SLURM cluster. Configure your global Cylc settings in `~/.cylc/flow/global.cylc`:
-
-```
-[platforms]
-    [[jlab_slurm]]
-        cylc path = /path/to/your/cylc-env/bin/
-        hosts = tsai@ifarm2402
-        job runner = slurm
-        install target = localhost
-```
-
-## Configuration
-
-The workflow uses Cylc environment variables for configuration. Key settings in `flow.cylc`:
+Each task uses specific messages to coordinate with others:
 
 ```
-[runtime]
-    [[root]]
-        [[[environment]]]
-            # Network configuration
-            RECEIVER_PORT = "50080"
-            EMULATOR_PORT = "50888"
+[scheduling]
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready => emulator
+            emulator:ready => sender
             
-            # Emulator configuration
-            EMU_THREADS = "4"              # Number of processing threads
-            EMU_LATENCY = "50"            # Processing latency per GB
-            EMU_MEM_FOOTPRINT = "0.05"    # Memory footprint in GB
-            EMU_OUTPUT_SIZE = "0.001"     # Output size in GB
-            
-            # Test data configuration
-            TEST_DATA_SIZE = "100M"       # Size of test data to send
+            # Completion chain
+            sender:succeeded => !receiver
+            receiver:completed
+        """
 ```
 
-## Installation
+Message definitions:
+- `ready`: Indicates task is initialized and running
+- `completed`: Indicates data transfer completion
+- `succeeded`: Indicates successful operation
+
+## Monitoring and Logs
+
+Each task maintains detailed logs in `$CYLC_WORKFLOW_SHARE_DIR/logs/<task_name>/`:
+- `stdout.log`: Standard output with timestamped messages
+- `stderr.log`: Error messages and debugging information
+- `apptainer.log`: Container execution logs
+- `process.log`: Process status information
+- `memory.log`: Memory usage tracking (emulator only)
+
+## Data Transfer Monitoring
+
+The receiver task monitors data transfer by:
+1. Tracking changes in received data file size
+2. Detecting actual data reception
+3. Logging transfer progress and completion
+4. Maintaining process health checks
+
+## Installation and Usage
 
 1. Create necessary directories:
 ```bash
@@ -102,158 +112,65 @@ mkdir -p sifs etc/config scripts
 ./build.sh -i jlabtsai/rtdp-cpu_emu:latest
 ```
 
-3. Run the installation script:
+3. Install the workflow:
 ```bash
-chmod +x install.sh
 ./install.sh
 ```
 
-Note: The installation script will:
-- Create required directories
-- Install the workflow using `cylc install`
-- Validate the workflow
-
-The workflow will be installed to `~/cylc-run/cpu-emu/`.
-
-## Running the Workflow
-
-1. Validate the workflow:
+4. Run the workflow:
 ```bash
-cylc validate .
-```
-
-2. Start the workflow:
-```bash
-# First time after installation:
-cylc install  # If not already installed
 cylc play cpu-emu
 ```
 
-## Workflow Tasks and Dependencies
+## Monitoring Workflow Progress
 
-The workflow follows this dependency chain:
-```
-receiver:ready => emulator => emulator:ready => sender
-```
-
-1. **receiver**: 
-   - Starts netcat listener
-   - Records hostname/IP
-   - Monitors port availability
-   - Signals readiness with `receiver:ready` message
-
-2. **emulator**:
-   - Waits for `receiver:ready` message
-   - Records hostname/IP
-   - Starts CPU emulator
-   - Monitors memory usage
-   - Signals readiness with `emulator:ready` message
-
-3. **sender**:
-   - Waits for `emulator:ready` message
-   - Generates test data
-   - Sends data through system
-   - Cleans up temporary files
-
-## Shared Resources
-
-The workflow uses `$CYLC_WORKFLOW_SHARE_DIR` to share information between tasks:
-- `receiver_hostname`: Written by receiver, read by emulator
-- `receiver_ip`: Written by receiver, read by emulator
-- `emulator_hostname`: Written by emulator, read by sender
-- `emulator_ip`: Written by emulator, read by sender
-
-## Task Resources
-
-### Receiver Task
-- CPUs: 4
-- Memory: 8GB
-- Output: `received_data.bin`
-
-### Emulator Task
-- CPUs: 4
-- Memory: 16GB
-- Output: Memory monitoring logs
-- Binds: `output` directory
-
-### Sender Task
-- CPUs: 4
-- Memory: 8GB
-- Input: Generated random data
-- Binds: `input` directory
-
-## Output and Data
-
-- Task logs: `log/job/`
-- Performance data: `work/1/`
-- Received data: `output/received_data.bin`
-- Memory logs: `output/memory_monitor.log`
-
-## Monitoring
-
-1. Terminal UI:
+1. View workflow status:
 ```bash
-cylc tui
+cylc tui cpu-emu
 ```
 
-2. Web UI:
+2. View task logs:
 ```bash
-cylc gui
-```
-
-3. View task logs:
-```bash
+# View specific task logs
 cylc cat-log cpu-emu//1/receiver
 cylc cat-log cpu-emu//1/emulator
 cylc cat-log cpu-emu//1/sender
+
+# View detailed logs in share directory
+ls -l ~/cylc-run/cpu-emu/runN/share/logs/
 ```
+
+## Troubleshooting
+
+1. **Task Communication Issues**:
+   - Check task logs for message sending/receiving
+   - Verify message formats match output definitions
+   - Check Cylc workflow log for message reception
+
+2. **Data Transfer Issues**:
+   - Check receiver's file size monitoring logs
+   - Verify network connectivity between nodes
+   - Check apptainer.log for container errors
+
+3. **Process Health**:
+   - Monitor process status in process.log
+   - Check memory usage in memory.log
+   - Verify port availability and connections
 
 ## Cleanup
 
-To clean up jobs and data:
+To clean up the workflow and data:
 ```bash
 ./cleanup.sh
 ```
 
 This will:
-- Cancel any running jobs
-- Remove log files
-- Clean up input/output data
-- Remove temporary files
+- Stop running workflows
+- Cancel SLURM jobs
+- Remove log files and data
+- Clean up Cylc installation
 
-## Troubleshooting
-
-1. Task Failures:
-   - Check logs: `cylc cat-log cpu-emu//1/task_name`
-   - Verify network connectivity
-   - Check memory usage in `memory_monitor.log`
-
-2. Common Issues:
-   - Port conflicts: Change ports in flow.cylc
-   - Memory issues: Adjust EMU_MEM_FOOTPRINT
-   - Network issues: Check hostname resolution
-
-3. Debug Commands:
-```bash
-# Check task status
-cylc show cpu-emu
-
-# View job logs
-cylc cat-log cpu-emu//1/receiver
-cylc cat-log cpu-emu//1/emulator
-cylc cat-log cpu-emu//1/sender
-
-# Check network connectivity
-netstat -tuln | grep -E "50080|50888"
-```
-
-## Support
-
-- Workflow issues: Check Cylc documentation
-- CPU emulator issues: Check Docker image documentation
-- JLab specific: Contact facility support
-
-## References
+## Support and References
 
 - [Cylc Documentation](https://cylc.github.io/)
 - [CPU Emulator Documentation](../README.md)
