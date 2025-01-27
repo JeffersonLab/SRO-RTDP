@@ -8,10 +8,13 @@
 
     [[graph]]
         R1 = """
+            # Start chain
             receiver:ready => emulator
             emulator:ready => sender
-            sender:succeeded => receiver:done
-            receiver:completed => !receiver
+            
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
+            receiver:completed
         """
 
 [runtime]
@@ -167,7 +170,6 @@
         [[[outputs]]]
             ready = "receiver:ready"
             completed = "Transfer completed successfully"
-            done = "sender:succeeded"
 
     [[emulator]]
         script = """
