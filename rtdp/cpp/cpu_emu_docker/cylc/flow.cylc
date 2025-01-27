@@ -91,38 +91,8 @@
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
             
-            # Wait for port to be ready with better error handling
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port ${RECEIVER_PORT} to be ready"
-            COUNTER=0
-            while true; do
-                # Check if process is still running
-                if ! kill -0 $RECV_PID 2>/dev/null; then
-                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process died unexpectedly" >&2
-                    echo "Apptainer log:" >&2
-                    cat ${LOG_DIR}/receiver/apptainer.log >&2
-                    exit 1
-                fi
-                
-                # Check if port is open
-                if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
-                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${RECEIVER_PORT} is now ready"
-                    break
-                fi
-                
-                ((COUNTER++))
-                if [ $COUNTER -ge 10 ]; then  # Reduced timeout to 10 seconds
-                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${RECEIVER_PORT} not ready after ${COUNTER} seconds"
-                    # Don't exit, just continue if process is still running
-                    break
-                fi
-                
-                sleep 1
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port... ($COUNTER/10)"
-            done
-            
-            # Show network status regardless of port check
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Current network status:"
-            netstat -tuln | grep -E ":(${RECEIVER_PORT}|${EMULATOR_PORT})" || true
+            # Brief pause to let process start
+            sleep 2
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
@@ -131,6 +101,7 @@
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
             
