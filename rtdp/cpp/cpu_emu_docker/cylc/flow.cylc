@@ -98,11 +98,8 @@
             if kill -0 $RECV_PID 2>/dev/null; then
                 # Make sure to output the exact message that matches the output pattern
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
-                cylc message "receiver:ready"
+                cylc message "ready"
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
-                
-                # Echo the message to stdout as well
-                echo "receiver:ready"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
                 cat ${LOG_DIR}/receiver/apptainer.log >&2
@@ -168,7 +165,7 @@
             --mem = 8G
         
         [[[outputs]]]
-            ready = "receiver:ready"
+            ready = "ready"
             completed = "Transfer completed successfully"
 
     [[emulator]]
@@ -213,8 +210,8 @@
             
             # Signal readiness if process is running
             if kill -0 $EMU_PID 2>/dev/null; then
-                cylc message -- "emulator:ready"
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process not running" >&2
                 cat ${LOG_DIR}/emulator/apptainer.log >&2
@@ -242,7 +239,7 @@
             --mem = 16G
         
         [[[outputs]]]
-            ready = "emulator:ready"
+            ready = "ready"
 
     [[sender]]
         script = """
