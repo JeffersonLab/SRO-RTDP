@@ -10,7 +10,7 @@
         R1 = """
             receiver:ready => emulator
             emulator:ready => sender
-            sender:succeeded => receiver:finish
+            sender:succeeded => receiver:done
             receiver:completed => !receiver
         """
 
@@ -167,7 +167,7 @@
         [[[outputs]]]
             ready = "receiver:ready"
             completed = "Transfer completed successfully"
-            finish = "sender:succeeded"
+            done = "sender:succeeded"
 
     [[emulator]]
         script = """
