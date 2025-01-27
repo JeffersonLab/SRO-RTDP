@@ -91,40 +91,48 @@
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
             
-            ## Wait for port to be ready
-            #echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port ${RECEIVER_PORT} to be ready"
-            #COUNTER=0
-            #while ! netstat -tuln | grep -q ":${RECEIVER_PORT}"; do
-            #    sleep 1
-            #    ((COUNTER++))
-            #    if [ $COUNTER -ge 30 ]; then
-            #        echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver failed to start" >&2
-            #        echo "Last few lines of apptainer log:" >&2
-            #        tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
-            #        echo "Process status:" >&2
-            #        ps -fp $RECV_PID >&2 || true
-            #        echo "Network status:" >&2
-            #        netstat -tuln >&2
-            #        kill $RECV_PID 2>/dev/null || true
-            #        exit 1
-            #    fi
-            #    if ! kill -0 $RECV_PID 2>/dev/null; then
-            #        echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process died" >&2
-            #        echo "Last few lines of apptainer log:" >&2
-            #        tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
-            #        exit 1
-            #    fi
-            #    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting... ($COUNTER/30)"
-            #done
-            #
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${RECEIVER_PORT} is ready"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Network status:"
-            netstat -tuln | grep ":${RECEIVER_PORT}" || true
+            # Wait for port to be ready with better error handling
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port ${RECEIVER_PORT} to be ready"
+            COUNTER=0
+            while true; do
+                # Check if process is still running
+                if ! kill -0 $RECV_PID 2>/dev/null; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process died unexpectedly" >&2
+                    echo "Apptainer log:" >&2
+                    cat ${LOG_DIR}/receiver/apptainer.log >&2
+                    exit 1
+                fi
+                
+                # Check if port is open
+                if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${RECEIVER_PORT} is now ready"
+                    break
+                fi
+                
+                ((COUNTER++))
+                if [ $COUNTER -ge 10 ]; then  # Reduced timeout to 10 seconds
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Port ${RECEIVER_PORT} not ready after ${COUNTER} seconds"
+                    # Don't exit, just continue if process is still running
+                    break
+                fi
+                
+                sleep 1
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for port... ($COUNTER/10)"
+            done
             
-            # Signal readiness
-            echo "receiver:ready"
-            cylc message -- "receiver:ready"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
+            # Show network status regardless of port check
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Current network status:"
+            netstat -tuln | grep -E ":(${RECEIVER_PORT}|${EMULATOR_PORT})" || true
+            
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "receiver:ready"
+                cylc message -- "receiver:ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                exit 1
+            fi
             
             # Create a flag file to indicate we should keep running
             KEEP_RUNNING=1
