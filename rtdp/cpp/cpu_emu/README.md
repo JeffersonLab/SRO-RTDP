@@ -20,16 +20,16 @@ e.g.,
 
 ## cpu_emu Usage: 
 
-        -h help  \n\
-        -b seconds thread latency per GB input \n\
-        -i destination address (string)  \n\
-        -m thread memory footprint in GB  \n\
-        -o output size in GB  \n\
-        -p destination port (default = 8888)  \n\
-        -r receive port (default = 8888)  \n\
-        -s sleep versus burn cpu  \n\
-        -t num threads (default = 10)  \n\
-        -v verbose (= 0/1 - default = false (0))  \n\n";
+        -h help
+        -b seconds thread latency per GB input
+        -i destination address (string)
+        -m thread memory footprint in GB
+        -o output size in GB
+        -p destination port (default = 8888)
+        -r receive port (default = 8888)
+        -s sleep versus burn cpu
+        -t num threads (default = 10)
+        -v verbose (= 0/1 - default = false (0))
 
         Required: -b -i -m -o -t
 
