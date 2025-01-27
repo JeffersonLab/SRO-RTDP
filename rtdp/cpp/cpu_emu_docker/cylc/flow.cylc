@@ -96,9 +96,13 @@
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
+                # Make sure to output the exact message that matches the output pattern
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "receiver:ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+                
+                # Echo the message to stdout as well
                 echo "receiver:ready"
-                cylc message -- "receiver:ready"
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sent ready message"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
                 cat ${LOG_DIR}/receiver/apptainer.log >&2
