@@ -1,0 +1,42 @@
+# Configuration for iperf3 Testing Workflow
+---
+workflow:
+  name: "iperf-test"
+  description: "Cylc-based iperf3 Testing Workflow"
+
+platform:
+  name: "jlab_slurm"
+  cylc_path: "/path/to/your/cylc-env/bin/"
+  hosts: "tsai@ifarm2402"
+  job_runner: "slurm"
+
+resources:
+  default:
+    ntasks: 1
+    cpus_per_task: 4
+    mem: "8G"
+    partition: "ifarm"
+    timeout: "2h"
+
+network:
+  process_exporter_port: 32801
+  app_port: 32901
+  prometheus_port: 32900
+
+paths:
+  iperf3:
+    binary: "/path/to/iperf3"
+    lib: "/path/to/iperf3/lib"
+  
+containers:
+  process_exporter:
+    image: "process-exporter.sif"
+    config: "process-exporter-config.yml"
+  prometheus:
+    image: "prom.sif"
+    config: "prometheus-config.yml"
+
+monitoring:
+  scrape_interval: "15s"
+  external_labels:
+    monitor: "ifarm-prom-monitor" 
