@@ -52,6 +52,7 @@ Any of the <yaml_file> settigs may be overidden at the commamnd line via the fol
         -r receive port (default = 8888)
         -s sleep versus burn cpu
         -t num threads (default = 10)
+        -y <yaml_file>
         -v verbose (= 0/1 - default = false (0))
 
 
