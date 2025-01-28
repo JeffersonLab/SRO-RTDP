@@ -112,351 +112,52 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    let network = null;
-    let components = {};
-    let connections = [];
-    let componentModal = null;
+<!-- Load dependencies first -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-    const defaultConfigs = {
-        sender: {
-            ntasks: 1,
-            cpus_per_task: 4,
-            mem: '8G',
-            partition: 'ifarm',
-            timeout: '2h'
-        },
-        receiver: {
-            ntasks: 1,
-            cpus_per_task: 4,
-            mem: '8G',
-            partition: 'ifarm',
-            timeout: '2h'
-        },
-        emulator: {
-            ntasks: 1,
-            cpus_per_task: 4,
-            mem: '16G',
-            partition: 'ifarm',
-            timeout: '2h',
-            threads: 4,
-            latency: 50,
-            mem_footprint: 0.05,
-            output_size: 0.001
+<!-- Load vis-network from multiple CDN sources for redundancy -->
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script>
+    // If the first CDN fails, try loading from another source
+    if (typeof vis === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/standalone/umd/vis-network.min.js';
+        script.onload = function () {
+            initWorkflowGraph();
+        };
+        script.onerror = function () {
+            console.error('Failed to load vis-network from both CDN sources');
+            alert('Failed to load required libraries. Please check your internet connection and refresh the page.');
+        };
+        document.head.appendChild(script);
+    } else {
+        initWorkflowGraph();
+    }
+
+    function initWorkflowGraph() {
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGraph);
+        } else {
+            initGraph();
         }
-    };
+    }
 
     function initGraph() {
-        const container = document.getElementById('workflowGraph');
-        const options = {
-            physics: {
-                enabled: false
-            },
-            nodes: {
-                shape: 'box',
-                margin: 10,
-                font: {
-                    size: 14,
-                    face: 'arial',
-                    align: 'center'
-                },
-                borderWidth: 2,
-                shadow: true,
-                color: {
-                    border: '#2B7CE9',
-                    hover: {
-                        background: '#D2E5FF',
-                        border: '#2B7CE9'
-                    }
-                }
-            },
-            edges: {
-                arrows: 'to',
-                smooth: {
-                    enabled: true,
-                    type: 'cubicBezier',
-                    roundness: 0.5
-                },
-                color: {
-                    color: '#848484',
-                    hover: '#848484',
-                    highlight: '#848484'
-                }
-            },
-            interaction: {
-                dragNodes: true,
-                dragView: true,
-                zoomView: true,
-                hover: true
-            },
-            manipulation: {
-                enabled: true,
-                addNode: false,
-                addEdge: function (edgeData, callback) {
-                    if (validateConnection(edgeData.from, edgeData.to)) {
-                        addConnection(edgeData.from, edgeData.to);
-                        callback(edgeData);
-                    }
-                },
-                deleteNode: function (nodeData, callback) {
-                    removeComponent(nodeData.nodes[0]);
-                    callback(nodeData);
-                },
-                deleteEdge: function (edgeData, callback) {
-                    removeConnection(edgeData.edges[0]);
-                    callback(edgeData);
-                }
+        try {
+            if (typeof vis === 'undefined') {
+                throw new Error('vis-network library not loaded');
             }
-        };
-
-        network = new vis.Network(container, { nodes: [], edges: [] }, options);
-
-        network.on('doubleClick', function (params) {
-            if (params.nodes.length > 0) {
-                openComponentConfig(params.nodes[0]);
-            }
-        });
-
-        setupDragAndDrop();
-    }
-
-    function setupDragAndDrop() {
-        const paletteItems = document.querySelectorAll('.palette-item');
-        const graphContainer = document.getElementById('workflowGraph');
-
-        paletteItems.forEach(item => {
-            item.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('application/json', JSON.stringify({
-                    type: item.dataset.type
-                }));
-            });
-        });
-
-        graphContainer.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        });
-
-        graphContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            try {
-                const data = JSON.parse(e.dataTransfer.getData('application/json'));
-                const type = data.type;
-
-                if (!type) {
-                    console.error('No component type found');
-                    return;
-                }
-
-                const rect = graphContainer.getBoundingClientRect();
-                const position = network.DOMtoCanvas({
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                });
-
-                const name = `${type}${Object.keys(components).length + 1}`;
-                const nodeData = {
-                    id: name,
-                    label: `${name}\n(${type})`,
-                    color: {
-                        background: type === 'sender' ? '#90EE90' :
-                            type === 'receiver' ? '#F08080' : '#ADD8E6'
-                    },
-                    x: position.x,
-                    y: position.y,
-                    physics: false
-                };
-
-                $.ajax({
-                    url: '/api/components',
-                    method: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({ name, type }),
-                    success: function () {
-                        components[name] = {
-                            type: type,
-                            config: { ...defaultConfigs[type] }
-                        };
-
-                        network.body.data.nodes.add([nodeData]);
-                        network.moveTo({
-                            position: { x: position.x, y: position.y },
-                            scale: 1.0
-                        });
-                        showMessage('Component added successfully', 'success');
-                    },
-                    error: function () {
-                        showMessage('Failed to add component', 'error');
-                    }
-                });
-            } catch (error) {
-                console.error('Error handling drop:', error);
-            }
-        });
-    }
-
-    function addConnection(source, target) {
-        $.ajax({
-            url: '/api/connections',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ source, target }),
-            success: function () {
-                connections.push([source, target]);
-                showMessage('Connection added successfully', 'success');
-            },
-            error: function () {
-                showMessage('Failed to add connection', 'error');
-            }
-        });
-    }
-
-    function removeComponent(name) {
-        $.ajax({
-            url: `/api/components/${name}`,
-            method: 'DELETE',
-            success: function () {
-                delete components[name];
-                connections = connections.filter(([src, dst]) => src !== name && dst !== name);
-                showMessage('Component removed successfully', 'success');
-            },
-            error: function () {
-                showMessage('Failed to remove component', 'error');
-            }
-        });
-    }
-
-    function removeConnection(edgeId) {
-        const connection = connections[edgeId];
-        if (!connection) return;
-
-        $.ajax({
-            url: '/api/connections',
-            method: 'DELETE',
-            contentType: 'application/json',
-            data: JSON.stringify({
-                source: connection[0],
-                target: connection[1]
-            }),
-            success: function () {
-                connections.splice(edgeId, 1);
-                showMessage('Connection removed successfully', 'success');
-            },
-            error: function () {
-                showMessage('Failed to remove connection', 'error');
-            }
-        });
-    }
-
-    function validateConnection(from, to) {
-        const fromType = components[from].type;
-        const toType = components[to].type;
-
-        // Sender can't receive connections
-        if (fromType === 'receiver' || toType === 'sender') {
-            showMessage('Invalid connection', 'error');
-            return false;
+            console.log('Initializing workflow graph...');
+            window.workflowGraph = new WorkflowGraph();
+            console.log('Workflow graph initialized successfully');
+        } catch (error) {
+            console.error('Error initializing workflow graph:', error);
+            alert('Error initializing the workflow editor. Please refresh the page and try again.');
         }
-
-        return true;
     }
-
-    function openComponentConfig(componentId) {
-        const component = components[componentId];
-        if (!component) return;
-
-        const modal = new bootstrap.Modal(document.getElementById('componentModal'));
-        const form = document.getElementById('componentFields');
-        document.getElementById('componentId').value = componentId;
-
-        // Generate form fields based on component type
-        let html = '';
-        const config = component.config || defaultConfigs[component.type];
-
-        for (const [key, value] of Object.entries(config)) {
-            html += `
-                <div class="mb-3">
-                    <label class="form-label">${key}</label>
-                    <input type="${typeof value === 'number' ? 'number' : 'text'}" 
-                           class="form-control" 
-                           name="${key}" 
-                           value="${value}"
-                           ${typeof value === 'number' ? 'step="any"' : ''}>
-                </div>
-            `;
-        }
-
-        form.innerHTML = html;
-        modal.show();
-    }
-
-    function saveComponentConfig() {
-        const componentId = document.getElementById('componentId').value;
-        const form = document.getElementById('componentForm');
-        const formData = new FormData(form);
-        const config = {};
-
-        formData.forEach((value, key) => {
-            if (key !== 'componentId') {
-                config[key] = !isNaN(value) && value !== '' ? Number(value) : value;
-            }
-        });
-
-        $.ajax({
-            url: `/api/component-config/${componentId}`,
-            method: 'PUT',
-            contentType: 'application/json',
-            data: JSON.stringify(config),
-            success: function () {
-                components[componentId].config = config;
-                bootstrap.Modal.getInstance(document.getElementById('componentModal')).hide();
-                showMessage('Configuration saved successfully', 'success');
-            },
-            error: function () {
-                showMessage('Failed to save configuration', 'error');
-            }
-        });
-    }
-
-    function showMessage(message, type) {
-        const messagesDiv = document.getElementById('messages');
-        messagesDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
-        setTimeout(() => {
-            messagesDiv.innerHTML = '';
-        }, 3000);
-    }
-
-    function generateConfig() {
-        $.ajax({
-            url: '/api/validate',
-            method: 'GET',
-            success: function (response) {
-                if (response.valid) {
-                    $.ajax({
-                        url: '/api/generate-config',
-                        method: 'POST',
-                        success: function () {
-                            window.location.href = '/api/generate-config';
-                        },
-                        error: function () {
-                            showMessage('Failed to generate configuration', 'error');
-                        }
-                    });
-                } else {
-                    showMessage('Invalid workflow configuration. Please check components and connections.', 'error');
-                }
-            },
-            error: function () {
-                showMessage('Failed to validate workflow', 'error');
-            }
-        });
-    }
-
-    // Initialize when the page loads
-    document.addEventListener('DOMContentLoaded', function () {
-        initGraph();
-    });
 </script>
+
+<!-- Load our application code -->
+<script src="{{ url_for('static', filename='js/workflow.js') }}"></script>
 {% endblock %}
