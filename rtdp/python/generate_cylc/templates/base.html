@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cylc Workflow Generator</title>
     {{ bootstrap.load_css() }}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css"
+        rel="stylesheet">
     <style>
         .form-section {
             margin-bottom: 2rem;
@@ -20,12 +22,72 @@
 
         .workflow-graph {
             margin: 2rem 0;
-            text-align: center;
+            height: 600px;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            background-color: #f8f9fa;
         }
 
-        .workflow-graph svg {
-            max-width: 100%;
-            height: auto;
+        .component-palette {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .palette-item {
+            cursor: move;
+            padding: 0.5rem;
+            border: 1px dashed #dee2e6;
+            border-radius: 0.25rem;
+            background-color: white;
+        }
+
+        .palette-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .node {
+            padding: 0.5rem;
+            text-align: center;
+            border-radius: 0.25rem;
+            font-weight: bold;
+        }
+
+        .node.sender {
+            background-color: #90EE90;
+        }
+
+        .node.emulator {
+            background-color: #ADD8E6;
+        }
+
+        .node.receiver {
+            background-color: #F08080;
+        }
+
+        .error-message {
+            color: #dc3545;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            background-color: #f8d7da;
+        }
+
+        .success-message {
+            color: #198754;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            background-color: #d1e7dd;
+        }
+
+        .modal-dialog {
+            max-width: 600px;
+        }
+
+        .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
         }
     </style>
 </head>
@@ -42,6 +104,9 @@
     </div>
 
     {{ bootstrap.load_js() }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    {% block scripts %}{% endblock %}
 </body>
 
 </html>
