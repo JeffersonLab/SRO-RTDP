@@ -178,4 +178,85 @@ For issues or feature requests:
 
 - [Cylc Documentation](https://cylc.github.io/)
 - [YAML Specification](https://yaml.org/spec/)
-- [JLab Computing](https://scicomp.jlab.org/) 
+- [JLab Computing](https://scicomp.jlab.org/)
+
+## Development Setup
+
+### Using VS Code Dev Containers
+
+1. Install Prerequisites:
+   - [Docker](https://www.docker.com/get-started)
+   - [VS Code](https://code.visualstudio.com/)
+   - [Remote - Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+
+2. Open in Dev Container:
+   ```bash
+   code /path/to/rtdp/python/generate_cylc
+   ```
+   - When prompted, click "Reopen in Container"
+   - VS Code will build the dev container and install all dependencies
+
+3. Development Features:
+   - Python 3.10 environment
+   - PyQt6 with X11 forwarding for GUI
+   - Code formatting (black)
+   - Linting (flake8)
+   - Type checking (mypy)
+   - Git integration
+   - Auto-documentation
+
+### Manual Setup
+
+1. Create virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # or
+   .\venv\Scripts\activate  # Windows
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Install system dependencies for PyQt6:
+   ```bash
+   # Ubuntu/Debian
+   sudo apt-get install qt6-base-dev libgl1-mesa-dev
+
+   # Fedora
+   sudo dnf install qt6-qtbase-devel mesa-libGL-devel
+
+   # macOS
+   brew install qt6
+   ```
+
+4. Run the application:
+   ```bash
+   python generate_gui.py
+   ```
+
+### Running Tests
+
+```bash
+pytest
+```
+
+### Code Style
+
+This project uses:
+- black for code formatting
+- flake8 for code linting
+- mypy for type checking
+
+To format code:
+```bash
+black .
+```
+
+To run linting:
+```bash
+flake8 .
+mypy .
+``` 
