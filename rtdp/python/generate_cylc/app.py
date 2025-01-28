@@ -4,7 +4,7 @@ from components import WorkflowManager
 import os
 from graph_generator import generate_workflow_graph, validate_workflow
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = os.environ.get(
     'SECRET_KEY', 'dev-key-please-change')
 bootstrap = Bootstrap5(app)
