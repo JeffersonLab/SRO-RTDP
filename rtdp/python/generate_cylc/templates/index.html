@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2>CPU Emulator Workflow Configuration</h2>
+
+        <div class="workflow-graph">
+            <img src="{{ url_for('static', filename='workflow_graph.png') }}" alt="Workflow Graph">
+        </div>
+
+        <form method="POST" class="mt-4">
+            {{ form.csrf_token }}
+
+            <div class="form-section">
+                <h3>Workflow Settings</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.workflow_name.label(class="form-label") }}
+                        {{ form.workflow_name(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.workflow_description.label(class="form-label") }}
+                        {{ form.workflow_description(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Platform Settings</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.platform_name.label(class="form-label") }}
+                        {{ form.platform_name(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.cylc_path.label(class="form-label") }}
+                        {{ form.cylc_path(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        {{ form.hosts.label(class="form-label") }}
+                        {{ form.hosts(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.job_runner.label(class="form-label") }}
+                        {{ form.job_runner(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Receiver Settings</h3>
+                <div class="row">
+                    <div class="col-md-4">
+                        {{ form.receiver_ntasks.label(class="form-label") }}
+                        {{ form.receiver_ntasks(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.receiver_cpus.label(class="form-label") }}
+                        {{ form.receiver_cpus(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.receiver_mem.label(class="form-label") }}
+                        {{ form.receiver_mem(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        {{ form.receiver_partition.label(class="form-label") }}
+                        {{ form.receiver_partition(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.receiver_timeout.label(class="form-label") }}
+                        {{ form.receiver_timeout(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Emulator Settings</h3>
+                <div class="row">
+                    <div class="col-md-3">
+                        {{ form.emulator_ntasks.label(class="form-label") }}
+                        {{ form.emulator_ntasks(class="form-control") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.emulator_cpus.label(class="form-label") }}
+                        {{ form.emulator_cpus(class="form-control") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.emulator_mem.label(class="form-label") }}
+                        {{ form.emulator_mem(class="form-control") }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form.emulator_threads.label(class="form-label") }}
+                        {{ form.emulator_threads(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        {{ form.emulator_partition.label(class="form-label") }}
+                        {{ form.emulator_partition(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.emulator_timeout.label(class="form-label") }}
+                        {{ form.emulator_timeout(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.emulator_latency.label(class="form-label") }}
+                        {{ form.emulator_latency(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        {{ form.emulator_mem_footprint.label(class="form-label") }}
+                        {{ form.emulator_mem_footprint(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.emulator_output_size.label(class="form-label") }}
+                        {{ form.emulator_output_size(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Sender Settings</h3>
+                <div class="row">
+                    <div class="col-md-4">
+                        {{ form.sender_ntasks.label(class="form-label") }}
+                        {{ form.sender_ntasks(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.sender_cpus.label(class="form-label") }}
+                        {{ form.sender_cpus(class="form-control") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.sender_mem.label(class="form-label") }}
+                        {{ form.sender_mem(class="form-control") }}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        {{ form.sender_partition.label(class="form-label") }}
+                        {{ form.sender_partition(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.sender_timeout.label(class="form-label") }}
+                        {{ form.sender_timeout(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Network Settings</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.receiver_port.label(class="form-label") }}
+                        {{ form.receiver_port(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.emulator_port.label(class="form-label") }}
+                        {{ form.emulator_port(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Test Data Settings</h3>
+                <div class="row">
+                    <div class="col-md-12">
+                        {{ form.test_data_size.label(class="form-label") }}
+                        {{ form.test_data_size(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Container Settings</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.container_image.label(class="form-label") }}
+                        {{ form.container_image(class="form-control") }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.docker_source.label(class="form-label") }}
+                        {{ form.docker_source(class="form-control") }}
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
