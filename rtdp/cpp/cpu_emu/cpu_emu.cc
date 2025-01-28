@@ -17,6 +17,10 @@
 #include <csignal>
 #include <sys/time.h>
 #include <algorithm>    // std::min
+#include <string>
+#include <yaml.h>
+#include <stack>
+#include <map>
 
 
 volatile bool timeoutExpired = false;
@@ -29,7 +33,7 @@ using namespace std;
 
 #define MAX (64*1024)	// buffer size seems arbitrary - what's a good value ?
 #define SA struct sockaddr
-#define DBG 0	//print extra verbosity apart from -v switch
+#define DBG 1	//print extra verbosity apart from -v switch
   
 void   Usage()
 {
@@ -44,10 +48,10 @@ void   Usage()
         -r receive port (default = 8888)  \n\
         -s sleep versus burn cpu  \n\
         -t num threads (default = 10)  \n\
+        -y yaml config file  \n\
         -v verbose (= 0/1 - default = false (0))  \n\n";
 
     std::cout <<  usage_str;
-    std::cout <<  "Required: -b -i -m -o -t \n\n";
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
@@ -88,24 +92,110 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
     }
 
     if(vrbs) std::cout << "Threading Done" << endl;
-} 
+}
+
+map<string,string> mymap;
+
+void parse_yaml(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open file");
+        return;
+    }
+
+    yaml_parser_t parser;
+    yaml_event_t event;
+
+    if (!yaml_parser_initialize(&parser)) {
+        fprintf(stderr, "Failed to initialize parser!\n");
+        fclose(file);
+        return;
+    }
+
+    yaml_parser_set_input_file(&parser, file);
+    stack<string> lbl_stk;
+    string s, s1;
+
+    vector<string> lbls;
+    lbls.push_back("destination"); lbls.push_back("dst_port"); lbls.push_back("rcv_port");
+    lbls.push_back("sleep"); lbls.push_back("threads"); lbls.push_back("latency");
+    lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
+    auto it = lbls.begin(); //a hack to get the type
+
+    while (yaml_parser_parse(&parser, &event)) {
+        switch (event.type) {
+        case YAML_NO_EVENT:
+            break;
+        case YAML_STREAM_START_EVENT:
+            if(DBG) printf("Stream started\n");
+            break;
+        case YAML_STREAM_END_EVENT:
+            if(DBG) printf("Stream ended\n");
+            break;
+        case YAML_DOCUMENT_START_EVENT:
+            if(DBG) printf("Document started\n");
+            break;
+        case YAML_DOCUMENT_END_EVENT:
+            if(DBG) printf("Document ended\n");
+            break;
+        case YAML_MAPPING_START_EVENT:
+            if(DBG) printf("Mapping started\n");
+            break;
+        case YAML_MAPPING_END_EVENT:
+            if(DBG) printf("Mapping ended\n");
+            break;
+        case YAML_SEQUENCE_START_EVENT:
+            if(DBG) printf("Sequence started\n");
+            break;
+        case YAML_SEQUENCE_END_EVENT:
+            if(DBG) printf("Sequence ended\n");
+            break;
+        case YAML_SCALAR_EVENT:
+            s = (const char*)event.data.scalar.value;
+            it = std::find(lbls.begin(), lbls.end(), s);
+            if (it != lbls.end()) {
+                if(DBG) cout << "Label: " << s << '\n';
+                lbl_stk.push(s);
+            } else {
+                s1 = lbl_stk.top();
+                if(DBG) cout << "Label: " << s1 << " Datum: " << s << '\n';
+                mymap[s1] = s;
+                lbl_stk.pop();
+            }
+            break;
+        default:
+            if(DBG) cout << "(Default)" << endl;
+            break;
+        }
+
+        if(event.type == YAML_STREAM_END_EVENT) break;
+        yaml_event_delete(&event);
+    }
+    if(DBG) cout << "All done parsing, got this:" << endl;
+    if(DBG) for (std::map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
+        std::cout << it->first << " => " << it->second << '\n';
+    
+    yaml_parser_delete(&parser);
+    fclose(file);
+}
   
 int main (int argc, char *argv[])
 { 
     int optc;
 
-    bool     psdB=false, psdI=false, psdM=false, psdO=false;
+    bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
     bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
-    char     dst_ip[INET6_ADDRSTRLEN];	// target ip
+    string   yfn = "cpu_emu.yaml";
+    char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
     uint16_t rcv_prt = 8888; // receive port default
     uint16_t dst_prt = 8888; // target port default
-    auto     nmThrds = 10;   // default
+    auto     nmThrds = 5;   // default
     bool     vrbs = false;   // verbose ?
-    double   scs_GB  = 0;    // seconds/(input GB) thread latency
-    double   memGB   = 0;    // thread memory footprint in GB
-    double   otmemGB = 0;    // program putput in GB
+    double   scs_GB  = 100;    // seconds/(input GB) thread latency
+    double   memGB   = 10;    // thread memory footprint in GB
+    double   otmemGB = 0.01;    // program putput in GB
 
-    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:")) != -1)
+    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:y:")) != -1)
     {
         switch (optc)
         {
@@ -156,6 +246,11 @@ int main (int argc, char *argv[])
             psdV = true;
             if(DBG) std::cout << " -v " << vrbs;
             break;
+        case 'y':
+            yfn = (const char *) optarg ;
+            psdY = true;
+            if(DBG) std::cout << " -y " << yfn;
+            break;
         case '?':
             std::cout << "Unrecognised option: " << optopt;
             Usage();
@@ -164,7 +259,27 @@ int main (int argc, char *argv[])
     }
 
     if(DBG) std::cout << endl;
-    if(!(psdB && psdI && psdM && psdO && psdT)) { Usage(); exit(1); }
+
+    /////////parse the yaml file if given
+    /////////cmd line parms overide yaml file settings
+    if (psdY) {
+        parse_yaml(yfn.c_str());
+        if(!psdB) scs_GB = stof(mymap["latency"]);
+        if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
+        if(!psdM) memGB = stof(mymap["mem_footprint"]);
+        if(!psdO) otmemGB = stof(mymap["output_size"]);
+        if(!psdP) dst_prt = stoi(mymap["dst_port"]);
+        if(!psdR) rcv_prt = stoi(mymap["rcv_port"]);
+        if(!psdS) psdS = stoi(mymap["sleep"]) == 1;
+        if(!psdT) nmThrds = stoi(mymap["threads"]);
+        if(!psdV) vrbs = stoi(mymap["verbose"]);
+    }    
+    ////////
+    if(vrbs) cout << "Operating with scs_GB = " << scs_GB << "\tdst_ip = "
+                << dst_ip << "\tmemGB = " << memGB << "\totmemGB = "
+                << otmemGB << "\tdst_prt = " << dst_prt << "\trcv_prt = "
+                << rcv_prt << "\tsleep = " << psdS << "\tnmThrds = "
+                << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << yfn << '\n';
 
     int sockfd, connfd;
     socklen_t len;
