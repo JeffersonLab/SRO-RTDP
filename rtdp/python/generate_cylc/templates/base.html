@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cylc Workflow Generator</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     {{ bootstrap.load_css() }}
     <link href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css"
         rel="stylesheet">
@@ -14,6 +15,8 @@
             padding: 1rem;
             border: 1px solid #dee2e6;
             border-radius: 0.25rem;
+            background-color: white;
+            position: relative;
         }
 
         .form-section h3 {
@@ -25,25 +28,30 @@
             height: 600px;
             border: 1px solid #dee2e6;
             border-radius: 0.25rem;
-            background-color: #f8f9fa;
+            background-color: white;
+            position: relative;
+            z-index: 1;
         }
 
         .component-palette {
             display: flex;
             flex-direction: column;
             gap: 1rem;
+            z-index: 2;
+            position: relative;
         }
 
         .palette-item {
-            cursor: move;
+            cursor: grab;
             padding: 0.5rem;
             border: 1px dashed #dee2e6;
             border-radius: 0.25rem;
             background-color: white;
+            user-select: none;
         }
 
-        .palette-item:hover {
-            background-color: #f8f9fa;
+        .palette-item:active {
+            cursor: grabbing;
         }
 
         .node {
@@ -51,18 +59,22 @@
             text-align: center;
             border-radius: 0.25rem;
             font-weight: bold;
+            user-select: none;
         }
 
         .node.sender {
             background-color: #90EE90;
+            border: 2px solid #60c060;
         }
 
         .node.emulator {
             background-color: #ADD8E6;
+            border: 2px solid #7ab5cc;
         }
 
         .node.receiver {
             background-color: #F08080;
+            border: 2px solid #d05050;
         }
 
         .error-message {
@@ -88,6 +100,40 @@
         .modal-body {
             max-height: 70vh;
             overflow-y: auto;
+        }
+
+        #workflowGraph {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #dee2e6;
+            background-color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vis-network {
+            outline: none;
+            position: absolute !important;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            background-color: white;
+        }
+
+        /* Drop zone highlight */
+        #workflowGraph.drop-target {
+            border-color: #2196F3;
+            background-color: #E3F2FD;
+        }
+
+        /* Drag visual */
+        .dragging {
+            position: fixed;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.7;
+            transform: translate(-50%, -50%);
         }
     </style>
 </head>
