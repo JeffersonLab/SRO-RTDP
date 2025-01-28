@@ -5,195 +5,458 @@
     <div class="col-md-12">
         <h2>CPU Emulator Workflow Configuration</h2>
 
-        <div class="workflow-graph">
-            <img src="{{ url_for('static', filename='workflow_graph.png') }}" alt="Workflow Graph">
+        <div class="row">
+            <!-- Component Palette -->
+            <div class="col-md-2">
+                <div class="form-section">
+                    <h3>Components</h3>
+                    <div class="component-palette">
+                        <div class="palette-item" draggable="true" data-type="sender">
+                            <div class="node sender">Sender</div>
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="emulator">
+                            <div class="node emulator">CPU Emulator</div>
+                        </div>
+                        <div class="palette-item" draggable="true" data-type="receiver">
+                            <div class="node receiver">Receiver</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workflow Graph -->
+            <div class="col-md-10">
+                <div class="form-section">
+                    <h3>Workflow Graph</h3>
+                    <div id="workflowGraph" class="workflow-graph"></div>
+                </div>
+            </div>
         </div>
 
-        <form method="POST" class="mt-4">
-            {{ form.csrf_token }}
-
-            <div class="form-section">
-                <h3>Workflow Settings</h3>
-                <div class="row">
-                    <div class="col-md-6">
-                        {{ form.workflow_name.label(class="form-label") }}
-                        {{ form.workflow_name(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.workflow_description.label(class="form-label") }}
-                        {{ form.workflow_description(class="form-control") }}
-                    </div>
+        <div class="form-section">
+            <h3>Platform Settings</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Platform Name</label>
+                    <input type="text" id="platformName" class="form-control" value="jlab_slurm">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Cylc Path</label>
+                    <input type="text" id="cylcPath" class="form-control" value="/path/to/cylc-env/bin/">
                 </div>
             </div>
-
-            <div class="form-section">
-                <h3>Platform Settings</h3>
-                <div class="row">
-                    <div class="col-md-6">
-                        {{ form.platform_name.label(class="form-label") }}
-                        {{ form.platform_name(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.cylc_path.label(class="form-label") }}
-                        {{ form.cylc_path(class="form-control") }}
-                    </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label">Hosts</label>
+                    <input type="text" id="hosts" class="form-control" value="tsai@ifarm2402">
                 </div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        {{ form.hosts.label(class="form-label") }}
-                        {{ form.hosts(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.job_runner.label(class="form-label") }}
-                        {{ form.job_runner(class="form-control") }}
-                    </div>
+                <div class="col-md-6">
+                    <label class="form-label">Job Runner</label>
+                    <input type="text" id="jobRunner" class="form-control" value="slurm">
                 </div>
             </div>
+        </div>
 
-            <div class="form-section">
-                <h3>Receiver Settings</h3>
-                <div class="row">
-                    <div class="col-md-4">
-                        {{ form.receiver_ntasks.label(class="form-label") }}
-                        {{ form.receiver_ntasks(class="form-control") }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form.receiver_cpus.label(class="form-label") }}
-                        {{ form.receiver_cpus(class="form-control") }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form.receiver_mem.label(class="form-label") }}
-                        {{ form.receiver_mem(class="form-control") }}
-                    </div>
+        <div class="form-section">
+            <h3>Container Settings</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Container Image</label>
+                    <input type="text" id="containerImage" class="form-control" value="cpu-emu.sif">
                 </div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        {{ form.receiver_partition.label(class="form-label") }}
-                        {{ form.receiver_partition(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.receiver_timeout.label(class="form-label") }}
-                        {{ form.receiver_timeout(class="form-control") }}
-                    </div>
+                <div class="col-md-6">
+                    <label class="form-label">Docker Source</label>
+                    <input type="text" id="dockerSource" class="form-control" value="jlabtsai/rtdp-cpu_emu:latest">
                 </div>
             </div>
+        </div>
 
-            <div class="form-section">
-                <h3>Emulator Settings</h3>
-                <div class="row">
-                    <div class="col-md-3">
-                        {{ form.emulator_ntasks.label(class="form-label") }}
-                        {{ form.emulator_ntasks(class="form-control") }}
-                    </div>
-                    <div class="col-md-3">
-                        {{ form.emulator_cpus.label(class="form-label") }}
-                        {{ form.emulator_cpus(class="form-control") }}
-                    </div>
-                    <div class="col-md-3">
-                        {{ form.emulator_mem.label(class="form-label") }}
-                        {{ form.emulator_mem(class="form-control") }}
-                    </div>
-                    <div class="col-md-3">
-                        {{ form.emulator_threads.label(class="form-label") }}
-                        {{ form.emulator_threads(class="form-control") }}
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-md-4">
-                        {{ form.emulator_partition.label(class="form-label") }}
-                        {{ form.emulator_partition(class="form-control") }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form.emulator_timeout.label(class="form-label") }}
-                        {{ form.emulator_timeout(class="form-control") }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form.emulator_latency.label(class="form-label") }}
-                        {{ form.emulator_latency(class="form-control") }}
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        {{ form.emulator_mem_footprint.label(class="form-label") }}
-                        {{ form.emulator_mem_footprint(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.emulator_output_size.label(class="form-label") }}
-                        {{ form.emulator_output_size(class="form-control") }}
-                    </div>
+        <div class="form-section">
+            <h3>Test Data Settings</h3>
+            <div class="row">
+                <div class="col-md-12">
+                    <label class="form-label">Test Data Size</label>
+                    <input type="text" id="testDataSize" class="form-control" value="100M">
                 </div>
             </div>
+        </div>
 
-            <div class="form-section">
-                <h3>Sender Settings</h3>
-                <div class="row">
-                    <div class="col-md-4">
-                        {{ form.sender_ntasks.label(class="form-label") }}
-                        {{ form.sender_ntasks(class="form-control") }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form.sender_cpus.label(class="form-label") }}
-                        {{ form.sender_cpus(class="form-control") }}
-                    </div>
-                    <div class="col-md-4">
-                        {{ form.sender_mem.label(class="form-label") }}
-                        {{ form.sender_mem(class="form-control") }}
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-md-6">
-                        {{ form.sender_partition.label(class="form-label") }}
-                        {{ form.sender_partition(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.sender_timeout.label(class="form-label") }}
-                        {{ form.sender_timeout(class="form-control") }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h3>Network Settings</h3>
-                <div class="row">
-                    <div class="col-md-6">
-                        {{ form.receiver_port.label(class="form-label") }}
-                        {{ form.receiver_port(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.emulator_port.label(class="form-label") }}
-                        {{ form.emulator_port(class="form-control") }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h3>Test Data Settings</h3>
-                <div class="row">
-                    <div class="col-md-12">
-                        {{ form.test_data_size.label(class="form-label") }}
-                        {{ form.test_data_size(class="form-control") }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h3>Container Settings</h3>
-                <div class="row">
-                    <div class="col-md-6">
-                        {{ form.container_image.label(class="form-label") }}
-                        {{ form.container_image(class="form-control") }}
-                    </div>
-                    <div class="col-md-6">
-                        {{ form.docker_source.label(class="form-label") }}
-                        {{ form.docker_source(class="form-control") }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                {{ form.submit(class="btn btn-primary") }}
-            </div>
-        </form>
+        <div class="form-section">
+            <button class="btn btn-primary" onclick="generateConfig()">Generate Configuration</button>
+            <div id="messages"></div>
+        </div>
     </div>
 </div>
+
+<!-- Component Configuration Modal -->
+<div class="modal fade" id="componentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Component Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="componentForm">
+                    <input type="hidden" id="componentId">
+                    <div id="componentFields"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="saveComponentConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let network = null;
+    let components = {};
+    let connections = [];
+    let componentModal = null;
+
+    const defaultConfigs = {
+        sender: {
+            ntasks: 1,
+            cpus_per_task: 4,
+            mem: '8G',
+            partition: 'ifarm',
+            timeout: '2h'
+        },
+        receiver: {
+            ntasks: 1,
+            cpus_per_task: 4,
+            mem: '8G',
+            partition: 'ifarm',
+            timeout: '2h'
+        },
+        emulator: {
+            ntasks: 1,
+            cpus_per_task: 4,
+            mem: '16G',
+            partition: 'ifarm',
+            timeout: '2h',
+            threads: 4,
+            latency: 50,
+            mem_footprint: 0.05,
+            output_size: 0.001
+        }
+    };
+
+    function initGraph() {
+        const container = document.getElementById('workflowGraph');
+        const options = {
+            physics: {
+                enabled: false
+            },
+            nodes: {
+                shape: 'box',
+                margin: 10,
+                font: {
+                    size: 14,
+                    face: 'arial',
+                    align: 'center'
+                },
+                borderWidth: 2,
+                shadow: true,
+                color: {
+                    border: '#2B7CE9',
+                    hover: {
+                        background: '#D2E5FF',
+                        border: '#2B7CE9'
+                    }
+                }
+            },
+            edges: {
+                arrows: 'to',
+                smooth: {
+                    enabled: true,
+                    type: 'cubicBezier',
+                    roundness: 0.5
+                },
+                color: {
+                    color: '#848484',
+                    hover: '#848484',
+                    highlight: '#848484'
+                }
+            },
+            interaction: {
+                dragNodes: true,
+                dragView: true,
+                zoomView: true,
+                hover: true
+            },
+            manipulation: {
+                enabled: true,
+                addNode: false,
+                addEdge: function (edgeData, callback) {
+                    if (validateConnection(edgeData.from, edgeData.to)) {
+                        addConnection(edgeData.from, edgeData.to);
+                        callback(edgeData);
+                    }
+                },
+                deleteNode: function (nodeData, callback) {
+                    removeComponent(nodeData.nodes[0]);
+                    callback(nodeData);
+                },
+                deleteEdge: function (edgeData, callback) {
+                    removeConnection(edgeData.edges[0]);
+                    callback(edgeData);
+                }
+            }
+        };
+
+        network = new vis.Network(container, { nodes: [], edges: [] }, options);
+
+        network.on('doubleClick', function (params) {
+            if (params.nodes.length > 0) {
+                openComponentConfig(params.nodes[0]);
+            }
+        });
+
+        setupDragAndDrop();
+    }
+
+    function setupDragAndDrop() {
+        const paletteItems = document.querySelectorAll('.palette-item');
+        const graphContainer = document.getElementById('workflowGraph');
+
+        paletteItems.forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('application/json', JSON.stringify({
+                    type: item.dataset.type
+                }));
+            });
+        });
+
+        graphContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        graphContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                const type = data.type;
+
+                if (!type) {
+                    console.error('No component type found');
+                    return;
+                }
+
+                const rect = graphContainer.getBoundingClientRect();
+                const position = network.DOMtoCanvas({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                });
+
+                const name = `${type}${Object.keys(components).length + 1}`;
+                const nodeData = {
+                    id: name,
+                    label: `${name}\n(${type})`,
+                    color: {
+                        background: type === 'sender' ? '#90EE90' :
+                            type === 'receiver' ? '#F08080' : '#ADD8E6'
+                    },
+                    x: position.x,
+                    y: position.y,
+                    physics: false
+                };
+
+                $.ajax({
+                    url: '/api/components',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ name, type }),
+                    success: function () {
+                        components[name] = {
+                            type: type,
+                            config: { ...defaultConfigs[type] }
+                        };
+
+                        network.body.data.nodes.add([nodeData]);
+                        network.moveTo({
+                            position: { x: position.x, y: position.y },
+                            scale: 1.0
+                        });
+                        showMessage('Component added successfully', 'success');
+                    },
+                    error: function () {
+                        showMessage('Failed to add component', 'error');
+                    }
+                });
+            } catch (error) {
+                console.error('Error handling drop:', error);
+            }
+        });
+    }
+
+    function addConnection(source, target) {
+        $.ajax({
+            url: '/api/connections',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ source, target }),
+            success: function () {
+                connections.push([source, target]);
+                showMessage('Connection added successfully', 'success');
+            },
+            error: function () {
+                showMessage('Failed to add connection', 'error');
+            }
+        });
+    }
+
+    function removeComponent(name) {
+        $.ajax({
+            url: `/api/components/${name}`,
+            method: 'DELETE',
+            success: function () {
+                delete components[name];
+                connections = connections.filter(([src, dst]) => src !== name && dst !== name);
+                showMessage('Component removed successfully', 'success');
+            },
+            error: function () {
+                showMessage('Failed to remove component', 'error');
+            }
+        });
+    }
+
+    function removeConnection(edgeId) {
+        const connection = connections[edgeId];
+        if (!connection) return;
+
+        $.ajax({
+            url: '/api/connections',
+            method: 'DELETE',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                source: connection[0],
+                target: connection[1]
+            }),
+            success: function () {
+                connections.splice(edgeId, 1);
+                showMessage('Connection removed successfully', 'success');
+            },
+            error: function () {
+                showMessage('Failed to remove connection', 'error');
+            }
+        });
+    }
+
+    function validateConnection(from, to) {
+        const fromType = components[from].type;
+        const toType = components[to].type;
+
+        // Sender can't receive connections
+        if (fromType === 'receiver' || toType === 'sender') {
+            showMessage('Invalid connection', 'error');
+            return false;
+        }
+
+        return true;
+    }
+
+    function openComponentConfig(componentId) {
+        const component = components[componentId];
+        if (!component) return;
+
+        const modal = new bootstrap.Modal(document.getElementById('componentModal'));
+        const form = document.getElementById('componentFields');
+        document.getElementById('componentId').value = componentId;
+
+        // Generate form fields based on component type
+        let html = '';
+        const config = component.config || defaultConfigs[component.type];
+
+        for (const [key, value] of Object.entries(config)) {
+            html += `
+                <div class="mb-3">
+                    <label class="form-label">${key}</label>
+                    <input type="${typeof value === 'number' ? 'number' : 'text'}" 
+                           class="form-control" 
+                           name="${key}" 
+                           value="${value}"
+                           ${typeof value === 'number' ? 'step="any"' : ''}>
+                </div>
+            `;
+        }
+
+        form.innerHTML = html;
+        modal.show();
+    }
+
+    function saveComponentConfig() {
+        const componentId = document.getElementById('componentId').value;
+        const form = document.getElementById('componentForm');
+        const formData = new FormData(form);
+        const config = {};
+
+        formData.forEach((value, key) => {
+            if (key !== 'componentId') {
+                config[key] = !isNaN(value) && value !== '' ? Number(value) : value;
+            }
+        });
+
+        $.ajax({
+            url: `/api/component-config/${componentId}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(config),
+            success: function () {
+                components[componentId].config = config;
+                bootstrap.Modal.getInstance(document.getElementById('componentModal')).hide();
+                showMessage('Configuration saved successfully', 'success');
+            },
+            error: function () {
+                showMessage('Failed to save configuration', 'error');
+            }
+        });
+    }
+
+    function showMessage(message, type) {
+        const messagesDiv = document.getElementById('messages');
+        messagesDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
+        setTimeout(() => {
+            messagesDiv.innerHTML = '';
+        }, 3000);
+    }
+
+    function generateConfig() {
+        $.ajax({
+            url: '/api/validate',
+            method: 'GET',
+            success: function (response) {
+                if (response.valid) {
+                    $.ajax({
+                        url: '/api/generate-config',
+                        method: 'POST',
+                        success: function () {
+                            window.location.href = '/api/generate-config';
+                        },
+                        error: function () {
+                            showMessage('Failed to generate configuration', 'error');
+                        }
+                    });
+                } else {
+                    showMessage('Invalid workflow configuration. Please check components and connections.', 'error');
+                }
+            },
+            error: function () {
+                showMessage('Failed to validate workflow', 'error');
+            }
+        });
+    }
+
+    // Initialize when the page loads
+    document.addEventListener('DOMContentLoaded', function () {
+        initGraph();
+    });
+</script>
 {% endblock %}
