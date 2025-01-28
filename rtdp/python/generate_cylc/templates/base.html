@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cylc Workflow Generator</title>
+    {{ bootstrap.load_css() }}
+    <style>
+        .form-section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+        }
+
+        .form-section h3 {
+            margin-bottom: 1rem;
+        }
+
+        .workflow-graph {
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .workflow-graph svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">Cylc Workflow Generator</a>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% block content %}{% endblock %}
+    </div>
+
+    {{ bootstrap.load_js() }}
+</body>
+
+</html>
