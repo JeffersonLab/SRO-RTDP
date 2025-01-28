@@ -27,15 +27,15 @@ In typical server fashion cpu_emu binds to all available resident interfaces and
         
 where the structure of <yaml_file> is as follows:
 
-rcv_port: 8888              # listen port
-destination: "129.57.177.8" # destination IP
-dst_port: 8888              # destination port
-sleep: 0                    # disables/enables sleep versus cpu burn mode.
-threads: 4                  # number of independent threads
-latency: 50                 # Thread Processing latency secs per input GB
-mem_footprint: 0.05         # Thread Memory footprint in GB
-output_size: 0.001          # Destination Output size in GB
-verbose: 1                  # disables/enables verbose mode.
+        rcv_port: 8888              # listen port
+        destination: "129.57.177.8" # destination IP
+        dst_port: 8888              # destination port
+        sleep: 0                    # disables/enables sleep versus cpu burn mode.
+        threads: 4                  # number of independent threads
+        latency: 50                 # Thread Processing latency secs per input GB
+        mem_footprint: 0.05         # Thread Memory footprint in GB
+        output_size: 0.001          # Destination Output size in GB
+        verbose: 1                  # disables/enables verbose mode.
 
 
 Any of the <yaml_file> settigs may be overidden at the commamnd line via the following options:
