@@ -1,16 +1,25 @@
 FROM mcr.microsoft.com/devcontainers/python:3.10
 
-# Install system dependencies for PyQt6
+# Install system dependencies for PyQt6 and graphviz
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     qt6-base-dev \
     libgl1-mesa-dev \
+    graphviz \
+    graphviz-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt /tmp/
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && pip install --no-cache-dir \
+    jupyter \
+    jupyterlab \
+    ipywidgets \
+    graphviz \
+    pydot \
+    networkx
 
 # Set up X11 forwarding for GUI
 ENV QT_X11_NO_MITSHM=1
