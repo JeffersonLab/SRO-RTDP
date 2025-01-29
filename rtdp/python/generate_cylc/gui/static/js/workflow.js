@@ -1,127 +1,264 @@
-// Using D3.js for graph visualization
+// Using vis-network for interactive graph editing with drag-and-drop functionality
 class WorkflowGraph {
     constructor() {
-        this.svg = d3.select('#workflow-graph')
-            .append('svg')
-            .attr('width', '100%')
-            .attr('height', '500px');
+        if (typeof vis === 'undefined') {
+            throw new Error('vis-network library not loaded');
+        }
 
-        this.simulation = d3.forceSimulation()
-            .force('link', d3.forceLink().id(d => d.id))
-            .force('charge', d3.forceManyBody().strength(-300))
-            .force('center', d3.forceCenter(
-                this.svg.node().getBoundingClientRect().width / 2,
-                250
-            ));
+        this.network = null;
+        this.nodes = new vis.DataSet();
+        this.edges = new vis.DataSet();
+        this.graphContainer = document.getElementById('workflow-graph');
 
-        this.nodes = [];
-        this.links = [];
+        // Define valid edge rules based on Cylc workflow
+        this.edgeRules = {
+            'receiver': {
+                'emulator': ['ready'],
+            },
+            'emulator': {
+                'sender': ['ready'],
+            },
+            'sender': {
+                'receiver': ['succeeded'],
+            }
+        };
 
-        this.initializeGraph();
+        this.init();
+        this.setupDragAndDrop();
     }
 
-    initializeGraph() {
-        // Create arrow marker for directed edges
-        this.svg.append('defs').append('marker')
-            .attr('id', 'arrowhead')
-            .attr('viewBox', '-0 -5 10 10')
-            .attr('refX', 20)
-            .attr('refY', 0)
-            .attr('orient', 'auto')
-            .attr('markerWidth', 6)
-            .attr('markerHeight', 6)
-            .attr('xoverflow', 'visible')
-            .append('svg:path')
-            .attr('d', 'M 0,-5 L 10 ,0 L 0,5')
-            .attr('fill', '#999')
-            .style('stroke', 'none');
-    }
+    init() {
+        const options = {
+            nodes: {
+                shape: 'box',
+                margin: 10,
+                font: {
+                    size: 14,
+                    face: 'arial',
+                    align: 'center'
+                },
+                borderWidth: 2,
+                shadow: true
+            },
+            edges: {
+                arrows: 'to',
+                smooth: {
+                    enabled: true,
+                    type: 'cubicBezier',
+                    roundness: 0.5
+                },
+                font: {
+                    size: 12,
+                    align: 'middle'
+                }
+            },
+            manipulation: {
+                enabled: true,
+                addEdge: (edgeData, callback) => {
+                    this.handleEdgeCreation(edgeData, callback);
+                }
+            },
+            physics: {
+                enabled: false
+            }
+        };
 
-    updateGraph(components, edges) {
-        // Convert components and edges to D3 format
-        this.nodes = Object.entries(components).map(([id, comp]) => ({
-            id,
-            type: comp.type
-        }));
+        this.network = new vis.Network(
+            this.graphContainer,
+            { nodes: this.nodes, edges: this.edges },
+            options
+        );
 
-        this.links = edges.map(edge => ({
-            source: edge.from,
-            target: edge.to,
-            type: edge.type
-        }));
-
-        // Update force simulation
-        this.simulation
-            .nodes(this.nodes)
-            .force('link').links(this.links);
-
-        // Draw links
-        const link = this.svg.selectAll('.link')
-            .data(this.links)
-            .join('line')
-            .attr('class', 'link')
-            .attr('stroke', '#999')
-            .attr('stroke-width', 2)
-            .attr('marker-end', 'url(#arrowhead)');
-
-        // Draw nodes
-        const node = this.svg.selectAll('.node')
-            .data(this.nodes)
-            .join('g')
-            .attr('class', 'node')
-            .call(d3.drag()
-                .on('start', this.dragstarted.bind(this))
-                .on('drag', this.dragged.bind(this))
-                .on('end', this.dragended.bind(this)));
-
-        // Add circles for nodes
-        node.append('circle')
-            .attr('r', 20)
-            .attr('fill', d => this.getNodeColor(d.type));
-
-        // Add labels
-        node.append('text')
-            .attr('dy', 30)
-            .attr('text-anchor', 'middle')
-            .text(d => d.id);
-
-        // Update positions on tick
-        this.simulation.on('tick', () => {
-            link
-                .attr('x1', d => d.source.x)
-                .attr('y1', d => d.source.y)
-                .attr('x2', d => d.target.x)
-                .attr('y2', d => d.target.y);
-
-            node
-                .attr('transform', d => `translate(${d.x},${d.y})`);
+        // Handle node selection for configuration
+        this.network.on('doubleClick', (params) => {
+            if (params.nodes.length > 0) {
+                this.openComponentConfig(params.nodes[0]);
+            }
         });
+    }
+
+    setupDragAndDrop() {
+        const paletteItems = document.querySelectorAll('.palette-item');
+        const graphContainer = this.graphContainer;
+
+        paletteItems.forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                const type = item.getAttribute('data-type');
+                e.dataTransfer.setData('componentType', type);
+            });
+        });
+
+        graphContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            graphContainer.classList.add('drop-target');
+        });
+
+        graphContainer.addEventListener('dragleave', () => {
+            graphContainer.classList.remove('drop-target');
+        });
+
+        graphContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            graphContainer.classList.remove('drop-target');
+
+            const type = e.dataTransfer.getData('componentType');
+            if (!type) return;
+
+            const rect = graphContainer.getBoundingClientRect();
+            const pos = this.network.DOMtoCanvas({
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            });
+
+            this.addComponent(type, pos);
+        });
+    }
+
+    addComponent(type, position) {
+        const id = `${type}-${Date.now()}`;
+        const nodeData = {
+            id: id,
+            label: type,
+            x: position.x,
+            y: position.y,
+            type: type,
+            color: this.getNodeColor(type)
+        };
+
+        this.nodes.add(nodeData);
+
+        // Create default configuration
+        const resources = {
+            partition: 'ifarm',
+            cpus_per_task: 4,
+            mem: '8G'
+        };
+
+        // Make API call to add component
+        fetch('/api/components', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: id,
+                type: type,
+                resources: resources
+            })
+        })
+            .catch(error => {
+                console.error('Error adding component:', error);
+                this.nodes.remove(id);
+            });
+    }
+
+    handleEdgeCreation(edgeData, callback) {
+        const fromNode = this.nodes.get(edgeData.from);
+        const toNode = this.nodes.get(edgeData.to);
+
+        if (!fromNode || !toNode) {
+            callback(null);
+            return;
+        }
+
+        const allowedTypes = this.edgeRules[fromNode.type]?.[toNode.type];
+        if (!allowedTypes) {
+            alert(`Invalid connection: ${fromNode.type} cannot connect to ${toNode.type}`);
+            callback(null);
+            return;
+        }
+
+        // Use the first allowed type
+        const edgeType = allowedTypes[0];
+
+        // Make API call to add edge
+        fetch('/api/edges', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from_id: edgeData.from,
+                to_id: edgeData.to,
+                type: edgeType
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    edgeData.label = edgeType;
+                    callback(edgeData);
+                } else {
+                    callback(null);
+                }
+            })
+            .catch(error => {
+                console.error('Error adding edge:', error);
+                callback(null);
+            });
+    }
+
+    openComponentConfig(nodeId) {
+        const node = this.nodes.get(nodeId);
+        if (!node) return;
+
+        // Get the modal
+        const modal = document.getElementById('componentModal');
+        if (!modal) return;
+
+        // Update modal title
+        const modalTitle = modal.querySelector('.modal-title');
+        if (modalTitle) {
+            modalTitle.textContent = `Configure ${node.type} Component`;
+        }
+
+        // Get the form
+        const form = modal.querySelector('form');
+        if (!form) return;
+
+        // Set the component ID
+        const idInput = form.querySelector('input[name="id"]');
+        if (idInput) {
+            idInput.value = nodeId;
+        }
+
+        // Show the modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
     }
 
     getNodeColor(type) {
         const colors = {
-            'sender': '#4CAF50',
-            'emulator': '#2196F3',
-            'receiver': '#F44336'
+            'sender': { background: '#90EE90', border: '#60c060' },
+            'receiver': { background: '#F08080', border: '#d05050' },
+            'emulator': { background: '#ADD8E6', border: '#7ab5cc' }
         };
-        return colors[type] || '#999';
+        return colors[type] || { background: '#ffffff', border: '#666666' };
     }
 
-    dragstarted(event) {
-        if (!event.active) this.simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-    }
+    updateFromConfig(config) {
+        // Clear existing nodes and edges
+        this.nodes.clear();
+        this.edges.clear();
 
-    dragged(event) {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-    }
+        // Add nodes from components
+        Object.entries(config.components).forEach(([id, comp]) => {
+            this.nodes.add({
+                id: id,
+                label: comp.type,
+                type: comp.type,
+                color: this.getNodeColor(comp.type)
+            });
+        });
 
-    dragended(event) {
-        if (!event.active) this.simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
+        // Add edges
+        config.edges.forEach(edge => {
+            this.edges.add({
+                from: edge.from,
+                to: edge.to,
+                label: edge.type
+            });
+        });
     }
 }
 
@@ -137,7 +274,7 @@ async function refreshWorkflowGraph() {
     try {
         const response = await fetch('/api/workflow/config');
         const config = await response.json();
-        workflowGraph.updateGraph(config.components, config.edges);
+        workflowGraph.updateFromConfig(config);
     } catch (error) {
         console.error('Failed to refresh workflow graph:', error);
     }
