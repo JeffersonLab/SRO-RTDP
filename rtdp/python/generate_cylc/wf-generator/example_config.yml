@@ -1,36 +1,29 @@
 ---
 workflow:
   name: "cpu-emu"
-  description: "CPU Emulator Testing Workflow"
+  description: "CPU Emulator Testing Workflow with Multiple Emulators"
 
 platform:
   name: "jlab_slurm"
-  cylc_path: "/path/to/cylc-env/bin/"
-  hosts: "tsai@ifarm2402"
   job_runner: "slurm"
 
 components:
-  receiver:
+  main_receiver:
+    type: "receiver"
     resources:
-      ntasks: 1
       cpus_per_task: 4
       mem: "8G"
       partition: "ifarm"
-      timeout: "2h"
     network:
       port: 50080
       bind_address: "0.0.0.0"
-    environment:
-      output_dir: "$CYLC_WORKFLOW_SHARE_DIR/output"
-      log_dir: "$CYLC_WORKFLOW_SHARE_DIR/logs"
 
-  emulator:
+  emu_stage1:
+    type: "emulator"
     resources:
-      ntasks: 1
       cpus_per_task: 4
       mem: "16G"
       partition: "ifarm"
-      timeout: "2h"
     configuration:
       threads: 4
       latency: 50
@@ -39,16 +32,48 @@ components:
     network:
       port: 50888
 
-  sender:
+  emu_stage2:
+    type: "emulator"
     resources:
-      ntasks: 1
+      cpus_per_task: 8
+      mem: "32G"
+      partition: "ifarm"
+    configuration:
+      threads: 8
+      latency: 100
+      mem_footprint: 0.1
+      output_size: 0.002
+    network:
+      port: 50889
+
+  data_sender:
+    type: "sender"
+    resources:
       cpus_per_task: 4
       mem: "8G"
       partition: "ifarm"
-      timeout: "2h"
     test_data:
       size: "100M"
 
+edges:
+  # Start chain
+  - from: "main_receiver"
+    to: "emu_stage1"
+    type: "ready"
+  
+  - from: "emu_stage1"
+    to: "emu_stage2"
+    type: "ready"
+  
+  - from: "emu_stage2"
+    to: "data_sender"
+    type: "ready"
+  
+  # Completion chain
+  - from: "data_sender"
+    to: "main_receiver"
+    type: "succeeded"
+    condition: "!"  # Indicates task should complete
+
 containers:
-  image_path: "cpu-emu.sif"
-  docker_source: "jlabtsai/rtdp-cpu_emu:latest" 
+  image_path: "cpu-emu.sif" 
