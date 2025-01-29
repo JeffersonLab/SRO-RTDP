@@ -1,8 +1,8 @@
 from flask import Flask, render_template, send_file, request, jsonify
 from flask_bootstrap import Bootstrap5
-from components import WorkflowManager
 import os
-from graph_generator import generate_workflow_graph, validate_workflow
+from .components import WorkflowManager
+from .graph_generator import generate_workflow_graph, validate_workflow
 
 app = Flask(__name__, static_folder='static')
 app.config['SECRET_KEY'] = os.environ.get(
