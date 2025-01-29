@@ -8,283 +8,134 @@
 
     [[graph]]
         R1 = """
-            # Start chain
-            receiver:ready => emulator
-            emulator:ready => sender
-            
-            # Completion chain (separate from start chain)
-            sender:succeeded => !receiver
-            receiver:completed
+            {{ config.edges|generate_graph }}
         """
 
 [runtime]
     [[root]]
-        # Common settings for all tasks
         platform = {{ config.platform.name }}
         [[[job]]]
-            execution time limit = PT2H    # 2 hours timeout
+            execution time limit = PT2H
         
         [[[directives]]]
             --ntasks = 1
-            --partition = {{ config.components.receiver.resources.partition }}
+            --partition = {{ config.components.values()|selectattr("type", "equalto", "receiver")|first|attr("resources")|attr("partition") }}
             --output = slurm_%j.log
             --error = slurm_%j.log
         
         [[[environment]]]
-            # Path to SIF file
             CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ config.containers.image_path }}"
-            
-            # Network configuration
-            RECEIVER_PORT = "{{ config.components.receiver.network.port }}"
-            EMULATOR_PORT = "{{ config.components.emulator.network.port }}"
-            
-            # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
-            
-            # Emulator configuration
-            EMU_THREADS = "{{ config.components.emulator.configuration.threads }}"
-            EMU_LATENCY = "{{ config.components.emulator.configuration.latency }}"
-            EMU_MEM_FOOTPRINT = "{{ config.components.emulator.configuration.mem_footprint }}"
-            EMU_OUTPUT_SIZE = "{{ config.components.emulator.configuration.output_size }}"
-            
-            # Test data configuration
-            TEST_DATA_SIZE = "{{ config.components.sender.test_data.size }}"
 
-    [[receiver]]
+    {% for component_id, component in config.components.items() %}
+    [[{{ component_id }}]]
         script = """
-            # Create log directory
-            mkdir -p ${LOG_DIR}/receiver
+            # Setup logging
+            mkdir -p ${LOG_DIR}/{{ component_id }}
+            exec 1> >(tee -a "${LOG_DIR}/{{ component_id }}/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/{{ component_id }}/stderr.log")
 
-            # Redirect all output to log files
-            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
-
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
-            
-            # Check if port is already in use
-            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
-                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
-                exit 1
-            fi
-            
-            # Store hostname for other tasks
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
-            HOSTNAME=$(hostname -f)
-            IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
-            
-            # Create output directory
-            mkdir -p ${OUTPUT_DIR}
-            
-            # Start receiver with debug output
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
+            {% if component.type == "receiver" %}
+            # Start receiver
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} receive \
-                ${RECEIVER_PORT} \
-                "{{ config.components.receiver.network.bind_address }}" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+                {{ component.network.port }} \
+                "{{ component.network.bind_address }}" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/{{ component_id }}/apptainer.log &
             
-            RECV_PID=$!
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
-            
-            # Brief pause to let process start
+            PROC_PID=$!
             sleep 2
             
-            # Signal readiness if process is running
-            if kill -0 $RECV_PID 2>/dev/null; then
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
                 cylc message "ready"
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
-            else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
-                cat ${LOG_DIR}/receiver/apptainer.log >&2
-                exit 1
-            fi
-            
-            # Create a flag file to indicate we should keep running
-            KEEP_RUNNING=1
-            trap 'KEEP_RUNNING=0' TERM INT
-            
-            # Create a flag file to track completion
-            COMPLETION_FILE="${CYLC_WORKFLOW_SHARE_DIR}/receiver_complete"
-            rm -f "${COMPLETION_FILE}"
-            
-            # Initialize file size tracking
-            PREV_SIZE=0
-            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                PREV_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
-            fi
-            
-            # Monitor the receiver process
-            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
-                echo "Process details:" >> ${LOG_DIR}/receiver/process.log
-                ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
                 
-                # Check if data has been received by monitoring file size changes
-                CURRENT_SIZE=0
-                if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                    CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
-                fi
-                
-                if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${COMPLETION_FILE}" ]; then
-                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
-                    echo "Transfer completed successfully"
-                    cylc message -- "Transfer completed successfully"
-                    touch "${COMPLETION_FILE}"
-                fi
-                
-                PREV_SIZE=$CURRENT_SIZE
-                sleep 5
-            done
-            
-            # Check final status
-            FINAL_SIZE=0
-            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                FINAL_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                # Monitor until completion
+                while kill -0 $PROC_PID 2>/dev/null; do
+                    if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                        SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                        if [ $SIZE -gt 0 ]; then
+                            cylc message -- "Transfer completed successfully"
+                            exit 0
+                        fi
+                    fi
+                    sleep 5
+                done
             fi
-            
-            if [ $FINAL_SIZE -gt 0 ]; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
-                exit 0
-            else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
-                echo "Last few lines of apptainer log:" >&2
-                tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
-                exit 1
-            fi
-        """
-        [[[directives]]]
-            --job-name = cpu-emu-recv
-            --cpus-per-task = {{ config.components.receiver.resources.cpus_per_task }}
-            --mem = {{ config.components.receiver.resources.mem }}
-        
-        [[[outputs]]]
-            ready = "ready"
-            completed = "Transfer completed successfully"
+            exit 1
 
-    [[emulator]]
-        script = """
-            # Create log directory
-            mkdir -p ${LOG_DIR}/emulator
-
-            # Redirect all output to log files
-            exec 1> >(tee -a "${LOG_DIR}/emulator/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/emulator/stderr.log")
-
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting emulator task"
+            {% elif component.type == "emulator" %}
+            # Get previous component info
+            {% set prev_component = namespace(id=None) %}
+            {% for edge in config.edges %}
+                {% if edge.to == component_id and edge.type == "ready" %}
+                    {% set prev_component.id = edge.from %}
+                {% endif %}
+            {% endfor %}
+            PREV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ prev_component.id }}_ip)
             
-            # Get receiver information
-            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
-            
-            # Store hostname for sender
-            HOSTNAME=$(hostname)
-            IP=$(hostname -i)
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
-            
-            # Create output directory
-            mkdir -p ${OUTPUT_DIR}
-            
-            # Start CPU emulator
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
+            # Start emulator
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} --output-dir /output \
-                -t ${EMU_THREADS} -b ${EMU_LATENCY} \
-                -m ${EMU_MEM_FOOTPRINT} -o ${EMU_OUTPUT_SIZE} \
-                -r ${EMULATOR_PORT} -p ${RECEIVER_PORT} \
-                -i ${RECV_IP} -v 1 &
+                -t {{ component.configuration.threads }} \
+                -b {{ component.configuration.latency }} \
+                -m {{ component.configuration.mem_footprint }} \
+                -o {{ component.configuration.output_size }} \
+                -r {{ component.network.port }} \
+                -p {{ config.components[prev_component.id].network.port }} \
+                -i ${PREV_IP} -v 1 &
             
-            EMU_PID=$!
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
-            
-            # Brief pause to let process start
+            PROC_PID=$!
             sleep 2
             
-            # Signal readiness if process is running
-            if kill -0 $EMU_PID 2>/dev/null; then
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
                 cylc message "ready"
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
-            else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process not running" >&2
-                cat ${LOG_DIR}/emulator/apptainer.log >&2
-                exit 1
+                wait $PROC_PID
+                exit $?
             fi
-            
-            # Monitor memory usage
-            while kill -0 $EMU_PID 2>/dev/null; do
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/emulator/memory.log
-                free -h >> ${LOG_DIR}/emulator/memory.log
-                ps -o pid,ppid,%cpu,%mem,cmd -p $EMU_PID >> ${LOG_DIR}/emulator/memory.log
-                sleep 5
-            done
-            
-            # Check if process died unexpectedly
-            if ! wait $EMU_PID; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process failed" >&2
-                cat ${LOG_DIR}/emulator/apptainer.log >&2
-                exit 1
-            fi
-        """
-        [[[directives]]]
-            --job-name = cpu-emu
-            --cpus-per-task = {{ config.components.emulator.resources.cpus_per_task }}
-            --mem = {{ config.components.emulator.resources.mem }}
-        
-        [[[outputs]]]
-            ready = "ready"
+            exit 1
 
-    [[sender]]
-        script = """
-            # Create log directory
-            mkdir -p ${LOG_DIR}/sender
-
-            # Redirect all output to log files
-            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
-
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            {% elif component.type == "sender" %}
+            # Get previous component info
+            {% set prev_component = namespace(id=None) %}
+            {% for edge in config.edges %}
+                {% if edge.to == component_id and edge.type == "ready" %}
+                    {% set prev_component.id = edge.from %}
+                {% endif %}
+            {% endfor %}
+            PREV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ prev_component.id }}_ip)
             
-            # Get emulator information
-            EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
+            # Generate and send data
+            dd if=/dev/urandom bs={{ component.test_data.size }} count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
             
-            # Create input directory
-            mkdir -p ${INPUT_DIR}
-            
-            # Generate test data
-            INPUT_FILE="${INPUT_DIR}/random_data.bin"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data: ${TEST_DATA_SIZE}"
-            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
-            
-            # Send data
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${EMU_IP}:${EMULATOR_PORT}"
             apptainer run --bind ${INPUT_DIR}:/data \
                 ${CPU_EMU_SIF} send \
-                "/data/$(basename ${INPUT_FILE})" \
-                ${EMU_IP} \
-                ${EMULATOR_PORT}
+                "/data/data.bin" \
+                ${PREV_IP} \
+                {{ config.components[prev_component.id].network.port }}
             
-            SEND_STATUS=$?
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+            STATUS=$?
+            rm -f ${INPUT_DIR}/data.bin
             
-            # Clean up
-            rm -f ${INPUT_FILE}
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
-            
-            if [ $SEND_STATUS -eq 0 ]; then
+            if [ $STATUS -eq 0 ]; then
                 cylc message -- "sender:succeeded"
             fi
-            
-            # Exit with send status
-            exit ${SEND_STATUS}
+            exit $STATUS
+            {% endif %}
         """
         [[[directives]]]
-            --job-name = cpu-emu-send
-            --cpus-per-task = {{ config.components.sender.resources.cpus_per_task }}
-            --mem = {{ config.components.sender.resources.mem }} 
+            --job-name = cpu-emu-{{ component_id }}
+            --cpus-per-task = {{ component.resources.cpus_per_task }}
+            --mem = {{ component.resources.mem }}
+        
+        [[[outputs]]]
+            {% if component.type == "receiver" %}
+            ready = "ready"
+            completed = "Transfer completed successfully"
+            {% else %}
+            ready = "ready"
+            {% endif %}
+
+    {% endfor %} 

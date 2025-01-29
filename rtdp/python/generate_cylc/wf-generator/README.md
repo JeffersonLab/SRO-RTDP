@@ -59,28 +59,63 @@ Platform-specific settings:
 ```yaml
 platform:
   name: "platform-name"
-  cylc_path: "/path/to/cylc"
-  hosts: "host-specification"
   job_runner: "slurm"
 ```
 
 ### Components Section
-Settings for each component (receiver, emulator, sender):
+Define workflow components (receiver, emulator, sender):
 ```yaml
 components:
-  receiver:
+  my_receiver:
+    type: "receiver"
     resources:
-      ntasks: 1
       cpus_per_task: 4
       mem: "8G"
       partition: "partition-name"
-      timeout: "2h"
     network:
       port: 50080
       bind_address: "0.0.0.0"
-    environment:
-      output_dir: "path/to/output"
-      log_dir: "path/to/logs"
+
+  my_emulator:
+    type: "emulator"
+    resources:
+      cpus_per_task: 4
+      mem: "16G"
+      partition: "partition-name"
+    configuration:
+      threads: 4
+      latency: 50
+      mem_footprint: 0.05
+      output_size: 0.001
+    network:
+      port: 50888
+
+  my_sender:
+    type: "sender"
+    resources:
+      cpus_per_task: 4
+      mem: "8G"
+      partition: "partition-name"
+    test_data:
+      size: "100M"
+```
+
+### Edges Section
+Define relationships between components:
+```yaml
+edges:
+  - from: "my_receiver"
+    to: "my_emulator"
+    type: "ready"
+  
+  - from: "my_emulator"
+    to: "my_sender"
+    type: "ready"
+  
+  - from: "my_sender"
+    to: "my_receiver"
+    type: "succeeded"
+    condition: "!"  # Indicates task should complete
 ```
 
 ### Containers Section
@@ -88,16 +123,29 @@ Container image settings:
 ```yaml
 containers:
   image_path: "image.sif"
-  docker_source: "docker/image:tag"
 ```
 
-## Customization
+## Component Types
 
-To customize the workflow:
+### Receiver
+- Receives data from senders
+- Requires network port configuration
+- Monitors data reception and signals completion
 
-1. Modify the configuration file to match your requirements
-2. Update the Jinja2 template in `templates/flow.cylc.j2` if needed
-3. Run the generator with your modified configuration
+### Emulator
+- Processes data between receiver and sender
+- Configurable processing parameters (threads, latency, etc.)
+- Requires network port for communication
+
+### Sender
+- Generates and sends test data
+- Configurable data size
+- Signals success upon completion
+
+## Edge Types
+- `ready`: Component is ready to receive data
+- `succeeded`: Component has completed successfully
+- `completed`: Component has finished its task
 
 ## Output
 
