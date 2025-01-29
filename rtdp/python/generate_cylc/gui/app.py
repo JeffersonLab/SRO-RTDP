@@ -1,8 +1,8 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, send_file
 from flask_bootstrap import Bootstrap5
 import os
 import yaml
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 from .components import WorkflowManager
 from .forms import (
@@ -37,7 +37,7 @@ def index() -> str:
 
 
 @app.route('/api/workflow/metadata', methods=['POST'])
-def update_workflow_metadata() -> Dict[str, Any]:
+def update_workflow_metadata() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Update workflow metadata."""
     form = WorkflowMetadataForm()
     if form.validate_on_submit():
@@ -48,7 +48,7 @@ def update_workflow_metadata() -> Dict[str, Any]:
 
 
 @app.route('/api/workflow/platform', methods=['POST'])
-def update_platform() -> Dict[str, Any]:
+def update_platform() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Update platform configuration."""
     form = PlatformConfigForm()
     if form.validate_on_submit():
@@ -59,7 +59,7 @@ def update_platform() -> Dict[str, Any]:
 
 
 @app.route('/api/components', methods=['POST'])
-def add_component() -> Dict[str, Any]:
+def add_component() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Add a new component."""
     form = ComponentForm()
     if form.validate_on_submit():
@@ -104,14 +104,14 @@ def add_component() -> Dict[str, Any]:
 
 
 @app.route('/api/components/<component_id>', methods=['DELETE'])
-def remove_component(component_id: str) -> Dict[str, Any]:
+def remove_component(component_id: str) -> Dict[str, str]:
     """Remove a component."""
     workflow_manager.remove_component(component_id)
     return {"status": "success"}
 
 
 @app.route('/api/edges', methods=['POST'])
-def add_edge() -> Dict[str, Any]:
+def add_edge() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Add a new edge."""
     form = EdgeForm()
     form.from_id.choices = [(id, id)
@@ -134,14 +134,14 @@ def add_edge() -> Dict[str, Any]:
 
 
 @app.route('/api/edges/<from_id>/<to_id>', methods=['DELETE'])
-def remove_edge(from_id: str, to_id: str) -> Dict[str, Any]:
+def remove_edge(from_id: str, to_id: str) -> Dict[str, str]:
     """Remove an edge."""
     workflow_manager.remove_edge(from_id, to_id)
     return {"status": "success"}
 
 
 @app.route('/api/workflow/container', methods=['POST'])
-def update_container() -> Dict[str, Any]:
+def update_container() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Update container configuration."""
     form = ContainerConfigForm()
     if form.validate_on_submit():
