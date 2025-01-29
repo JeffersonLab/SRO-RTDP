@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
 
 {% block content %}
 <div class="container-fluid">
@@ -37,10 +38,20 @@
                         <div class="col-md-3">
                             <div class="card">
                                 <div class="card-header">
-                                    <h4 class="h6 mb-0">Add Component</h4>
+                                    <h4 class="h6 mb-0">Components</h4>
                                 </div>
                                 <div class="card-body">
-                                    {{ render_form(component_form) }}
+                                    <div class="component-palette">
+                                        <div class="palette-item" draggable="true" data-type="sender">
+                                            <div class="node sender">Sender</div>
+                                        </div>
+                                        <div class="palette-item" draggable="true" data-type="emulator">
+                                            <div class="node emulator">CPU Emulator</div>
+                                        </div>
+                                        <div class="palette-item" draggable="true" data-type="receiver">
+                                            <div class="node receiver">Receiver</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -53,9 +64,6 @@
                                 </div>
                                 <div class="card-body">
                                     <div id="workflow-graph" class="workflow-graph"></div>
-                                    <div class="mt-3">
-                                        {{ render_form(edge_form) }}
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -84,6 +92,21 @@
     </div>
 </div>
 
+<!-- Component Configuration Modal -->
+<div class="modal fade" id="componentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Component Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {{ render_form(component_form) }}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Preview Modal -->
 <div class="modal fade" id="previewModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -107,36 +130,6 @@
         initializeWorkflowGraph();
     });
 
-    // Handle form submissions via AJAX
-    document.querySelectorAll('form').forEach(form => {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(form);
-            const endpoint = form.getAttribute('data-endpoint') || form.action;
-
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const data = await response.json();
-                    showError(data.message || 'Form submission failed');
-                    return;
-                }
-
-                // Refresh the graph if needed
-                if (form.id === 'component-form' || form.id === 'edge-form') {
-                    refreshWorkflowGraph();
-                }
-            } catch (error) {
-                showError('An error occurred while submitting the form');
-                console.error(error);
-            }
-        });
-    });
-
     async function downloadConfig() {
         window.location.href = '/api/workflow/config/download';
     }
@@ -155,18 +148,7 @@
     }
 
     function showError(message) {
-        // Implement error display logic
         alert(message);
-    }
-
-    function initializeWorkflowGraph() {
-        // Initialize workflow graph visualization
-        // This will be implemented using a graph visualization library
-    }
-
-    function refreshWorkflowGraph() {
-        // Refresh the workflow graph visualization
-        // This will be implemented using a graph visualization library
     }
 </script>
 {% endblock %}
