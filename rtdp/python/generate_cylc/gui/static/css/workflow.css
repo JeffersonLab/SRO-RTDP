@@ -1,0 +1,89 @@
+.workflow-graph {
+    width: 100%;
+    height: 500px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+.workflow-graph svg {
+    width: 100%;
+    height: 100%;
+}
+
+.workflow-graph .node circle {
+    stroke: #fff;
+    stroke-width: 2px;
+}
+
+.workflow-graph .node text {
+    font-size: 12px;
+    font-family: sans-serif;
+}
+
+.workflow-graph .link {
+    stroke-opacity: 0.6;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.form-section {
+    margin-bottom: 1.5rem;
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.modal-content {
+    border-radius: 8px;
+}
+
+.modal-header {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+pre {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 0;
+    overflow-x: auto;
+}
+
+.alert {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}

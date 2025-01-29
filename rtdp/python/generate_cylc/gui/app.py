@@ -1,10 +1,16 @@
-from flask import Flask, render_template, send_file, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from flask_bootstrap import Bootstrap5
 import os
-from .components import WorkflowManager
-from .graph_generator import generate_workflow_graph, validate_workflow
+import yaml
+from typing import Dict, Any
 
-app = Flask(__name__, static_folder='static')
+from .components import WorkflowManager
+from .forms import (
+    WorkflowMetadataForm, PlatformConfigForm, ComponentForm,
+    EdgeForm, ContainerConfigForm
+)
+
+app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get(
     'SECRET_KEY', 'dev-key-please-change')
 bootstrap = Bootstrap5(app)
@@ -13,116 +19,160 @@ bootstrap = Bootstrap5(app)
 workflow_manager = WorkflowManager()
 
 
-@app.route('/', methods=['GET'])
-def index():
-    return render_template('index.html',
-                           components=workflow_manager.components,
-                           connections=workflow_manager.connections)
+@app.route('/')
+def index() -> str:
+    """Render the main page."""
+    return render_template(
+        'index.html',
+        workflow_metadata_form=WorkflowMetadataForm(obj=workflow_manager),
+        platform_form=PlatformConfigForm(obj=workflow_manager.platform),
+        component_form=ComponentForm(),
+        edge_form=EdgeForm(),
+        container_form=ContainerConfigForm(
+            image_path=workflow_manager.container_image_path
+        ),
+        components=workflow_manager.components,
+        edges=workflow_manager.edges
+    )
+
+
+@app.route('/api/workflow/metadata', methods=['POST'])
+def update_workflow_metadata() -> Dict[str, Any]:
+    """Update workflow metadata."""
+    form = WorkflowMetadataForm()
+    if form.validate_on_submit():
+        workflow_manager.name = form.name.data
+        workflow_manager.description = form.description.data
+        return {"status": "success"}
+    return {"status": "error", "errors": form.errors}, 400
+
+
+@app.route('/api/workflow/platform', methods=['POST'])
+def update_platform() -> Dict[str, Any]:
+    """Update platform configuration."""
+    form = PlatformConfigForm()
+    if form.validate_on_submit():
+        workflow_manager.platform.name = form.name.data
+        workflow_manager.platform.job_runner = form.job_runner.data
+        return {"status": "success"}
+    return {"status": "error", "errors": form.errors}, 400
 
 
 @app.route('/api/components', methods=['POST'])
-def add_component():
-    data = request.json
-    name = data.get('name')
-    component_type = data.get('type')
+def add_component() -> Dict[str, Any]:
+    """Add a new component."""
+    form = ComponentForm()
+    if form.validate_on_submit():
+        resources = {
+            "partition": form.partition.data,
+            "cpus_per_task": form.cpus_per_task.data,
+            "mem": form.mem.data
+        }
+        try:
+            workflow_manager.add_component(
+                form.id.data, form.type.data, resources)
 
-    if not name or not component_type:
-        return jsonify({'error': 'Missing name or type'}), 400
+            # Add component-specific configuration
+            config: Dict[str, Any] = {}
 
-    workflow_manager.add_component(name, component_type)
-    return jsonify({'status': 'success'})
+            if form.port.data:
+                config["network"] = {
+                    "port": form.port.data,
+                    "bind_address": form.bind_address.data
+                }
 
+            if form.type.data == "emulator":
+                config["configuration"] = {
+                    "threads": form.threads.data,
+                    "latency": form.latency.data,
+                    "mem_footprint": form.mem_footprint.data,
+                    "output_size": form.output_size.data
+                }
 
-@app.route('/api/components/<name>', methods=['DELETE'])
-def remove_component(name):
-    workflow_manager.remove_component(name)
-    return jsonify({'status': 'success'})
+            if form.type.data == "sender":
+                config["test_data"] = {
+                    "size": form.data_size.data
+                }
 
+            if config:
+                workflow_manager.update_component_config(form.id.data, config)
 
-@app.route('/api/connections', methods=['POST'])
-def add_connection():
-    data = request.json
-    source = data.get('source')
-    target = data.get('target')
-
-    if not source or not target:
-        return jsonify({'error': 'Missing source or target'}), 400
-
-    if workflow_manager.add_connection(source, target):
-        return jsonify({'status': 'success'})
-    return jsonify({'error': 'Invalid connection'}), 400
-
-
-@app.route('/api/connections', methods=['DELETE'])
-def remove_connection():
-    data = request.json
-    source = data.get('source')
-    target = data.get('target')
-
-    if not source or not target:
-        return jsonify({'error': 'Missing source or target'}), 400
-
-    workflow_manager.remove_connection(source, target)
-    return jsonify({'status': 'success'})
-
-
-@app.route('/api/component-config/<name>', methods=['PUT'])
-def update_component_config(name):
-    data = request.json
-    workflow_manager.update_component_config(name, data)
-    return jsonify({'status': 'success'})
+            return {"status": "success"}
+        except ValueError as e:
+            return {"status": "error", "message": str(e)}, 400
+    return {"status": "error", "errors": form.errors}, 400
 
 
-@app.route('/api/platform-config', methods=['PUT'])
-def update_platform_config():
-    data = request.json
-    workflow_manager.update_platform_config(data)
-    return jsonify({'status': 'success'})
+@app.route('/api/components/<component_id>', methods=['DELETE'])
+def remove_component(component_id: str) -> Dict[str, Any]:
+    """Remove a component."""
+    workflow_manager.remove_component(component_id)
+    return {"status": "success"}
 
 
-@app.route('/api/container-config', methods=['PUT'])
-def update_container_config():
-    data = request.json
-    workflow_manager.update_container_config(data)
-    return jsonify({'status': 'success'})
+@app.route('/api/edges', methods=['POST'])
+def add_edge() -> Dict[str, Any]:
+    """Add a new edge."""
+    form = EdgeForm()
+    form.from_id.choices = [(id, id)
+                            for id in workflow_manager.components.keys()]
+    form.to_id.choices = [(id, id)
+                          for id in workflow_manager.components.keys()]
+
+    if form.validate_on_submit():
+        try:
+            workflow_manager.add_edge(
+                form.from_id.data,
+                form.to_id.data,
+                form.type.data,
+                form.condition.data if form.condition.data else None
+            )
+            return {"status": "success"}
+        except ValueError as e:
+            return {"status": "error", "message": str(e)}, 400
+    return {"status": "error", "errors": form.errors}, 400
 
 
-@app.route('/api/test-data', methods=['PUT'])
-def update_test_data():
-    data = request.json
-    workflow_manager.update_test_data(data)
-    return jsonify({'status': 'success'})
+@app.route('/api/edges/<from_id>/<to_id>', methods=['DELETE'])
+def remove_edge(from_id: str, to_id: str) -> Dict[str, Any]:
+    """Remove an edge."""
+    workflow_manager.remove_edge(from_id, to_id)
+    return {"status": "success"}
 
 
-@app.route('/api/validate', methods=['GET'])
-def validate():
-    components = {
-        name: {'type': comp.type}
-        for name, comp in workflow_manager.components.items()
-    }
+@app.route('/api/workflow/container', methods=['POST'])
+def update_container() -> Dict[str, Any]:
+    """Update container configuration."""
+    form = ContainerConfigForm()
+    if form.validate_on_submit():
+        workflow_manager.container_image_path = form.image_path.data
+        return {"status": "success"}
+    return {"status": "error", "errors": form.errors}, 400
 
-    is_valid = validate_workflow(components, workflow_manager.connections)
-    return jsonify({'valid': is_valid})
+
+@app.route('/api/workflow/config', methods=['GET'])
+def get_config() -> Dict[str, Any]:
+    """Get the current workflow configuration."""
+    return workflow_manager.to_dict()
 
 
-@app.route('/api/generate-config', methods=['POST'])
-def generate_config():
-    # Validate the workflow first
-    components = {
-        name: {'type': comp.type}
-        for name, comp in workflow_manager.components.items()
-    }
+@app.route('/api/workflow/config/download')
+def download_config() -> Any:
+    """Download the workflow configuration as YAML."""
+    config = workflow_manager.to_dict()
+    yaml_str = yaml.dump(config, default_flow_style=False)
 
-    if not validate_workflow(components, workflow_manager.connections):
-        return jsonify({'error': 'Invalid workflow configuration'}), 400
+    # Create a temporary file
+    temp_path = "/tmp/workflow_config.yml"
+    with open(temp_path, 'w') as f:
+        f.write(yaml_str)
 
-    # Generate the graph visualization
-    generate_workflow_graph(components, workflow_manager.connections)
-
-    # Generate and save the configuration
-    workflow_manager.save_config('config.yml')
-
-    return send_file('config.yml', as_attachment=True)
+    return send_file(
+        temp_path,
+        as_attachment=True,
+        download_name="workflow_config.yml",
+        mimetype="application/x-yaml"
+    )
 
 
 if __name__ == '__main__':

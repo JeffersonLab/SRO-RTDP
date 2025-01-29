@@ -1,4 +1,5 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
+from dataclasses import dataclass, field
 import yaml
 
 
@@ -42,85 +43,167 @@ class WorkflowComponent:
         self.config.update(config)
 
 
+@dataclass
+class Resources:
+    partition: str
+    cpus_per_task: int = 4
+    mem: str = "4G"
+
+
+@dataclass
+class Network:
+    port: int
+    bind_address: str = "0.0.0.0"
+
+
+@dataclass
+class EmulatorConfig:
+    threads: int = 4
+    latency: int = 50
+    mem_footprint: float = 0.05
+    output_size: float = 0.001
+
+
+@dataclass
+class TestData:
+    size: str = "100M"
+
+
+@dataclass
+class Component:
+    id: str
+    type: str  # "receiver", "emulator", or "sender"
+    resources: Resources
+    network: Optional[Network] = None
+    configuration: Optional[EmulatorConfig] = None  # For emulator type
+    test_data: Optional[TestData] = None  # For sender type
+
+
+@dataclass
+class Edge:
+    from_id: str
+    to_id: str
+    type: str  # "ready", "succeeded", or "completed"
+    condition: Optional[str] = None
+
+
+@dataclass
+class Platform:
+    name: str
+    job_runner: str
+
+
+@dataclass
 class WorkflowManager:
-    def __init__(self) -> None:
-        self.components: Dict[str, WorkflowComponent] = {}
-        self.connections: List[tuple] = []
-        self.platform_config = {
-            'name': 'jlab_slurm',
-            'cylc_path': '/path/to/cylc-env/bin/',
-            'hosts': 'tsai@ifarm2402',
-            'job_runner': 'slurm'
-        }
-        self.container_config = {
-            'image': 'cpu-emu.sif',
-            'docker_source': 'jlabtsai/rtdp-cpu_emu:latest'
-        }
-        self.test_data = {'size': '100M'}
+    name: str = ""
+    description: str = ""
+    platform: Platform = field(
+        default_factory=lambda: Platform("jlab_slurm", "slurm"))
+    components: Dict[str, Component] = field(default_factory=dict)
+    edges: List[Edge] = field(default_factory=list)
+    container_image_path: str = ""
 
-    def add_component(self, name: str, component_type: str) -> None:
-        if name not in self.components:
-            self.components[name] = WorkflowComponent(name, component_type)
+    def add_component(self, component_id: str, component_type: str, resources: Dict) -> None:
+        """Add a new component to the workflow."""
+        if component_id in self.components:
+            raise ValueError(f"Component {component_id} already exists")
 
-    def remove_component(self, name: str) -> None:
-        if name in self.components:
-            # Remove any connections involving this component
-            self.connections = [
-                (src, dst) for src, dst in self.connections
-                if src != name and dst != name
-            ]
-            del self.components[name]
+        resources_obj = Resources(**resources)
+        component = Component(
+            id=component_id, type=component_type, resources=resources_obj)
+        self.components[component_id] = component
 
-    def add_connection(self, source: str, target: str) -> bool:
-        if (source in self.components and
-            target in self.components and
-                (source, target) not in self.connections):
-            self.connections.append((source, target))
-            return True
-        return False
+    def remove_component(self, component_id: str) -> None:
+        """Remove a component and its associated edges from the workflow."""
+        if component_id in self.components:
+            del self.components[component_id]
+            # Remove any edges connected to this component
+            self.edges = [edge for edge in self.edges
+                          if edge.from_id != component_id and edge.to_id != component_id]
 
-    def remove_connection(self, source: str, target: str) -> None:
-        if (source, target) in self.connections:
-            self.connections.remove((source, target))
+    def add_edge(self, from_id: str, to_id: str, edge_type: str, condition: Optional[str] = None) -> None:
+        """Add a new edge between components."""
+        if from_id not in self.components or to_id not in self.components:
+            raise ValueError("Both components must exist")
+        if edge_type not in ["ready", "succeeded", "completed"]:
+            raise ValueError("Invalid edge type")
 
-    def update_component_config(self, name: str, config: Dict) -> None:
-        if name in self.components:
-            self.components[name].update_config(config)
+        edge = Edge(from_id=from_id, to_id=to_id,
+                    type=edge_type, condition=condition)
+        self.edges.append(edge)
 
-    def update_platform_config(self, config: Dict) -> None:
-        self.platform_config.update(config)
+    def remove_edge(self, from_id: str, to_id: str) -> None:
+        """Remove an edge between components."""
+        self.edges = [edge for edge in self.edges
+                      if edge.from_id != from_id or edge.to_id != to_id]
 
-    def update_container_config(self, config: Dict) -> None:
-        self.container_config.update(config)
+    def update_component_config(self, component_id: str, config: Dict) -> None:
+        """Update a component's configuration."""
+        if component_id not in self.components:
+            raise ValueError(f"Component {component_id} does not exist")
 
-    def update_test_data(self, config: Dict) -> None:
-        self.test_data.update(config)
+        component = self.components[component_id]
 
-    def generate_config(self) -> Dict:
-        config = {
-            'workflow': {
-                'name': 'cpu-emu',
-                'description': 'Cylc-based CPU Emulator Testing Workflow'
+        if "network" in config:
+            component.network = Network(**config["network"])
+
+        if component.type == "emulator" and "configuration" in config:
+            component.configuration = EmulatorConfig(**config["configuration"])
+
+        if component.type == "sender" and "test_data" in config:
+            component.test_data = TestData(**config["test_data"])
+
+    def to_dict(self) -> Dict:
+        """Convert the workflow to a dictionary format matching the schema."""
+        return {
+            "workflow": {
+                "name": self.name,
+                "description": self.description
             },
-            'platform': self.platform_config,
-            'resources': {},
-            'network': {
-                'ports': {}
+            "platform": {
+                "name": self.platform.name,
+                "job_runner": self.platform.job_runner
             },
-            'emulators': {},
-            'test_data': self.test_data,
-            'containers': {
-                'cpu_emulator': self.container_config
+            "components": {
+                comp.id: {
+                    "type": comp.type,
+                    "resources": {
+                        "partition": comp.resources.partition,
+                        "cpus_per_task": comp.resources.cpus_per_task,
+                        "mem": comp.resources.mem
+                    },
+                    **({"network": {
+                        "port": comp.network.port,
+                        "bind_address": comp.network.bind_address
+                    }} if comp.network else {}),
+                    **({"configuration": {
+                        "threads": comp.configuration.threads,
+                        "latency": comp.configuration.latency,
+                        "mem_footprint": comp.configuration.mem_footprint,
+                        "output_size": comp.configuration.output_size
+                    }} if comp.configuration else {}),
+                    **({"test_data": {
+                        "size": comp.test_data.size
+                    }} if comp.test_data else {})
+                }
+                for comp in self.components.values()
+            },
+            "edges": [
+                {
+                    "from": edge.from_id,
+                    "to": edge.to_id,
+                    "type": edge.type,
+                    **({"condition": edge.condition} if edge.condition else {})
+                }
+                for edge in self.edges
+            ],
+            "containers": {
+                "image_path": self.container_image_path
             }
         }
 
-        # Add component configurations
-        for name, component in self.components.items():
-            if component.type == 'emulator':
-                config['emulators'][name] = component.config
-            else:
-                config['resources'][name] = component.config
-
+    def generate_config(self) -> Dict:
+        config = self.to_dict()
         return config
 
     def save_config(self, filename: str = 'config.yml') -> None:
@@ -130,4 +213,3 @@ class WorkflowManager:
 
     def get_component_types(self) -> Dict[str, str]:
         return {name: comp.type for name, comp in self.components.items()}
-
