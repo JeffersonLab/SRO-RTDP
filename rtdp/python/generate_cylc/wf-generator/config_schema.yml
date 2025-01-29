@@ -1,0 +1,129 @@
+---
+# Schema for CPU Emulator Workflow Configuration
+workflow:
+  name:
+    type: string
+    required: true
+    description: "Name of the workflow"
+  description:
+    type: string
+    required: false
+    description: "Description of the workflow"
+
+platform:
+  name:
+    type: string
+    required: true
+    description: "Platform name (e.g., jlab_slurm)"
+  cylc_path:
+    type: string
+    required: false
+    description: "Path to cylc environment"
+  hosts:
+    type: string
+    required: true
+    description: "Host specification"
+  job_runner:
+    type: string
+    required: true
+    description: "Job runner type (e.g., slurm)"
+
+components:
+  receiver:
+    resources:
+      ntasks:
+        type: integer
+        default: 1
+      cpus_per_task:
+        type: integer
+        default: 4
+      mem:
+        type: string
+        default: "8G"
+      partition:
+        type: string
+        required: true
+      timeout:
+        type: string
+        default: "2h"
+    network:
+      port:
+        type: integer
+        required: true
+      bind_address:
+        type: string
+        default: "0.0.0.0"
+    environment:
+      output_dir:
+        type: string
+        required: true
+      log_dir:
+        type: string
+        required: true
+
+  emulator:
+    resources:
+      ntasks:
+        type: integer
+        default: 1
+      cpus_per_task:
+        type: integer
+        default: 4
+      mem:
+        type: string
+        default: "16G"
+      partition:
+        type: string
+        required: true
+      timeout:
+        type: string
+        default: "2h"
+    configuration:
+      threads:
+        type: integer
+        default: 4
+      latency:
+        type: integer
+        default: 50
+      mem_footprint:
+        type: float
+        default: 0.05
+      output_size:
+        type: float
+        default: 0.001
+    network:
+      port:
+        type: integer
+        required: true
+
+  sender:
+    resources:
+      ntasks:
+        type: integer
+        default: 1
+      cpus_per_task:
+        type: integer
+        default: 4
+      mem:
+        type: string
+        default: "8G"
+      partition:
+        type: string
+        required: true
+      timeout:
+        type: string
+        default: "2h"
+    test_data:
+      size:
+        type: string
+        default: "100M"
+
+containers:
+  image_path:
+    type: string
+    required: true
+    description: "Path to the container image"
+  docker_source:
+    type: string
+    required: false
+    description: "Source Docker image for reference" 

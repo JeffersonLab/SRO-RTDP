@@ -1,0 +1,54 @@
+---
+workflow:
+  name: "cpu-emu"
+  description: "CPU Emulator Testing Workflow"
+
+platform:
+  name: "jlab_slurm"
+  cylc_path: "/path/to/cylc-env/bin/"
+  hosts: "tsai@ifarm2402"
+  job_runner: "slurm"
+
+components:
+  receiver:
+    resources:
+      ntasks: 1
+      cpus_per_task: 4
+      mem: "8G"
+      partition: "ifarm"
+      timeout: "2h"
+    network:
+      port: 50080
+      bind_address: "0.0.0.0"
+    environment:
+      output_dir: "$CYLC_WORKFLOW_SHARE_DIR/output"
+      log_dir: "$CYLC_WORKFLOW_SHARE_DIR/logs"
+
+  emulator:
+    resources:
+      ntasks: 1
+      cpus_per_task: 4
+      mem: "16G"
+      partition: "ifarm"
+      timeout: "2h"
+    configuration:
+      threads: 4
+      latency: 50
+      mem_footprint: 0.05
+      output_size: 0.001
+    network:
+      port: 50888
+
+  sender:
+    resources:
+      ntasks: 1
+      cpus_per_task: 4
+      mem: "8G"
+      partition: "ifarm"
+      timeout: "2h"
+    test_data:
+      size: "100M"
+
+containers:
+  image_path: "cpu-emu.sif"
+  docker_source: "jlabtsai/rtdp-cpu_emu:latest" 
