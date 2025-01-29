@@ -89,22 +89,39 @@
 </div>
 
 <!-- Component Configuration Modal -->
-<div class="modal fade" id="componentModal" tabindex="-1">
+<div class="modal fade" id="componentModal" tabindex="-1" aria-labelledby="componentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title" id="componentModalLabel">Component Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="componentForm" class="needs-validation" novalidate>
+                    <input type="hidden" id="componentId" name="componentId">
+                    <div id="componentFields" class="container-fluid">
+                        <!-- Form fields will be dynamically added here -->
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveConfigBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Debug Modal -->
+<div class="modal fade" id="debugModal" tabindex="-1" aria-labelledby="debugModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Component Configuration</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="debugModalLabel">Debug Info</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="componentForm">
-                    <input type="hidden" id="componentId">
-                    <div id="componentFields"></div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="saveComponentConfig()">Save</button>
+                <pre id="debugInfo"></pre>
             </div>
         </div>
     </div>
@@ -112,50 +129,45 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Load dependencies first -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
-<!-- Load vis-network from multiple CDN sources for redundancy -->
-<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <script>
-    // If the first CDN fails, try loading from another source
-    if (typeof vis === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/standalone/umd/vis-network.min.js';
-        script.onload = function () {
-            initWorkflowGraph();
-        };
-        script.onerror = function () {
-            console.error('Failed to load vis-network from both CDN sources');
-            alert('Failed to load required libraries. Please check your internet connection and refresh the page.');
-        };
-        document.head.appendChild(script);
-    } else {
-        initWorkflowGraph();
-    }
-
-    function initWorkflowGraph() {
-        // Wait for DOM to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initGraph);
-        } else {
-            initGraph();
-        }
-    }
-
-    function initGraph() {
+    // Initialize workflow graph when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
         try {
-            if (typeof vis === 'undefined') {
-                throw new Error('vis-network library not loaded');
-            }
-            console.log('Initializing workflow graph...');
+            // Initialize workflow graph
             window.workflowGraph = new WorkflowGraph();
-            console.log('Workflow graph initialized successfully');
+
+            // Set up save button handler
+            const saveBtn = document.getElementById('saveConfigBtn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => {
+                    if (window.workflowGraph) {
+                        window.workflowGraph.saveComponentConfig();
+                    }
+                });
+            }
+
+            // Set up modal events for debugging
+            const componentModal = document.getElementById('componentModal');
+            if (componentModal) {
+                componentModal.addEventListener('show.bs.modal', function (event) {
+                    console.log('Modal is about to show');
+                    console.log('Modal content:', document.getElementById('componentFields').innerHTML);
+                });
+
+                componentModal.addEventListener('shown.bs.modal', function (event) {
+                    console.log('Modal is now visible');
+                    const firstInput = componentModal.querySelector('input[type="text"], input[type="number"]');
+                    if (firstInput) {
+                        firstInput.focus();
+                    }
+                });
+            }
+
+            console.log('Initialization complete');
         } catch (error) {
-            console.error('Error initializing workflow graph:', error);
-            alert('Error initializing the workflow editor. Please refresh the page and try again.');
+            console.error('Error during initialization:', error);
         }
-    }
+    });
 </script>
 
 <!-- Load our application code -->
