@@ -1,127 +1,99 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2>CPU Emulator Workflow Configuration</h2>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <h2>Cylc Workflow Generator</h2>
 
-        <div class="row">
-            <!-- Component Palette -->
-            <div class="col-md-2">
-                <div class="form-section">
-                    <h3>Components</h3>
-                    <div class="component-palette">
-                        <div class="palette-item" draggable="true" data-type="sender">
-                            <div class="node sender">Sender</div>
+            <!-- Workflow Metadata -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Workflow Metadata</h3>
+                </div>
+                <div class="card-body">
+                    {{ render_form(workflow_metadata_form) }}
+                </div>
+            </div>
+
+            <!-- Platform Configuration -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Platform Configuration</h3>
+                </div>
+                <div class="card-body">
+                    {{ render_form(platform_form) }}
+                </div>
+            </div>
+
+            <!-- Workflow Design -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Workflow Design</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Component Palette -->
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h4 class="h6 mb-0">Add Component</h4>
+                                </div>
+                                <div class="card-body">
+                                    {{ render_form(component_form) }}
+                                </div>
+                            </div>
                         </div>
-                        <div class="palette-item" draggable="true" data-type="emulator">
-                            <div class="node emulator">CPU Emulator</div>
-                        </div>
-                        <div class="palette-item" draggable="true" data-type="receiver">
-                            <div class="node receiver">Receiver</div>
+
+                        <!-- Workflow Graph -->
+                        <div class="col-md-9">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h4 class="h6 mb-0">Workflow Graph</h4>
+                                </div>
+                                <div class="card-body">
+                                    <div id="workflow-graph" class="workflow-graph"></div>
+                                    <div class="mt-3">
+                                        {{ render_form(edge_form) }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Workflow Graph -->
-            <div class="col-md-10">
-                <div class="form-section">
-                    <h3>Workflow Graph</h3>
-                    <div id="workflowGraph" class="workflow-graph"></div>
+            <!-- Container Configuration -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Container Configuration</h3>
+                </div>
+                <div class="card-body">
+                    {{ render_form(container_form) }}
                 </div>
             </div>
-        </div>
 
-        <div class="form-section">
-            <h3>Platform Settings</h3>
-            <div class="row">
-                <div class="col-md-6">
-                    <label class="form-label">Platform Name</label>
-                    <input type="text" id="platformName" class="form-control" value="jlab_slurm">
+            <!-- Actions -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <button class="btn btn-primary" onclick="downloadConfig()">Download Configuration</button>
+                    <button class="btn btn-secondary" onclick="previewConfig()">Preview Configuration</button>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Cylc Path</label>
-                    <input type="text" id="cylcPath" class="form-control" value="/path/to/cylc-env/bin/">
-                </div>
-            </div>
-            <div class="row mt-3">
-                <div class="col-md-6">
-                    <label class="form-label">Hosts</label>
-                    <input type="text" id="hosts" class="form-control" value="tsai@ifarm2402">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Job Runner</label>
-                    <input type="text" id="jobRunner" class="form-control" value="slurm">
-                </div>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <h3>Container Settings</h3>
-            <div class="row">
-                <div class="col-md-6">
-                    <label class="form-label">Container Image</label>
-                    <input type="text" id="containerImage" class="form-control" value="cpu-emu.sif">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">Docker Source</label>
-                    <input type="text" id="dockerSource" class="form-control" value="jlabtsai/rtdp-cpu_emu:latest">
-                </div>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <h3>Test Data Settings</h3>
-            <div class="row">
-                <div class="col-md-12">
-                    <label class="form-label">Test Data Size</label>
-                    <input type="text" id="testDataSize" class="form-control" value="100M">
-                </div>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <button class="btn btn-primary" onclick="generateConfig()">Generate Configuration</button>
-            <div id="messages"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Component Configuration Modal -->
-<div class="modal fade" id="componentModal" tabindex="-1" aria-labelledby="componentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-light">
-                <h5 class="modal-title" id="componentModalLabel">Component Configuration</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="componentForm" class="needs-validation" novalidate>
-                    <input type="hidden" id="componentId" name="componentId">
-                    <div id="componentFields" class="container-fluid">
-                        <!-- Form fields will be dynamically added here -->
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="saveConfigBtn">Save Changes</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Debug Modal -->
-<div class="modal fade" id="debugModal" tabindex="-1" aria-labelledby="debugModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="debugModalLabel">Debug Info</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Configuration Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <pre id="debugInfo"></pre>
+                <pre id="configPreview" class="bg-light p-3"></pre>
             </div>
         </div>
     </div>
@@ -130,46 +102,71 @@
 
 {% block scripts %}
 <script>
-    // Initialize workflow graph when DOM is ready
+    // Initialize workflow visualization
     document.addEventListener('DOMContentLoaded', () => {
-        try {
-            // Initialize workflow graph
-            window.workflowGraph = new WorkflowGraph();
-
-            // Set up save button handler
-            const saveBtn = document.getElementById('saveConfigBtn');
-            if (saveBtn) {
-                saveBtn.addEventListener('click', () => {
-                    if (window.workflowGraph) {
-                        window.workflowGraph.saveComponentConfig();
-                    }
-                });
-            }
-
-            // Set up modal events for debugging
-            const componentModal = document.getElementById('componentModal');
-            if (componentModal) {
-                componentModal.addEventListener('show.bs.modal', function (event) {
-                    console.log('Modal is about to show');
-                    console.log('Modal content:', document.getElementById('componentFields').innerHTML);
-                });
-
-                componentModal.addEventListener('shown.bs.modal', function (event) {
-                    console.log('Modal is now visible');
-                    const firstInput = componentModal.querySelector('input[type="text"], input[type="number"]');
-                    if (firstInput) {
-                        firstInput.focus();
-                    }
-                });
-            }
-
-            console.log('Initialization complete');
-        } catch (error) {
-            console.error('Error during initialization:', error);
-        }
+        initializeWorkflowGraph();
     });
-</script>
 
-<!-- Load our application code -->
-<script src="{{ url_for('static', filename='js/workflow.js') }}"></script>
+    // Handle form submissions via AJAX
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const endpoint = form.getAttribute('data-endpoint') || form.action;
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    showError(data.message || 'Form submission failed');
+                    return;
+                }
+
+                // Refresh the graph if needed
+                if (form.id === 'component-form' || form.id === 'edge-form') {
+                    refreshWorkflowGraph();
+                }
+            } catch (error) {
+                showError('An error occurred while submitting the form');
+                console.error(error);
+            }
+        });
+    });
+
+    async function downloadConfig() {
+        window.location.href = '/api/workflow/config/download';
+    }
+
+    async function previewConfig() {
+        try {
+            const response = await fetch('/api/workflow/config');
+            const config = await response.json();
+            document.getElementById('configPreview').textContent =
+                JSON.stringify(config, null, 2);
+            new bootstrap.Modal(document.getElementById('previewModal')).show();
+        } catch (error) {
+            showError('Failed to load configuration preview');
+            console.error(error);
+        }
+    }
+
+    function showError(message) {
+        // Implement error display logic
+        alert(message);
+    }
+
+    function initializeWorkflowGraph() {
+        // Initialize workflow graph visualization
+        // This will be implemented using a graph visualization library
+    }
+
+    function refreshWorkflowGraph() {
+        // Refresh the workflow graph visualization
+        // This will be implemented using a graph visualization library
+    }
+</script>
 {% endblock %}
