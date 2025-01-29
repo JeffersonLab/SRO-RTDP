@@ -1,176 +1,138 @@
 from flask_wtf import FlaskForm
 from wtforms import (
-    StringField, IntegerField, FloatField, SubmitField
+    StringField, SelectField, IntegerField, FloatField,
+    SubmitField, ValidationError
 )
-from wtforms.validators import DataRequired, NumberRange
+from wtforms.validators import DataRequired, Optional, NumberRange
 
 
-class WorkflowConfigForm(FlaskForm):
-    # Workflow Settings
-    workflow_name = StringField(
-        'Workflow Name',
-        default='cpu-emu',
-        validators=[DataRequired()]
-    )
-    workflow_description = StringField(
-        'Description',
-        default='Cylc-based CPU Emulator Testing Workflow'
-    )
+class WorkflowMetadataForm(FlaskForm):
+    """Form for workflow metadata."""
+    name = StringField('Workflow Name', validators=[DataRequired()])
+    description = StringField('Description')
+    submit = SubmitField('Save')
 
-    # Platform Settings
-    platform_name = StringField(
-        'Platform Name',
-        default='jlab_slurm',
-        validators=[DataRequired()]
-    )
-    cylc_path = StringField(
-        'Cylc Path',
-        default='/path/to/cylc-env/bin/',
-        validators=[DataRequired()]
-    )
-    hosts = StringField(
-        'Hosts',
-        default='tsai@ifarm2402',
-        validators=[DataRequired()]
-    )
-    job_runner = StringField(
-        'Job Runner',
-        default='slurm',
-        validators=[DataRequired()]
-    )
 
-    # Receiver Settings
-    receiver_ntasks = IntegerField(
-        'Receiver Tasks',
-        default=1,
-        validators=[NumberRange(min=1)]
-    )
-    receiver_cpus = IntegerField(
-        'Receiver CPUs per Task',
-        default=4,
-        validators=[NumberRange(min=1)]
-    )
-    receiver_mem = StringField(
-        'Receiver Memory',
-        default='8G',
-        validators=[DataRequired()]
-    )
-    receiver_partition = StringField(
-        'Receiver Partition',
-        default='ifarm',
-        validators=[DataRequired()]
-    )
-    receiver_timeout = StringField(
-        'Receiver Timeout',
-        default='2h',
-        validators=[DataRequired()]
-    )
+class PlatformConfigForm(FlaskForm):
+    """Form for platform configuration."""
+    name = StringField('Platform Name', validators=[DataRequired()])
+    job_runner = SelectField('Job Runner',
+                             choices=[('slurm', 'SLURM')],
+                             validators=[DataRequired()])
+    submit = SubmitField('Save')
 
-    # Emulator Settings
-    emulator_ntasks = IntegerField(
-        'Emulator Tasks',
-        default=1,
-        validators=[NumberRange(min=1)]
-    )
-    emulator_cpus = IntegerField(
-        'Emulator CPUs per Task',
-        default=4,
-        validators=[NumberRange(min=1)]
-    )
-    emulator_mem = StringField(
-        'Emulator Memory',
-        default='16G',
-        validators=[DataRequired()]
-    )
-    emulator_partition = StringField(
-        'Emulator Partition',
-        default='ifarm',
-        validators=[DataRequired()]
-    )
-    emulator_timeout = StringField(
-        'Emulator Timeout',
-        default='2h',
-        validators=[DataRequired()]
-    )
 
-    # Sender Settings
-    sender_ntasks = IntegerField(
-        'Sender Tasks',
-        default=1,
-        validators=[NumberRange(min=1)]
-    )
-    sender_cpus = IntegerField(
-        'Sender CPUs per Task',
-        default=4,
-        validators=[NumberRange(min=1)]
-    )
-    sender_mem = StringField(
-        'Sender Memory',
-        default='8G',
-        validators=[DataRequired()]
-    )
-    sender_partition = StringField(
-        'Sender Partition',
-        default='ifarm',
-        validators=[DataRequired()]
-    )
-    sender_timeout = StringField(
-        'Sender Timeout',
-        default='2h',
-        validators=[DataRequired()]
-    )
+class ResourcesForm(FlaskForm):
+    """Form for component resources."""
+    partition = StringField('Partition', validators=[DataRequired()])
+    cpus_per_task = IntegerField('CPUs per Task',
+                                 default=4,
+                                 validators=[DataRequired(), NumberRange(min=1)])
+    mem = StringField('Memory',
+                      default="4G",
+                      validators=[DataRequired()])
 
-    # Network Settings
-    receiver_port = IntegerField(
-        'Receiver Port',
-        default=50080,
-        validators=[NumberRange(min=1024, max=65535)]
-    )
-    emulator_port = IntegerField(
-        'Emulator Port',
-        default=50888,
-        validators=[NumberRange(min=1024, max=65535)]
-    )
+
+class NetworkForm(FlaskForm):
+    """Form for network configuration."""
+    port = IntegerField('Port', validators=[
+                        DataRequired(), NumberRange(min=1024, max=65535)])
+    bind_address = StringField('Bind Address', default="0.0.0.0")
+
+
+class EmulatorConfigForm(FlaskForm):
+    """Form for emulator configuration."""
+    threads = IntegerField('Threads',
+                           default=4,
+                           validators=[DataRequired(), NumberRange(min=1)])
+    latency = IntegerField('Latency (ms)',
+                           default=50,
+                           validators=[DataRequired(), NumberRange(min=0)])
+    mem_footprint = FloatField('Memory Footprint',
+                               default=0.05,
+                               validators=[DataRequired(), NumberRange(min=0)])
+    output_size = FloatField('Output Size',
+                             default=0.001,
+                             validators=[DataRequired(), NumberRange(min=0)])
+
+
+class TestDataForm(FlaskForm):
+    """Form for test data configuration."""
+    size = StringField('Data Size',
+                       default="100M",
+                       validators=[DataRequired()])
+
+
+class ComponentForm(FlaskForm):
+    """Form for adding/editing components."""
+    id = StringField('Component ID', validators=[DataRequired()])
+    type = SelectField('Type',
+                       choices=[
+                           ('receiver', 'Receiver'),
+                           ('emulator', 'Emulator'),
+                           ('sender', 'Sender')
+                       ],
+                       validators=[DataRequired()])
+
+    # Resources
+    partition = StringField('Partition', validators=[DataRequired()])
+    cpus_per_task = IntegerField('CPUs per Task',
+                                 default=4,
+                                 validators=[DataRequired(), NumberRange(min=1)])
+    mem = StringField('Memory',
+                      default="4G",
+                      validators=[DataRequired()])
+
+    # Network
+    port = IntegerField('Port',
+                        validators=[Optional(), NumberRange(min=1024, max=65535)])
+    bind_address = StringField('Bind Address', default="0.0.0.0")
 
     # Emulator Configuration
-    emulator_threads = IntegerField(
-        'Emulator Threads',
-        default=4,
-        validators=[NumberRange(min=1)]
-    )
-    emulator_latency = FloatField(
-        'Emulator Latency (GB)',
-        default=50,
-        validators=[NumberRange(min=0)]
-    )
-    emulator_mem_footprint = FloatField(
-        'Memory Footprint (GB)',
-        default=0.05,
-        validators=[NumberRange(min=0)]
-    )
-    emulator_output_size = FloatField(
-        'Output Size (GB)',
-        default=0.001,
-        validators=[NumberRange(min=0)]
-    )
+    threads = IntegerField('Threads',
+                           default=4,
+                           validators=[Optional(), NumberRange(min=1)])
+    latency = IntegerField('Latency (ms)',
+                           default=50,
+                           validators=[Optional(), NumberRange(min=0)])
+    mem_footprint = FloatField('Memory Footprint',
+                               default=0.05,
+                               validators=[Optional(), NumberRange(min=0)])
+    output_size = FloatField('Output Size',
+                             default=0.001,
+                             validators=[Optional(), NumberRange(min=0)])
 
-    # Test Data Settings
-    test_data_size = StringField(
-        'Test Data Size',
-        default='100M',
-        validators=[DataRequired()]
-    )
+    # Test Data
+    data_size = StringField('Data Size', default="100M")
 
-    # Container Settings
-    container_image = StringField(
-        'Container Image',
-        default='cpu-emu.sif',
-        validators=[DataRequired()]
-    )
-    docker_source = StringField(
-        'Docker Source',
-        default='jlabtsai/rtdp-cpu_emu:latest',
-        validators=[DataRequired()]
-    )
+    submit = SubmitField('Save')
 
-    submit = SubmitField('Generate Configuration')
+    def validate_id(self, field):
+        """Validate component ID format."""
+        if not field.data[0].isalpha():
+            raise ValidationError("Component ID must start with a letter")
+        if not field.data.replace('_', '').isalnum():
+            raise ValidationError(
+                "Component ID can only contain letters, numbers, and underscores")
+
+
+class EdgeForm(FlaskForm):
+    """Form for adding/editing edges."""
+    from_id = SelectField('From Component', validators=[DataRequired()])
+    to_id = SelectField('To Component', validators=[DataRequired()])
+    type = SelectField('Edge Type',
+                       choices=[
+                           ('ready', 'Ready'),
+                           ('succeeded', 'Succeeded'),
+                           ('completed', 'Completed')
+                       ],
+                       validators=[DataRequired()])
+    condition = StringField('Condition')
+    submit = SubmitField('Add Edge')
+
+
+class ContainerConfigForm(FlaskForm):
+    """Form for container configuration."""
+    image_path = StringField('Container Image Path',
+                             validators=[DataRequired()])
+    submit = SubmitField('Save')
