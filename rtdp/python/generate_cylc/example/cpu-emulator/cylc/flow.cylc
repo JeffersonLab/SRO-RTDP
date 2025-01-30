@@ -49,7 +49,7 @@
             # Find data target from edges
             # Connect to receiver-1
             TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip)
-            TARGET_PORT=
+            TARGET_PORT=50080
             
             # Start emulator
             apptainer run --bind ${OUTPUT_DIR}:/output \
@@ -58,7 +58,7 @@
                 -b 50 \
                 -m 0.05 \
                 -o 0.001 \
-                -r  \
+                -r 50888 \
                 -p ${TARGET_PORT} \
                 -i ${TARGET_IP} -v 1 &
             
@@ -77,7 +77,7 @@
         [[[directives]]]
             --job-name = cpu-emu-emulator-1
             --cpus-per-task = 4
-            --mem = 8G
+            --mem = 16G
         
         [[[outputs]]]
             ready = "ready"
@@ -100,7 +100,7 @@
             # Start receiver
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} receive \
-                 \
+                50080 \
                 "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver-1/apptainer.log &
             
             PROC_PID=$!
@@ -171,7 +171,7 @@
             # Find data target from edges
             # Connect to emulator-1
             TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip)
-            TARGET_PORT=
+            TARGET_PORT=50888
             
             # Generate and send data
             dd if=/dev/urandom bs=100M count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
