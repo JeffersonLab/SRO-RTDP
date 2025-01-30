@@ -24,11 +24,61 @@ def validate_config(config: Dict[str, Any], schema: Dict[str, Any]) -> None:
         sys.exit(1)
 
 
-def generate_graph(edges: List[Dict[str, str]]) -> str:
-    """Generate Cylc graph from edge definitions."""
+def generate_control_edges(data_edges: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Generate control flow edges from data flow edges.
+    Control flow goes in reverse direction of data flow to ensure consumers
+    are ready before producers start."""
+    control_edges = []
+    components = set()
+
+    # Collect all components
+    for edge in data_edges:
+        components.add(edge['from'])
+        components.add(edge['to'])
+
+    # Create reverse dependencies
+    for edge in data_edges:
+        # Consumer must be ready before producer starts
+        control_edges.append({
+            'from': edge['to'],
+            'to': edge['from'],
+            'type': 'ready'
+        })
+
+    # Find the last component (one that doesn't send to anyone)
+    last_components = set()
+    for comp in components:
+        if not any(edge['from'] == comp for edge in data_edges):
+            last_components.add(comp)
+
+    # Find the first component (one that doesn't receive from anyone)
+    first_components = set()
+    for comp in components:
+        if not any(edge['to'] == comp for edge in data_edges):
+            first_components.add(comp)
+
+    # Add completion edges
+    for first in first_components:
+        for last in last_components:
+            control_edges.append({
+                'from': first,
+                'to': last,
+                'type': 'succeeded',
+                'condition': '!'
+            })
+
+    return control_edges
+
+
+def generate_graph(config: Dict[str, Any]) -> str:
+    """Generate Cylc graph from data flow edges."""
+    # Generate control edges from data flow
+    control_edges = generate_control_edges(config['edges'])
+
+    # Generate graph lines
     graph_lines = []
 
-    for edge in edges:
+    for edge in control_edges:
         from_task = edge['from']
         to_task = edge['to']
         edge_type = edge['type']
@@ -47,7 +97,8 @@ def generate_graph(edges: List[Dict[str, str]]) -> str:
     return '\n            '.join(graph_lines)
 
 
-def generate_workflow(config: Dict[str, Any], template_dir: str, output_dir: str) -> None:
+def generate_workflow(config: Dict[str, Any], template_dir: str,
+                      output_dir: str) -> None:
     """Generate Cylc workflow files from configuration."""
     # Set up Jinja2 environment
     env = Environment(
@@ -57,7 +108,7 @@ def generate_workflow(config: Dict[str, Any], template_dir: str, output_dir: str
     )
 
     # Add custom filters
-    env.filters['generate_graph'] = generate_graph
+    env.filters['generate_graph'] = lambda _: generate_graph(config)
 
     # Generate flow.cylc
     flow_template = env.get_template('flow.cylc.j2')
