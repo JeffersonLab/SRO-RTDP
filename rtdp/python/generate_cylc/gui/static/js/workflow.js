@@ -94,6 +94,8 @@ class WorkflowGraph {
         this.network.on('doubleClick', (params) => {
             if (params.nodes.length > 0) {
                 this.openComponentConfig(params.nodes[0]);
+            } else if (params.edges.length > 0) {
+                this.openEdgeConfig(params.edges[0]);
             }
         });
 
@@ -364,23 +366,41 @@ class WorkflowGraph {
     }
 
     handleEdgeDeletion(edgeData, callback) {
-        const edge = edgeData.edges[0];
-        // Make API call to delete edge
-        fetch(`/api/edges/${edge.from}/${edge.to}`, {
-            method: 'DELETE'
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Remove edge from the graph
-                    this.edges.remove(edge);
-                    callback(edge);
-                } else {
-                    callback(null);
-                }
+        // Handle both single and multiple edge deletion
+        const edgeIds = Array.isArray(edgeData.edges) ? edgeData.edges : [edgeData.edges[0]];
+
+        // Create a promise for each edge deletion
+        const deletePromises = edgeIds.map(edgeId => {
+            const edge = this.edges.get(edgeId);
+            if (!edge) {
+                return Promise.reject(new Error(`Edge ${edgeId} not found`));
+            }
+            return fetch(`/api/edges/${edge.from}/${edge.to}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to delete edge from ${edge.from} to ${edge.to}`);
+                    }
+                    return response.json();
+                });
+        });
+
+        // Wait for all deletions to complete
+        Promise.all(deletePromises)
+            .then(() => {
+                // Remove all edges from the graph
+                this.edges.remove(edgeIds);
+                callback(edgeData);
+
+                // Wait a short moment before refreshing to ensure backend is updated
+                setTimeout(() => {
+                    refreshWorkflowGraph();
+                }, 100);
             })
             .catch(error => {
-                console.error('Error deleting edge:', error);
+                console.error('Error deleting edges:', error);
+                alert('Failed to delete some edges. Please try again.');
                 callback(null);
             });
     }
@@ -589,6 +609,127 @@ class WorkflowGraph {
             console.error('Error loading component configuration:', error);
             alert('Failed to load component configuration');
         }
+    }
+
+    openEdgeConfig(edgeId) {
+        const edge = this.edges.get(edgeId);
+        if (!edge) return;
+
+        // Show edge configuration modal
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Edge</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="edgeConfigForm">
+                            <div class="mb-3">
+                                <label class="form-label">Edge Type</label>
+                                <select class="form-control" name="type" id="edgeType" required>
+                                    <option value="ready">Ready (Start Chain)</option>
+                                    <option value="succeeded">Succeeded (Completion Chain)</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="conditionField" style="display: none;">
+                                <label class="form-label">Condition</label>
+                                <input type="text" class="form-control" name="condition" value="!" placeholder="e.g., ! for task completion">
+                                <small class="form-text text-muted">Use ! for task completion in completion chain</small>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="saveEdgeConfig">Save</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        const modalInstance = new bootstrap.Modal(modal);
+
+        // Extract current edge type and condition
+        const currentType = edge.label.split('\n')[0];
+        const conditionMatch = edge.label.match(/\((.*?)\)/);
+        const currentCondition = conditionMatch ? conditionMatch[1] : '';
+
+        // Set current values
+        const edgeTypeSelect = modal.querySelector('#edgeType');
+        const conditionField = modal.querySelector('#conditionField');
+        const conditionInput = modal.querySelector('[name="condition"]');
+
+        edgeTypeSelect.value = currentType;
+        if (currentType === 'succeeded') {
+            conditionField.style.display = 'block';
+            conditionInput.value = currentCondition;
+        }
+
+        // Show/hide condition field based on edge type
+        edgeTypeSelect.addEventListener('change', () => {
+            if (edgeTypeSelect.value === 'succeeded') {
+                conditionField.style.display = 'block';
+            } else {
+                conditionField.style.display = 'none';
+            }
+        });
+
+        modalInstance.show();
+
+        // Handle edge configuration save
+        document.getElementById('saveEdgeConfig').addEventListener('click', () => {
+            const form = document.getElementById('edgeConfigForm');
+            const edgeType = form.querySelector('[name="type"]').value;
+            const condition = edgeType === 'succeeded' ? form.querySelector('[name="condition"]').value : '';
+
+            // First delete the old edge
+            fetch(`/api/edges/${edge.from}/${edge.to}`, {
+                method: 'DELETE'
+            })
+                .then(response => response.json())
+                .then(() => {
+                    // Then create the new edge with updated configuration
+                    const formData = new FormData();
+                    formData.append('from_id', edge.from);
+                    formData.append('to_id', edge.to);
+                    formData.append('type', edgeType);
+                    if (condition) {
+                        formData.append('condition', condition);
+                    }
+
+                    return fetch('/api/edges', {
+                        method: 'POST',
+                        body: formData
+                    });
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Update edge in the graph
+                        this.edges.update({
+                            id: edgeId,
+                            label: edgeType + (condition ? `\n(${condition})` : ''),
+                        });
+                        modalInstance.hide();
+                        modal.remove();
+                        // Refresh graph to ensure consistency
+                        refreshWorkflowGraph();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating edge:', error);
+                    alert('Failed to update edge configuration');
+                });
+        });
+
+        // Clean up modal when hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            modal.remove();
+        });
     }
 
     getNodeColor(type) {
