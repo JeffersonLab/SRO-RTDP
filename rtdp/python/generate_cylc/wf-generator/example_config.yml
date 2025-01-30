@@ -8,15 +8,28 @@ platform:
   job_runner: "slurm"
 
 components:
-  main_receiver:
-    type: "receiver"
+  data_sender:
+    type: "sender"
     resources:
       cpus_per_task: 4
       mem: "8G"
       partition: "ifarm"
-    network:
-      port: 50080
-      bind_address: "0.0.0.0"
+    test_data:
+      size: "100M"
+
+  # emu_stage2:
+  #   type: "emulator"
+  #   resources:
+  #     cpus_per_task: 8
+  #     mem: "32G"
+  #     partition: "ifarm"
+  #   configuration:
+  #     threads: 8
+  #     latency: 100
+  #     mem_footprint: 0.1
+  #     output_size: 0.002
+  #   network:
+  #     listen_port: 50889
 
   emu_stage1:
     type: "emulator"
@@ -30,50 +43,31 @@ components:
       mem_footprint: 0.05
       output_size: 0.001
     network:
-      port: 50888
+      listen_port: 50888
 
-  emu_stage2:
-    type: "emulator"
-    resources:
-      cpus_per_task: 8
-      mem: "32G"
-      partition: "ifarm"
-    configuration:
-      threads: 8
-      latency: 100
-      mem_footprint: 0.1
-      output_size: 0.002
-    network:
-      port: 50889
-
-  data_sender:
-    type: "sender"
+  main_receiver:
+    type: "receiver"
     resources:
       cpus_per_task: 4
       mem: "8G"
       partition: "ifarm"
-    test_data:
-      size: "100M"
+    network:
+      listen_port: 50080
+      bind_address: "0.0.0.0"
 
+# Data flow edges (following the direction of data movement)
 edges:
-  # Start chain
-  - from: "main_receiver"
-    to: "emu_stage1"
-    type: "ready"
-  
-  - from: "emu_stage1"
-    to: "emu_stage2"
-    type: "ready"
-  
-  - from: "emu_stage2"
-    to: "data_sender"
-    type: "ready"
-  
-  # Completion chain
   - from: "data_sender"
+    to: "emu_stage1"
+    description: "Initial data stream"
+
+  # - from: "emu_stage2"
+  #   to: "emu_stage1"
+  #   description: "Stage 2 processed data"
+
+  - from: "emu_stage1"
     to: "main_receiver"
-    type: "succeeded"
-    condition: "!"  # Indicates task should complete
+    description: "Stage 1 processed data"
 
 containers:
   image_path: "cpu-emu.sif" 
