@@ -6,7 +6,7 @@ components:
       output_size: 0.001
       threads: 4
     network:
-      port: 50888
+      listen_port: 1024
     resources:
       cpus_per_task: 4
       mem: 8G
@@ -15,7 +15,7 @@ components:
   receiver-1:
     network:
       bind_address: 0.0.0.0
-      port: 50080
+      listen_port: 1026
     resources:
       cpus_per_task: 4
       mem: 8G
@@ -32,15 +32,15 @@ components:
 containers:
   image_path: cpu-emu.sif
 edges:
-- description: send
+- description: '1'
   from: sender-1
   to: emulator-1
-- description: receive
+- description: '2'
   from: emulator-1
   to: receiver-1
 platform:
   job_runner: slurm
   name: jlab_slurm
 workflow:
-  description: gui-3node-test
-  name: gui-3node-test
+  description: test
+  name: test
