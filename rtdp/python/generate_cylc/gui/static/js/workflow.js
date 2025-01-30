@@ -235,10 +235,14 @@ class WorkflowGraph {
             return;
         }
 
-        // Check if this connection is allowed
-        const allowedTargets = this.edgeRules[fromNode.type] || [];
-        if (!allowedTargets.includes(toNode.type)) {
-            alert(`Invalid connection: ${fromNode.type} cannot trigger ${toNode.type}`);
+        // Check if this connection is allowed based on data flow rules
+        if (fromNode.type === 'receiver') {
+            alert('Receiver cannot be a data producer');
+            callback(null);
+            return;
+        }
+        if (toNode.type === 'sender') {
+            alert('Sender cannot be a data consumer');
             callback(null);
             return;
         }
@@ -249,120 +253,44 @@ class WorkflowGraph {
         });
 
         if (existingEdges.length > 0) {
-            alert('This connection already exists');
+            alert('Data flow already exists between these components');
             callback(null);
             return;
         }
 
-        // Show edge configuration modal
-        const modal = document.createElement('div');
-        modal.className = 'modal fade';
-        modal.innerHTML = `
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Configure Edge</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="edgeConfigForm">
-                            <div class="mb-3">
-                                <label class="form-label">Edge Type</label>
-                                <select class="form-control" name="type" id="edgeType" required>
-                                    <option value="ready">Ready (Start Chain)</option>
-                                    <option value="succeeded">Succeeded (Completion Chain)</option>
-                                    <option value="completed">Completed</option>
-                                </select>
-                            </div>
-                            <div class="mb-3" id="conditionField" style="display: none;">
-                                <label class="form-label">Condition</label>
-                                <input type="text" class="form-control" name="condition" value="!" placeholder="e.g., ! for task completion">
-                                <small class="form-text text-muted">Use ! for task completion in completion chain</small>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="saveEdgeConfig">Save</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Open a dialog to get the data flow description
+        const description = prompt('Enter a description of the data being transferred:');
+        if (!description) {
+            callback(null);
+            return;
+        }
 
-        document.body.appendChild(modal);
-        const modalInstance = new bootstrap.Modal(modal);
+        // Create form data for the request
+        const formData = new FormData();
+        formData.append('from_id', edgeData.from);
+        formData.append('to_id', edgeData.to);
+        formData.append('description', description);
 
-        // Show/hide condition field based on edge type
-        const edgeTypeSelect = modal.querySelector('#edgeType');
-        const conditionField = modal.querySelector('#conditionField');
-        edgeTypeSelect.addEventListener('change', () => {
-            if (edgeTypeSelect.value === 'succeeded') {
-                conditionField.style.display = 'block';
-            } else {
-                conditionField.style.display = 'none';
-            }
-        });
-
-        modalInstance.show();
-
-        // Handle edge configuration save
-        document.getElementById('saveEdgeConfig').addEventListener('click', () => {
-            const form = document.getElementById('edgeConfigForm');
-            const edgeType = form.querySelector('[name="type"]').value;
-            const condition = edgeType === 'succeeded' ? form.querySelector('[name="condition"]').value : '';
-
-            // Create edge data
-            const edge = {
-                from: edgeData.from,
-                to: edgeData.to,
-                label: edgeType + (condition ? `\n(${condition})` : ''),
-                arrows: {
-                    to: {
-                        enabled: true,
-                        scaleFactor: 1
-                    }
-                }
-            };
-
-            // Create form data for the request
-            const formData = new FormData();
-            formData.append('from_id', edgeData.from);
-            formData.append('to_id', edgeData.to);
-            formData.append('type', edgeType);
-            if (condition) {
-                formData.append('condition', condition);
-            }
-
-            // Make API call to add edge
-            fetch('/api/edges', {
-                method: 'POST',
-                body: formData
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        // Add edge to the graph
-                        this.edges.add(edge);
-                        callback(edge);
-                        modalInstance.hide();
-                        modal.remove();
-                    } else {
-                        callback(null);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error adding edge:', error);
+        // Make API call to add edge
+        fetch('/api/edges', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    edgeData.label = description;
+                    callback(edgeData);
+                } else {
+                    alert(data.message || 'Failed to add data flow');
                     callback(null);
-                });
-        });
-
-        // Clean up modal when hidden
-        modal.addEventListener('hidden.bs.modal', () => {
-            modal.remove();
-            if (!this.edges.get(edgeData.id)) {
+                }
+            })
+            .catch(error => {
+                console.error('Error adding data flow:', error);
+                alert('Failed to add data flow. Please try again.');
                 callback(null);
-            }
-        });
+            });
     }
 
     handleEdgeDeletion(edgeData, callback) {
@@ -615,121 +543,34 @@ class WorkflowGraph {
         const edge = this.edges.get(edgeId);
         if (!edge) return;
 
-        // Show edge configuration modal
-        const modal = document.createElement('div');
-        modal.className = 'modal fade';
-        modal.innerHTML = `
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Edit Edge</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="edgeConfigForm">
-                            <div class="mb-3">
-                                <label class="form-label">Edge Type</label>
-                                <select class="form-control" name="type" id="edgeType" required>
-                                    <option value="ready">Ready (Start Chain)</option>
-                                    <option value="succeeded">Succeeded (Completion Chain)</option>
-                                    <option value="completed">Completed</option>
-                                </select>
-                            </div>
-                            <div class="mb-3" id="conditionField" style="display: none;">
-                                <label class="form-label">Condition</label>
-                                <input type="text" class="form-control" name="condition" value="!" placeholder="e.g., ! for task completion">
-                                <small class="form-text text-muted">Use ! for task completion in completion chain</small>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="saveEdgeConfig">Save</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Open a dialog to edit the data flow description
+        const description = prompt('Edit the description of the data being transferred:', edge.label);
+        if (description === null) return; // User cancelled
 
-        document.body.appendChild(modal);
-        const modalInstance = new bootstrap.Modal(modal);
+        // Create form data for the request
+        const formData = new FormData();
+        formData.append('from_id', edge.from);
+        formData.append('to_id', edge.to);
+        formData.append('description', description);
 
-        // Extract current edge type and condition
-        const currentType = edge.label.split('\n')[0];
-        const conditionMatch = edge.label.match(/\((.*?)\)/);
-        const currentCondition = conditionMatch ? conditionMatch[1] : '';
-
-        // Set current values
-        const edgeTypeSelect = modal.querySelector('#edgeType');
-        const conditionField = modal.querySelector('#conditionField');
-        const conditionInput = modal.querySelector('[name="condition"]');
-
-        edgeTypeSelect.value = currentType;
-        if (currentType === 'succeeded') {
-            conditionField.style.display = 'block';
-            conditionInput.value = currentCondition;
-        }
-
-        // Show/hide condition field based on edge type
-        edgeTypeSelect.addEventListener('change', () => {
-            if (edgeTypeSelect.value === 'succeeded') {
-                conditionField.style.display = 'block';
-            } else {
-                conditionField.style.display = 'none';
-            }
-        });
-
-        modalInstance.show();
-
-        // Handle edge configuration save
-        document.getElementById('saveEdgeConfig').addEventListener('click', () => {
-            const form = document.getElementById('edgeConfigForm');
-            const edgeType = form.querySelector('[name="type"]').value;
-            const condition = edgeType === 'succeeded' ? form.querySelector('[name="condition"]').value : '';
-
-            // First delete the old edge
-            fetch(`/api/edges/${edge.from}/${edge.to}`, {
-                method: 'DELETE'
+        // Make API call to update edge
+        fetch('/api/edges', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    edge.label = description;
+                    this.edges.update(edge);
+                } else {
+                    alert(data.message || 'Failed to update data flow');
+                }
             })
-                .then(response => response.json())
-                .then(() => {
-                    // Then create the new edge with updated configuration
-                    const formData = new FormData();
-                    formData.append('from_id', edge.from);
-                    formData.append('to_id', edge.to);
-                    formData.append('type', edgeType);
-                    if (condition) {
-                        formData.append('condition', condition);
-                    }
-
-                    return fetch('/api/edges', {
-                        method: 'POST',
-                        body: formData
-                    });
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        // Update edge in the graph
-                        this.edges.update({
-                            id: edgeId,
-                            label: edgeType + (condition ? `\n(${condition})` : ''),
-                        });
-                        modalInstance.hide();
-                        modal.remove();
-                        // Refresh graph to ensure consistency
-                        refreshWorkflowGraph();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error updating edge:', error);
-                    alert('Failed to update edge configuration');
-                });
-        });
-
-        // Clean up modal when hidden
-        modal.addEventListener('hidden.bs.modal', () => {
-            modal.remove();
-        });
+            .catch(error => {
+                console.error('Error updating data flow:', error);
+                alert('Failed to update data flow. Please try again.');
+            });
     }
 
     getNodeColor(type) {

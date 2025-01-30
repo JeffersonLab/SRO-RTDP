@@ -1,7 +1,7 @@
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField, SelectField, IntegerField, FloatField,
-    SubmitField, ValidationError
+    SubmitField, ValidationError, HiddenField
 )
 from wtforms.validators import DataRequired, Optional, NumberRange
 
@@ -117,18 +117,15 @@ class ComponentForm(FlaskForm):
 
 
 class EdgeForm(FlaskForm):
-    """Form for adding/editing edges."""
-    from_id = SelectField('From Component', validators=[DataRequired()])
-    to_id = SelectField('To Component', validators=[DataRequired()])
-    type = SelectField('Edge Type',
-                       choices=[
-                           ('ready', 'Ready'),
-                           ('succeeded', 'Succeeded'),
-                           ('completed', 'Completed')
-                       ],
-                       validators=[DataRequired()])
-    condition = StringField('Condition')
-    submit = SubmitField('Add Edge')
+    """Form for adding data flow connections."""
+    from_id = HiddenField('From Component')
+    to_id = HiddenField('To Component')
+    description = StringField(
+        'Data Flow Description',
+        description='Description of the data being transferred',
+        validators=[DataRequired()]
+    )
+    submit = SubmitField('Add Data Flow')
 
 
 class ContainerConfigForm(FlaskForm):

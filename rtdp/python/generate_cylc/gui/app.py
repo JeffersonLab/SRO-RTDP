@@ -1,8 +1,8 @@
 from flask import Flask, render_template, send_file, request
-from flask_bootstrap import Bootstrap5
+from flask_bootstrap import Bootstrap5  # type: ignore
 import os
 import yaml
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, cast, Tuple
 
 from .components import WorkflowManager
 from .forms import (
@@ -22,18 +22,26 @@ workflow_manager = WorkflowManager()
 @app.route('/')
 def index() -> str:
     """Render the main page."""
-    return render_template(
+    metadata_form = WorkflowMetadataForm(
+        obj=workflow_manager
+    )
+    platform_form = PlatformConfigForm(
+        obj=workflow_manager.platform
+    )
+    container_form = ContainerConfigForm(
+        image_path=workflow_manager.container_image_path
+    )
+
+    return cast(str, render_template(
         'index.html',
-        workflow_metadata_form=WorkflowMetadataForm(obj=workflow_manager),
-        platform_form=PlatformConfigForm(obj=workflow_manager.platform),
+        workflow_metadata_form=metadata_form,
+        platform_form=platform_form,
         component_form=ComponentForm(),
         edge_form=EdgeForm(),
-        container_form=ContainerConfigForm(
-            image_path=workflow_manager.container_image_path
-        ),
+        container_form=container_form,
         components=workflow_manager.components,
         edges=workflow_manager.edges
-    )
+    ))
 
 
 @app.route('/api/workflow/metadata', methods=['POST'])
@@ -148,19 +156,31 @@ def update_component(component_id: str) -> Union[Dict[str, str], tuple[Dict[str,
 
 
 @app.route('/api/edges', methods=['POST'])
-def add_edge() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
-    """Add a new edge."""
+def add_edge() -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
+    """Add a new data flow connection."""
     # Get data from form
     from_id = request.form.get('from_id')
     to_id = request.form.get('to_id')
-    edge_type = request.form.get('type', 'ready')
-    condition = request.form.get('condition')  # Get condition from form data
-
+    description = request.form.get('description')
+    
     if not from_id or not to_id:
-        return {"status": "error", "message": "Missing from_id or to_id"}, 400
+        return {
+            "status": "error",
+            "message": "Source and target components must be selected"
+        }, 400
+
+    if not description:
+        return {
+            "status": "error",
+            "message": "Description of data flow is required"
+        }, 400
 
     try:
-        workflow_manager.add_edge(from_id, to_id, edge_type, condition)
+        workflow_manager.add_edge(
+            from_id=from_id,
+            to_id=to_id,
+            description=description
+        )
         return {"status": "success"}
     except ValueError as e:
         return {"status": "error", "message": str(e)}, 400
