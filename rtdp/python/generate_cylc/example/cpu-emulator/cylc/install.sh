@@ -10,7 +10,7 @@ WORKFLOW_NAME="cylc-cpu-emu-gen"
 mkdir -p sifs etc/config scripts
 
 # build sif file
-./build.sh -i jlabtsai/rtdp-cpu_emu:latest
+./build.sh -i jlabtsai/rtdp-cpu_emu:latest -o sifs/cpu-emu.sif
 
 # Make sure we're in the correct directory
 CYLC_RUN_DIR=~/cylc-run/${WORKFLOW_NAME}
