@@ -38,26 +38,24 @@
     {% for component_id, component in config.components.items() %}
     [[{{ component_id }}]]
         script = """
-            # setup output input directories
+            # Setup directories
             mkdir -p ${OUTPUT_DIR}
             mkdir -p ${INPUT_DIR}
-
-            # Setup logging
             mkdir -p ${LOG_DIR}/{{ component_id }}
             exec 1> >(tee -a "${LOG_DIR}/{{ component_id }}/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/{{ component_id }}/stderr.log")
 
-            {% if component.type == "receiver" %}
             # Store hostname for other tasks
             HOSTNAME=$(hostname -f)
             IP=$(hostname -i | awk '{print $1}')
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_hostname
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_ip
 
+            {% if component.type == "receiver" %}
             # Start receiver
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} receive \
-                {{ component.network.port }} \
+                {{ component.network.listen_port }} \
                 "{{ component.network.bind_address }}" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/{{ component_id }}/apptainer.log &
             
             PROC_PID=$!
@@ -82,20 +80,16 @@
             exit 1
 
             {% elif component.type == "emulator" %}
-            # Store hostname for other tasks
-            HOSTNAME=$(hostname -f)
-            IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_ip
-
-            # Get previous component info
-            {% set prev_component = namespace(id=None) %}
+            # Find data target from edges
             {% for edge in config.edges %}
-                {% if edge.to == component_id and edge.type == "ready" %}
-                    {% set prev_component.id = edge.from %}
+                {% if edge.from == component_id %}
+                    {% set target_id = edge.to %}
+                    # Connect to {{ target_id }}
+                    TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target_id }}_ip)
+                    TARGET_PORT={{ config.components[target_id].network.listen_port }}
+                    break
                 {% endif %}
             {% endfor %}
-            PREV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ prev_component.id }}_ip)
             
             # Start emulator
             apptainer run --bind ${OUTPUT_DIR}:/output \
@@ -104,9 +98,9 @@
                 -b {{ component.configuration.latency }} \
                 -m {{ component.configuration.mem_footprint }} \
                 -o {{ component.configuration.output_size }} \
-                -r {{ component.network.port }} \
-                -p {{ config.components[prev_component.id].network.port }} \
-                -i ${PREV_IP} -v 1 &
+                -r {{ component.network.listen_port }} \
+                -p ${TARGET_PORT} \
+                -i ${TARGET_IP} -v 1 &
             
             PROC_PID=$!
             sleep 2
@@ -120,14 +114,16 @@
             exit 1
 
             {% elif component.type == "sender" %}
-            # Get previous component info
-            {% set prev_component = namespace(id=None) %}
+            # Find data target from edges
             {% for edge in config.edges %}
-                {% if edge.to == component_id and edge.type == "ready" %}
-                    {% set prev_component.id = edge.from %}
+                {% if edge.from == component_id %}
+                    {% set target_id = edge.to %}
+                    # Connect to {{ target_id }}
+                    TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target_id }}_ip)
+                    TARGET_PORT={{ config.components[target_id].network.listen_port }}
+                    break
                 {% endif %}
             {% endfor %}
-            PREV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ prev_component.id }}_ip)
             
             # Generate and send data
             dd if=/dev/urandom bs={{ component.test_data.size }} count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
@@ -135,8 +131,8 @@
             apptainer run --bind ${INPUT_DIR}:/data \
                 ${CPU_EMU_SIF} send \
                 "/data/data.bin" \
-                ${PREV_IP} \
-                {{ config.components[prev_component.id].network.port }}
+                ${TARGET_IP} \
+                ${TARGET_PORT}
             
             STATUS=$?
             rm -f ${INPUT_DIR}/data.bin

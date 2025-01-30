@@ -46,10 +46,11 @@ components:
               type: string
         network:
           type: object
-          required: ["port"]
+          required: ["listen_port"]
           properties:
-            port:
+            listen_port:
               type: integer
+              description: "Port to listen on for incoming connections"
             bind_address:
               type: string
               default: "0.0.0.0"
@@ -78,24 +79,20 @@ components:
 edges:
   type: array
   required: true
-  description: "Relationships between components"
+  description: "Data flow connections between components"
   items:
     type: object
-    required: ["from", "to", "type"]
+    required: ["from", "to"]
     properties:
       from:
         type: string
-        description: "Source component ID"
+        description: "Source component ID (data producer)"
       to:
         type: string
-        description: "Target component ID"
-      type:
+        description: "Target component ID (data consumer)"
+      description:
         type: string
-        enum: ["ready", "succeeded", "completed"]
-        description: "Type of relationship"
-      condition:
-        type: string
-        description: "Optional condition for the edge"
+        description: "Optional description of the data flow"
 
 containers:
   image_path:
