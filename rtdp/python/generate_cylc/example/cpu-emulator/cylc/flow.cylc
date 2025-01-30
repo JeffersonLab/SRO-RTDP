@@ -47,10 +47,9 @@
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/data_sender_ip
 
             # Find data target from edges
-                    # Connect to emu_stage1
-                    TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emu_stage1_ip)
-                    TARGET_PORT=50888
-                    break
+            # Connect to emu_stage1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emu_stage1_ip)
+            TARGET_PORT=50888
             
             # Generate and send data
             dd if=/dev/urandom bs=100M count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
@@ -93,10 +92,9 @@
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emu_stage1_ip
 
             # Find data target from edges
-                    # Connect to main_receiver
-                    TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/main_receiver_ip)
-                    TARGET_PORT=50080
-                    break
+            # Connect to main_receiver
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/main_receiver_ip)
+            TARGET_PORT=50080
             
             # Start emulator
             apptainer run --bind ${OUTPUT_DIR}:/output \
