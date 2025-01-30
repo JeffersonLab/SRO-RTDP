@@ -124,9 +124,9 @@ def update_component(component_id: str) -> Union[Dict[str, str], tuple[Dict[str,
         config["resources"] = resources
 
         # Network (based on component type)
-        port = request.form.get('port')
-        if port and component_type in ['receiver', 'emulator']:
-            network_config = {"listen_port": int(port)}
+        listen_port = request.form.get('listen_port')
+        if listen_port and component_type in ['receiver', 'emulator']:
+            network_config = {"listen_port": int(listen_port)}
             if component_type == 'receiver':
                 network_config["bind_address"] = request.form.get(
                     'bind_address', '0.0.0.0')

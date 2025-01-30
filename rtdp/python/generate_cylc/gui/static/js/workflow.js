@@ -370,66 +370,74 @@ class WorkflowGraph {
     }
 
     async openComponentConfig(nodeId) {
-        const node = this.nodes.get(nodeId);
-        if (!node) return;
-
-        // Get the modal
-        const modal = document.getElementById('componentModal');
-        if (!modal) return;
-
-        // Update modal title
-        const modalTitle = modal.querySelector('.modal-title');
-        if (modalTitle) {
-            modalTitle.textContent = `Configure ${node.type} Component`;
-        }
-
         try {
-            // Fetch current component configuration
-            const response = await fetch('/api/workflow/config');
-            const config = await response.json();
-            const componentConfig = config.components[nodeId];
+            // Get current configuration from backend
+            const configResponse = await fetch('/api/workflow/config');
+            const config = await configResponse.json();
+            const componentConfig = config.components[nodeId] || {};
+            const node = this.nodes.get(nodeId);
 
-            if (!componentConfig) {
-                throw new Error('Component configuration not found');
+            // Create modal if it doesn't exist
+            let modal = document.getElementById('componentConfigModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'componentConfigModal';
+                modal.className = 'modal fade';
+                document.body.appendChild(modal);
             }
 
-            // Get the form container
-            const formContainer = modal.querySelector('.modal-body');
-            if (!formContainer) return;
+            // Set modal content
+            modal.innerHTML = `
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Configure ${node.type}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="componentConfigForm">
+                                <!-- Form content will be added here -->
+                            </form>
+                        </div>
+                    </div>
+                </div>`;
 
-            // Create form HTML based on component type
-            let formHtml = `
-                <form id="componentForm">
-                    <input type="hidden" name="id" value="${nodeId}">
-                    <input type="hidden" name="type" value="${node.type}">
-                    
-                    <!-- Common Resources Section -->
-                    <div class="mb-3">
-                        <h5>Resources</h5>
-                        <div class="mb-2">
-                            <label class="form-label">Partition</label>
-                            <input type="text" class="form-control" name="partition" value="${componentConfig.resources.partition}" required>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">CPUs per Task</label>
-                            <input type="number" class="form-control" name="cpus_per_task" value="${componentConfig.resources.cpus_per_task}" min="1" required>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Memory</label>
-                            <input type="text" class="form-control" name="mem" value="${componentConfig.resources.mem}" required>
-                        </div>
-                    </div>`;
+            // Get the form element
+            const form = modal.querySelector('#componentConfigForm');
+            let formHtml = '';
 
-            // Add Network Section based on component type
+            // Add resources section
+            formHtml += `
+                <!-- Resources Section -->
+                <div class="mb-3">
+                    <h5>Resources</h5>
+                    <div class="mb-2">
+                        <label class="form-label">Partition</label>
+                        <input type="text" class="form-control" name="partition" 
+                            value="${componentConfig.resources ? componentConfig.resources.partition : 'ifarm'}" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">CPUs per Task</label>
+                        <input type="number" class="form-control" name="cpus_per_task" min="1" 
+                            value="${componentConfig.resources ? componentConfig.resources.cpus_per_task : '4'}" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Memory</label>
+                        <input type="text" class="form-control" name="mem" 
+                            value="${componentConfig.resources ? componentConfig.resources.mem : '8G'}" required>
+                    </div>
+                </div>`;
+
+            // Add network section based on component type
             if (node.type === 'receiver') {
                 formHtml += `
                     <!-- Network Section -->
                     <div class="mb-3">
                         <h5>Network</h5>
                         <div class="mb-2">
-                            <label class="form-label">Port</label>
-                            <input type="number" class="form-control" name="port" min="1024" max="65535" 
-                                value="${componentConfig.network ? componentConfig.network.port : ''}">
+                            <label class="form-label">Listen Port</label>
+                            <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
+                                value="${componentConfig.network ? componentConfig.network.listen_port : ''}">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Bind Address</label>
@@ -444,7 +452,7 @@ class WorkflowGraph {
                         <h5>Network</h5>
                         <div class="mb-2">
                             <label class="form-label">Listen Port</label>
-                            <input type="number" class="form-control" name="port" min="1024" max="65535" 
+                            <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
                                 value="${componentConfig.network ? componentConfig.network.listen_port : ''}">
                         </div>
                     </div>`;
@@ -458,75 +466,67 @@ class WorkflowGraph {
                     mem_footprint: 0.05,
                     output_size: 0.001
                 };
+
                 formHtml += `
                     <!-- Emulator Configuration -->
                     <div class="mb-3">
                         <h5>Emulator Configuration</h5>
                         <div class="mb-2">
                             <label class="form-label">Threads</label>
-                            <input type="number" class="form-control" name="threads" value="${emulatorConfig.threads}" min="1">
+                            <input type="number" class="form-control" name="threads" min="1" 
+                                value="${emulatorConfig.threads}">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Latency (ms)</label>
-                            <input type="number" class="form-control" name="latency" value="${emulatorConfig.latency}" min="0">
+                            <input type="number" class="form-control" name="latency" min="0" 
+                                value="${emulatorConfig.latency}">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Memory Footprint</label>
-                            <input type="number" class="form-control" name="mem_footprint" value="${emulatorConfig.mem_footprint}" step="0.01" min="0">
+                            <input type="number" class="form-control" name="mem_footprint" min="0" step="0.01" 
+                                value="${emulatorConfig.mem_footprint}">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Output Size</label>
-                            <input type="number" class="form-control" name="output_size" value="${emulatorConfig.output_size}" step="0.001" min="0">
+                            <input type="number" class="form-control" name="output_size" min="0" step="0.001" 
+                                value="${emulatorConfig.output_size}">
                         </div>
                     </div>`;
             } else if (node.type === 'sender') {
-                const testData = componentConfig.test_data || { size: '100M' };
                 formHtml += `
-                    <!-- Sender Configuration -->
+                    <!-- Test Data Configuration -->
                     <div class="mb-3">
                         <h5>Test Data</h5>
                         <div class="mb-2">
                             <label class="form-label">Data Size</label>
-                            <input type="text" class="form-control" name="data_size" value="${testData.size}">
+                            <input type="text" class="form-control" name="data_size" 
+                                value="${componentConfig.test_data ? componentConfig.test_data.size : '100M'}">
                         </div>
                     </div>`;
             }
 
+            // Add submit button
             formHtml += `
-                    <div class="text-end">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save</button>
-                    </div>
-                </form>`;
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>`;
 
-            formContainer.innerHTML = formHtml;
+            form.innerHTML = formHtml;
 
             // Add form submit handler
-            const form = formContainer.querySelector('form');
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
+                // Add the component type to the form data
+                formData.append('type', node.type);
 
                 try {
-                    const response = await fetch('/api/components/' + nodeId, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('Failed to update component');
-                    }
-
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        // Close modal
-                        bootstrap.Modal.getInstance(modal).hide();
-                        // Refresh graph
-                        refreshWorkflowGraph();
-                    }
+                    // Pass the modal instance to saveComponentConfig
+                    await this.saveComponentConfig(nodeId, formData, bsModal);
                 } catch (error) {
-                    console.error('Error updating component:', error);
-                    alert('Failed to update component configuration');
+                    console.error('Error saving component configuration:', error);
+                    alert('Failed to save component configuration. Please try again.');
                 }
             });
 
@@ -536,6 +536,107 @@ class WorkflowGraph {
         } catch (error) {
             console.error('Error loading component configuration:', error);
             alert('Failed to load component configuration');
+        }
+    }
+
+    async saveComponentConfig(nodeId, formData, modalInstance) {
+        try {
+            // Store existing edges before the update
+            const existingEdges = this.edges.get();
+
+            const response = await fetch(`/api/components/${nodeId}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save component configuration');
+            }
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                // Restore edge descriptions after the update
+                existingEdges.forEach(edge => {
+                    const currentEdge = this.edges.get(edge.id);
+                    if (currentEdge) {
+                        currentEdge.label = edge.label;
+                        this.edges.update(currentEdge);
+                    }
+                });
+
+                // Close the modal using the passed instance
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+
+                // Refresh the graph by reloading the configuration
+                await this.loadWorkflowConfig();
+            }
+        } catch (error) {
+            console.error('Error saving component configuration:', error);
+            alert('Failed to save component configuration. Please try again.');
+        }
+    }
+
+    async loadWorkflowConfig() {
+        try {
+            const response = await fetch('/api/workflow/config');
+            if (!response.ok) {
+                throw new Error('Failed to load workflow configuration');
+            }
+
+            const config = await response.json();
+
+            // Store current node positions before clearing
+            const nodePositions = {};
+            this.nodes.forEach(node => {
+                const position = this.network.getPosition(node.id);
+                nodePositions[node.id] = position;
+            });
+
+            // Clear existing nodes and edges
+            this.nodes.clear();
+            this.edges.clear();
+
+            // Add components as nodes, preserving positions
+            for (const [id, component] of Object.entries(config.components || {})) {
+                this.nodes.add({
+                    id: id,
+                    label: `${component.type}\n#${id.split('-')[1]}`,
+                    type: component.type,
+                    color: this.getNodeColor(component.type),
+                    // Restore position if it exists, otherwise let vis.js position it
+                    ...(nodePositions[id] ? {
+                        x: nodePositions[id].x,
+                        y: nodePositions[id].y,
+                        fixed: true  // Keep the node fixed in its position
+                    } : {})
+                });
+            }
+
+            // Add edges with their descriptions
+            if (config.edges) {
+                config.edges.forEach(edge => {
+                    this.edges.add({
+                        from: edge.from,
+                        to: edge.to,
+                        label: edge.description || '',
+                        id: `${edge.from}-${edge.to}`
+                    });
+                });
+            }
+
+            // Release fixed positions after a short delay
+            setTimeout(() => {
+                this.nodes.forEach(node => {
+                    if (node.fixed) {
+                        this.nodes.update({ id: node.id, fixed: false });
+                    }
+                });
+            }, 100);
+        } catch (error) {
+            console.error('Error loading workflow configuration:', error);
+            alert('Failed to load workflow configuration');
         }
     }
 
