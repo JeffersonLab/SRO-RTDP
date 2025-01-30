@@ -19,7 +19,13 @@
         
         [[[directives]]]
             --ntasks = 1
-            --partition = {{ config.components.values()|selectattr("type", "equalto", "receiver")|first|attr("resources")|attr("partition") }}
+            {% set receiver = namespace(partition=None) %}
+            {% for component in config.components.values() %}
+                {% if component.type == "receiver" and not receiver.partition %}
+                    {% set receiver.partition = component.resources.partition %}
+                {% endif %}
+            {% endfor %}
+            --partition = {{ receiver.partition }}
             --output = slurm_%j.log
             --error = slurm_%j.log
         
@@ -38,6 +44,12 @@
             exec 2> >(tee -a "${LOG_DIR}/{{ component_id }}/stderr.log")
 
             {% if component.type == "receiver" %}
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_ip
+
             # Start receiver
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} receive \
@@ -66,6 +78,12 @@
             exit 1
 
             {% elif component.type == "emulator" %}
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_ip
+
             # Get previous component info
             {% set prev_component = namespace(id=None) %}
             {% for edge in config.edges %}
