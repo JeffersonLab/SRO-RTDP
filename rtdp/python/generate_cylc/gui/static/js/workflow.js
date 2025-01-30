@@ -206,44 +206,115 @@ class WorkflowGraph {
             return;
         }
 
-        // Create edge data
-        const edge = {
-            from: edgeData.from,
-            to: edgeData.to,
-            label: 'ready',
-            arrows: {
-                to: {
-                    enabled: true,
-                    scaleFactor: 1
-                }
+        // Show edge configuration modal
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Configure Edge</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="edgeConfigForm">
+                            <div class="mb-3">
+                                <label class="form-label">Edge Type</label>
+                                <select class="form-control" name="type" id="edgeType" required>
+                                    <option value="ready">Ready (Start Chain)</option>
+                                    <option value="succeeded">Succeeded (Completion Chain)</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                            <div class="mb-3" id="conditionField" style="display: none;">
+                                <label class="form-label">Condition</label>
+                                <input type="text" class="form-control" name="condition" value="!" placeholder="e.g., ! for task completion">
+                                <small class="form-text text-muted">Use ! for task completion in completion chain</small>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="saveEdgeConfig">Save</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        const modalInstance = new bootstrap.Modal(modal);
+
+        // Show/hide condition field based on edge type
+        const edgeTypeSelect = modal.querySelector('#edgeType');
+        const conditionField = modal.querySelector('#conditionField');
+        edgeTypeSelect.addEventListener('change', () => {
+            if (edgeTypeSelect.value === 'succeeded') {
+                conditionField.style.display = 'block';
+            } else {
+                conditionField.style.display = 'none';
             }
-        };
+        });
 
-        // Create form data for the request
-        const formData = new FormData();
-        formData.append('from_id', edgeData.from);
-        formData.append('to_id', edgeData.to);
-        formData.append('type', 'ready');
+        modalInstance.show();
 
-        // Make API call to add edge
-        fetch('/api/edges', {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    // Add edge to the graph
-                    this.edges.add(edge);
-                    callback(edge);
-                } else {
-                    callback(null);
+        // Handle edge configuration save
+        document.getElementById('saveEdgeConfig').addEventListener('click', () => {
+            const form = document.getElementById('edgeConfigForm');
+            const edgeType = form.querySelector('[name="type"]').value;
+            const condition = edgeType === 'succeeded' ? form.querySelector('[name="condition"]').value : '';
+
+            // Create edge data
+            const edge = {
+                from: edgeData.from,
+                to: edgeData.to,
+                label: edgeType + (condition ? `\n(${condition})` : ''),
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 1
+                    }
                 }
+            };
+
+            // Create form data for the request
+            const formData = new FormData();
+            formData.append('from_id', edgeData.from);
+            formData.append('to_id', edgeData.to);
+            formData.append('type', edgeType);
+            if (condition) {
+                formData.append('condition', condition);
+            }
+
+            // Make API call to add edge
+            fetch('/api/edges', {
+                method: 'POST',
+                body: formData
             })
-            .catch(error => {
-                console.error('Error adding edge:', error);
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Add edge to the graph
+                        this.edges.add(edge);
+                        callback(edge);
+                        modalInstance.hide();
+                        modal.remove();
+                    } else {
+                        callback(null);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error adding edge:', error);
+                    callback(null);
+                });
+        });
+
+        // Clean up modal when hidden
+        modal.addEventListener('hidden.bs.modal', () => {
+            modal.remove();
+            if (!this.edges.get(edgeData.id)) {
                 callback(null);
-            });
+            }
+        });
     }
 
     handleEdgeDeletion(edgeData, callback) {
@@ -466,13 +537,14 @@ class WorkflowGraph {
             this.nodes.add(nodeData);
         });
 
-        // Add edges
+        // Add edges with their types and conditions
         if (config.edges && Array.isArray(config.edges)) {
             config.edges.forEach(edge => {
+                const edgeLabel = edge.type + (edge.condition ? `\n(${edge.condition})` : '');
                 this.edges.add({
                     from: edge.from,
                     to: edge.to,
-                    label: edge.type || 'ready',
+                    label: edgeLabel,
                     arrows: {
                         to: {
                             enabled: true,

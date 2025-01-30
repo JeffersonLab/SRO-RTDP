@@ -145,12 +145,13 @@ def add_edge() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     from_id = request.form.get('from_id')
     to_id = request.form.get('to_id')
     edge_type = request.form.get('type', 'ready')
+    condition = request.form.get('condition')  # Get condition from form data
 
     if not from_id or not to_id:
         return {"status": "error", "message": "Missing from_id or to_id"}, 400
 
     try:
-        workflow_manager.add_edge(from_id, to_id, edge_type)
+        workflow_manager.add_edge(from_id, to_id, edge_type, condition)
         return {"status": "success"}
     except ValueError as e:
         return {"status": "error", "message": str(e)}, 400
