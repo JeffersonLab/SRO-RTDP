@@ -34,6 +34,10 @@
 
     [[main_receiver]]
         script = """
+            # setup output input directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+
             # Setup logging
             mkdir -p ${LOG_DIR}/main_receiver
             exec 1> >(tee -a "${LOG_DIR}/main_receiver/stdout.log")
@@ -84,6 +88,10 @@
 
     [[emu_stage1]]
         script = """
+            # setup output input directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+
             # Setup logging
             mkdir -p ${LOG_DIR}/emu_stage1
             exec 1> >(tee -a "${LOG_DIR}/emu_stage1/stdout.log")
@@ -131,6 +139,10 @@
 
     [[emu_stage2]]
         script = """
+            # setup output input directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+
             # Setup logging
             mkdir -p ${LOG_DIR}/emu_stage2
             exec 1> >(tee -a "${LOG_DIR}/emu_stage2/stdout.log")
@@ -178,6 +190,10 @@
 
     [[data_sender]]
         script = """
+            # setup output input directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+
             # Setup logging
             mkdir -p ${LOG_DIR}/data_sender
             exec 1> >(tee -a "${LOG_DIR}/data_sender/stdout.log")
