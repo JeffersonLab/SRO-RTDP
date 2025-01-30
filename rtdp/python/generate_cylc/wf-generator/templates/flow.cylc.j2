@@ -81,15 +81,15 @@
 
             {% elif component.type == "emulator" %}
             # Find data target from edges
+            {% set target = namespace(id=None) %}
             {% for edge in config.edges %}
                 {% if edge.from == component_id %}
-                    {% set target_id = edge.to %}
-                    # Connect to {{ target_id }}
-                    TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target_id }}_ip)
-                    TARGET_PORT={{ config.components[target_id].network.listen_port }}
-                    break
+                    {% set target.id = edge.to %}
                 {% endif %}
             {% endfor %}
+            # Connect to {{ target.id }}
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target.id }}_ip)
+            TARGET_PORT={{ config.components[target.id].network.listen_port }}
             
             # Start emulator
             apptainer run --bind ${OUTPUT_DIR}:/output \
@@ -115,15 +115,15 @@
 
             {% elif component.type == "sender" %}
             # Find data target from edges
+            {% set target = namespace(id=None) %}
             {% for edge in config.edges %}
                 {% if edge.from == component_id %}
-                    {% set target_id = edge.to %}
-                    # Connect to {{ target_id }}
-                    TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target_id }}_ip)
-                    TARGET_PORT={{ config.components[target_id].network.listen_port }}
-                    break
+                    {% set target.id = edge.to %}
                 {% endif %}
             {% endfor %}
+            # Connect to {{ target.id }}
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target.id }}_ip)
+            TARGET_PORT={{ config.components[target.id].network.listen_port }}
             
             # Generate and send data
             dd if=/dev/urandom bs={{ component.test_data.size }} count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
