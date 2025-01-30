@@ -84,7 +84,7 @@ class ComponentForm(FlaskForm):
                       validators=[DataRequired()])
 
     # Network
-    port = IntegerField('Port',
+    port = IntegerField('Listen Port',
                         validators=[Optional(), NumberRange(min=1024, max=65535)])
     bind_address = StringField('Bind Address', default="0.0.0.0")
 

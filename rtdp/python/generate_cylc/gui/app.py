@@ -126,7 +126,7 @@ def update_component(component_id: str) -> Union[Dict[str, str], tuple[Dict[str,
         # Network (based on component type)
         port = request.form.get('port')
         if port and component_type in ['receiver', 'emulator']:
-            network_config = {"port": int(port)}
+            network_config = {"listen_port": int(port)}
             if component_type == 'receiver':
                 network_config["bind_address"] = request.form.get(
                     'bind_address', '0.0.0.0')
@@ -162,7 +162,7 @@ def add_edge() -> Union[Dict[str, Any], Tuple[Dict[str, Any], int]]:
     from_id = request.form.get('from_id')
     to_id = request.form.get('to_id')
     description = request.form.get('description')
-    
+
     if not from_id or not to_id:
         return {
             "status": "error",
