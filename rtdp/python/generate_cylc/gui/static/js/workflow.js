@@ -14,7 +14,7 @@ class WorkflowGraph {
         // A -> B means "if A ready then start B"
         this.edgeRules = {
             'sender': ['emulator', 'receiver'],
-            'emulator': ['receiver'],
+            'emulator': ['receiver', 'sender', 'emulator'],  // Allow emulator to connect to sender and other emulators
             'receiver': ['sender', 'emulator']
         };
 
@@ -64,6 +64,9 @@ class WorkflowGraph {
                 },
                 deleteEdge: (edgeData, callback) => {
                     this.handleEdgeDeletion(edgeData, callback);
+                },
+                deleteNode: (nodeData, callback) => {
+                    this.handleNodeDeletion(nodeData, callback);
                 }
             },
             physics: {
@@ -378,6 +381,42 @@ class WorkflowGraph {
             })
             .catch(error => {
                 console.error('Error deleting edge:', error);
+                callback(null);
+            });
+    }
+
+    handleNodeDeletion(nodeData, callback) {
+        // Handle both single and multiple node deletion
+        const nodeIds = Array.isArray(nodeData.nodes) ? nodeData.nodes : [nodeData.nodes[0]];
+
+        // Create a promise for each node deletion
+        const deletePromises = nodeIds.map(nodeId =>
+            fetch(`/api/components/${nodeId}`, {
+                method: 'DELETE'
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to delete component ${nodeId}`);
+                    }
+                    return response.json();
+                })
+        );
+
+        // Wait for all deletions to complete
+        Promise.all(deletePromises)
+            .then(() => {
+                // Remove all nodes from the graph
+                this.nodes.remove(nodeIds);
+                callback(nodeData);
+
+                // Wait a short moment before refreshing to ensure backend is updated
+                setTimeout(() => {
+                    refreshWorkflowGraph();
+                }, 100);
+            })
+            .catch(error => {
+                console.error('Error deleting components:', error);
+                alert('Failed to delete some components. Please try again.');
                 callback(null);
             });
     }
