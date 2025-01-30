@@ -144,9 +144,15 @@ class WorkflowManager:
 
         component = self.components[component_id]
 
+        # Update resources
+        if "resources" in config:
+            component.resources = Resources(**config["resources"])
+
+        # Update network configuration
         if "network" in config:
             component.network = Network(**config["network"])
 
+        # Update type-specific configuration
         if component.type == "emulator" and "configuration" in config:
             component.configuration = EmulatorConfig(**config["configuration"])
 

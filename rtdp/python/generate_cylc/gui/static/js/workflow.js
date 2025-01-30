@@ -268,7 +268,7 @@ class WorkflowGraph {
             });
     }
 
-    openComponentConfig(nodeId) {
+    async openComponentConfig(nodeId) {
         const node = this.nodes.get(nodeId);
         if (!node) return;
 
@@ -282,19 +282,145 @@ class WorkflowGraph {
             modalTitle.textContent = `Configure ${node.type} Component`;
         }
 
-        // Get the form
-        const form = modal.querySelector('form');
-        if (!form) return;
+        try {
+            // Fetch current component configuration
+            const response = await fetch('/api/workflow/config');
+            const config = await response.json();
+            const componentConfig = config.components[nodeId];
 
-        // Set the component ID
-        const idInput = form.querySelector('input[name="id"]');
-        if (idInput) {
-            idInput.value = nodeId;
+            if (!componentConfig) {
+                throw new Error('Component configuration not found');
+            }
+
+            // Get the form container
+            const formContainer = modal.querySelector('.modal-body');
+            if (!formContainer) return;
+
+            // Create form HTML based on component type
+            let formHtml = `
+                <form id="componentForm">
+                    <input type="hidden" name="id" value="${nodeId}">
+                    <input type="hidden" name="type" value="${node.type}">
+                    
+                    <!-- Common Resources Section -->
+                    <div class="mb-3">
+                        <h5>Resources</h5>
+                        <div class="mb-2">
+                            <label class="form-label">Partition</label>
+                            <input type="text" class="form-control" name="partition" value="${componentConfig.resources.partition}" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">CPUs per Task</label>
+                            <input type="number" class="form-control" name="cpus_per_task" value="${componentConfig.resources.cpus_per_task}" min="1" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Memory</label>
+                            <input type="text" class="form-control" name="mem" value="${componentConfig.resources.mem}" required>
+                        </div>
+                    </div>
+
+                    <!-- Network Section -->
+                    <div class="mb-3">
+                        <h5>Network</h5>
+                        <div class="mb-2">
+                            <label class="form-label">Port</label>
+                            <input type="number" class="form-control" name="port" min="1024" max="65535" 
+                                value="${componentConfig.network ? componentConfig.network.port : ''}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Bind Address</label>
+                            <input type="text" class="form-control" name="bind_address" 
+                                value="${componentConfig.network ? componentConfig.network.bind_address : '0.0.0.0'}">
+                        </div>
+                    </div>`;
+
+            // Add type-specific configuration
+            if (node.type === 'emulator') {
+                const emulatorConfig = componentConfig.configuration || {
+                    threads: 4,
+                    latency: 50,
+                    mem_footprint: 0.05,
+                    output_size: 0.001
+                };
+                formHtml += `
+                    <!-- Emulator Configuration -->
+                    <div class="mb-3">
+                        <h5>Emulator Configuration</h5>
+                        <div class="mb-2">
+                            <label class="form-label">Threads</label>
+                            <input type="number" class="form-control" name="threads" value="${emulatorConfig.threads}" min="1">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Latency (ms)</label>
+                            <input type="number" class="form-control" name="latency" value="${emulatorConfig.latency}" min="0">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Memory Footprint</label>
+                            <input type="number" class="form-control" name="mem_footprint" value="${emulatorConfig.mem_footprint}" step="0.01" min="0">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Output Size</label>
+                            <input type="number" class="form-control" name="output_size" value="${emulatorConfig.output_size}" step="0.001" min="0">
+                        </div>
+                    </div>`;
+            } else if (node.type === 'sender') {
+                const testData = componentConfig.test_data || { size: '100M' };
+                formHtml += `
+                    <!-- Sender Configuration -->
+                    <div class="mb-3">
+                        <h5>Test Data</h5>
+                        <div class="mb-2">
+                            <label class="form-label">Data Size</label>
+                            <input type="text" class="form-control" name="data_size" value="${testData.size}">
+                        </div>
+                    </div>`;
+            }
+
+            formHtml += `
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>`;
+
+            formContainer.innerHTML = formHtml;
+
+            // Add form submit handler
+            const form = formContainer.querySelector('form');
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+
+                try {
+                    const response = await fetch('/api/components/' + nodeId, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to update component');
+                    }
+
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        // Close modal
+                        bootstrap.Modal.getInstance(modal).hide();
+                        // Refresh graph
+                        refreshWorkflowGraph();
+                    }
+                } catch (error) {
+                    console.error('Error updating component:', error);
+                    alert('Failed to update component configuration');
+                }
+            });
+
+            // Show the modal
+            const bsModal = new bootstrap.Modal(modal);
+            bsModal.show();
+        } catch (error) {
+            console.error('Error loading component configuration:', error);
+            alert('Failed to load component configuration');
         }
-
-        // Show the modal
-        const bsModal = new bootstrap.Modal(modal);
-        bsModal.show();
     }
 
     getNodeColor(type) {
@@ -307,18 +433,37 @@ class WorkflowGraph {
     }
 
     updateFromConfig(config) {
+        // Disable physics before any changes
+        this.network.setOptions({ physics: { enabled: false } });
+
+        // Store current positions of nodes
+        const positions = {};
+        this.nodes.forEach(node => {
+            const position = this.network.getPosition(node.id);
+            positions[node.id] = position;
+        });
+
         // Clear existing nodes and edges
         this.nodes.clear();
         this.edges.clear();
 
-        // Add nodes from components
+        // Add nodes from components, preserving positions if they existed
         Object.entries(config.components).forEach(([id, comp]) => {
-            this.nodes.add({
+            const nodeData = {
                 id: id,
                 label: `${comp.type}\n#${id}`,
                 type: comp.type,
-                color: this.getNodeColor(comp.type)
-            });
+                color: this.getNodeColor(comp.type),
+                physics: false  // Disable physics for each node
+            };
+
+            // If this node existed before, restore its position
+            if (positions[id]) {
+                nodeData.x = positions[id].x;
+                nodeData.y = positions[id].y;
+            }
+
+            this.nodes.add(nodeData);
         });
 
         // Add edges
@@ -333,13 +478,13 @@ class WorkflowGraph {
                             enabled: true,
                             scaleFactor: 1
                         }
-                    }
+                    },
+                    physics: false  // Disable physics for edges too
                 });
             });
         }
 
-        // Stabilize the network
-        this.network.stabilize();
+        // No need to stabilize or fix/unfix nodes since physics is disabled
     }
 }
 
