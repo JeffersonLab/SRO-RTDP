@@ -81,10 +81,9 @@ class Component:
 
 @dataclass
 class Edge:
-    from_id: str
-    to_id: str
-    type: str  # "ready", "succeeded", or "completed"
-    condition: Optional[str] = None
+    from_id: str  # Source component ID (data producer)
+    to_id: str    # Target component ID (data consumer)
+    description: Optional[str] = None  # Optional description of the data flow
 
 
 @dataclass
@@ -128,15 +127,31 @@ class WorkflowManager:
                 if hasattr(self._component_types, component_id):
                     delattr(self._component_types, component_id)
 
-    def add_edge(self, from_id: str, to_id: str, edge_type: str, condition: Optional[str] = None) -> None:
-        """Add a new edge between components."""
+    def add_edge(
+        self,
+        from_id: str,
+        to_id: str,
+        description: Optional[str] = None
+    ) -> None:
+        """Add a new data flow edge between components."""
         if from_id not in self.components or to_id not in self.components:
             raise ValueError("Both components must exist")
-        if edge_type not in ["ready", "succeeded", "completed"]:
-            raise ValueError("Invalid edge type")
 
-        edge = Edge(from_id=from_id, to_id=to_id,
-                    type=edge_type, condition=condition)
+        # Validate that the edge represents a valid data flow
+        from_comp = self.components[from_id]
+        to_comp = self.components[to_id]
+
+        # Validate data flow direction
+        if from_comp.type == 'receiver':
+            raise ValueError("Receiver cannot be a data producer")
+        if to_comp.type == 'sender':
+            raise ValueError("Sender cannot be a data consumer")
+
+        edge = Edge(
+            from_id=from_id,
+            to_id=to_id,
+            description=description
+        )
         self.edges.append(edge)
 
     def remove_edge(self, from_id: str, to_id: str) -> None:
@@ -205,8 +220,7 @@ class WorkflowManager:
                 {
                     "from": edge.from_id,
                     "to": edge.to_id,
-                    "type": edge.type,
-                    **({"condition": edge.condition} if edge.condition else {})
+                    **({"description": edge.description} if edge.description else {})
                 }
                 for edge in self.edges
             ],
