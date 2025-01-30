@@ -65,14 +65,33 @@
             if kill -0 $PROC_PID 2>/dev/null; then
                 cylc message "ready"
                 
+                # Initialize size tracking
+                PREV_SIZE=0
+                STABLE_COUNT=0
+                MAX_STABLE_COUNT=6  # Wait for 30 seconds of stable size
+                
                 # Monitor until completion
                 while kill -0 $PROC_PID 2>/dev/null; do
                     if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                        SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
-                        if [ $SIZE -gt 0 ]; then
-                            cylc message -- "Transfer completed successfully"
-                            exit 0
+                        CURR_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                        
+                        if [ $CURR_SIZE -gt $PREV_SIZE ]; then
+                            # Size increased, reset stable counter
+                            STABLE_COUNT=0
+                            echo "Data size increased: ${CURR_SIZE} bytes"
+                        elif [ $CURR_SIZE -gt 0 ] && [ $CURR_SIZE -eq $PREV_SIZE ]; then
+                            # Size stable and non-zero
+                            STABLE_COUNT=$((STABLE_COUNT + 1))
+                            echo "Data size stable for $((STABLE_COUNT * 5)) seconds: ${CURR_SIZE} bytes"
+                            
+                            if [ $STABLE_COUNT -ge $MAX_STABLE_COUNT ]; then
+                                echo "Transfer completed successfully"
+                                cylc message -- "Transfer completed successfully"
+                                exit 0
+                            fi
                         fi
+                        
+                        PREV_SIZE=$CURR_SIZE
                     fi
                     sleep 5
                 done
