@@ -4,7 +4,7 @@
 set -e
 
 # Set fixed workflow name
-WORKFLOW_NAME="cpu-emu"
+WORKFLOW_NAME="cylc-cpu-emu-gen"
 
 # Create necessary directories
 mkdir -p sifs etc/config scripts
