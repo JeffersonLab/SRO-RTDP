@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_file
+from flask import Flask, render_template, send_file, request
 from flask_bootstrap import Bootstrap5
 import os
 import yaml
@@ -61,46 +61,27 @@ def update_platform() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
 @app.route('/api/components', methods=['POST'])
 def add_component() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Add a new component."""
-    form = ComponentForm()
-    if form.validate_on_submit():
+    try:
+        # Get data from form
+        component_id = request.form.get('id')
+        component_type = request.form.get('type')
+
+        if not component_id or not component_type:
+            return {"status": "error", "message": "Missing id or type"}, 400
+
+        # Create resources dictionary
         resources = {
-            "partition": form.partition.data,
-            "cpus_per_task": form.cpus_per_task.data,
-            "mem": form.mem.data
+            "partition": request.form.get('partition', 'ifarm'),
+            "cpus_per_task": int(request.form.get('cpus_per_task', '4')),
+            "mem": request.form.get('mem', '8G')
         }
-        try:
-            workflow_manager.add_component(
-                form.id.data, form.type.data, resources)
 
-            # Add component-specific configuration
-            config: Dict[str, Any] = {}
-
-            if form.port.data:
-                config["network"] = {
-                    "port": form.port.data,
-                    "bind_address": form.bind_address.data
-                }
-
-            if form.type.data == "emulator":
-                config["configuration"] = {
-                    "threads": form.threads.data,
-                    "latency": form.latency.data,
-                    "mem_footprint": form.mem_footprint.data,
-                    "output_size": form.output_size.data
-                }
-
-            if form.type.data == "sender":
-                config["test_data"] = {
-                    "size": form.data_size.data
-                }
-
-            if config:
-                workflow_manager.update_component_config(form.id.data, config)
-
-            return {"status": "success"}
-        except ValueError as e:
-            return {"status": "error", "message": str(e)}, 400
-    return {"status": "error", "errors": form.errors}, 400
+        workflow_manager.add_component(component_id, component_type, resources)
+        return {"status": "success"}
+    except ValueError as e:
+        return {"status": "error", "message": str(e)}, 400
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to add component: {str(e)}"}, 400
 
 
 @app.route('/api/components/<component_id>', methods=['DELETE'])
@@ -113,24 +94,19 @@ def remove_component(component_id: str) -> Dict[str, str]:
 @app.route('/api/edges', methods=['POST'])
 def add_edge() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Add a new edge."""
-    form = EdgeForm()
-    form.from_id.choices = [(id, id)
-                            for id in workflow_manager.components.keys()]
-    form.to_id.choices = [(id, id)
-                          for id in workflow_manager.components.keys()]
+    # Get data from form
+    from_id = request.form.get('from_id')
+    to_id = request.form.get('to_id')
+    edge_type = request.form.get('type', 'ready')
 
-    if form.validate_on_submit():
-        try:
-            workflow_manager.add_edge(
-                form.from_id.data,
-                form.to_id.data,
-                form.type.data,
-                form.condition.data if form.condition.data else None
-            )
-            return {"status": "success"}
-        except ValueError as e:
-            return {"status": "error", "message": str(e)}, 400
-    return {"status": "error", "errors": form.errors}, 400
+    if not from_id or not to_id:
+        return {"status": "error", "message": "Missing from_id or to_id"}, 400
+
+    try:
+        workflow_manager.add_edge(from_id, to_id, edge_type)
+        return {"status": "success"}
+    except ValueError as e:
+        return {"status": "error", "message": str(e)}, 400
 
 
 @app.route('/api/edges/<from_id>/<to_id>', methods=['DELETE'])

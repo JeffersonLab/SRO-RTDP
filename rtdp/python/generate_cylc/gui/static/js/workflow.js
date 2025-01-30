@@ -10,17 +10,12 @@ class WorkflowGraph {
         this.edges = new vis.DataSet();
         this.graphContainer = document.getElementById('workflow-graph');
 
-        // Define valid edge rules based on Cylc workflow
+        // Define valid edge rules based on workflow dependencies
+        // A -> B means "if A ready then start B"
         this.edgeRules = {
-            'receiver': {
-                'emulator': ['ready'],
-            },
-            'emulator': {
-                'sender': ['ready'],
-            },
-            'sender': {
-                'receiver': ['succeeded'],
-            }
+            'sender': ['emulator', 'receiver'],
+            'emulator': ['receiver'],
+            'receiver': ['sender', 'emulator']
         };
 
         this.init();
@@ -41,7 +36,12 @@ class WorkflowGraph {
                 shadow: true
             },
             edges: {
-                arrows: 'to',
+                arrows: {
+                    to: {
+                        enabled: true,
+                        scaleFactor: 1
+                    }
+                },
                 smooth: {
                     enabled: true,
                     type: 'cubicBezier',
@@ -50,16 +50,34 @@ class WorkflowGraph {
                 font: {
                     size: 12,
                     align: 'middle'
+                },
+                color: {
+                    color: '#2B7CE9',
+                    highlight: '#2B7CE9',
+                    hover: '#2B7CE9'
                 }
             },
             manipulation: {
                 enabled: true,
                 addEdge: (edgeData, callback) => {
                     this.handleEdgeCreation(edgeData, callback);
+                },
+                deleteEdge: (edgeData, callback) => {
+                    this.handleEdgeDeletion(edgeData, callback);
                 }
             },
             physics: {
-                enabled: false
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -50,
+                    springLength: 200,
+                    springConstant: 0.1
+                },
+                stabilization: {
+                    enabled: true,
+                    iterations: 1000
+                }
             }
         };
 
@@ -74,6 +92,11 @@ class WorkflowGraph {
             if (params.nodes.length > 0) {
                 this.openComponentConfig(params.nodes[0]);
             }
+        });
+
+        // Disable physics after initial layout
+        this.network.once('stabilized', () => {
+            this.network.setOptions({ physics: { enabled: false } });
         });
     }
 
@@ -125,30 +148,33 @@ class WorkflowGraph {
             color: this.getNodeColor(type)
         };
 
-        this.nodes.add(nodeData);
-
-        // Create default configuration
-        const resources = {
-            partition: 'ifarm',
-            cpus_per_task: 4,
-            mem: '8G'
-        };
+        // Create form data for the request
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('type', type);
+        formData.append('partition', 'ifarm');
+        formData.append('cpus_per_task', '4');
+        formData.append('mem', '8G');
 
         // Make API call to add component
         fetch('/api/components', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                id: id,
-                type: type,
-                resources: resources
-            })
+            body: formData
         })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to add component');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    // Add node to the graph
+                    this.nodes.add(nodeData);
+                }
+            })
             .catch(error => {
                 console.error('Error adding component:', error);
-                this.nodes.remove(id);
             });
     }
 
@@ -161,39 +187,83 @@ class WorkflowGraph {
             return;
         }
 
-        const allowedTypes = this.edgeRules[fromNode.type]?.[toNode.type];
-        if (!allowedTypes) {
-            alert(`Invalid connection: ${fromNode.type} cannot connect to ${toNode.type}`);
+        // Check if this connection is allowed
+        const allowedTargets = this.edgeRules[fromNode.type] || [];
+        if (!allowedTargets.includes(toNode.type)) {
+            alert(`Invalid connection: ${fromNode.type} cannot trigger ${toNode.type}`);
             callback(null);
             return;
         }
 
-        // Use the first allowed type
-        const edgeType = allowedTypes[0];
+        // Check for duplicate edges
+        const existingEdges = this.edges.get({
+            filter: edge => edge.from === edgeData.from && edge.to === edgeData.to
+        });
+
+        if (existingEdges.length > 0) {
+            alert('This connection already exists');
+            callback(null);
+            return;
+        }
+
+        // Create edge data
+        const edge = {
+            from: edgeData.from,
+            to: edgeData.to,
+            label: 'ready',
+            arrows: {
+                to: {
+                    enabled: true,
+                    scaleFactor: 1
+                }
+            }
+        };
+
+        // Create form data for the request
+        const formData = new FormData();
+        formData.append('from_id', edgeData.from);
+        formData.append('to_id', edgeData.to);
+        formData.append('type', 'ready');
 
         // Make API call to add edge
         fetch('/api/edges', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                from_id: edgeData.from,
-                to_id: edgeData.to,
-                type: edgeType
-            })
+            body: formData
         })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    edgeData.label = edgeType;
-                    callback(edgeData);
+                    // Add edge to the graph
+                    this.edges.add(edge);
+                    callback(edge);
                 } else {
                     callback(null);
                 }
             })
             .catch(error => {
                 console.error('Error adding edge:', error);
+                callback(null);
+            });
+    }
+
+    handleEdgeDeletion(edgeData, callback) {
+        const edge = edgeData.edges[0];
+        // Make API call to delete edge
+        fetch(`/api/edges/${edge.from}/${edge.to}`, {
+            method: 'DELETE'
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Remove edge from the graph
+                    this.edges.remove(edge);
+                    callback(edge);
+                } else {
+                    callback(null);
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting edge:', error);
                 callback(null);
             });
     }
@@ -245,20 +315,31 @@ class WorkflowGraph {
         Object.entries(config.components).forEach(([id, comp]) => {
             this.nodes.add({
                 id: id,
-                label: comp.type,
+                label: `${comp.type}\n#${id}`,
                 type: comp.type,
                 color: this.getNodeColor(comp.type)
             });
         });
 
         // Add edges
-        config.edges.forEach(edge => {
-            this.edges.add({
-                from: edge.from,
-                to: edge.to,
-                label: edge.type
+        if (config.edges && Array.isArray(config.edges)) {
+            config.edges.forEach(edge => {
+                this.edges.add({
+                    from: edge.from,
+                    to: edge.to,
+                    label: edge.type || 'ready',
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 1
+                        }
+                    }
+                });
             });
-        });
+        }
+
+        // Stabilize the network
+        this.network.stabilize();
     }
 }
 
