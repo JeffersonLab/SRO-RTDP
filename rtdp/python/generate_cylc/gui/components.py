@@ -52,7 +52,7 @@ class Resources:
 
 @dataclass
 class Network:
-    port: int
+    listen_port: int
     bind_address: Optional[str] = None
 
 
@@ -201,7 +201,7 @@ class WorkflowManager:
                         "mem": comp.resources.mem
                     },
                     **({"network": {
-                        "port": comp.network.port,
+                        "listen_port": comp.network.listen_port,
                         **({
                             "bind_address": comp.network.bind_address
                         } if (comp.type == "receiver" and 
