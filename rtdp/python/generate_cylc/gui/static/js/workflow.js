@@ -137,45 +137,88 @@ class WorkflowGraph {
         });
     }
 
-    addComponent(type, position) {
-        const id = `${type}-${Date.now()}`;
-        const nodeData = {
-            id: id,
-            label: type,
-            x: position.x,
-            y: position.y,
-            type: type,
-            color: this.getNodeColor(type)
-        };
+    async addComponent(type, position) {
+        try {
+            // Get current configuration from backend
+            const configResponse = await fetch('/api/workflow/config');
+            const config = await configResponse.json();
 
-        // Create form data for the request
-        const formData = new FormData();
-        formData.append('id', id);
-        formData.append('type', type);
-        formData.append('partition', 'ifarm');
-        formData.append('cpus_per_task', '4');
-        formData.append('mem', '8G');
-
-        // Make API call to add component
-        fetch('/api/components', {
-            method: 'POST',
-            body: formData
-        })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to add component');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    // Add node to the graph
-                    this.nodes.add(nodeData);
-                }
-            })
-            .catch(error => {
-                console.error('Error adding component:', error);
+            // Get existing nodes from both visual graph and backend
+            const visualNodes = this.nodes.get({
+                filter: node => node.type === type
             });
+            const backendNodes = Object.keys(config.components || {})
+                .filter(id => id.startsWith(`${type}-`))
+                .map(id => {
+                    const match = id.match(new RegExp(`${type}-(\\d+)`));
+                    return match ? parseInt(match[1]) : 0;
+                });
+
+            // Combine and sort all used numbers
+            const usedNumbers = [...new Set([
+                ...visualNodes.map(node => {
+                    const match = node.id.match(new RegExp(`${type}-(\\d+)`));
+                    return match ? parseInt(match[1]) : 0;
+                }),
+                ...backendNodes
+            ])].sort((a, b) => a - b);
+
+            // Find the first available number
+            let nextNumber = 1;
+            for (const num of usedNumbers) {
+                if (nextNumber < num) {
+                    break;
+                }
+                nextNumber = num + 1;
+            }
+
+            if (nextNumber > 999) {
+                alert('Maximum number of components reached (999)');
+                return;
+            }
+
+            const id = `${type}-${nextNumber}`;
+
+            // Double check the ID is truly unique
+            if (config.components && config.components[id]) {
+                throw new Error('Component ID collision detected');
+            }
+
+            const nodeData = {
+                id: id,
+                label: `${type}\n#${nextNumber}`,
+                x: position.x,
+                y: position.y,
+                type: type,
+                color: this.getNodeColor(type)
+            };
+
+            // Create form data for the request
+            const formData = new FormData();
+            formData.append('id', id);
+            formData.append('type', type);
+            formData.append('partition', 'ifarm');
+            formData.append('cpus_per_task', '4');
+            formData.append('mem', '8G');
+
+            // Make API call to add component
+            const response = await fetch('/api/components', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to add component');
+            }
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                this.nodes.add(nodeData);
+            }
+        } catch (error) {
+            console.error('Error adding component:', error);
+            alert('Failed to add component. Please try again.');
+        }
     }
 
     handleEdgeCreation(edgeData, callback) {
@@ -388,8 +431,11 @@ class WorkflowGraph {
                             <label class="form-label">Memory</label>
                             <input type="text" class="form-control" name="mem" value="${componentConfig.resources.mem}" required>
                         </div>
-                    </div>
+                    </div>`;
 
+            // Add Network Section based on component type
+            if (node.type === 'receiver') {
+                formHtml += `
                     <!-- Network Section -->
                     <div class="mb-3">
                         <h5>Network</h5>
@@ -404,6 +450,18 @@ class WorkflowGraph {
                                 value="${componentConfig.network ? componentConfig.network.bind_address : '0.0.0.0'}">
                         </div>
                     </div>`;
+            } else if (node.type === 'emulator') {
+                formHtml += `
+                    <!-- Network Section -->
+                    <div class="mb-3">
+                        <h5>Network</h5>
+                        <div class="mb-2">
+                            <label class="form-label">Port</label>
+                            <input type="number" class="form-control" name="port" min="1024" max="65535" 
+                                value="${componentConfig.network ? componentConfig.network.port : ''}">
+                        </div>
+                    </div>`;
+            }
 
             // Add type-specific configuration
             if (node.type === 'emulator') {
