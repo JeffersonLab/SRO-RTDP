@@ -69,6 +69,10 @@ def add_component() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
         if not component_id or not component_type:
             return {"status": "error", "message": "Missing id or type"}, 400
 
+        # Check if component ID is valid
+        if component_id in workflow_manager.components:
+            return {"status": "error", "message": f"Component {component_id} already exists"}, 400
+
         # Create resources dictionary
         resources = {
             "partition": request.form.get('partition', 'ifarm'),
@@ -87,8 +91,12 @@ def add_component() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
 @app.route('/api/components/<component_id>', methods=['DELETE'])
 def remove_component(component_id: str) -> Dict[str, str]:
     """Remove a component."""
-    workflow_manager.remove_component(component_id)
-    return {"status": "success"}
+    try:
+        # Remove the component and its associated edges
+        workflow_manager.remove_component(component_id)
+        return {"status": "success"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 400
 
 
 @app.route('/api/components/<component_id>', methods=['POST'])
@@ -97,6 +105,7 @@ def update_component(component_id: str) -> Union[Dict[str, str], tuple[Dict[str,
     try:
         # Get data from form
         config = {}
+        component_type = request.form.get('type')
 
         # Resources
         resources = {
@@ -106,16 +115,16 @@ def update_component(component_id: str) -> Union[Dict[str, str], tuple[Dict[str,
         }
         config["resources"] = resources
 
-        # Network (optional)
+        # Network (based on component type)
         port = request.form.get('port')
-        if port:
-            config["network"] = {
-                "port": int(port),
-                "bind_address": request.form.get('bind_address', '0.0.0.0')
-            }
+        if port and component_type in ['receiver', 'emulator']:
+            network_config = {"port": int(port)}
+            if component_type == 'receiver':
+                network_config["bind_address"] = request.form.get(
+                    'bind_address', '0.0.0.0')
+            config["network"] = network_config
 
         # Type-specific configuration
-        component_type = request.form.get('type')
         if component_type == 'emulator':
             config["configuration"] = {
                 "threads": int(request.form.get('threads', 4)),

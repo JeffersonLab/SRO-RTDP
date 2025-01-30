@@ -116,10 +116,17 @@ class WorkflowManager:
     def remove_component(self, component_id: str) -> None:
         """Remove a component and its associated edges from the workflow."""
         if component_id in self.components:
+            # Remove the component
             del self.components[component_id]
+
             # Remove any edges connected to this component
             self.edges = [edge for edge in self.edges
                           if edge.from_id != component_id and edge.to_id != component_id]
+
+            # Ensure the component is completely removed from any internal references
+            if hasattr(self, '_component_types'):
+                if hasattr(self._component_types, component_id):
+                    delattr(self._component_types, component_id)
 
     def add_edge(self, from_id: str, to_id: str, edge_type: str, condition: Optional[str] = None) -> None:
         """Add a new edge between components."""
