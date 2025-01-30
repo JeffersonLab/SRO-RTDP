@@ -53,7 +53,7 @@ class Resources:
 @dataclass
 class Network:
     port: int
-    bind_address: str = "0.0.0.0"
+    bind_address: Optional[str] = None
 
 
 @dataclass
@@ -202,7 +202,10 @@ class WorkflowManager:
                     },
                     **({"network": {
                         "port": comp.network.port,
-                        "bind_address": comp.network.bind_address
+                        **({
+                            "bind_address": comp.network.bind_address
+                        } if (comp.type == "receiver" and 
+                             comp.network.bind_address) else {})
                     }} if comp.network else {}),
                     **({"configuration": {
                         "threads": comp.configuration.threads,

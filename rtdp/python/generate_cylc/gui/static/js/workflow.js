@@ -443,7 +443,7 @@ class WorkflowGraph {
                     <div class="mb-3">
                         <h5>Network</h5>
                         <div class="mb-2">
-                            <label class="form-label">Port</label>
+                            <label class="form-label">Listen Port</label>
                             <input type="number" class="form-control" name="port" min="1024" max="65535" 
                                 value="${componentConfig.network ? componentConfig.network.port : ''}">
                         </div>
