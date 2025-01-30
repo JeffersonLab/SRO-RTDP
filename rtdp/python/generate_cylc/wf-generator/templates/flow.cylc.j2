@@ -38,6 +38,10 @@
     {% for component_id, component in config.components.items() %}
     [[{{ component_id }}]]
         script = """
+            # setup output input directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+
             # Setup logging
             mkdir -p ${LOG_DIR}/{{ component_id }}
             exec 1> >(tee -a "${LOG_DIR}/{{ component_id }}/stdout.log")
