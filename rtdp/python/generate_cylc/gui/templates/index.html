@@ -13,7 +13,9 @@
                     <h3 class="h5 mb-0">Workflow Metadata</h3>
                 </div>
                 <div class="card-body">
-                    {{ render_form(workflow_metadata_form) }}
+                    <form id="workflow-metadata-form">
+                        {{ render_form(workflow_metadata_form) }}
+                    </form>
                 </div>
             </div>
 
@@ -23,7 +25,9 @@
                     <h3 class="h5 mb-0">Platform Configuration</h3>
                 </div>
                 <div class="card-body">
-                    {{ render_form(platform_form) }}
+                    <form id="platform-config-form">
+                        {{ render_form(platform_form) }}
+                    </form>
                 </div>
             </div>
 
@@ -77,7 +81,9 @@
                     <h3 class="h5 mb-0">Container Configuration</h3>
                 </div>
                 <div class="card-body">
-                    {{ render_form(container_form) }}
+                    <form id="container-config-form">
+                        {{ render_form(container_form) }}
+                    </form>
                 </div>
             </div>
 
@@ -128,7 +134,79 @@
     // Initialize workflow visualization
     document.addEventListener('DOMContentLoaded', () => {
         initializeWorkflowGraph();
+        setupFormHandlers();
     });
+
+    function setupFormHandlers() {
+        // Workflow Metadata Form
+        const metadataForm = document.querySelector('#workflow-metadata-form');
+        if (metadataForm) {
+            metadataForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(metadataForm);
+                try {
+                    const response = await fetch('/api/workflow/metadata', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) throw new Error('Failed to update workflow metadata');
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        showSuccess('Workflow metadata updated successfully');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showError('Failed to update workflow metadata');
+                }
+            });
+        }
+
+        // Platform Configuration Form
+        const platformForm = document.querySelector('#platform-config-form');
+        if (platformForm) {
+            platformForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(platformForm);
+                try {
+                    const response = await fetch('/api/workflow/platform', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) throw new Error('Failed to update platform configuration');
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        showSuccess('Platform configuration updated successfully');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showError('Failed to update platform configuration');
+                }
+            });
+        }
+
+        // Container Configuration Form
+        const containerForm = document.querySelector('#container-config-form');
+        if (containerForm) {
+            containerForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(containerForm);
+                try {
+                    const response = await fetch('/api/workflow/container', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) throw new Error('Failed to update container configuration');
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        showSuccess('Container configuration updated successfully');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showError('Failed to update container configuration');
+                }
+            });
+        }
+    }
 
     async function downloadConfig() {
         window.location.href = '/api/workflow/config/download';
@@ -148,6 +226,10 @@
     }
 
     function showError(message) {
+        alert(message);
+    }
+
+    function showSuccess(message) {
         alert(message);
     }
 </script>
