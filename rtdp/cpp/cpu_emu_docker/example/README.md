@@ -74,12 +74,12 @@ The script will create an `input` directory in the current working directory for
 
 2. In terminal 2 (CPU emulator):
 ```bash
-./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -v
+./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -v -i 172.17.0.1 -p 50080 -r 50888
 ```
 
 3. In terminal 3 (source):
 ```bash
-./send_data.sh -s 100M
+./send_data.sh -s 100M -h 127.0.0.1 -p 50888
 ```
 
 This will:
