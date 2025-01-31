@@ -9,6 +9,11 @@ class WorkflowGraph {
         this.nodes = new vis.DataSet();
         this.edges = new vis.DataSet();
         this.graphContainer = document.getElementById('workflow-graph');
+        this.clipboard = {
+            nodes: [],
+            edges: [],
+            offset: { x: 0, y: 0 }
+        };  // Enhanced clipboard structure
 
         // Define valid edge rules based on workflow dependencies
         // A -> B means "if A ready then start B"
@@ -20,6 +25,7 @@ class WorkflowGraph {
 
         this.init();
         this.setupDragAndDrop();
+        this.setupCopyPaste();
     }
 
     init() {
@@ -68,6 +74,10 @@ class WorkflowGraph {
                 deleteNode: (nodeData, callback) => {
                     this.handleNodeDeletion(nodeData, callback);
                 }
+            },
+            interaction: {
+                multiselect: true,  // Enable multi-select
+                selectConnectedEdges: false  // Don't auto-select edges when selecting nodes
             },
             physics: {
                 enabled: true,
@@ -142,69 +152,306 @@ class WorkflowGraph {
         });
     }
 
-    async addComponent(type, position) {
-        try {
-            // Get current configuration from backend
-            const configResponse = await fetch('/api/workflow/config');
-            const config = await configResponse.json();
-
-            // Get existing nodes from both visual graph and backend
-            const visualNodes = this.nodes.get({
-                filter: node => node.type === type
-            });
-            const backendNodes = Object.keys(config.components || {})
-                .filter(id => id.startsWith(`${type}-`))
-                .map(id => {
-                    const match = id.match(new RegExp(`${type}-(\\d+)`));
-                    return match ? parseInt(match[1]) : 0;
-                });
-
-            // Combine and sort all used numbers
-            const usedNumbers = [...new Set([
-                ...visualNodes.map(node => {
-                    const match = node.id.match(new RegExp(`${type}-(\\d+)`));
-                    return match ? parseInt(match[1]) : 0;
-                }),
-                ...backendNodes
-            ])].sort((a, b) => a - b);
-
-            // Find the first available number
-            let nextNumber = 1;
-            for (const num of usedNumbers) {
-                if (nextNumber < num) {
-                    break;
-                }
-                nextNumber = num + 1;
-            }
-
-            if (nextNumber > 999) {
-                alert('Maximum number of components reached (999)');
+    setupCopyPaste() {
+        // Add keyboard event listener
+        document.addEventListener('keydown', async (e) => {
+            // Check if the graph container is focused
+            if (!this.graphContainer.contains(document.activeElement)) {
                 return;
             }
 
-            const id = `${type}-${nextNumber}`;
+            // Copy (Cmd+C on Mac, Ctrl+C on Windows)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+                const selectedNodes = this.network.getSelectedNodes();
+                if (selectedNodes.length > 0) {
+                    await this.copyComponents(selectedNodes);
+                }
+            }
+
+            // Paste (Cmd+V on Mac, Ctrl+V on Windows)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+                if (this.clipboard.nodes.length > 0) {
+                    await this.pasteComponents(e);
+                }
+            }
+        });
+    }
+
+    async copyComponents(nodeIds) {
+        try {
+            // Get current configuration
+            const response = await fetch('/api/workflow/config');
+            const config = await response.json();
+
+            // Get selected nodes and their positions
+            const selectedNodes = nodeIds.map(id => {
+                const component = config.components[id];
+                if (!component) return null;
+
+                const position = this.network.getPosition(id);
+                return {
+                    id: id,
+                    type: component.type,
+                    config: {
+                        resources: component.config?.resources,
+                        network: component.config?.network,
+                        configuration: component.config?.configuration,
+                        test_data: component.config?.test_data
+                    },
+                    position: position
+                };
+            }).filter(Boolean);
+
+            // Get edges between selected nodes
+            const selectedEdges = this.edges.get().filter(edge => {
+                return nodeIds.includes(edge.from) && nodeIds.includes(edge.to);
+            });
+
+            // Calculate reference point (center of selection)
+            const centerX = selectedNodes.reduce((sum, node) => sum + node.position.x, 0) / selectedNodes.length;
+            const centerY = selectedNodes.reduce((sum, node) => sum + node.position.y, 0) / selectedNodes.length;
+
+            // Store in clipboard with relative positions from center
+            this.clipboard = {
+                nodes: selectedNodes.map(node => ({
+                    ...node,
+                    relativePos: {
+                        x: node.position.x - centerX,
+                        y: node.position.y - centerY
+                    }
+                })),
+                edges: selectedEdges,
+                offset: { x: 0, y: 0 }  // Reset offset on new copy
+            };
+
+            // Show feedback
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = `Copied ${selectedNodes.length} components and ${selectedEdges.length} connections`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+
+        } catch (error) {
+            console.error('Error copying components:', error);
+            alert('Failed to copy components');
+        }
+    }
+
+    async pasteComponents(event) {
+        if (!this.clipboard.nodes.length) return;
+
+        try {
+            // Get the current mouse position in canvas coordinates
+            const pointer = this.network.getViewPosition();
+            const scale = this.network.getScale();
+            
+            // Calculate paste position based on pointer and viewport
+            const pastePosition = {
+                x: pointer.x + (this.clipboard.offset.x * scale),
+                y: pointer.y + (this.clipboard.offset.y * scale)
+            };
+
+            // Create a mapping of old IDs to new IDs
+            const idMapping = {};
+            const addedNodes = [];
+            const addedEdges = [];
+
+            // Create new components
+            for (const component of this.clipboard.nodes) {
+                const newId = await this.getUniqueComponentId(component.type);
+                idMapping[component.id] = newId;
+
+                // Calculate new position relative to paste position
+                const position = {
+                    x: pastePosition.x + (component.relativePos.x * scale),
+                    y: pastePosition.y + (component.relativePos.y * scale)
+                };
+
+                try {
+                    // Add the node and store the result
+                    const nodeData = await this.addComponent(component.type, position, component.config, newId, true);
+                    if (nodeData) {
+                        addedNodes.push(nodeData);
+                    }
+                } catch (error) {
+                    console.error(`Failed to add component ${newId}:`, error);
+                    continue;
+                }
+            }
+
+            // Create new edges using the ID mapping
+            for (const edge of this.clipboard.edges) {
+                if (!idMapping[edge.from] || !idMapping[edge.to]) continue;
+
+                const newEdgeData = {
+                    from: idMapping[edge.from],
+                    to: idMapping[edge.to],
+                    label: edge.label || '',
+                    id: `${idMapping[edge.from]}-${idMapping[edge.to]}`,
+                    physics: false
+                };
+
+                // Create the edge in the backend
+                const formData = new FormData();
+                formData.append('from_id', newEdgeData.from);
+                formData.append('to_id', newEdgeData.to);
+                formData.append('description', edge.label || '');
+
+                try {
+                    const response = await fetch('/api/edges', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        addedEdges.push(newEdgeData);
+                    }
+                } catch (error) {
+                    console.error(`Failed to add edge ${newEdgeData.id}:`, error);
+                    continue;
+                }
+            }
+
+            if (addedNodes.length > 0) {
+                // Disable physics before adding nodes
+                this.network.setOptions({ physics: { enabled: false } });
+                
+                // Batch update the visual graph
+                this.nodes.add(addedNodes);
+                if (addedEdges.length > 0) {
+                    this.edges.add(addedEdges);
+                }
+
+                // Update offset for next paste
+                this.clipboard.offset.x += 50;
+                this.clipboard.offset.y += 50;
+
+                // Show feedback
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = `Pasted ${addedNodes.length} components and ${addedEdges.length} connections`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
+
+                // Force a network redraw but don't fit - maintain current view
+                this.network.redraw();
+            } else {
+                throw new Error('No components were successfully pasted');
+            }
+
+        } catch (error) {
+            console.error('Error pasting components:', error);
+            alert('Failed to paste components');
+        }
+    }
+
+    async getUniqueComponentId(type) {
+        // Get current configuration
+        const response = await fetch('/api/workflow/config');
+        const config = await response.json();
+
+        // Get existing nodes from both visual graph and backend
+        const visualNodes = this.nodes.get({
+            filter: node => node.type === type
+        });
+        const backendNodes = Object.keys(config.components || {})
+            .filter(id => id.startsWith(`${type}-`))
+            .map(id => {
+                const match = id.match(new RegExp(`${type}-(\\d+)`));
+                return match ? parseInt(match[1]) : 0;
+            });
+
+        // Combine and sort all used numbers
+        const usedNumbers = [...new Set([
+            ...visualNodes.map(node => {
+                const match = node.id.match(new RegExp(`${type}-(\\d+)`));
+                return match ? parseInt(match[1]) : 0;
+            }),
+            ...backendNodes
+        ])].sort((a, b) => a - b);
+
+        // Find the first available number
+        let nextNumber = 1;
+        for (const num of usedNumbers) {
+            if (nextNumber < num) {
+                break;
+            }
+            nextNumber = num + 1;
+        }
+
+        return `${type}-${nextNumber}`;
+    }
+
+    async addComponent(type, position, config = {}, id, skipVisualUpdate = false) {
+        try {
+            // Get current configuration from backend
+            const configResponse = await fetch('/api/workflow/config');
+            const configData = await configResponse.json();
+
+            // If no id provided, generate one
+            if (!id) {
+                id = await this.getUniqueComponentId(type);
+            }
 
             // Double check the ID is truly unique
-            if (config.components && config.components[id]) {
+            if (configData.components && configData.components[id]) {
                 throw new Error('Component ID collision detected');
             }
 
             const nodeData = {
                 id: id,
-                label: `${type}\n#${nextNumber}`,
+                label: `${type}\n#${id.split('-')[1]}`,
                 x: position.x,
                 y: position.y,
                 type: type,
-                color: this.getNodeColor(type)
+                color: this.getNodeColor(type),
+                physics: false  // Disable physics for each node
             };
 
             // Create form data for the request
             const formData = new FormData();
             formData.append('id', id);
             formData.append('type', type);
-            formData.append('partition', 'ifarm');
-            formData.append('cpus_per_task', '4');
-            formData.append('mem', '8G');
+
+            // Set default values if config is not provided
+            const defaultConfig = {
+                resources: {
+                    partition: 'ifarm',
+                    cpus_per_task: '4',
+                    mem: '8G'
+                }
+            };
+
+            // Merge default config with provided config
+            const finalConfig = {
+                resources: { ...defaultConfig.resources, ...(config.resources || {}) },
+                network: config.network || {},
+                configuration: config.configuration || {},
+                test_data: config.test_data || {}
+            };
+
+            // Add resources configuration
+            formData.append('partition', finalConfig.resources.partition);
+            formData.append('cpus_per_task', finalConfig.resources.cpus_per_task);
+            formData.append('mem', finalConfig.resources.mem);
+
+            // Add network configuration if present
+            if (finalConfig.network.listen_port) {
+                formData.append('listen_port', finalConfig.network.listen_port);
+                if (type === 'receiver' && finalConfig.network.bind_address) {
+                    formData.append('bind_address', finalConfig.network.bind_address);
+                }
+            }
+
+            // Add emulator configuration if present
+            if (type === 'emulator' && finalConfig.configuration) {
+                if (finalConfig.configuration.threads) formData.append('threads', finalConfig.configuration.threads);
+                if (finalConfig.configuration.latency) formData.append('latency', finalConfig.configuration.latency);
+                if (finalConfig.configuration.mem_footprint) formData.append('mem_footprint', finalConfig.configuration.mem_footprint);
+                if (finalConfig.configuration.output_size) formData.append('output_size', finalConfig.configuration.output_size);
+            } else if (type === 'sender' && finalConfig.test_data) {
+                if (finalConfig.test_data.size) formData.append('data_size', finalConfig.test_data.size);
+            }
 
             // Make API call to add component
             const response = await fetch('/api/components', {
@@ -217,12 +464,15 @@ class WorkflowGraph {
             }
 
             const data = await response.json();
-            if (data.status === 'success') {
+            if (data.status === 'success' && !skipVisualUpdate) {
                 this.nodes.add(nodeData);
             }
+            
+            return nodeData;
         } catch (error) {
             console.error('Error adding component:', error);
             alert('Failed to add component. Please try again.');
+            throw error;  // Re-throw to handle in calling function
         }
     }
 
