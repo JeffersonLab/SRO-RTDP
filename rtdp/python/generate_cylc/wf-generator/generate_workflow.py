@@ -29,14 +29,23 @@ def generate_control_edges(data_edges: List[Dict[str, str]]) -> List[Dict[str, s
     Control flow goes in reverse direction of data flow to ensure consumers
     are ready before producers start."""
     control_edges = []
-    components = set()
 
-    # Collect all components
+    # Create a mapping of data flow paths
+    data_flow_paths = {}
     for edge in data_edges:
-        components.add(edge['from'])
-        components.add(edge['to'])
+        from_comp = edge['from']
+        to_comp = edge['to']
 
-    # Create reverse dependencies
+        # Initialize the path for this sender if not exists
+        if from_comp.startswith('sender'):
+            data_flow_paths[from_comp] = []
+
+        # For each edge, add the destination to all paths that include the source
+        for sender, path in data_flow_paths.items():
+            if not path or path[-1] == from_comp:
+                path.append(to_comp)
+
+    # Create reverse dependencies for each edge
     for edge in data_edges:
         # Consumer must be ready before producer starts
         control_edges.append({
@@ -45,24 +54,13 @@ def generate_control_edges(data_edges: List[Dict[str, str]]) -> List[Dict[str, s
             'type': 'ready'
         })
 
-    # Find the last component (one that doesn't send to anyone)
-    last_components = set()
-    for comp in components:
-        if not any(edge['from'] == comp for edge in data_edges):
-            last_components.add(comp)
-
-    # Find the first component (one that doesn't receive from anyone)
-    first_components = set()
-    for comp in components:
-        if not any(edge['to'] == comp for edge in data_edges):
-            first_components.add(comp)
-
-    # Add completion edges
-    for first in first_components:
-        for last in last_components:
+    # Add completion edges based on actual data flow paths
+    for sender, path in data_flow_paths.items():
+        if path:  # If there is a path
+            receiver = path[-1]  # Get the last component in the path
             control_edges.append({
-                'from': first,
-                'to': last,
+                'from': sender,
+                'to': receiver,
                 'type': 'succeeded',
                 'condition': '!'
             })
