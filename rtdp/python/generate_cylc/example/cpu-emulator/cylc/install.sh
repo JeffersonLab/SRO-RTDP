@@ -36,3 +36,5 @@ echo "To run the workflow:"
 echo "cylc play ${WORKFLOW_NAME}"
 echo ""
 echo "Workflow installed at: ${CYLC_RUN_DIR}" 
+
+cylc play cylc-cpu-emu-gen
