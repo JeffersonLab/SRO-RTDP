@@ -351,11 +351,10 @@ class WorkflowGraph {
                     }
                 };
 
-                // Add network configuration if present
-                const listenPort = config.network?.listen_port;
-                if (listenPort) {
+                // Add network configuration if present and not a sender
+                if (config.type !== 'sender' && config.network?.listen_port) {
                     componentData.network = {
-                        listen_port: parseInt(listenPort)
+                        listen_port: parseInt(config.network.listen_port)
                     };
                     if (config.type === 'receiver' && config.network.bind_address) {
                         componentData.network.bind_address = config.network.bind_address;
@@ -1037,28 +1036,30 @@ class WorkflowGraph {
                     </div>
                 </div>`;
 
-            // Add network section for all component types
-            formHtml += `
-                <!-- Network Section -->
-                <div class="mb-3">
-                    <h5>Network</h5>
-                    <div class="mb-2">
-                        <label class="form-label">Listen Port</label>
-                        <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
-                            value="${config.network ? config.network.listen_port : ''}">
-                    </div>`;
-
-            // Add bind address only for receiver
-            if (node.type === 'receiver') {
+            // Add network section only for emulator and receiver
+            if (node.type === 'emulator' || node.type === 'receiver') {
                 formHtml += `
-                    <div class="mb-2">
-                        <label class="form-label">Bind Address</label>
-                        <input type="text" class="form-control" name="bind_address" 
-                            value="${config.network ? config.network.bind_address : '0.0.0.0'}">
-                    </div>`;
-            }
+                    <!-- Network Section -->
+                    <div class="mb-3">
+                        <h5>Network</h5>
+                        <div class="mb-2">
+                            <label class="form-label">Listen Port</label>
+                            <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
+                                value="${config.network ? config.network.listen_port : ''}">
+                        </div>`;
 
-            formHtml += `</div>`;  // Close network section
+                // Add bind address only for receiver
+                if (node.type === 'receiver') {
+                    formHtml += `
+                        <div class="mb-2">
+                            <label class="form-label">Bind Address</label>
+                            <input type="text" class="form-control" name="bind_address" 
+                                value="${config.network ? config.network.bind_address : '0.0.0.0'}">
+                        </div>`;
+                }
+
+                formHtml += `</div>`;  // Close network section
+            }
 
             // Add type-specific configuration
             if (node.type === 'emulator') {
@@ -1124,16 +1125,18 @@ class WorkflowGraph {
                     }
                 };
 
-                // Add network configuration for all components
-                const listenPort = formData.get('listen_port');
-                if (listenPort && listenPort.trim() !== '') {
-                    componentConfig.network = {
-                        listen_port: parseInt(listenPort)
-                    };
-                    if (node.type === 'receiver') {
-                        const bindAddress = formData.get('bind_address');
-                        if (bindAddress && bindAddress.trim() !== '') {
-                            componentConfig.network.bind_address = bindAddress;
+                // Add network configuration only for emulator and receiver
+                if (node.type === 'emulator' || node.type === 'receiver') {
+                    const listenPort = formData.get('listen_port');
+                    if (listenPort && listenPort.trim() !== '') {
+                        componentConfig.network = {
+                            listen_port: parseInt(listenPort)
+                        };
+                        if (node.type === 'receiver') {
+                            const bindAddress = formData.get('bind_address');
+                            if (bindAddress && bindAddress.trim() !== '') {
+                                componentConfig.network.bind_address = bindAddress;
+                            }
                         }
                     }
                 }
@@ -1147,9 +1150,12 @@ class WorkflowGraph {
                         output_size: parseFloat(formData.get('output_size'))
                     };
                 } else if (node.type === 'sender') {
-                    componentConfig.test_data = {
-                        size: formData.get('data_size')
-                    };
+                    const dataSize = formData.get('data_size');
+                    if (dataSize && dataSize.trim() !== '') {
+                        componentConfig.test_data = {
+                            size: dataSize
+                        };
+                    }
                 }
 
                 try {
