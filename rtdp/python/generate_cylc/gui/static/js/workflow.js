@@ -196,13 +196,9 @@ class WorkflowGraph {
         const previewBtn = document.getElementById('preview-btn');
 
         if (downloadBtn) {
-            downloadBtn.addEventListener('click', async () => {
-                await this.saveAllChanges();
-                // Continue with download logic
-            });
+            downloadBtn.classList.remove('btn-warning');
         }
 
-        // Remove Preview button handler since it's now handled in index.html
         if (previewBtn) {
             previewBtn.classList.remove('btn-warning');
         }
@@ -223,8 +219,8 @@ class WorkflowGraph {
             workflowForm.addEventListener('change', (e) => {
                 const formData = new FormData(workflowForm);
                 this.unsavedChanges.workflow = {
-                    name: formData.get('name'),  // Changed to match Flask form field name
-                    description: formData.get('description')  // Changed to match Flask form field name
+                    name: formData.get('name'),
+                    description: formData.get('description')
                 };
                 this.showUnsavedChanges();
             });
@@ -236,8 +232,8 @@ class WorkflowGraph {
             platformForm.addEventListener('change', (e) => {
                 const formData = new FormData(platformForm);
                 this.unsavedChanges.platform = {
-                    name: formData.get('name'),  // Changed to match Flask form field name
-                    job_runner: formData.get('job_runner')  // Changed to match Flask form field name
+                    name: formData.get('name'),
+                    job_runner: formData.get('job_runner')
                 };
                 this.showUnsavedChanges();
             });
@@ -246,10 +242,16 @@ class WorkflowGraph {
         // Container Configuration Form
         const containerForm = document.getElementById('container-config-form');
         if (containerForm) {
+            // Set default value for image_path if empty
+            const imagePathInput = containerForm.querySelector('input[name="image_path"]');
+            if (imagePathInput && !imagePathInput.value) {
+                imagePathInput.value = 'cpu-emu.sif';
+            }
+
             containerForm.addEventListener('change', (e) => {
                 const formData = new FormData(containerForm);
                 this.unsavedChanges.container = {
-                    image_path: formData.get('image_path')  // Changed to match Flask form field name
+                    image_path: formData.get('image_path') || 'cpu-emu.sif'
                 };
                 this.showUnsavedChanges();
             });
@@ -1243,6 +1245,25 @@ class WorkflowGraph {
 
             const config = await response.json();
 
+            // Initialize empty configuration if none exists
+            if (!config) {
+                config = {
+                    workflow: {
+                        name: '',
+                        description: ''
+                    },
+                    platform: {
+                        name: '',
+                        job_runner: ''
+                    },
+                    containers: {
+                        image_path: 'cpu-emu.sif'
+                    },
+                    components: {},
+                    edges: []
+                };
+            }
+
             // Clear existing nodes and edges
             this.nodes.clear();
             this.edges.clear();
@@ -1307,7 +1328,7 @@ class WorkflowGraph {
             this.network.stabilize();
         } catch (error) {
             console.error('Error loading workflow state:', error);
-            alert('Failed to load workflow state');
+            showError('Failed to load workflow state');
         }
     }
 }

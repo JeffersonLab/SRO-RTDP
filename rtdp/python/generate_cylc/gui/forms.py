@@ -128,5 +128,4 @@ class EdgeForm(FlaskForm):
 
 class ContainerConfigForm(FlaskForm):
     """Form for container configuration."""
-    image_path = StringField('Container Image Path',
-                             validators=[DataRequired()])
+    image_path = StringField('Image Path', default='cpu-emu.sif', validators=[DataRequired()])
