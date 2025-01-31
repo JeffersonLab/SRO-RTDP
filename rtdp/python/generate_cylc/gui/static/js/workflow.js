@@ -242,19 +242,31 @@ class WorkflowGraph {
         // Container Configuration Form
         const containerForm = document.getElementById('container-config-form');
         if (containerForm) {
-            // Set default value for image_path if empty
             const imagePathInput = containerForm.querySelector('input[name="image_path"]');
-            if (imagePathInput && !imagePathInput.value) {
-                imagePathInput.value = 'cpu-emu.sif';
-            }
+            if (imagePathInput) {
+                // If the input is empty, set and save the default value
+                if (!imagePathInput.value) {
+                    imagePathInput.value = 'cpu-emu.sif';
+                    // Save the default value immediately
+                    const formData = new FormData();
+                    formData.append('image_path', 'cpu-emu.sif');
+                    fetch('/api/workflow/container', {
+                        method: 'POST',
+                        body: formData
+                    }).catch(error => {
+                        console.error('Error saving default container image path:', error);
+                    });
+                }
 
-            containerForm.addEventListener('change', (e) => {
-                const formData = new FormData(containerForm);
-                this.unsavedChanges.container = {
-                    image_path: formData.get('image_path') || 'cpu-emu.sif'
-                };
-                this.showUnsavedChanges();
-            });
+                // Handle subsequent changes
+                containerForm.addEventListener('change', (e) => {
+                    const formData = new FormData(containerForm);
+                    this.unsavedChanges.container = {
+                        image_path: formData.get('image_path') || 'cpu-emu.sif'
+                    };
+                    this.showUnsavedChanges();
+                });
+            }
         }
     }
 
