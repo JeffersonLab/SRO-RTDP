@@ -754,7 +754,7 @@ class WorkflowGraph {
                 resources: {
                     partition: 'ifarm',
                     cpus_per_task: '4',
-                    mem: '8G'
+                    mem: type === 'emulator' ? '16G' : '8G'
                 }
             };
 
