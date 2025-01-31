@@ -8,16 +8,21 @@
 
     [[graph]]
         R1 = """
-            emulator-1:ready => sender-1
-            receiver-1:ready => emulator-1
-            sender-1:succeeded => !receiver-1
+            # Start chain
+            receiver:ready => emulator
+            emulator:ready => sender
+            
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
+            receiver:completed
         """
 
 [runtime]
     [[root]]
+        # Common settings for all tasks
         platform = jlab_slurm
         [[[job]]]
-            execution time limit = PT2H
+            execution time limit = PT2H    # 2 hours timeout
         
         [[[directives]]]
             --ntasks = 1
@@ -26,126 +31,136 @@
             --error = slurm_%j.log
         
         [[[environment]]]
+            # Path to SIF file
             CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            
+            # Network configuration
+            RECEIVER_PORT = "50080"
+            EMULATOR_PORT = "50888"
+            
+            # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+            
+            # Emulator configuration
+            EMU_THREADS = "4"              # Number of processing threads
+            EMU_LATENCY = "50"            # Processing latency per GB
+            EMU_MEM_FOOTPRINT = "0.05"    # Memory footprint in GB
+            EMU_OUTPUT_SIZE = "0.001"     # Output size in GB
+            
+            # Test data configuration
+            TEST_DATA_SIZE = "100M"       # Size of test data to send
 
-    [[emulator-1]]
+    [[receiver]]
         script = """
-            # Setup directories
-            mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${INPUT_DIR}
-            mkdir -p ${LOG_DIR}/emulator-1
-            exec 1> >(tee -a "${LOG_DIR}/emulator-1/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/emulator-1/stderr.log")
+            # Create log directory
+            mkdir -p ${LOG_DIR}/receiver
 
-            # Store hostname for other tasks
-            HOSTNAME=$(hostname -f)
-            IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator-1_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
 
-            # Find data target from edges
-            # Connect to receiver-1
-            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip)
-            TARGET_PORT=50088
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
-            # Start emulator
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} --output-dir /output \
-                -t 4 \
-                -b 50 \
-                -m 0.05 \
-                -o 0.001 \
-                -r 50088 \
-                -p ${TARGET_PORT} \
-                -i ${TARGET_IP} -v 1 &
-            
-            PROC_PID=$!
-            sleep 2
-            
-            # Signal readiness and monitor
-            if kill -0 $PROC_PID 2>/dev/null; then
-                cylc message "ready"
-                wait $PROC_PID
-                exit $?
+            # Check if port is already in use
+            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
+                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
+                exit 1
             fi
-            exit 1
-
-        """
-        [[[directives]]]
-            --job-name = cpu-emu-emulator-1
-            --cpus-per-task = 4
-            --mem = 16G
-        
-        [[[outputs]]]
-            ready = "ready"
-
-    [[receiver-1]]
-        script = """
-            # Setup directories
-            mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${INPUT_DIR}
-            mkdir -p ${LOG_DIR}/receiver-1
-            exec 1> >(tee -a "${LOG_DIR}/receiver-1/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/receiver-1/stderr.log")
-
+            
             # Store hostname for other tasks
-            HOSTNAME=$(hostname -f)
-            IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver-1_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip
-
-            # Start receiver
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
+            HOSTNAME=$(hostname -f)  # Use fully qualified hostname
+            IP=$(hostname -i | awk '{print $1}')  # Use first IP if multiple
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start receiver with debug output
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} receive \
-                50088 \
-                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver-1/apptainer.log &
+                ${RECEIVER_PORT} \
+                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
-            PROC_PID=$!
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+            
+            # Brief pause to let process start
             sleep 2
             
-            # Signal readiness and monitor
-            if kill -0 $PROC_PID 2>/dev/null; then
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                # Make sure to output the exact message that matches the output pattern
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
-                
-                # Initialize size tracking
-                PREV_SIZE=0
-                STABLE_COUNT=0
-                MAX_STABLE_COUNT=6  # Wait for 30 seconds of stable size
-                
-                # Monitor until completion
-                while kill -0 $PROC_PID 2>/dev/null; do
-                    if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                        CURR_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
-                        
-                        if [ $CURR_SIZE -gt $PREV_SIZE ]; then
-                            # Size increased, reset stable counter
-                            STABLE_COUNT=0
-                            echo "Data size increased: ${CURR_SIZE} bytes"
-                        elif [ $CURR_SIZE -gt 0 ] && [ $CURR_SIZE -eq $PREV_SIZE ]; then
-                            # Size stable and non-zero
-                            STABLE_COUNT=$((STABLE_COUNT + 1))
-                            echo "Data size stable for $((STABLE_COUNT * 5)) seconds: ${CURR_SIZE} bytes"
-                            
-                            if [ $STABLE_COUNT -ge $MAX_STABLE_COUNT ]; then
-                                echo "Transfer completed successfully"
-                                cylc message -- "Transfer completed successfully"
-                                exit 0
-                            fi
-                        fi
-                        
-                        PREV_SIZE=$CURR_SIZE
-                    fi
-                    sleep 5
-                done
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
             fi
-            exit 1
-
+            
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+            
+            # Create a flag file to track completion
+            COMPLETION_FILE="${CYLC_WORKFLOW_SHARE_DIR}/receiver_complete"
+            rm -f "${COMPLETION_FILE}"
+            
+            # Initialize file size tracking
+            PREV_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                PREV_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            # Monitor the receiver process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "Process details:" >> ${LOG_DIR}/receiver/process.log
+                ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
+                
+                # Check if data has been received by monitoring file size changes
+                CURRENT_SIZE=0
+                if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                    CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                fi
+                
+                if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${COMPLETION_FILE}" ]; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "Transfer completed successfully"
+                    cylc message -- "Transfer completed successfully"
+                    touch "${COMPLETION_FILE}"
+                fi
+                
+                PREV_SIZE=$CURRENT_SIZE
+                sleep 5
+            done
+            
+            # Check final status
+            FINAL_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                FINAL_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            if [ $FINAL_SIZE -gt 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                echo "Last few lines of apptainer log:" >&2
+                tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
-            --job-name = cpu-emu-receiver-1
+            --job-name = cpu-emu-recv
             --cpus-per-task = 4
             --mem = 8G
         
@@ -153,49 +168,125 @@
             ready = "ready"
             completed = "Transfer completed successfully"
 
-    [[sender-1]]
+    [[emulator]]
         script = """
-            # Setup directories
+            # Create log directory
+            mkdir -p ${LOG_DIR}/emulator
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/emulator/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting emulator task"
+            
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
+            
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
             mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${INPUT_DIR}
-            mkdir -p ${LOG_DIR}/sender-1
-            exec 1> >(tee -a "${LOG_DIR}/sender-1/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/sender-1/stderr.log")
-
-            # Store hostname for other tasks
-            HOSTNAME=$(hostname -f)
-            IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/sender-1_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/sender-1_ip
-
-            # Find data target from edges
-            # Connect to emulator-1
-            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip)
-            TARGET_PORT=50088
             
-            # Generate and send data
-            dd if=/dev/urandom bs=100M count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
+            # Start CPU emulator
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${CPU_EMU_SIF} --output-dir /output \
+                -t ${EMU_THREADS} -b ${EMU_LATENCY} \
+                -m ${EMU_MEM_FOOTPRINT} -o ${EMU_OUTPUT_SIZE} \
+                -r ${EMULATOR_PORT} -p ${RECEIVER_PORT} \
+                -i ${RECV_IP} -v 1 &
             
-            apptainer run --bind ${INPUT_DIR}:/data \
-                ${CPU_EMU_SIF} send \
-                "/data/data.bin" \
-                ${TARGET_IP} \
-                ${TARGET_PORT}
+            EMU_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
             
-            STATUS=$?
-            rm -f ${INPUT_DIR}/data.bin
+            # Brief pause to let process start
+            sleep 2
             
-            if [ $STATUS -eq 0 ]; then
-                cylc message -- "sender:succeeded"
+            # Signal readiness if process is running
+            if kill -0 $EMU_PID 2>/dev/null; then
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process not running" >&2
+                cat ${LOG_DIR}/emulator/apptainer.log >&2
+                exit 1
             fi
-            exit $STATUS
+            
+            # Monitor memory usage
+            while kill -0 $EMU_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/emulator/memory.log
+                free -h >> ${LOG_DIR}/emulator/memory.log
+                ps -o pid,ppid,%cpu,%mem,cmd -p $EMU_PID >> ${LOG_DIR}/emulator/memory.log
+                sleep 5
+            done
+            
+            # Check if process died unexpectedly
+            if ! wait $EMU_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process failed" >&2
+                cat ${LOG_DIR}/emulator/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
-            --job-name = cpu-emu-sender-1
+            --job-name = cpu-emu
             --cpus-per-task = 4
-            --mem = 8G
+            --mem = 16G
         
         [[[outputs]]]
             ready = "ready"
 
- 
+    [[sender]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/sender
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            
+            # Get emulator information
+            EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
+            
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+            
+            # Generate test data
+            INPUT_FILE="${INPUT_DIR}/random_data.bin"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data: ${TEST_DATA_SIZE}"
+            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
+            
+            # Send data
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${EMU_IP}:${EMULATOR_PORT}"
+            apptainer run --bind ${INPUT_DIR}:/data \
+                ${CPU_EMU_SIF} send \
+                "/data/$(basename ${INPUT_FILE})" \
+                ${EMU_IP} \
+                ${EMULATOR_PORT}
+            
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+            
+            # Clean up
+            rm -f ${INPUT_FILE}
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
+            
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:succeeded"
+            fi
+            
+            # Exit with send status
+            exit ${SEND_STATUS}
+        """
+        [[[directives]]]
+            --job-name = cpu-emu-send
+            --cpus-per-task = 4
+            --mem = 8G 
