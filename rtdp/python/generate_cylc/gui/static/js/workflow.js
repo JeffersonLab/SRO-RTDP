@@ -341,10 +341,48 @@ class WorkflowGraph {
 
             // Save components
             for (const [id, config] of this.unsavedChanges.components) {
-                const formData = this.createComponentFormData(id, config);
+                // Create the component data structure
+                const componentData = {
+                    type: config.type,
+                    resources: {
+                        partition: config.resources.partition,
+                        cpus_per_task: parseInt(config.resources.cpus_per_task),
+                        mem: config.resources.mem
+                    }
+                };
+
+                // Add network configuration if present
+                const listenPort = config.network?.listen_port;
+                if (listenPort) {
+                    componentData.network = {
+                        listen_port: parseInt(listenPort)
+                    };
+                    if (config.type === 'receiver' && config.network.bind_address) {
+                        componentData.network.bind_address = config.network.bind_address;
+                    }
+                }
+
+                // Add type-specific configuration
+                if (config.type === 'emulator' && config.configuration) {
+                    componentData.configuration = {
+                        threads: parseInt(config.configuration.threads),
+                        latency: parseInt(config.configuration.latency),
+                        mem_footprint: parseFloat(config.configuration.mem_footprint),
+                        output_size: parseFloat(config.configuration.output_size)
+                    };
+                } else if (config.type === 'sender' && config.test_data) {
+                    componentData.test_data = {
+                        size: config.test_data.size
+                    };
+                }
+
+                // Send the component data
                 const componentResponse = await fetch(`/api/components/${id}`, {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(componentData)
                 });
 
                 if (!componentResponse.ok) {
@@ -412,7 +450,7 @@ class WorkflowGraph {
             formData.append('mem', config.resources.mem);
         }
 
-        // Add network configuration
+        // Add network configuration for all component types
         if (config.network) {
             if (config.network.listen_port) {
                 formData.append('listen_port', config.network.listen_port);
@@ -424,12 +462,12 @@ class WorkflowGraph {
 
         // Add type-specific configuration
         if (config.type === 'emulator' && config.configuration) {
-            if (config.configuration.threads) formData.append('threads', config.configuration.threads);
-            if (config.configuration.latency) formData.append('latency', config.configuration.latency);
-            if (config.configuration.mem_footprint) formData.append('mem_footprint', config.configuration.mem_footprint);
-            if (config.configuration.output_size) formData.append('output_size', config.configuration.output_size);
+            formData.append('threads', config.configuration.threads || '4');
+            formData.append('latency', config.configuration.latency || '50');
+            formData.append('mem_footprint', config.configuration.mem_footprint || '0.05');
+            formData.append('output_size', config.configuration.output_size || '0.001');
         } else if (config.type === 'sender' && config.test_data) {
-            if (config.test_data.size) formData.append('data_size', config.test_data.size);
+            formData.append('data_size', config.test_data.size || '100M');
         }
 
         return formData;
@@ -999,35 +1037,28 @@ class WorkflowGraph {
                     </div>
                 </div>`;
 
-            // Add network section based on component type
+            // Add network section for all component types
+            formHtml += `
+                <!-- Network Section -->
+                <div class="mb-3">
+                    <h5>Network</h5>
+                    <div class="mb-2">
+                        <label class="form-label">Listen Port</label>
+                        <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
+                            value="${config.network ? config.network.listen_port : ''}">
+                    </div>`;
+
+            // Add bind address only for receiver
             if (node.type === 'receiver') {
                 formHtml += `
-                    <!-- Network Section -->
-                    <div class="mb-3">
-                        <h5>Network</h5>
-                        <div class="mb-2">
-                            <label class="form-label">Listen Port</label>
-                            <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
-                                value="${config.network ? config.network.listen_port : ''}">
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Bind Address</label>
-                            <input type="text" class="form-control" name="bind_address" 
-                                value="${config.network ? config.network.bind_address : '0.0.0.0'}">
-                        </div>
-                    </div>`;
-            } else if (node.type === 'emulator') {
-                formHtml += `
-                    <!-- Network Section -->
-                    <div class="mb-3">
-                        <h5>Network</h5>
-                        <div class="mb-2">
-                            <label class="form-label">Listen Port</label>
-                            <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
-                                value="${config.network ? config.network.listen_port : ''}">
-                        </div>
+                    <div class="mb-2">
+                        <label class="form-label">Bind Address</label>
+                        <input type="text" class="form-control" name="bind_address" 
+                            value="${config.network ? config.network.bind_address : '0.0.0.0'}">
                     </div>`;
             }
+
+            formHtml += `</div>`;  // Close network section
 
             // Add type-specific configuration
             if (node.type === 'emulator') {
@@ -1079,42 +1110,83 @@ class WorkflowGraph {
             form.innerHTML = formHtml;
 
             // Modify form submit handler to store changes locally
-            form.addEventListener('submit', (e) => {
+            form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
 
-                // Store the changes
-                this.unsavedChanges.components.set(nodeId, {
+                // Create base component config
+                const componentConfig = {
                     type: node.type,
                     resources: {
                         partition: formData.get('partition'),
-                        cpus_per_task: formData.get('cpus_per_task'),
+                        cpus_per_task: parseInt(formData.get('cpus_per_task')),
                         mem: formData.get('mem')
-                    },
-                    network: node.type !== 'sender' ? {
-                        listen_port: formData.get('listen_port'),
-                        ...(node.type === 'receiver' ? { bind_address: formData.get('bind_address') } : {})
-                    } : {},
-                    configuration: node.type === 'emulator' ? {
-                        threads: formData.get('threads'),
-                        latency: formData.get('latency'),
-                        mem_footprint: formData.get('mem_footprint'),
-                        output_size: formData.get('output_size')
-                    } : {},
-                    test_data: node.type === 'sender' ? {
+                    }
+                };
+
+                // Add network configuration for all components
+                const listenPort = formData.get('listen_port');
+                if (listenPort && listenPort.trim() !== '') {
+                    componentConfig.network = {
+                        listen_port: parseInt(listenPort)
+                    };
+                    if (node.type === 'receiver') {
+                        const bindAddress = formData.get('bind_address');
+                        if (bindAddress && bindAddress.trim() !== '') {
+                            componentConfig.network.bind_address = bindAddress;
+                        }
+                    }
+                }
+
+                // Add type-specific configuration
+                if (node.type === 'emulator') {
+                    componentConfig.configuration = {
+                        threads: parseInt(formData.get('threads')),
+                        latency: parseInt(formData.get('latency')),
+                        mem_footprint: parseFloat(formData.get('mem_footprint')),
+                        output_size: parseFloat(formData.get('output_size'))
+                    };
+                } else if (node.type === 'sender') {
+                    componentConfig.test_data = {
                         size: formData.get('data_size')
-                    } : {}
-                });
+                    };
+                }
 
-                // Close the modal
-                bsModal.hide();
+                try {
+                    // Send to backend immediately
+                    const response = await fetch(`/api/components/${nodeId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(componentConfig)
+                    });
 
-                // Show feedback
-                const toast = document.createElement('div');
-                toast.className = 'toast';
-                toast.textContent = 'Changes stored. Click Download or Preview to save.';
-                document.body.appendChild(toast);
-                setTimeout(() => toast.remove(), 2000);
+                    if (!response.ok) {
+                        throw new Error('Failed to save component configuration');
+                    }
+
+                    const data = await response.json();
+                    if (data.status !== 'success') {
+                        throw new Error(data.message || 'Failed to save component configuration');
+                    }
+
+                    // Store the changes locally after successful backend save
+                    this.unsavedChanges.components.set(nodeId, componentConfig);
+
+                    // Close the modal
+                    bsModal.hide();
+
+                    // Show feedback
+                    const toast = document.createElement('div');
+                    toast.className = 'toast';
+                    toast.textContent = 'Changes saved successfully';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
+                } catch (error) {
+                    console.error('Error saving component:', error);
+                    alert('Failed to save component configuration');
+                }
             });
 
             // Show the modal

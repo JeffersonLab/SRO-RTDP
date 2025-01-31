@@ -171,8 +171,13 @@ class WorkflowManager:
             component.resources = Resources(**config["resources"])
 
         # Update network configuration
-        if "network" in config:
-            component.network = Network(**config["network"])
+        if "network" in config and config["network"]:
+            network_config = config["network"]
+            if "listen_port" in network_config:
+                component.network = Network(
+                    listen_port=int(network_config["listen_port"]),
+                    bind_address=network_config.get("bind_address")
+                )
 
         # Update type-specific configuration
         if component.type == "emulator" and "configuration" in config:
@@ -204,8 +209,8 @@ class WorkflowManager:
                         "listen_port": comp.network.listen_port,
                         **({
                             "bind_address": comp.network.bind_address
-                        } if (comp.type == "receiver" and 
-                             comp.network.bind_address) else {})
+                        } if (comp.type == "receiver" and
+                              comp.network.bind_address) else {})
                     }} if comp.network else {}),
                     **({"configuration": {
                         "threads": comp.configuration.threads,

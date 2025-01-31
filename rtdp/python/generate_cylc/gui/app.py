@@ -111,41 +111,10 @@ def remove_component(component_id: str) -> Dict[str, str]:
 def update_component(component_id: str) -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Update a component's configuration."""
     try:
-        # Get data from form
-        config = {}
-        component_type = request.form.get('type')
-
-        # Resources
-        resources = {
-            "partition": request.form.get('partition'),
-            "cpus_per_task": int(request.form.get('cpus_per_task')),
-            "mem": request.form.get('mem')
-        }
-        config["resources"] = resources
-
-        # Network (based on component type)
-        listen_port = request.form.get('listen_port')
-        if listen_port and component_type in ['receiver', 'emulator']:
-            network_config = {"listen_port": int(listen_port)}
-            if component_type == 'receiver':
-                network_config["bind_address"] = request.form.get(
-                    'bind_address', '0.0.0.0')
-            config["network"] = network_config
-
-        # Type-specific configuration
-        if component_type == 'emulator':
-            config["configuration"] = {
-                "threads": int(request.form.get('threads', 4)),
-                "latency": int(request.form.get('latency', 50)),
-                "mem_footprint": float(request.form.get('mem_footprint', 0.05)),
-                "output_size": float(request.form.get('output_size', 0.001))
-            }
-        elif component_type == 'sender':
-            data_size = request.form.get('data_size')
-            if data_size:
-                config["test_data"] = {
-                    "size": data_size
-                }
+        # Get JSON data from request
+        config = request.get_json()
+        if not config:
+            return {"status": "error", "message": "No configuration data provided"}, 400
 
         workflow_manager.update_component_config(component_id, config)
         return {"status": "success"}
