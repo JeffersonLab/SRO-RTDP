@@ -6,7 +6,20 @@ components:
       output_size: 0.001
       threads: 4
     network:
-      listen_port: 50088
+      listen_port: 50000
+    resources:
+      cpus_per_task: 4
+      mem: 8G
+      partition: ifarm
+    type: emulator
+  emulator-2:
+    configuration:
+      latency: 50
+      mem_footprint: 0.05
+      output_size: 0.001
+      threads: 4
+    network:
+      listen_port: 50000
     resources:
       cpus_per_task: 4
       mem: 8G
@@ -15,7 +28,16 @@ components:
   receiver-1:
     network:
       bind_address: 0.0.0.0
-      listen_port: 50088
+      listen_port: 50000
+    resources:
+      cpus_per_task: 4
+      mem: 8G
+      partition: ifarm
+    type: receiver
+  receiver-2:
+    network:
+      bind_address: 0.0.0.0
+      listen_port: 50000
     resources:
       cpus_per_task: 4
       mem: 8G
@@ -29,8 +51,16 @@ components:
     test_data:
       size: 100M
     type: sender
+  sender-2:
+    resources:
+      cpus_per_task: 4
+      mem: 8G
+      partition: ifarm
+    test_data:
+      size: 100M
+    type: sender
 containers:
-  image_path: cpu-emu.sif
+  image_path: ''
 edges:
 - description: '1'
   from: sender-1
@@ -38,6 +68,12 @@ edges:
 - description: '2'
   from: emulator-1
   to: receiver-1
+- description: '1'
+  from: sender-2
+  to: emulator-2
+- description: '2'
+  from: emulator-2
+  to: receiver-2
 platform:
   job_runner: slurm
   name: jlab_slurm
