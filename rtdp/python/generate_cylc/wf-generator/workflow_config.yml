@@ -30,7 +30,7 @@ components:
       size: 100M
     type: sender
 containers:
-  image_path: ''
+  image_path: cpu-emu.sif
 edges:
 - description: '1'
   from: sender-1

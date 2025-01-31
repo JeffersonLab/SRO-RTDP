@@ -26,7 +26,7 @@
             --error = slurm_%j.log
         
         [[[environment]]]
-            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/"
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
