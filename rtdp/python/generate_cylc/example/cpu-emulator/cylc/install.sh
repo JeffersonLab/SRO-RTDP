@@ -3,6 +3,9 @@
 # Set -e to exit on error
 set -e
 
+# clean the sifs directory if it exists
+rm -rf sifs
+
 # Set fixed workflow name
 WORKFLOW_NAME="cylc-cpu-emu-gen"
 
