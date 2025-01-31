@@ -11,6 +11,8 @@
             emulator-1:ready => sender-1
             receiver-1:ready => emulator-1
             emulator-1:ready => sender-3
+            sender-1:succeeded => !receiver-1
+            sender-3:succeeded => !emulator-1
         """
 
 [runtime]

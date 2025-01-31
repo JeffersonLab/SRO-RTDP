@@ -12,29 +12,7 @@ components:
       mem: 16G
       partition: ifarm
     type: emulator
-  emulator-2:
-    configuration:
-      latency: 50
-      mem_footprint: 0.05
-      output_size: 0.001
-      threads: 4
-    network:
-      listen_port: 50888
-    resources:
-      cpus_per_task: 4
-      mem: 16G
-      partition: ifarm
-    type: emulator
   receiver-1:
-    network:
-      bind_address: 0.0.0.0
-      listen_port: 50888
-    resources:
-      cpus_per_task: 4
-      mem: 8G
-      partition: ifarm
-    type: receiver
-  receiver-2:
     network:
       bind_address: 0.0.0.0
       listen_port: 50888
@@ -51,7 +29,7 @@ components:
     test_data:
       size: 100M
     type: sender
-  sender-2:
+  sender-3:
     resources:
       cpus_per_task: 4
       mem: 8G
@@ -68,12 +46,9 @@ edges:
 - description: '2'
   from: emulator-1
   to: receiver-1
-- description: '1'
-  from: sender-2
-  to: emulator-2
-- description: '2'
-  from: emulator-2
-  to: receiver-2
+- description: '3'
+  from: sender-3
+  to: emulator-1
 platform:
   job_runner: slurm
   name: jlab_slurm
