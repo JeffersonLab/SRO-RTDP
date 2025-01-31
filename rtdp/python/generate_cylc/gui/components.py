@@ -109,7 +109,11 @@ class WorkflowManager:
 
         resources_obj = Resources(**resources)
         component = Component(
-            id=component_id, type=component_type, resources=resources_obj)
+            id=component_id,
+            type=component_type,
+            resources=resources_obj,
+            test_data=TestData() if component_type == 'sender' else None
+        )
         self.components[component_id] = component
 
     def remove_component(self, component_id: str) -> None:

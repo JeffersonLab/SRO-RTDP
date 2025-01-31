@@ -746,12 +746,21 @@ class WorkflowGraph {
                 }
             };
 
+            // Add default test_data for sender
+            if (type === 'sender') {
+                defaultConfig.test_data = {
+                    size: '100M'
+                };
+            }
+
             // Merge default config with provided config
             const finalConfig = {
                 resources: { ...defaultConfig.resources, ...(config.resources || {}) },
                 network: config.network || {},
                 configuration: config.configuration || {},
-                test_data: config.test_data || {}
+                test_data: type === 'sender' ?
+                    (config.test_data || defaultConfig.test_data) :
+                    (config.test_data || {})
             };
 
             // Add resources configuration
@@ -773,8 +782,9 @@ class WorkflowGraph {
                 if (finalConfig.configuration.latency) formData.append('latency', finalConfig.configuration.latency);
                 if (finalConfig.configuration.mem_footprint) formData.append('mem_footprint', finalConfig.configuration.mem_footprint);
                 if (finalConfig.configuration.output_size) formData.append('output_size', finalConfig.configuration.output_size);
-            } else if (type === 'sender' && finalConfig.test_data) {
-                if (finalConfig.test_data.size) formData.append('data_size', finalConfig.test_data.size);
+            } else if (type === 'sender') {
+                // Always include test_data for sender
+                formData.append('data_size', finalConfig.test_data.size);
             }
 
             // Make API call to add component
