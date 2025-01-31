@@ -12,8 +12,77 @@
 }
 
 @keyframes fadeInOut {
-    0% { opacity: 0; transform: translateY(20px); }
-    10% { opacity: 1; transform: translateY(0); }
-    90% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-20px); }
-} 
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    90% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+.palette {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.palette-item {
+    cursor: grab;
+    padding: 5px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.palette-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.palette-item .node {
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: 500;
+    border: 2px solid;
+}
+
+.node.sender {
+    background-color: #90EE90;
+    border-color: #60c060;
+}
+
+.node.receiver {
+    background-color: #F08080;
+    border-color: #d05050;
+}
+
+.node.emulator {
+    background-color: #ADD8E6;
+    border-color: #7ab5cc;
+}
+
+.workflow-graph {
+    width: 100%;
+    height: 600px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fafafa;
+}
+
+.workflow-graph.drop-target {
+    border-color: #2B7CE9;
+    background-color: #f0f8ff;
+}

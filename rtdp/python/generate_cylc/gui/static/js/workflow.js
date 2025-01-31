@@ -15,6 +15,15 @@ class WorkflowGraph {
             offset: { x: 0, y: 0 }
         };  // Enhanced clipboard structure
 
+        // Store unsaved changes
+        this.unsavedChanges = {
+            components: new Map(),  // Map of component ID to its configuration
+            edges: new Map(),        // Map of edge ID to its configuration
+            workflow: null,          // Workflow metadata
+            platform: null,          // Platform configuration
+            container: null          // Container configuration
+        };
+
         // Define valid edge rules based on workflow dependencies
         // A -> B means "if A ready then start B"
         this.edgeRules = {
@@ -26,6 +35,9 @@ class WorkflowGraph {
         this.init();
         this.setupDragAndDrop();
         this.setupCopyPaste();
+        this.setupSaveHandlers();
+        this.setupFormHandlers();
+        this.loadWorkflowState();  // Load initial state
     }
 
     init() {
@@ -65,6 +77,7 @@ class WorkflowGraph {
             },
             manipulation: {
                 enabled: true,
+                addNode: false,  // Disable add node button
                 addEdge: (edgeData, callback) => {
                     this.handleEdgeCreation(edgeData, callback);
                 },
@@ -177,6 +190,249 @@ class WorkflowGraph {
         });
     }
 
+    setupSaveHandlers() {
+        // Add handlers for Download and Preview buttons
+        const downloadBtn = document.getElementById('download-btn');
+        const previewBtn = document.getElementById('preview-btn');
+
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', async () => {
+                await this.saveAllChanges();
+                // Continue with download logic
+            });
+        }
+
+        // Remove Preview button handler since it's now handled in index.html
+        if (previewBtn) {
+            previewBtn.classList.remove('btn-warning');
+        }
+
+        // Add warning when leaving page with unsaved changes
+        window.addEventListener('beforeunload', (e) => {
+            if (this.hasUnsavedChanges()) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+    }
+
+    setupFormHandlers() {
+        // Workflow Metadata Form
+        const workflowForm = document.getElementById('workflow-metadata-form');
+        if (workflowForm) {
+            workflowForm.addEventListener('change', (e) => {
+                const formData = new FormData(workflowForm);
+                this.unsavedChanges.workflow = {
+                    name: formData.get('name'),  // Changed to match Flask form field name
+                    description: formData.get('description')  // Changed to match Flask form field name
+                };
+                this.showUnsavedChanges();
+            });
+        }
+
+        // Platform Configuration Form
+        const platformForm = document.getElementById('platform-config-form');
+        if (platformForm) {
+            platformForm.addEventListener('change', (e) => {
+                const formData = new FormData(platformForm);
+                this.unsavedChanges.platform = {
+                    name: formData.get('name'),  // Changed to match Flask form field name
+                    job_runner: formData.get('job_runner')  // Changed to match Flask form field name
+                };
+                this.showUnsavedChanges();
+            });
+        }
+
+        // Container Configuration Form
+        const containerForm = document.getElementById('container-config-form');
+        if (containerForm) {
+            containerForm.addEventListener('change', (e) => {
+                const formData = new FormData(containerForm);
+                this.unsavedChanges.container = {
+                    image_path: formData.get('image_path')  // Changed to match Flask form field name
+                };
+                this.showUnsavedChanges();
+            });
+        }
+    }
+
+    showUnsavedChanges() {
+        // Show indicator that there are unsaved changes
+        const downloadBtn = document.getElementById('download-btn');
+        const previewBtn = document.getElementById('preview-btn');
+
+        if (this.hasUnsavedChanges()) {
+            if (downloadBtn) downloadBtn.classList.add('btn-warning');
+            if (previewBtn) previewBtn.classList.add('btn-warning');
+
+            // Show toast notification
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = 'Changes stored. Click Download or Preview to save.';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+        } else {
+            if (downloadBtn) downloadBtn.classList.remove('btn-warning');
+            if (previewBtn) previewBtn.classList.remove('btn-warning');
+        }
+    }
+
+    hasUnsavedChanges() {
+        return this.unsavedChanges.components.size > 0 ||
+            this.unsavedChanges.edges.size > 0 ||
+            this.unsavedChanges.workflow !== null ||
+            this.unsavedChanges.platform !== null ||
+            this.unsavedChanges.container !== null;
+    }
+
+    async saveAllChanges() {
+        try {
+            // Save workflow metadata if changed
+            if (this.unsavedChanges.workflow) {
+                const workflowFormData = new FormData();
+                workflowFormData.append('workflow_name', this.unsavedChanges.workflow.name || '');
+                workflowFormData.append('workflow_description', this.unsavedChanges.workflow.description || '');
+
+                const workflowResponse = await fetch('/api/workflow/metadata', {
+                    method: 'POST',
+                    body: workflowFormData
+                });
+
+                if (!workflowResponse.ok) {
+                    const errorData = await workflowResponse.json();
+                    throw new Error(errorData.message || 'Failed to save workflow metadata');
+                }
+            }
+
+            // Save platform configuration if changed
+            if (this.unsavedChanges.platform) {
+                const platformFormData = new FormData();
+                platformFormData.append('platform_name', this.unsavedChanges.platform.name || '');
+                platformFormData.append('job_runner', this.unsavedChanges.platform.job_runner || '');
+
+                const platformResponse = await fetch('/api/workflow/platform', {
+                    method: 'POST',
+                    body: platformFormData
+                });
+
+                if (!platformResponse.ok) {
+                    const errorData = await platformResponse.json();
+                    throw new Error(errorData.message || 'Failed to save platform configuration');
+                }
+            }
+
+            // Save container configuration if changed
+            if (this.unsavedChanges.container) {
+                const containerFormData = new FormData();
+                containerFormData.append('image_path', this.unsavedChanges.container.image_path || '');
+
+                const containerResponse = await fetch('/api/workflow/container', {
+                    method: 'POST',
+                    body: containerFormData
+                });
+
+                if (!containerResponse.ok) {
+                    const errorData = await containerResponse.json();
+                    throw new Error(errorData.message || 'Failed to save container configuration');
+                }
+            }
+
+            // Save components
+            for (const [id, config] of this.unsavedChanges.components) {
+                const formData = this.createComponentFormData(id, config);
+                const componentResponse = await fetch(`/api/components/${id}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!componentResponse.ok) {
+                    const errorData = await componentResponse.json();
+                    throw new Error(errorData.message || `Failed to save component ${id}`);
+                }
+            }
+
+            // Save edges
+            for (const [id, config] of this.unsavedChanges.edges) {
+                const formData = new FormData();
+                formData.append('from_id', config.from);
+                formData.append('to_id', config.to);
+                formData.append('description', config.description || '');
+
+                const edgeResponse = await fetch('/api/edges', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!edgeResponse.ok) {
+                    const errorData = await edgeResponse.json();
+                    throw new Error(errorData.message || `Failed to save edge ${id}`);
+                }
+            }
+
+            // Clear all unsaved changes
+            this.unsavedChanges = {
+                components: new Map(),
+                edges: new Map(),
+                workflow: null,
+                platform: null,
+                container: null
+            };
+
+            // Update UI
+            const downloadBtn = document.getElementById('download-btn');
+            const previewBtn = document.getElementById('preview-btn');
+            if (downloadBtn) downloadBtn.classList.remove('btn-warning');
+            if (previewBtn) previewBtn.classList.remove('btn-warning');
+
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = 'All changes saved successfully';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
+
+        } catch (error) {
+            console.error('Error saving changes:', error);
+            alert(`Failed to save changes: ${error.message}`);
+            throw error;  // Re-throw to handle in calling function
+        }
+    }
+
+    createComponentFormData(id, config) {
+        const formData = new FormData();
+        formData.append('id', id);
+        formData.append('type', config.type);
+
+        // Add resources configuration
+        if (config.resources) {
+            formData.append('partition', config.resources.partition);
+            formData.append('cpus_per_task', config.resources.cpus_per_task);
+            formData.append('mem', config.resources.mem);
+        }
+
+        // Add network configuration
+        if (config.network) {
+            if (config.network.listen_port) {
+                formData.append('listen_port', config.network.listen_port);
+            }
+            if (config.type === 'receiver' && config.network.bind_address) {
+                formData.append('bind_address', config.network.bind_address);
+            }
+        }
+
+        // Add type-specific configuration
+        if (config.type === 'emulator' && config.configuration) {
+            if (config.configuration.threads) formData.append('threads', config.configuration.threads);
+            if (config.configuration.latency) formData.append('latency', config.configuration.latency);
+            if (config.configuration.mem_footprint) formData.append('mem_footprint', config.configuration.mem_footprint);
+            if (config.configuration.output_size) formData.append('output_size', config.configuration.output_size);
+        } else if (config.type === 'sender' && config.test_data) {
+            if (config.test_data.size) formData.append('data_size', config.test_data.size);
+        }
+
+        return formData;
+    }
+
     async copyComponents(nodeIds) {
         try {
             // Get current configuration
@@ -205,7 +461,10 @@ class WorkflowGraph {
             // Get edges between selected nodes
             const selectedEdges = this.edges.get().filter(edge => {
                 return nodeIds.includes(edge.from) && nodeIds.includes(edge.to);
-            });
+            }).map(edge => ({
+                ...edge,
+                description: edge.label  // Store the edge description
+            }));
 
             // Calculate reference point (center of selection)
             const centerX = selectedNodes.reduce((sum, node) => sum + node.position.x, 0) / selectedNodes.length;
@@ -244,7 +503,7 @@ class WorkflowGraph {
             // Get the current mouse position in canvas coordinates
             const pointer = this.network.getViewPosition();
             const scale = this.network.getScale();
-            
+
             // Calculate paste position based on pointer and viewport
             const pastePosition = {
                 x: pointer.x + (this.clipboard.offset.x * scale),
@@ -283,11 +542,28 @@ class WorkflowGraph {
             for (const edge of this.clipboard.edges) {
                 if (!idMapping[edge.from] || !idMapping[edge.to]) continue;
 
+                const description = edge.description || edge.label || '';
                 const newEdgeData = {
                     from: idMapping[edge.from],
                     to: idMapping[edge.to],
-                    label: edge.label || '',
+                    label: description,
                     id: `${idMapping[edge.from]}-${idMapping[edge.to]}`,
+                    arrows: {
+                        to: {
+                            enabled: true,
+                            scaleFactor: 1
+                        }
+                    },
+                    smooth: {
+                        enabled: true,
+                        type: 'cubicBezier',
+                        roundness: 0.5
+                    },
+                    color: {
+                        color: '#2B7CE9',
+                        highlight: '#2B7CE9',
+                        hover: '#2B7CE9'
+                    },
                     physics: false
                 };
 
@@ -295,7 +571,7 @@ class WorkflowGraph {
                 const formData = new FormData();
                 formData.append('from_id', newEdgeData.from);
                 formData.append('to_id', newEdgeData.to);
-                formData.append('description', edge.label || '');
+                formData.append('description', description);
 
                 try {
                     const response = await fetch('/api/edges', {
@@ -304,7 +580,16 @@ class WorkflowGraph {
                     });
 
                     if (response.ok) {
-                        addedEdges.push(newEdgeData);
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            addedEdges.push(newEdgeData);
+                            // Store the edge configuration locally
+                            this.unsavedChanges.edges.set(newEdgeData.id, {
+                                from: newEdgeData.from,
+                                to: newEdgeData.to,
+                                description: description
+                            });
+                        }
                     }
                 } catch (error) {
                     console.error(`Failed to add edge ${newEdgeData.id}:`, error);
@@ -315,7 +600,7 @@ class WorkflowGraph {
             if (addedNodes.length > 0) {
                 // Disable physics before adding nodes
                 this.network.setOptions({ physics: { enabled: false } });
-                
+
                 // Batch update the visual graph
                 this.nodes.add(addedNodes);
                 if (addedEdges.length > 0) {
@@ -467,7 +752,7 @@ class WorkflowGraph {
             if (data.status === 'success' && !skipVisualUpdate) {
                 this.nodes.add(nodeData);
             }
-            
+
             return nodeData;
         } catch (error) {
             console.error('Error adding component:', error);
@@ -515,13 +800,13 @@ class WorkflowGraph {
             return;
         }
 
-        // Create form data for the request
+        // Create form data for immediate backend save
         const formData = new FormData();
         formData.append('from_id', edgeData.from);
         formData.append('to_id', edgeData.to);
         formData.append('description', description);
 
-        // Make API call to add edge
+        // Save edge to backend immediately
         fetch('/api/edges', {
             method: 'POST',
             body: formData
@@ -529,16 +814,32 @@ class WorkflowGraph {
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
+                    // Store the edge configuration locally
+                    const edgeId = `${edgeData.from}-${edgeData.to}`;
+                    this.unsavedChanges.edges.set(edgeId, {
+                        from: edgeData.from,
+                        to: edgeData.to,
+                        description: description
+                    });
+
+                    // Update the visual edge
                     edgeData.label = description;
                     callback(edgeData);
+
+                    // Show feedback
+                    const toast = document.createElement('div');
+                    toast.className = 'toast';
+                    toast.textContent = 'Edge added successfully';
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 2000);
                 } else {
-                    alert(data.message || 'Failed to add data flow');
+                    alert(data.message || 'Failed to add edge');
                     callback(null);
                 }
             })
             .catch(error => {
-                console.error('Error adding data flow:', error);
-                alert('Failed to add data flow. Please try again.');
+                console.error('Error adding edge:', error);
+                alert('Failed to add edge. Please try again.');
                 callback(null);
             });
     }
@@ -567,14 +868,16 @@ class WorkflowGraph {
         // Wait for all deletions to complete
         Promise.all(deletePromises)
             .then(() => {
-                // Remove all edges from the graph
+                // Remove the specified edges from the graph
                 this.edges.remove(edgeIds);
                 callback(edgeData);
 
-                // Wait a short moment before refreshing to ensure backend is updated
-                setTimeout(() => {
-                    refreshWorkflowGraph();
-                }, 100);
+                // Show feedback
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = `Deleted ${edgeIds.length} connection(s)`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
             })
             .catch(error => {
                 console.error('Error deleting edges:', error);
@@ -586,6 +889,12 @@ class WorkflowGraph {
     handleNodeDeletion(nodeData, callback) {
         // Handle both single and multiple node deletion
         const nodeIds = Array.isArray(nodeData.nodes) ? nodeData.nodes : [nodeData.nodes[0]];
+
+        // Find edges connected to these nodes
+        const connectedEdges = this.edges.get().filter(edge =>
+            nodeIds.includes(edge.from) || nodeIds.includes(edge.to)
+        );
+        const connectedEdgeIds = connectedEdges.map(edge => edge.id);
 
         // Create a promise for each node deletion
         const deletePromises = nodeIds.map(nodeId =>
@@ -603,14 +912,21 @@ class WorkflowGraph {
         // Wait for all deletions to complete
         Promise.all(deletePromises)
             .then(() => {
-                // Remove all nodes from the graph
+                // Remove only the directly connected edges from the graph
+                if (connectedEdgeIds.length > 0) {
+                    this.edges.remove(connectedEdgeIds);
+                }
+
+                // Remove the nodes from the graph
                 this.nodes.remove(nodeIds);
                 callback(nodeData);
 
-                // Wait a short moment before refreshing to ensure backend is updated
-                setTimeout(() => {
-                    refreshWorkflowGraph();
-                }, 100);
+                // Show feedback
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = `Deleted ${nodeIds.length} component(s) and ${connectedEdgeIds.length} connection(s)`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
             })
             .catch(error => {
                 console.error('Error deleting components:', error);
@@ -621,10 +937,9 @@ class WorkflowGraph {
 
     async openComponentConfig(nodeId) {
         try {
-            // Get current configuration from backend
-            const configResponse = await fetch('/api/workflow/config');
-            const config = await configResponse.json();
-            const componentConfig = config.components[nodeId] || {};
+            // Get current configuration
+            const config = this.unsavedChanges.components.get(nodeId) ||
+                (await (await fetch('/api/workflow/config')).json()).components[nodeId] || {};
             const node = this.nodes.get(nodeId);
 
             // Create modal if it doesn't exist
@@ -649,6 +964,10 @@ class WorkflowGraph {
                                 <!-- Form content will be added here -->
                             </form>
                         </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('componentConfigForm').dispatchEvent(new Event('submit'))">Apply</button>
+                        </div>
                     </div>
                 </div>`;
 
@@ -664,17 +983,17 @@ class WorkflowGraph {
                     <div class="mb-2">
                         <label class="form-label">Partition</label>
                         <input type="text" class="form-control" name="partition" 
-                            value="${componentConfig.resources ? componentConfig.resources.partition : 'ifarm'}" required>
+                            value="${config.resources ? config.resources.partition : 'ifarm'}" required>
                     </div>
                     <div class="mb-2">
                         <label class="form-label">CPUs per Task</label>
                         <input type="number" class="form-control" name="cpus_per_task" min="1" 
-                            value="${componentConfig.resources ? componentConfig.resources.cpus_per_task : '4'}" required>
+                            value="${config.resources ? config.resources.cpus_per_task : '4'}" required>
                     </div>
                     <div class="mb-2">
                         <label class="form-label">Memory</label>
                         <input type="text" class="form-control" name="mem" 
-                            value="${componentConfig.resources ? componentConfig.resources.mem : '8G'}" required>
+                            value="${config.resources ? config.resources.mem : '8G'}" required>
                     </div>
                 </div>`;
 
@@ -687,12 +1006,12 @@ class WorkflowGraph {
                         <div class="mb-2">
                             <label class="form-label">Listen Port</label>
                             <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
-                                value="${componentConfig.network ? componentConfig.network.listen_port : ''}">
+                                value="${config.network ? config.network.listen_port : ''}">
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Bind Address</label>
                             <input type="text" class="form-control" name="bind_address" 
-                                value="${componentConfig.network ? componentConfig.network.bind_address : '0.0.0.0'}">
+                                value="${config.network ? config.network.bind_address : '0.0.0.0'}">
                         </div>
                     </div>`;
             } else if (node.type === 'emulator') {
@@ -703,14 +1022,14 @@ class WorkflowGraph {
                         <div class="mb-2">
                             <label class="form-label">Listen Port</label>
                             <input type="number" class="form-control" name="listen_port" min="1024" max="65535" 
-                                value="${componentConfig.network ? componentConfig.network.listen_port : ''}">
+                                value="${config.network ? config.network.listen_port : ''}">
                         </div>
                     </div>`;
             }
 
             // Add type-specific configuration
             if (node.type === 'emulator') {
-                const emulatorConfig = componentConfig.configuration || {
+                const emulatorConfig = config.configuration || {
                     threads: 4,
                     latency: 50,
                     mem_footprint: 0.05,
@@ -750,34 +1069,50 @@ class WorkflowGraph {
                         <div class="mb-2">
                             <label class="form-label">Data Size</label>
                             <input type="text" class="form-control" name="data_size" 
-                                value="${componentConfig.test_data ? componentConfig.test_data.size : '100M'}">
+                                value="${config.test_data ? config.test_data.size : '100M'}">
                         </div>
                     </div>`;
             }
 
-            // Add submit button
-            formHtml += `
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>`;
-
             form.innerHTML = formHtml;
 
-            // Add form submit handler
-            form.addEventListener('submit', async (e) => {
+            // Modify form submit handler to store changes locally
+            form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
-                // Add the component type to the form data
-                formData.append('type', node.type);
 
-                try {
-                    // Pass the modal instance to saveComponentConfig
-                    await this.saveComponentConfig(nodeId, formData, bsModal);
-                } catch (error) {
-                    console.error('Error saving component configuration:', error);
-                    alert('Failed to save component configuration. Please try again.');
-                }
+                // Store the changes
+                this.unsavedChanges.components.set(nodeId, {
+                    type: node.type,
+                    resources: {
+                        partition: formData.get('partition'),
+                        cpus_per_task: formData.get('cpus_per_task'),
+                        mem: formData.get('mem')
+                    },
+                    network: node.type !== 'sender' ? {
+                        listen_port: formData.get('listen_port'),
+                        ...(node.type === 'receiver' ? { bind_address: formData.get('bind_address') } : {})
+                    } : {},
+                    configuration: node.type === 'emulator' ? {
+                        threads: formData.get('threads'),
+                        latency: formData.get('latency'),
+                        mem_footprint: formData.get('mem_footprint'),
+                        output_size: formData.get('output_size')
+                    } : {},
+                    test_data: node.type === 'sender' ? {
+                        size: formData.get('data_size')
+                    } : {}
+                });
+
+                // Close the modal
+                bsModal.hide();
+
+                // Show feedback
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = 'Changes stored. Click Download or Preview to save.';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 2000);
             });
 
             // Show the modal
@@ -786,107 +1121,6 @@ class WorkflowGraph {
         } catch (error) {
             console.error('Error loading component configuration:', error);
             alert('Failed to load component configuration');
-        }
-    }
-
-    async saveComponentConfig(nodeId, formData, modalInstance) {
-        try {
-            // Store existing edges before the update
-            const existingEdges = this.edges.get();
-
-            const response = await fetch(`/api/components/${nodeId}`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to save component configuration');
-            }
-
-            const data = await response.json();
-            if (data.status === 'success') {
-                // Restore edge descriptions after the update
-                existingEdges.forEach(edge => {
-                    const currentEdge = this.edges.get(edge.id);
-                    if (currentEdge) {
-                        currentEdge.label = edge.label;
-                        this.edges.update(currentEdge);
-                    }
-                });
-
-                // Close the modal using the passed instance
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
-
-                // Refresh the graph by reloading the configuration
-                await this.loadWorkflowConfig();
-            }
-        } catch (error) {
-            console.error('Error saving component configuration:', error);
-            alert('Failed to save component configuration. Please try again.');
-        }
-    }
-
-    async loadWorkflowConfig() {
-        try {
-            const response = await fetch('/api/workflow/config');
-            if (!response.ok) {
-                throw new Error('Failed to load workflow configuration');
-            }
-
-            const config = await response.json();
-
-            // Store current node positions before clearing
-            const nodePositions = {};
-            this.nodes.forEach(node => {
-                const position = this.network.getPosition(node.id);
-                nodePositions[node.id] = position;
-            });
-
-            // Clear existing nodes and edges
-            this.nodes.clear();
-            this.edges.clear();
-
-            // Add components as nodes, preserving positions
-            for (const [id, component] of Object.entries(config.components || {})) {
-                this.nodes.add({
-                    id: id,
-                    label: `${component.type}\n#${id.split('-')[1]}`,
-                    type: component.type,
-                    color: this.getNodeColor(component.type),
-                    // Restore position if it exists, otherwise let vis.js position it
-                    ...(nodePositions[id] ? {
-                        x: nodePositions[id].x,
-                        y: nodePositions[id].y,
-                        fixed: true  // Keep the node fixed in its position
-                    } : {})
-                });
-            }
-
-            // Add edges with their descriptions
-            if (config.edges) {
-                config.edges.forEach(edge => {
-                    this.edges.add({
-                        from: edge.from,
-                        to: edge.to,
-                        label: edge.description || '',
-                        id: `${edge.from}-${edge.to}`
-                    });
-                });
-            }
-
-            // Release fixed positions after a short delay
-            setTimeout(() => {
-                this.nodes.forEach(node => {
-                    if (node.fixed) {
-                        this.nodes.update({ id: node.id, fixed: false });
-                    }
-                });
-            }, 100);
-        } catch (error) {
-            console.error('Error loading workflow configuration:', error);
-            alert('Failed to load workflow configuration');
         }
     }
 
@@ -950,9 +1184,10 @@ class WorkflowGraph {
 
         // Add nodes from components, preserving positions if they existed
         Object.entries(config.components).forEach(([id, comp]) => {
+            const number = id.split('-')[1];
             const nodeData = {
                 id: id,
-                label: `${comp.type}\n#${id}`,
+                label: `${comp.type}\n#${number}`,
                 type: comp.type,
                 color: this.getNodeColor(comp.type),
                 physics: false  // Disable physics for each node
@@ -967,19 +1202,29 @@ class WorkflowGraph {
             this.nodes.add(nodeData);
         });
 
-        // Add edges with their types and conditions
+        // Add edges with their descriptions
         if (config.edges && Array.isArray(config.edges)) {
             config.edges.forEach(edge => {
-                const edgeLabel = edge.type + (edge.condition ? `\n(${edge.condition})` : '');
                 this.edges.add({
                     from: edge.from,
                     to: edge.to,
-                    label: edgeLabel,
+                    label: edge.description || '',
+                    id: `${edge.from}-${edge.to}`,
                     arrows: {
                         to: {
                             enabled: true,
                             scaleFactor: 1
                         }
+                    },
+                    smooth: {
+                        enabled: true,
+                        type: 'cubicBezier',
+                        roundness: 0.5
+                    },
+                    color: {
+                        color: '#2B7CE9',
+                        highlight: '#2B7CE9',
+                        hover: '#2B7CE9'
                     },
                     physics: false  // Disable physics for edges too
                 });
@@ -988,6 +1233,83 @@ class WorkflowGraph {
 
         // No need to stabilize or fix/unfix nodes since physics is disabled
     }
+
+    async loadWorkflowState() {
+        try {
+            const response = await fetch('/api/workflow/config');
+            if (!response.ok) {
+                throw new Error('Failed to load workflow configuration');
+            }
+
+            const config = await response.json();
+
+            // Clear existing nodes and edges
+            this.nodes.clear();
+            this.edges.clear();
+            this.unsavedChanges.edges.clear();  // Clear unsaved edge changes
+
+            // Add components as nodes
+            for (const [id, component] of Object.entries(config.components || {})) {
+                const number = id.split('-')[1];
+                this.nodes.add({
+                    id: id,
+                    label: `${component.type}\n#${number}`,
+                    type: component.type,
+                    color: this.getNodeColor(component.type),
+                    physics: false
+                });
+            }
+
+            // Add edges with their descriptions and styling
+            if (config.edges && Array.isArray(config.edges)) {
+                for (const edge of config.edges) {
+                    const edgeId = `${edge.from}-${edge.to}`;
+                    const edgeData = {
+                        from: edge.from,
+                        to: edge.to,
+                        label: edge.description || '',
+                        id: edgeId,
+                        arrows: {
+                            to: {
+                                enabled: true,
+                                scaleFactor: 1
+                            }
+                        },
+                        smooth: {
+                            enabled: true,
+                            type: 'cubicBezier',
+                            roundness: 0.5
+                        },
+                        color: {
+                            color: '#2B7CE9',
+                            highlight: '#2B7CE9',
+                            hover: '#2B7CE9'
+                        },
+                        physics: false
+                    };
+
+                    // Add edge to the visual graph
+                    this.edges.add(edgeData);
+
+                    // Store edge configuration in unsavedChanges
+                    this.unsavedChanges.edges.set(edgeId, {
+                        from: edge.from,
+                        to: edge.to,
+                        description: edge.description || ''
+                    });
+                }
+            }
+
+            // Disable physics after loading
+            this.network.setOptions({ physics: { enabled: false } });
+
+            // Apply automatic layout and stabilize
+            this.network.stabilize();
+        } catch (error) {
+            console.error('Error loading workflow state:', error);
+            alert('Failed to load workflow state');
+        }
+    }
 }
 
 // Initialize graph and handle updates
@@ -995,15 +1317,6 @@ let workflowGraph;
 
 function initializeWorkflowGraph() {
     workflowGraph = new WorkflowGraph();
-    refreshWorkflowGraph();
 }
 
-async function refreshWorkflowGraph() {
-    try {
-        const response = await fetch('/api/workflow/config');
-        const config = await response.json();
-        workflowGraph.updateFromConfig(config);
-    } catch (error) {
-        console.error('Failed to refresh workflow graph:', error);
-    }
-} 
+// Remove refreshWorkflowGraph function as it's no longer needed 

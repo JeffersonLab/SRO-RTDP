@@ -10,7 +10,6 @@ class WorkflowMetadataForm(FlaskForm):
     """Form for workflow metadata."""
     name = StringField('Workflow Name', validators=[DataRequired()])
     description = StringField('Description')
-    submit = SubmitField('Save')
 
 
 class PlatformConfigForm(FlaskForm):
@@ -19,7 +18,6 @@ class PlatformConfigForm(FlaskForm):
     job_runner = SelectField('Job Runner',
                              choices=[('slurm', 'SLURM')],
                              validators=[DataRequired()])
-    submit = SubmitField('Save')
 
 
 class ResourcesForm(FlaskForm):
@@ -132,4 +130,3 @@ class ContainerConfigForm(FlaskForm):
     """Form for container configuration."""
     image_path = StringField('Container Image Path',
                              validators=[DataRequired()])
-    submit = SubmitField('Save')

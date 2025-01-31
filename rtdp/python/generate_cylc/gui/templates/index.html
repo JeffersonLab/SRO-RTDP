@@ -13,8 +13,9 @@
                     <h3 class="h5 mb-0">Workflow Metadata</h3>
                 </div>
                 <div class="card-body">
-                    <form id="workflow-metadata-form">
-                        {{ render_form(workflow_metadata_form) }}
+                    <form id="workflow-metadata-form" onsubmit="return false;">
+                        {{ render_form(workflow_metadata_form, button_map={}) }}
+                        <button type="button" class="btn btn-primary" onclick="saveWorkflowMetadata()">Save Metadata</button>
                     </form>
                 </div>
             </div>
@@ -25,16 +26,17 @@
                     <h3 class="h5 mb-0">Platform Configuration</h3>
                 </div>
                 <div class="card-body">
-                    <form id="platform-config-form">
-                        {{ render_form(platform_form) }}
+                    <form id="platform-config-form" onsubmit="return false;">
+                        {{ render_form(platform_form, button_map={}) }}
+                        <button type="button" class="btn btn-primary" onclick="savePlatformConfig()">Save Platform Config</button>
                     </form>
                 </div>
             </div>
 
-            <!-- Workflow Design -->
+            <!-- Workflow Graph -->
             <div class="card mb-3">
                 <div class="card-header">
-                    <h3 class="h5 mb-0">Workflow Design</h3>
+                    <h3 class="h5 mb-0">Workflow Graph</h3>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -45,12 +47,12 @@
                                     <h4 class="h6 mb-0">Components</h4>
                                 </div>
                                 <div class="card-body">
-                                    <div class="component-palette">
+                                    <div class="palette">
                                         <div class="palette-item" draggable="true" data-type="sender">
                                             <div class="node sender">Sender</div>
                                         </div>
                                         <div class="palette-item" draggable="true" data-type="emulator">
-                                            <div class="node emulator">CPU Emulator</div>
+                                            <div class="node emulator">Emulator</div>
                                         </div>
                                         <div class="palette-item" draggable="true" data-type="receiver">
                                             <div class="node receiver">Receiver</div>
@@ -81,8 +83,9 @@
                     <h3 class="h5 mb-0">Container Configuration</h3>
                 </div>
                 <div class="card-body">
-                    <form id="container-config-form">
-                        {{ render_form(container_form) }}
+                    <form id="container-config-form" onsubmit="return false;">
+                        {{ render_form(container_form, button_map={}) }}
+                        <button type="button" class="btn btn-primary" onclick="saveContainerConfig()">Save Container Config</button>
                     </form>
                 </div>
             </div>
@@ -90,8 +93,10 @@
             <!-- Actions -->
             <div class="card mb-3">
                 <div class="card-body">
-                    <button class="btn btn-primary" onclick="downloadConfig()">Download Configuration</button>
-                    <button class="btn btn-secondary" onclick="previewConfig()">Preview Configuration</button>
+                    <button id="download-btn" class="btn btn-primary" onclick="downloadConfig()">Download
+                        Configuration</button>
+                    <button id="preview-btn" class="btn btn-secondary" onclick="previewConfig()">Preview
+                        Configuration</button>
                 </div>
             </div>
         </div>
@@ -214,23 +219,84 @@
 
     async function previewConfig() {
         try {
+            // Just fetch the current configuration without saving
             const response = await fetch('/api/workflow/config');
+            if (!response.ok) {
+                throw new Error('Failed to load configuration preview');
+            }
             const config = await response.json();
-            document.getElementById('configPreview').textContent =
-                JSON.stringify(config, null, 2);
+            document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
             new bootstrap.Modal(document.getElementById('previewModal')).show();
         } catch (error) {
+            console.error('Error loading preview:', error);
             showError('Failed to load configuration preview');
-            console.error(error);
+        }
+    }
+
+    async function saveWorkflowMetadata() {
+        const form = document.getElementById('workflow-metadata-form');
+        const formData = new FormData(form);
+        try {
+            const response = await fetch('/api/workflow/metadata', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Failed to save workflow metadata');
+            showSuccess('Workflow metadata saved successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError('Failed to save workflow metadata');
+        }
+    }
+
+    async function savePlatformConfig() {
+        const form = document.getElementById('platform-config-form');
+        const formData = new FormData(form);
+        try {
+            const response = await fetch('/api/workflow/platform', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Failed to save platform configuration');
+            showSuccess('Platform configuration saved successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError('Failed to save platform configuration');
+        }
+    }
+
+    async function saveContainerConfig() {
+        const form = document.getElementById('container-config-form');
+        const formData = new FormData(form);
+        try {
+            const response = await fetch('/api/workflow/container', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Failed to save container configuration');
+            showSuccess('Container configuration saved successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError('Failed to save container configuration');
         }
     }
 
     function showError(message) {
-        alert(message);
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.backgroundColor = '#dc3545';
+        toast.style.color = 'white';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
     }
 
     function showSuccess(message) {
-        alert(message);
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
     }
 </script>
 {% endblock %}
