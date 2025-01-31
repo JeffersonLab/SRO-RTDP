@@ -6,7 +6,7 @@ components:
       output_size: 0.001
       threads: 4
     network:
-      listen_port: 50888
+      listen_port: 50088
     resources:
       cpus_per_task: 4
       mem: 16G
@@ -15,7 +15,7 @@ components:
   receiver-1:
     network:
       bind_address: 0.0.0.0
-      listen_port: 50888
+      listen_port: 50088
     resources:
       cpus_per_task: 4
       mem: 8G
