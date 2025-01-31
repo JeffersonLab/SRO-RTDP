@@ -15,7 +15,7 @@
                 <div class="card-body">
                     <form id="workflow-metadata-form" onsubmit="return false;">
                         {{ render_form(workflow_metadata_form, button_map={}) }}
-                        <button type="button" class="btn btn-primary" onclick="saveWorkflowMetadata()">Save Metadata</button>
+                        <button type="button" class="btn btn-primary" onclick="applyWorkflowMetadata()">Apply</button>
                     </form>
                 </div>
             </div>
@@ -28,7 +28,7 @@
                 <div class="card-body">
                     <form id="platform-config-form" onsubmit="return false;">
                         {{ render_form(platform_form, button_map={}) }}
-                        <button type="button" class="btn btn-primary" onclick="savePlatformConfig()">Save Platform Config</button>
+                        <button type="button" class="btn btn-primary" onclick="applyPlatformConfig()">Apply</button>
                     </form>
                 </div>
             </div>
@@ -85,7 +85,7 @@
                 <div class="card-body">
                     <form id="container-config-form" onsubmit="return false;">
                         {{ render_form(container_form, button_map={}) }}
-                        <button type="button" class="btn btn-primary" onclick="saveContainerConfig()">Save Container Config</button>
+                        <button type="button" class="btn btn-primary" onclick="applyContainerConfig()">Apply</button>
                     </form>
                 </div>
             </div>
@@ -139,87 +139,48 @@
     // Initialize workflow visualization
     document.addEventListener('DOMContentLoaded', () => {
         initializeWorkflowGraph();
-        setupFormHandlers();
     });
 
-    function setupFormHandlers() {
-        // Workflow Metadata Form
-        const metadataForm = document.querySelector('#workflow-metadata-form');
-        if (metadataForm) {
-            metadataForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const formData = new FormData(metadataForm);
-                try {
-                    const response = await fetch('/api/workflow/metadata', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (!response.ok) throw new Error('Failed to update workflow metadata');
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        showSuccess('Workflow metadata updated successfully');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showError('Failed to update workflow metadata');
-                }
-            });
-        }
-
-        // Platform Configuration Form
-        const platformForm = document.querySelector('#platform-config-form');
-        if (platformForm) {
-            platformForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const formData = new FormData(platformForm);
-                try {
-                    const response = await fetch('/api/workflow/platform', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (!response.ok) throw new Error('Failed to update platform configuration');
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        showSuccess('Platform configuration updated successfully');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showError('Failed to update platform configuration');
-                }
-            });
-        }
-
-        // Container Configuration Form
-        const containerForm = document.querySelector('#container-config-form');
-        if (containerForm) {
-            containerForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const formData = new FormData(containerForm);
-                try {
-                    const response = await fetch('/api/workflow/container', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (!response.ok) throw new Error('Failed to update container configuration');
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        showSuccess('Container configuration updated successfully');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    showError('Failed to update container configuration');
-                }
-            });
-        }
-    }
-
     async function downloadConfig() {
-        window.location.href = '/api/workflow/config/download';
+        try {
+            const response = await fetch('/api/workflow/config/download');
+            if (!response.ok) {
+                throw new Error('Failed to download configuration');
+            }
+
+            // Get the filename from the Content-Disposition header if available
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'workflow_config.yml';
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="(.+)"/);
+                if (match) {
+                    filename = match[1];
+                }
+            }
+
+            // Convert response to blob
+            const blob = await response.blob();
+
+            // Create download link and trigger download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+
+            showSuccess('Configuration downloaded successfully');
+        } catch (error) {
+            console.error('Error downloading configuration:', error);
+            showError('Failed to download configuration');
+        }
     }
 
     async function previewConfig() {
         try {
-            // Just fetch the current configuration without saving
+            // Just fetch and display the configuration without saving
             const response = await fetch('/api/workflow/config');
             if (!response.ok) {
                 throw new Error('Failed to load configuration preview');
@@ -233,10 +194,10 @@
         }
     }
 
-    async function saveWorkflowMetadata() {
-        const form = document.getElementById('workflow-metadata-form');
-        const formData = new FormData(form);
+    async function applyWorkflowMetadata() {
         try {
+            const form = document.getElementById('workflow-metadata-form');
+            const formData = new FormData(form);
             const response = await fetch('/api/workflow/metadata', {
                 method: 'POST',
                 body: formData
@@ -245,14 +206,14 @@
             showSuccess('Workflow metadata saved successfully');
         } catch (error) {
             console.error('Error:', error);
-            showError('Failed to save workflow metadata');
+            showError(error.message);
         }
     }
 
-    async function savePlatformConfig() {
-        const form = document.getElementById('platform-config-form');
-        const formData = new FormData(form);
+    async function applyPlatformConfig() {
         try {
+            const form = document.getElementById('platform-config-form');
+            const formData = new FormData(form);
             const response = await fetch('/api/workflow/platform', {
                 method: 'POST',
                 body: formData
@@ -261,14 +222,14 @@
             showSuccess('Platform configuration saved successfully');
         } catch (error) {
             console.error('Error:', error);
-            showError('Failed to save platform configuration');
+            showError(error.message);
         }
     }
 
-    async function saveContainerConfig() {
-        const form = document.getElementById('container-config-form');
-        const formData = new FormData(form);
+    async function applyContainerConfig() {
         try {
+            const form = document.getElementById('container-config-form');
+            const formData = new FormData(form);
             const response = await fetch('/api/workflow/container', {
                 method: 'POST',
                 body: formData
@@ -277,7 +238,7 @@
             showSuccess('Container configuration saved successfully');
         } catch (error) {
             console.error('Error:', error);
-            showError('Failed to save container configuration');
+            showError(error.message);
         }
     }
 
