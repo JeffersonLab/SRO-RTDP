@@ -8,8 +8,9 @@
 
     [[graph]]
         R1 = """
-            emu_stage1:ready => data_sender
-            main_receiver:ready => emu_stage1
+            emulator-1:ready => sender-1
+            receiver-1:ready => emulator-1
+            sender-1:succeeded => !receiver-1
         """
 
 [runtime]
@@ -30,69 +31,24 @@
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
 
-    [[data_sender]]
+    [[emulator-1]]
         script = """
             # Setup directories
             mkdir -p ${OUTPUT_DIR}
             mkdir -p ${INPUT_DIR}
-            mkdir -p ${LOG_DIR}/data_sender
-            exec 1> >(tee -a "${LOG_DIR}/data_sender/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/data_sender/stderr.log")
+            mkdir -p ${LOG_DIR}/emulator-1
+            exec 1> >(tee -a "${LOG_DIR}/emulator-1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator-1/stderr.log")
 
             # Store hostname for other tasks
             HOSTNAME=$(hostname -f)
             IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/data_sender_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/data_sender_ip
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator-1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip
 
             # Find data target from edges
-            # Connect to emu_stage1
-            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emu_stage1_ip)
-            TARGET_PORT=50888
-            
-            # Generate and send data
-            dd if=/dev/urandom bs=100M count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
-            
-            apptainer run --bind ${INPUT_DIR}:/data \
-                ${CPU_EMU_SIF} send \
-                "/data/data.bin" \
-                ${TARGET_IP} \
-                ${TARGET_PORT}
-            
-            STATUS=$?
-            rm -f ${INPUT_DIR}/data.bin
-            
-            if [ $STATUS -eq 0 ]; then
-                cylc message -- "sender:succeeded"
-            fi
-            exit $STATUS
-        """
-        [[[directives]]]
-            --job-name = cpu-emu-data_sender
-            --cpus-per-task = 4
-            --mem = 8G
-        
-        [[[outputs]]]
-            ready = "ready"
-
-    [[emu_stage1]]
-        script = """
-            # Setup directories
-            mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${INPUT_DIR}
-            mkdir -p ${LOG_DIR}/emu_stage1
-            exec 1> >(tee -a "${LOG_DIR}/emu_stage1/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/emu_stage1/stderr.log")
-
-            # Store hostname for other tasks
-            HOSTNAME=$(hostname -f)
-            IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emu_stage1_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emu_stage1_ip
-
-            # Find data target from edges
-            # Connect to main_receiver
-            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/main_receiver_ip)
+            # Connect to receiver-1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip)
             TARGET_PORT=50080
             
             # Start emulator
@@ -119,33 +75,33 @@
 
         """
         [[[directives]]]
-            --job-name = cpu-emu-emu_stage1
+            --job-name = cpu-emu-emulator-1
             --cpus-per-task = 4
             --mem = 16G
         
         [[[outputs]]]
             ready = "ready"
 
-    [[main_receiver]]
+    [[receiver-1]]
         script = """
             # Setup directories
             mkdir -p ${OUTPUT_DIR}
             mkdir -p ${INPUT_DIR}
-            mkdir -p ${LOG_DIR}/main_receiver
-            exec 1> >(tee -a "${LOG_DIR}/main_receiver/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/main_receiver/stderr.log")
+            mkdir -p ${LOG_DIR}/receiver-1
+            exec 1> >(tee -a "${LOG_DIR}/receiver-1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver-1/stderr.log")
 
             # Store hostname for other tasks
             HOSTNAME=$(hostname -f)
             IP=$(hostname -i | awk '{print $1}')
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/main_receiver_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/main_receiver_ip
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver-1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip
 
             # Start receiver
             apptainer run --bind ${OUTPUT_DIR}:/output \
                 ${CPU_EMU_SIF} receive \
                 50080 \
-                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/main_receiver/apptainer.log &
+                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver-1/apptainer.log &
             
             PROC_PID=$!
             sleep 2
@@ -189,12 +145,57 @@
 
         """
         [[[directives]]]
-            --job-name = cpu-emu-main_receiver
+            --job-name = cpu-emu-receiver-1
             --cpus-per-task = 4
             --mem = 8G
         
         [[[outputs]]]
             ready = "ready"
             completed = "Transfer completed successfully"
+
+    [[sender-1]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/sender-1
+            exec 1> >(tee -a "${LOG_DIR}/sender-1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender-1/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/sender-1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/sender-1_ip
+
+            # Find data target from edges
+            # Connect to emulator-1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip)
+            TARGET_PORT=50888
+            
+            # Generate and send data
+            dd if=/dev/urandom bs=100M count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
+            
+            apptainer run --bind ${INPUT_DIR}:/data \
+                ${CPU_EMU_SIF} send \
+                "/data/data.bin" \
+                ${TARGET_IP} \
+                ${TARGET_PORT}
+            
+            STATUS=$?
+            rm -f ${INPUT_DIR}/data.bin
+            
+            if [ $STATUS -eq 0 ]; then
+                cylc message -- "sender:succeeded"
+            fi
+            exit $STATUS
+        """
+        [[[directives]]]
+            --job-name = cpu-emu-sender-1
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
 
  
