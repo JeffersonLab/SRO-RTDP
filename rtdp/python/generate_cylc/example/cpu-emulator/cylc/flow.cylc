@@ -77,7 +77,7 @@
         [[[directives]]]
             --job-name = cpu-emu-emulator-1
             --cpus-per-task = 4
-            --mem = 8G
+            --mem = 16G
         
         [[[outputs]]]
             ready = "ready"

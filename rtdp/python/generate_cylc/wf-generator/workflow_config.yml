@@ -9,7 +9,7 @@ components:
       listen_port: 50888
     resources:
       cpus_per_task: 4
-      mem: 8G
+      mem: 16G
       partition: ifarm
     type: emulator
   receiver-1:
