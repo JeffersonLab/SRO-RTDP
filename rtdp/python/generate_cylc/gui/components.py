@@ -107,6 +107,10 @@ class WorkflowManager:
         if component_id in self.components:
             raise ValueError(f"Component {component_id} already exists")
 
+        # Set default memory to 16G for emulator
+        if component_type == 'emulator':
+            resources['mem'] = '16G'
+
         resources_obj = Resources(**resources)
         component = Component(
             id=component_id,
