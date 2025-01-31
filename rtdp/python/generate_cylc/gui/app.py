@@ -165,11 +165,12 @@ def remove_edge(from_id: str, to_id: str) -> Dict[str, str]:
 @app.route('/api/workflow/container', methods=['POST'])
 def update_container() -> Union[Dict[str, str], tuple[Dict[str, Any], int]]:
     """Update container configuration."""
-    form = ContainerConfigForm()
-    if form.validate_on_submit():
-        workflow_manager.container_image_path = form.image_path.data
-        return {"status": "success"}
-    return {"status": "error", "errors": form.errors}, 400
+    # Get the image path from form data
+    image_path = request.form.get('image_path', 'cpu-emu.sif')
+
+    # Update the container image path
+    workflow_manager.container_image_path = image_path
+    return {"status": "success"}
 
 
 @app.route('/api/workflow/config', methods=['GET'])
