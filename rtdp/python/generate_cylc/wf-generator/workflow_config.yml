@@ -29,6 +29,14 @@ components:
     test_data:
       size: 100M
     type: sender
+  sender-2:
+    resources:
+      cpus_per_task: 4
+      mem: 8G
+      partition: ifarm
+    test_data:
+      size: 100M
+    type: sender
 containers:
   image_path: cpu-emu.sif
 edges:
@@ -38,6 +46,9 @@ edges:
 - description: '2'
   from: emulator-1
   to: receiver-1
+- description: '3'
+  from: sender-2
+  to: emulator-1
 platform:
   job_runner: slurm
   name: jlab_slurm
