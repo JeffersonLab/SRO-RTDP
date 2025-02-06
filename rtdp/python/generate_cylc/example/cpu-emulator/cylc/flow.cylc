@@ -10,6 +10,10 @@
         R1 = """
             emulator-1:ready => sender-1
             receiver-1:ready => emulator-1
+            emulator-2:ready => sender-1
+            emulator-3:ready => sender-1
+            receiver-1:ready => emulator-2
+            receiver-1:ready => emulator-3
             sender-1:succeeded => !receiver-1
         """
 
@@ -76,6 +80,108 @@
         """
         [[[directives]]]
             --job-name = cpu-emu-emulator-1
+            --cpus-per-task = 4
+            --mem = 16G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[emulator-2]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/emulator-2
+            exec 1> >(tee -a "${LOG_DIR}/emulator-2/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator-2/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator-2_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator-2_ip
+
+            # Find data target from edges
+            # Connect to receiver-1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip)
+            TARGET_PORT=50000
+            
+            # Start emulator
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${CPU_EMU_SIF} --output-dir /output \
+                -t 4 \
+                -b 50 \
+                -m 0.05 \
+                -o 0.001 \
+                -r 50800 \
+                -p ${TARGET_PORT} \
+                -i ${TARGET_IP} -v 1 &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = cpu-emu-emulator-2
+            --cpus-per-task = 4
+            --mem = 16G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[emulator-3]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/emulator-3
+            exec 1> >(tee -a "${LOG_DIR}/emulator-3/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator-3/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator-3_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator-3_ip
+
+            # Find data target from edges
+            # Connect to receiver-1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver-1_ip)
+            TARGET_PORT=50000
+            
+            # Start emulator
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${CPU_EMU_SIF} --output-dir /output \
+                -t 4 \
+                -b 50 \
+                -m 0.05 \
+                -o 0.001 \
+                -r 50800 \
+                -p ${TARGET_PORT} \
+                -i ${TARGET_IP} -v 1 &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = cpu-emu-emulator-3
             --cpus-per-task = 4
             --mem = 16G
         
@@ -169,8 +275,8 @@
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/sender-1_ip
 
             # Find data target from edges
-            # Connect to emulator-1
-            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip)
+            # Connect to emulator-3
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator-3_ip)
             TARGET_PORT=50800
             
             # Generate and send data
