@@ -12,32 +12,6 @@ components:
       mem: 16G
       partition: ifarm
     type: emulator
-  emulator-2:
-    configuration:
-      latency: 50
-      mem_footprint: 0.05
-      output_size: 0.001
-      threads: 4
-    network:
-      listen_port: 1234
-    resources:
-      cpus_per_task: 4
-      mem: 16G
-      partition: ifarm
-    type: emulator
-  emulator-3:
-    configuration:
-      latency: 50
-      mem_footprint: 0.05
-      output_size: 0.001
-      threads: 4
-    network:
-      listen_port: 1234
-    resources:
-      cpus_per_task: 4
-      mem: 16G
-      partition: ifarm
-    type: emulator
   receiver-1:
     network:
       bind_address: 0.0.0.0
@@ -61,20 +35,8 @@ edges:
 - description: '1'
   from: sender-1
   to: emulator-1
-- description: '2'
-  from: sender-1
-  to: emulator-2
-- description: '3'
-  from: sender-1
-  to: emulator-3
 - description: '4'
   from: emulator-1
-  to: receiver-1
-- description: '5'
-  from: emulator-2
-  to: receiver-1
-- description: '6'
-  from: emulator-3
   to: receiver-1
 platform:
   job_runner: slurm
