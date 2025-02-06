@@ -3,6 +3,6 @@
 [platforms]
     [[jlab_slurm]]
         cylc path = /w/epsci-sciwork18/jeng/cylc-env/bin/
-        hosts = tsai@ifarm2402
+        hosts = tsai@ifarm2401
         job runner = slurm
         install target = localhost 
