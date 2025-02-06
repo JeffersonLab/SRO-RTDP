@@ -58,7 +58,7 @@
                 -b 50 \
                 -m 0.05 \
                 -o 0.001 \
-                -r 50000 \
+                -r 50800 \
                 -p ${TARGET_PORT} \
                 -i ${TARGET_IP} -v 1 &
             
@@ -171,7 +171,7 @@
             # Find data target from edges
             # Connect to emulator-1
             TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator-1_ip)
-            TARGET_PORT=50000
+            TARGET_PORT=50800
             
             # Generate and send data
             dd if=/dev/urandom bs=100M count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
