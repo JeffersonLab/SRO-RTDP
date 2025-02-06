@@ -6,7 +6,7 @@ components:
       output_size: 0.001
       threads: 4
     network:
-      listen_port: 50000
+      listen_port: 50800
     resources:
       cpus_per_task: 4
       mem: 16G
