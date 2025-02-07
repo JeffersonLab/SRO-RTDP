@@ -31,6 +31,16 @@ if [ -d "${WF_GENERATOR_DIR}" ]; then
             exit 1
         fi
         echo "Workflow configuration generated successfully"
+        
+        # Copy generated configuration files to Cylc share directory
+        echo "Copying configuration files to Cylc directory..."
+        if [ -d "${WF_GENERATOR_DIR}/generated/share" ]; then
+            cp -r "${WF_GENERATOR_DIR}/generated/share/"* "${CYLC_DIR}/share/"
+            echo "Configuration files copied successfully"
+        else
+            echo "Error: Generated share directory not found at ${WF_GENERATOR_DIR}/generated/share"
+            exit 1
+        fi
     else
         echo "Error: workflow_config.yml not found in ${WF_GENERATOR_DIR}"
         exit 1
