@@ -9,7 +9,7 @@ WORKFLOW_NAME="rtdp-workflow"
 # Get the directory of this script and set up paths
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 COMPONENTS_DIR="$( cd "${SCRIPT_DIR}/.." &> /dev/null && pwd )"
-CYLC_DIR="${COMPONENTS_DIR}/cylc"
+CYLC_DIR="${COMPONENTS_DIR}/example/cpu-emulator/cylc"
 WF_GENERATOR_DIR="${COMPONENTS_DIR}/wf-generator"
 
 # Clean existing directories
@@ -52,8 +52,13 @@ fi
 
 # Build container images and convert to SIF format
 echo "Building and converting container images..."
-cd "${COMPONENTS_DIR}"
-./build.sh
+if [ -f "${CYLC_DIR}/build.sh" ]; then
+    cd "${CYLC_DIR}"
+    ./build.sh
+else
+    echo "Error: build.sh not found at ${CYLC_DIR}/build.sh"
+    exit 1
+fi
 
 # Make sure we're in the correct directory for Cylc operations
 cd "${CYLC_DIR}"
