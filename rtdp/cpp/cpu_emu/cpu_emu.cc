@@ -358,44 +358,42 @@ int main (int argc, char *argv[])
     for (auto& th : threads) th.join();
    
     //forward to next hop    
-    { 
 
-        int sockfd; 
-        struct sockaddr_in servaddr;  
+    int sockfddst; 
+    struct sockaddr_in dstaddr;  
 
-        // socket create and verification 
+    // socket create and verification 
 
-        sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+    sockfddst = socket(AF_INET, SOCK_STREAM, 0); 
 
-        if (sockfd == -1) { 
-            std::cout << "socket creation failed...\n"; 
-            exit(0); 
-        } 
-        else 
-            if(vrbs) std::cout << "Socket successfully created.." << endl;
-	        
-        bzero(&servaddr, sizeof(servaddr));   
-
-        // assign IP, PORT 
-
-        servaddr.sin_family = AF_INET; 
-        servaddr.sin_addr.s_addr = inet_addr(dst_ip);
-        servaddr.sin_port = htons(dst_prt);  
-
-        // connect the client socket to server socket 
-
-        if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
-            std::cout << "connection with the server failed...\n"; 
-            exit(0); 
-        } 
-        else 
-            if(vrbs) std::cout << "connected to the server.." << endl;   
-
-        size_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
-        double* x = new double[outSz]; //harvested data
-        size_t nw = write(sockfd, x, outSz);
-        if(vrbs) std::cout << "output Num written " << nw  << endl;
-        if(nw != outSz) cerr << "Destination data incorrect size\n";
-        close(sockfd);
+    if (sockfddst == -1) { 
+        std::cout << "socket creation failed...\n"; 
+        exit(0); 
     } 
+    else 
+        if(vrbs) std::cout << "Socket successfully created.." << endl;
+	        
+    bzero(&dstaddr, sizeof(dstaddr));   
+
+    // assign IP, PORT 
+
+    dstaddr.sin_family = AF_INET; 
+    dstaddr.sin_addr.s_addr = inet_addr(dst_ip);
+    dstaddr.sin_port = htons(dst_prt);  
+
+    // connect the client socket to server socket 
+
+    if (connect(sockfddst, (SA*)&dstaddr, sizeof(dstaddr)) != 0) { 
+        std::cout << "connection with the server failed...\n"; 
+        exit(0); 
+    } 
+    else 
+        if(vrbs) std::cout << "connected to the server.." << endl;   
+
+    size_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
+    double* x = new double[outSz]; //harvested data
+    size_t nw = write(sockfddst, x, outSz);
+    if(vrbs) std::cout << "output Num written " << nw  << endl;
+    if(nw != outSz) cerr << "Destination data incorrect size\n";
+    close(sockfddst);
 }
