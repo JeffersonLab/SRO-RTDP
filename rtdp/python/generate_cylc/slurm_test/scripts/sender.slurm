@@ -7,9 +7,6 @@
 #SBATCH --mem=4G
 #SBATCH --time=2:00:00
 
-# Load any required modules
-module load singularity
-
 # Set environment variables
 export OUTPUT_DIR="$PWD/../output"
 export CONFIG_DIR="$PWD/../config"
@@ -24,5 +21,5 @@ echo "$IP" > sender_ip
 # Start sender with configuration
 apptainer run --bind ${OUTPUT_DIR}:/data \
     ../sifs/rtdp-components.sif \
-    python -m components.sender \
+    python3 -m components.sender \
     --config ${CONFIG_DIR}/sender_config.yml 

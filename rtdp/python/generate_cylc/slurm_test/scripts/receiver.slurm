@@ -7,9 +7,6 @@
 #SBATCH --mem=4G
 #SBATCH --time=2:00:00
 
-# Load any required modules
-module load singularity
-
 # Set environment variables
 export OUTPUT_DIR="$PWD/../output"
 export CONFIG_DIR="$PWD/../config"
@@ -27,6 +24,6 @@ EMULATOR_IP=$(cat emulator_ip)
 # Start receiver with configuration
 apptainer run --bind ${OUTPUT_DIR}:/data \
     ../sifs/rtdp-components.sif \
-    python -m components.receiver \
+    python3 -m components.receiver \
     --config ${CONFIG_DIR}/receiver_config.yml \
     --emulator-ip ${EMULATOR_IP} 
