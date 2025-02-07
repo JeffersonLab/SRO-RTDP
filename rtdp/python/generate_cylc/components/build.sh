@@ -3,9 +3,11 @@
 # Set -e to exit on error
 set -e
 
-# Get the directory of this script
+# Get the directory of this script and set up paths
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-CYLC_DIR="${SCRIPT_DIR}/../cylc"
+COMPONENTS_DIR="$( cd "${SCRIPT_DIR}/.." &> /dev/null && pwd )"
+CYLC_DIR="${COMPONENTS_DIR}/cylc"
+WF_GENERATOR_DIR="${COMPONENTS_DIR}/wf-generator"
 
 # Create sifs directory if it doesn't exist
 mkdir -p sifs
@@ -43,12 +45,14 @@ copy_to_cylc() {
     # Copy SIF files
     cp sifs/*.sif "$cylc_dir/sifs/"
     
-    # Copy configuration files
-    if [ -d "../wf-generator/generated/share" ]; then
-        cp ../wf-generator/generated/share/* "$cylc_dir/share/"
+    # Copy configuration files if they exist
+    if [ -d "${WF_GENERATOR_DIR}/generated/share" ]; then
+        cp -r "${WF_GENERATOR_DIR}/generated/share/"* "$cylc_dir/share/"
+        echo "Configuration files copied successfully"
+    else
+        echo "Warning: No configuration files found in ${WF_GENERATOR_DIR}/generated/share"
+        echo "Please run the workflow generator first"
     fi
-    
-    echo "Files copied successfully to Cylc workflow directory"
 }
 
 # Step 1: Convert CPU emulator image
