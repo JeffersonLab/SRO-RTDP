@@ -14,11 +14,11 @@ WF_GENERATOR_DIR="${COMPONENTS_DIR}/wf-generator"
 
 # Clean existing directories
 echo "Cleaning up existing directories..."
-rm -rf "${CYLC_DIR}/sifs" "${CYLC_DIR}/etc/config" "${CYLC_DIR}/scripts" "${CYLC_DIR}/share"
+rm -rf "${CYLC_DIR}/sifs" "${CYLC_DIR}/etc/config" "${CYLC_DIR}/scripts" "${CYLC_DIR}/workflow_config"
 
 # Create necessary directories in Cylc directory
 echo "Creating directories..."
-mkdir -p "${CYLC_DIR}/sifs" "${CYLC_DIR}/etc/config" "${CYLC_DIR}/scripts" "${CYLC_DIR}/share"
+mkdir -p "${CYLC_DIR}/sifs" "${CYLC_DIR}/etc/config" "${CYLC_DIR}/scripts" "${CYLC_DIR}/workflow_config"
 
 # Run workflow generator first
 echo "Generating workflow configuration..."
@@ -32,10 +32,10 @@ if [ -d "${WF_GENERATOR_DIR}" ]; then
         fi
         echo "Workflow configuration generated successfully"
         
-        # Copy generated configuration files to Cylc share directory
+        # Copy generated configuration files to Cylc workflow_config directory
         echo "Copying configuration files to Cylc directory..."
         if [ -d "${WF_GENERATOR_DIR}/generated/share" ]; then
-            cp -r "${WF_GENERATOR_DIR}/generated/share/"* "${CYLC_DIR}/share/"
+            cp -r "${WF_GENERATOR_DIR}/generated/share/"* "${CYLC_DIR}/workflow_config/"
             echo "Configuration files copied successfully"
         else
             echo "Error: Generated share directory not found at ${WF_GENERATOR_DIR}/generated/share"
@@ -101,8 +101,8 @@ fi
 if [ ! -f "${CYLC_DIR}/sifs/rtdp-components.sif" ]; then
     echo "Warning: rtdp-components.sif not found!"
 fi
-if [ ! -d "${CYLC_DIR}/share" ] || [ -z "$(ls -A ${CYLC_DIR}/share)" ]; then
-    echo "Warning: No configuration files found in ${CYLC_DIR}/share"
+if [ ! -d "${CYLC_DIR}/workflow_config" ] || [ -z "$(ls -A ${CYLC_DIR}/workflow_config)" ]; then
+    echo "Warning: No configuration files found in ${CYLC_DIR}/workflow_config"
 fi
 
 echo "Workflow installed and validated."
@@ -110,7 +110,7 @@ echo "Before running, please ensure:"
 echo "1. Both SIF files are present in ./sifs/:"
 echo "   - cpu-emu.sif"
 echo "   - rtdp-components.sif"
-echo "2. Component configuration files are in ./share/"
+echo "2. Component configuration files are in ./workflow_config/"
 echo "3. Configure environment variables in flow.cylc if needed"
 echo ""
 echo "To run the workflow:"
