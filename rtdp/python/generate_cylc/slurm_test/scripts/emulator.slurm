@@ -22,8 +22,10 @@ echo "$IP" > emulator_ip
 SENDER_IP=$(cat sender_ip)
 
 # Start emulator with configuration
-apptainer run --bind ${OUTPUT_DIR}:/output \
+apptainer exec \
+    --bind ${OUTPUT_DIR}:/output \
+    --bind ${CONFIG_DIR}:/config \
     ../sifs/cpu-emu.sif \
-    /usr/local/bin/cpu_emu \
-    -y ${CONFIG_DIR}/emulator_config.yml \
+    cpu_emu \
+    -y /config/emulator_config.yml \
     --sender-ip ${SENDER_IP} 
