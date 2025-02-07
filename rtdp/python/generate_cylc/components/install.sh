@@ -54,7 +54,22 @@ fi
 echo "Building and converting container images..."
 if [ -f "${CYLC_DIR}/build.sh" ]; then
     cd "${CYLC_DIR}"
-    ./build.sh
+    
+    # Convert CPU emulator image
+    echo "Converting CPU emulator image..."
+    ./build.sh -i jlabtsai/rtdp-cpu_emu:v0.1 -o cpu-emu.sif
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to convert CPU emulator image"
+        exit 1
+    fi
+    
+    # Convert RTDP components image
+    echo "Converting RTDP components image..."
+    ./build.sh -i jlabtsai/rtdp-components:latest -o rtdp-components.sif
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to convert RTDP components image"
+        exit 1
+    fi
 else
     echo "Error: build.sh not found at ${CYLC_DIR}/build.sh"
     exit 1
