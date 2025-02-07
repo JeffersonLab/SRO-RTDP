@@ -6,11 +6,11 @@ set -e
 # Set fixed workflow name
 WORKFLOW_NAME="rtdp-workflow"
 
-# Get the directory of this script
+# Get the directory of this script and set up paths
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-COMPONENTS_DIR="${SCRIPT_DIR}"
-CYLC_DIR="${SCRIPT_DIR}/../cylc"
-WF_GENERATOR_DIR="${SCRIPT_DIR}/../wf-generator"
+COMPONENTS_DIR="$( cd "${SCRIPT_DIR}/.." &> /dev/null && pwd )"
+CYLC_DIR="${COMPONENTS_DIR}/cylc"
+WF_GENERATOR_DIR="${COMPONENTS_DIR}/wf-generator"
 
 # Clean existing directories
 echo "Cleaning up existing directories..."
