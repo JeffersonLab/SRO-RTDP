@@ -10,6 +10,7 @@ WORKFLOW_NAME="rtdp-workflow"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 COMPONENTS_DIR="${SCRIPT_DIR}"
 CYLC_DIR="${SCRIPT_DIR}/../cylc"
+WF_GENERATOR_DIR="${SCRIPT_DIR}/../wf-generator"
 
 # Clean existing directories
 echo "Cleaning up existing directories..."
@@ -18,6 +19,26 @@ rm -rf "${CYLC_DIR}/sifs" "${CYLC_DIR}/etc/config" "${CYLC_DIR}/scripts" "${CYLC
 # Create necessary directories in Cylc directory
 echo "Creating directories..."
 mkdir -p "${CYLC_DIR}/sifs" "${CYLC_DIR}/etc/config" "${CYLC_DIR}/scripts" "${CYLC_DIR}/share"
+
+# Run workflow generator first
+echo "Generating workflow configuration..."
+if [ -d "${WF_GENERATOR_DIR}" ]; then
+    cd "${WF_GENERATOR_DIR}"
+    if [ -f "workflow_config.yml" ]; then
+        python generate_workflow.py workflow_config.yml --output-dir generated
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to generate workflow configuration"
+            exit 1
+        fi
+        echo "Workflow configuration generated successfully"
+    else
+        echo "Error: workflow_config.yml not found in ${WF_GENERATOR_DIR}"
+        exit 1
+    fi
+else
+    echo "Error: Workflow generator directory not found at ${WF_GENERATOR_DIR}"
+    exit 1
+fi
 
 # Build container images and convert to SIF format
 echo "Building and converting container images..."
@@ -37,13 +58,16 @@ cylc install --workflow-name=${WORKFLOW_NAME}
 echo "Validating workflow..."
 cylc validate .
 
-# Verify SIF files
-echo "Verifying SIF files..."
+# Verify SIF files and configuration
+echo "Verifying files..."
 if [ ! -f "${CYLC_DIR}/sifs/cpu-emu.sif" ]; then
     echo "Warning: cpu-emu.sif not found!"
 fi
 if [ ! -f "${CYLC_DIR}/sifs/rtdp-components.sif" ]; then
     echo "Warning: rtdp-components.sif not found!"
+fi
+if [ ! -d "${CYLC_DIR}/share" ] || [ -z "$(ls -A ${CYLC_DIR}/share)" ]; then
+    echo "Warning: No configuration files found in ${CYLC_DIR}/share"
 fi
 
 echo "Workflow installed and validated."
