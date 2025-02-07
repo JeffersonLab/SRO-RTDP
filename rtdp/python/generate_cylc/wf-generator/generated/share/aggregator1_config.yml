@@ -1,0 +1,30 @@
+aggregator_config:
+  batch_size: 100
+  buffer_size: 256M
+  max_delay: 1000
+  strategy: ordered
+  window_size: 1s
+connections:
+- buffer_size: 1M
+  data_type: processed
+  source: emulator1
+- buffer_size: 1M
+  data_type: processed
+  source: emulator2
+- buffer_size: 1M
+  data_type: processed
+  target: receiver1
+id: aggregator1
+network:
+  bind_address: 0.0.0.0
+  connect_to:
+  - host: localhost
+    port: 50801
+  - host: localhost
+    port: 50802
+  listen_port: 50803
+resources:
+  cpus_per_task: 4
+  mem: 8G
+  partition: ifarm
+type: aggregator

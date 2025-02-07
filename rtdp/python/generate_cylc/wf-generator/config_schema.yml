@@ -31,7 +31,7 @@ components:
       properties:
         type:
           type: string
-          enum: ["receiver", "emulator", "sender"]
+          enum: ["receiver", "emulator", "sender", "load_balancer", "aggregator"]
           description: "Type of the component"
         resources:
           type: object
@@ -54,6 +54,15 @@ components:
             bind_address:
               type: string
               default: "0.0.0.0"
+            connect_to:
+              type: array
+              items:
+                type: object
+                properties:
+                  host:
+                    type: string
+                  port:
+                    type: integer
         configuration:  # For emulator type
           type: object
           properties:
@@ -69,12 +78,86 @@ components:
             output_size:
               type: float
               default: 0.001
-        test_data:  # For sender type
+            processing_type:
+              type: string
+              enum: ["cpu_intensive", "memory_intensive", "io_intensive"]
+              default: "cpu_intensive"
+        sender_config:  # For sender type
           type: object
           properties:
-            size:
+            data_source:
+              type: string
+              description: "Path or URL to data source"
+            data_format:
+              type: string
+              enum: ["raw", "hdf5", "root"]
+              default: "raw"
+            chunk_size:
+              type: string
+              default: "1M"
+            test_data:
+              type: object
+              properties:
+                size:
+                  type: string
+                  default: "100M"
+                pattern:
+                  type: string
+                  enum: ["random", "sequential", "custom"]
+                  default: "random"
+        receiver_config:  # For receiver type
+          type: object
+          properties:
+            output_dir:
+              type: string
+              description: "Directory to store received data"
+            data_validation:
+              type: boolean
+              default: true
+            buffer_size:
+              type: string
+              default: "64M"
+            compression:
+              type: boolean
+              default: false
+        load_balancer_config:  # For load balancer type
+          type: object
+          properties:
+            strategy:
+              type: string
+              enum: ["round_robin", "least_loaded", "consistent_hash"]
+              default: "round_robin"
+            max_queue_size:
               type: string
               default: "100M"
+            health_check_interval:
+              type: integer
+              default: 5
+            backpressure_threshold:
+              type: float
+              default: 0.8
+            rebalance_threshold:
+              type: float
+              default: 0.2
+        aggregator_config:  # For aggregator type
+          type: object
+          properties:
+            strategy:
+              type: string
+              enum: ["ordered", "unordered", "time_window"]
+              default: "ordered"
+            buffer_size:
+              type: string
+              default: "256M"
+            max_delay:
+              type: integer
+              default: 1000
+            batch_size:
+              type: integer
+              default: 100
+            window_size:
+              type: string
+              default: "1s"
 
 edges:
   type: array
@@ -93,6 +176,13 @@ edges:
       description:
         type: string
         description: "Optional description of the data flow"
+      data_type:
+        type: string
+        description: "Type of data being transferred"
+      buffer_size:
+        type: string
+        description: "Buffer size for data transfer"
+        default: "1M"
 
 containers:
   image_path:

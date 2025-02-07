@@ -2,6 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import os
 from typing import Dict, List, Any
+import graphviz
 
 
 def get_edge_style(edge_type: str) -> Dict[str, Any]:
@@ -58,10 +59,20 @@ def generate_workflow_graph(
         color = {
             'sender': 'lightgreen',
             'emulator': 'lightblue',
-            'receiver': 'lightcoral'
+            'receiver': 'lightcoral',
+            'load_balancer': '#ffadad',  # Light red
+            'aggregator': '#e4c1f9'      # Light purple
         }.get(info['type'], 'gray')
 
-        G.add_node(name, color=color)
+        shape = {
+            'sender': 'box',
+            'emulator': 'box',
+            'receiver': 'box',
+            'load_balancer': 'diamond',
+            'aggregator': 'hexagon'
+        }.get(info['type'], 'box')
+
+        G.add_node(name, color=color, shape=shape)
 
     # Add edges (data flows)
     for edge in edges:
@@ -73,14 +84,19 @@ def generate_workflow_graph(
     # Create the visualization
     plt.figure(figsize=(12, 6))
 
-    # Draw nodes
-    node_colors = [G.nodes[node].get('color', 'gray') for node in G.nodes()]
-    nx.draw_networkx_nodes(
-        G,
-        pos,
-        node_color=node_colors,
-        node_size=2000
-    )
+    # Draw nodes with custom shapes and colors
+    for shape in set(nx.get_node_attributes(G, 'shape').values()):
+        node_list = [node for node in G.nodes(
+        ) if G.nodes[node].get('shape') == shape]
+        if node_list:
+            nx.draw_networkx_nodes(
+                G,
+                pos,
+                nodelist=node_list,
+                node_color=[G.nodes[node]['color'] for node in node_list],
+                node_shape=shape,
+                node_size=2000
+            )
 
     # Draw edges with data flow style
     nx.draw_networkx_edges(
@@ -127,7 +143,7 @@ def generate_workflow_graph(
 
 
 def validate_workflow(components: Dict[str, Dict],
-                     edges: List[Dict]) -> bool:
+                      edges: List[Dict]) -> bool:
     """Validate the workflow configuration.
 
     Args:
@@ -171,6 +187,99 @@ def validate_workflow(components: Dict[str, Dict],
             return False
 
     return True
+
+
+def create_workflow_graph(config: Dict[str, Any]) -> graphviz.Digraph:
+    """Create a graphviz visualization of the workflow.
+
+    Args:
+        config: Workflow configuration dictionary
+
+    Returns:
+        Graphviz graph object
+    """
+    dot = graphviz.Digraph(comment='Workflow Graph')
+    dot.attr(rankdir='LR')  # Left to right layout
+
+    # Node styles for different component types
+    styles = {
+        'sender': {
+            'shape': 'box',
+            'style': 'filled',
+            'fillcolor': '#a8e6cf',  # Light green
+            'fontname': 'Arial'
+        },
+        'receiver': {
+            'shape': 'box',
+            'style': 'filled',
+            'fillcolor': '#ffd3b6',  # Light orange
+            'fontname': 'Arial'
+        },
+        'emulator': {
+            'shape': 'box',
+            'style': 'filled',
+            'fillcolor': '#bde0fe',  # Light blue
+            'fontname': 'Arial'
+        },
+        'load_balancer': {
+            'shape': 'diamond',
+            'style': 'filled',
+            'fillcolor': '#ffadad',  # Light red
+            'fontname': 'Arial'
+        },
+        'aggregator': {
+            'shape': 'hexagon',
+            'style': 'filled',
+            'fillcolor': '#e4c1f9',  # Light purple
+            'fontname': 'Arial'
+        }
+    }
+
+    # Add component nodes
+    components = config.get('components', {})
+    for comp_id, comp in components.items():
+        comp_type = comp.get('type', 'unknown')
+        style = styles.get(comp_type, {})
+
+        # Create label with component details
+        label = f"{comp_id}\n({comp_type})"
+
+        # Add configuration details based on type
+        if comp_type == 'emulator':
+            config_data = comp.get('configuration', {})
+            label += f"\nThreads: {config_data.get('threads', 4)}"
+            label += f"\nLatency: {config_data.get('latency', 50)}ms"
+        elif comp_type == 'load_balancer':
+            config_data = comp.get('load_balancer_config', {})
+            label += f"\nStrategy: {config_data.get('strategy', 'round_robin')}"
+        elif comp_type == 'aggregator':
+            config_data = comp.get('aggregator_config', {})
+            label += f"\nStrategy: {config_data.get('strategy', 'ordered')}"
+
+        dot.node(comp_id, label, **style)
+
+    # Add edges
+    edges = config.get('edges', [])
+    for edge in edges:
+        from_id = edge.get('from')
+        to_id = edge.get('to')
+        if from_id and to_id:
+            # Create edge label
+            label = []
+            if 'data_type' in edge:
+                label.append(f"Type: {edge['data_type']}")
+            if 'buffer_size' in edge:
+                label.append(f"Buffer: {edge['buffer_size']}")
+
+            dot.edge(
+                from_id,
+                to_id,
+                label='\n'.join(label) if label else None,
+                fontname='Arial',
+                fontsize='10'
+            )
+
+    return dot
 
 
 if __name__ == '__main__':

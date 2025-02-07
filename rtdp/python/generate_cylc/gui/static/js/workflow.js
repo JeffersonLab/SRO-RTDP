@@ -1,14 +1,14 @@
 // Using vis-network for interactive graph editing with drag-and-drop functionality
 class WorkflowGraph {
-    constructor() {
+    constructor(container) {
         if (typeof vis === 'undefined') {
             throw new Error('vis-network library not loaded');
         }
 
+        this.container = container;
         this.network = null;
         this.nodes = new vis.DataSet();
         this.edges = new vis.DataSet();
-        this.graphContainer = document.getElementById('workflow-graph');
         this.clipboard = {
             nodes: [],
             edges: [],
@@ -108,7 +108,7 @@ class WorkflowGraph {
         };
 
         this.network = new vis.Network(
-            this.graphContainer,
+            this.container,
             { nodes: this.nodes, edges: this.edges },
             options
         );
@@ -130,7 +130,7 @@ class WorkflowGraph {
 
     setupDragAndDrop() {
         const paletteItems = document.querySelectorAll('.palette-item');
-        const graphContainer = this.graphContainer;
+        const graphContainer = this.container;
 
         paletteItems.forEach(item => {
             item.addEventListener('dragstart', (e) => {
@@ -169,7 +169,7 @@ class WorkflowGraph {
         // Add keyboard event listener
         document.addEventListener('keydown', async (e) => {
             // Check if the graph container is focused
-            if (!this.graphContainer.contains(document.activeElement)) {
+            if (!this.container.contains(document.activeElement)) {
                 return;
             }
 
@@ -1437,7 +1437,211 @@ class WorkflowGraph {
 let workflowGraph;
 
 function initializeWorkflowGraph() {
-    workflowGraph = new WorkflowGraph();
+    const container = document.getElementById('workflow-graph');
+    if (!container) return;
+
+    // Initialize drag-and-drop
+    initializeDragAndDrop();
+
+    // Initialize graph visualization
+    workflowGraph = new WorkflowGraph(container);
+    workflowGraph.init();
 }
 
-// Remove refreshWorkflowGraph function as it's no longer needed 
+function initializeDragAndDrop() {
+    const paletteItems = document.querySelectorAll('.palette-item');
+
+    paletteItems.forEach(item => {
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragend', handleDragEnd);
+    });
+
+    const graphContainer = document.getElementById('workflow-graph');
+    graphContainer.addEventListener('dragover', handleDragOver);
+    graphContainer.addEventListener('drop', handleDrop);
+}
+
+function handleDragStart(event) {
+    const type = event.target.getAttribute('data-component-type');
+    if (!type) return;
+
+    const style = componentTypes[type];
+    event.dataTransfer.setData('text/plain', JSON.stringify({
+        type,
+        style
+    }));
+
+    event.target.classList.add('dragging');
+}
+
+function handleDragEnd(event) {
+    event.target.classList.remove('dragging');
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+}
+
+function handleDrop(event) {
+    event.preventDefault();
+    const data = JSON.parse(event.dataTransfer.getData('text/plain'));
+
+    const rect = event.target.getBoundingClientRect();
+    const position = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+    };
+
+    addComponent(data.type, position);
+}
+
+function addComponent(type, position) {
+    componentCounter++;
+    const id = `${type}${componentCounter}`;
+    const style = componentTypes[type];
+
+    const node = {
+        id,
+        type,
+        position,
+        data: {
+            label: `${style.label} ${componentCounter}`,
+            type
+        },
+        style: {
+            backgroundColor: style.color,
+            padding: '10px',
+            borderRadius: '4px',
+            border: `2px solid ${style.color}`,
+            width: 150,
+            height: type === 'load_balancer' || type === 'aggregator' ? 100 : 80
+        }
+    };
+
+    // Add special shapes for load balancer and aggregator
+    if (type === 'load_balancer') {
+        node.style.clipPath = 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)';
+        node.style.borderRadius = '0';
+    } else if (type === 'aggregator') {
+        node.style.clipPath = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
+        node.style.borderRadius = '0';
+    }
+
+    workflowGraph.addNode(node);
+    showConfigModal(type, id);
+}
+
+class WorkflowGraph {
+    constructor(container) {
+        this.container = container;
+        this.nodes = new Map();
+        this.edges = new Map();
+    }
+
+    init() {
+        // Initialize graph visualization library
+        // (Implementation depends on your chosen library)
+    }
+
+    addNode(node) {
+        this.nodes.set(node.id, node);
+        this.updateVisualization();
+    }
+
+    updateVisualization() {
+        // Update graph visualization
+        // (Implementation depends on your chosen library)
+    }
+}
+
+function showConfigModal(type, id) {
+    const modalId = `${type}-config-form`;
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    // Store the component ID for use when saving
+    modal.dataset.componentId = id;
+
+    // Show the modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+}
+
+function saveLoadBalancerConfig() {
+    const modal = document.getElementById('load-balancer-config-form');
+    const id = modal.dataset.componentId;
+
+    const config = {
+        strategy: document.getElementById('lb-strategy').value,
+        max_queue_size: document.getElementById('lb-max-queue-size').value,
+        health_check_interval: document.getElementById('lb-health-check-interval').value,
+        backpressure_threshold: document.getElementById('lb-backpressure-threshold').value,
+        rebalance_threshold: document.getElementById('lb-rebalance-threshold').value
+    };
+
+    updateComponentConfig(id, config);
+    bootstrap.Modal.getInstance(modal).hide();
+}
+
+function saveAggregatorConfig() {
+    const modal = document.getElementById('aggregator-config-form');
+    const id = modal.dataset.componentId;
+
+    const config = {
+        strategy: document.getElementById('agg-strategy').value,
+        buffer_size: document.getElementById('agg-buffer-size').value,
+        batch_size: document.getElementById('agg-batch-size').value,
+        max_delay: document.getElementById('agg-max-delay').value,
+        window_size: document.getElementById('agg-window-size').value
+    };
+
+    updateComponentConfig(id, config);
+    bootstrap.Modal.getInstance(modal).hide();
+}
+
+function updateComponentConfig(id, config) {
+    const node = workflowGraph.nodes.get(id);
+    if (!node) return;
+
+    node.data.config = config;
+    workflowGraph.updateVisualization();
+}
+
+// Component type definitions and styling
+const componentTypes = {
+    sender: {
+        color: '#a8e6cf',
+        label: 'Sender',
+        shape: 'box'
+    },
+    load_balancer: {
+        color: '#ffadad',
+        label: 'Load Balancer',
+        shape: 'diamond'
+    },
+    emulator: {
+        color: '#bde0fe',
+        label: 'Emulator',
+        shape: 'box'
+    },
+    aggregator: {
+        color: '#e4c1f9',
+        label: 'Aggregator',
+        shape: 'hexagon'
+    },
+    receiver: {
+        color: '#ffd3b6',
+        label: 'Receiver',
+        shape: 'box'
+    }
+};
+
+let componentCounter = 0;
+
+// Initialize the workflow editor
+document.addEventListener('DOMContentLoaded', () => {
+    initializePalette();
+    initializeGraph();
+    initializeEventListeners();
+}); 

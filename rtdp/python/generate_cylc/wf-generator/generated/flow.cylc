@@ -1,0 +1,288 @@
+[scheduler]
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            load_balancer1:ready => sender1
+            emulator1:ready => load_balancer1
+            emulator2:ready => load_balancer1
+            aggregator1:ready => emulator1
+            aggregator1:ready => emulator2
+            receiver1:ready => aggregator1
+            sender1:succeeded => !receiver1
+        """
+
+[runtime]
+    [[root]]
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/"
+            RTDP_COMPONENTS_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/"
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+
+    [[sender1]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/sender1
+            exec 1> >(tee -a "${LOG_DIR}/sender1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender1/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/sender1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/sender1_ip
+
+            # Start sender
+            apptainer run --bind ${INPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} python -m components.sender \
+                --config $CYLC_WORKFLOW_SHARE_DIR/sender1_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = rtdp-sender1
+            --cpus-per-task = 4
+            --mem = 4G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[load_balancer1]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/load_balancer1
+            exec 1> >(tee -a "${LOG_DIR}/load_balancer1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/load_balancer1/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/load_balancer1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/load_balancer1_ip
+
+            # Start load balancer
+            apptainer run --bind ${OUTPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} python -m components.load_balancer \
+                --config $CYLC_WORKFLOW_SHARE_DIR/load_balancer1_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = rtdp-load_balancer1
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[emulator1]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/emulator1
+            exec 1> >(tee -a "${LOG_DIR}/emulator1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator1/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator1_ip
+
+            # Find data target from edges
+            # Connect to aggregator1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/aggregator1_ip)
+            TARGET_PORT=50803
+
+            # Start emulator with YAML configuration
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${CPU_EMU_SIF} ./cpu_emu \
+                -y $CYLC_WORKFLOW_SHARE_DIR/emulator1_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = rtdp-emulator1
+            --cpus-per-task = 8
+            --mem = 16G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[emulator2]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/emulator2
+            exec 1> >(tee -a "${LOG_DIR}/emulator2/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator2/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator2_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator2_ip
+
+            # Find data target from edges
+            # Connect to aggregator1
+            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/aggregator1_ip)
+            TARGET_PORT=50803
+
+            # Start emulator with YAML configuration
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${CPU_EMU_SIF} ./cpu_emu \
+                -y $CYLC_WORKFLOW_SHARE_DIR/emulator2_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = rtdp-emulator2
+            --cpus-per-task = 8
+            --mem = 16G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[aggregator1]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/aggregator1
+            exec 1> >(tee -a "${LOG_DIR}/aggregator1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/aggregator1/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/aggregator1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/aggregator1_ip
+
+            # Start aggregator
+            apptainer run --bind ${OUTPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} python -m components.aggregator \
+                --config $CYLC_WORKFLOW_SHARE_DIR/aggregator1_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+        """
+        [[[directives]]]
+            --job-name = rtdp-aggregator1
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[receiver1]]
+        script = """
+            # Setup directories
+            mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${INPUT_DIR}
+            mkdir -p ${LOG_DIR}/receiver1
+            exec 1> >(tee -a "${LOG_DIR}/receiver1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver1/stderr.log")
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver1_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver1_ip
+
+            # Start receiver
+            apptainer run --bind ${OUTPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} python -m components.receiver \
+                --config $CYLC_WORKFLOW_SHARE_DIR/receiver1_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+        """
+        [[[directives]]]
+            --job-name = rtdp-receiver1
+            --cpus-per-task = 4
+            --mem = 4G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+ 
