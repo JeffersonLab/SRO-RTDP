@@ -19,7 +19,9 @@ echo "$HOSTNAME" > sender_hostname
 echo "$IP" > sender_ip
 
 # Start sender with configuration
-apptainer run --bind ${OUTPUT_DIR}:/data \
+apptainer exec \
+    --bind ${OUTPUT_DIR}:/data \
+    --bind ${CONFIG_DIR}:/config \
     ../sifs/rtdp-components.sif \
-    python3 -m components.sender \
-    --config ${CONFIG_DIR}/sender_config.yml 
+    python3 -c "from components.sender import main; main()" \
+    --config /config/sender_config.yml 

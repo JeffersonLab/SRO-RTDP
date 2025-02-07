@@ -22,8 +22,10 @@ echo "$IP" > receiver_ip
 EMULATOR_IP=$(cat emulator_ip)
 
 # Start receiver with configuration
-apptainer run --bind ${OUTPUT_DIR}:/data \
+apptainer exec \
+    --bind ${OUTPUT_DIR}:/data \
+    --bind ${CONFIG_DIR}:/config \
     ../sifs/rtdp-components.sif \
-    python3 -m components.receiver \
-    --config ${CONFIG_DIR}/receiver_config.yml \
+    python3 -c "from components.receiver import main; main()" \
+    --config /config/receiver_config.yml \
     --emulator-ip ${EMULATOR_IP} 
