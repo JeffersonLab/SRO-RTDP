@@ -41,20 +41,26 @@
                 <div class="card-body">
                     <div class="row">
                         <!-- Component Palette -->
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="card">
                                 <div class="card-header">
-                                    <h4 class="h6 mb-0">Components</h4>
+                                    <h5>Components</h5>
                                 </div>
                                 <div class="card-body">
                                     <div class="palette">
-                                        <div class="palette-item" draggable="true" data-type="sender">
+                                        <div class="palette-item" draggable="true" data-component-type="sender">
                                             <div class="node sender">Sender</div>
                                         </div>
-                                        <div class="palette-item" draggable="true" data-type="emulator">
+                                        <div class="palette-item" draggable="true" data-component-type="load_balancer">
+                                            <div class="node load-balancer">Load Balancer</div>
+                                        </div>
+                                        <div class="palette-item" draggable="true" data-component-type="emulator">
                                             <div class="node emulator">Emulator</div>
                                         </div>
-                                        <div class="palette-item" draggable="true" data-type="receiver">
+                                        <div class="palette-item" draggable="true" data-component-type="aggregator">
+                                            <div class="node aggregator">Aggregator</div>
+                                        </div>
+                                        <div class="palette-item" draggable="true" data-component-type="receiver">
                                             <div class="node receiver">Receiver</div>
                                         </div>
                                     </div>
@@ -63,10 +69,14 @@
                         </div>
 
                         <!-- Workflow Graph -->
-                        <div class="col-md-9">
+                        <div class="col-md-10">
                             <div class="card">
-                                <div class="card-header">
-                                    <h4 class="h6 mb-0">Workflow Graph</h4>
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5>Workflow Graph</h5>
+                                    <div>
+                                        <button class="btn btn-primary" onclick="exportWorkflow()">Export</button>
+                                        <button class="btn btn-secondary" onclick="clearWorkflow()">Clear</button>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <div id="workflow-graph" class="workflow-graph"></div>
@@ -132,9 +142,157 @@
         </div>
     </div>
 </div>
+
+<!-- Load Balancer Config Modal -->
+<div class="modal fade" id="load-balancer-config-form" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Load Balancer Configuration</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="lb-strategy">Load Balancing Strategy</label>
+                        <select class="form-control" id="lb-strategy" required>
+                            <option value="round_robin">Round Robin</option>
+                            <option value="least_loaded">Least Loaded</option>
+                            <option value="consistent_hash">Consistent Hash</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-max-queue-size">Maximum Queue Size</label>
+                        <input type="number" class="form-control" id="lb-max-queue-size" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-health-check-interval">Health Check Interval (seconds)</label>
+                        <input type="number" class="form-control" id="lb-health-check-interval" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-backpressure-threshold">Backpressure Threshold (%)</label>
+                        <input type="number" class="form-control" id="lb-backpressure-threshold" min="0" max="100"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-rebalance-threshold">Rebalance Threshold (%)</label>
+                        <input type="number" class="form-control" id="lb-rebalance-threshold" min="0" max="100"
+                            required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveLoadBalancerConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Aggregator Config Modal -->
+<div class="modal fade" id="aggregator-config-form" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aggregator Configuration</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="agg-strategy">Aggregation Strategy</label>
+                        <select class="form-control" id="agg-strategy" required>
+                            <option value="ordered">Ordered</option>
+                            <option value="unordered">Unordered</option>
+                            <option value="time_window">Time Window</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-buffer-size">Buffer Size</label>
+                        <input type="number" class="form-control" id="agg-buffer-size" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-batch-size">Batch Size</label>
+                        <input type="number" class="form-control" id="agg-batch-size" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-max-delay">Maximum Delay (seconds)</label>
+                        <input type="number" class="form-control" id="agg-max-delay" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-window-size">Window Size (seconds)</label>
+                        <input type="number" class="form-control" id="agg-window-size" min="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAggregatorConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .palette {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .palette-item {
+        cursor: move;
+    }
+
+    .node {
+        padding: 10px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .sender {
+        background-color: #a8e6cf;
+        /* Light green */
+    }
+
+    .load-balancer {
+        background-color: #ffadad;
+        /* Light red */
+        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        padding: 15px;
+    }
+
+    .emulator {
+        background-color: #bde0fe;
+        /* Light blue */
+    }
+
+    .aggregator {
+        background-color: #e4c1f9;
+        /* Light purple */
+        clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+        padding: 15px;
+    }
+
+    .receiver {
+        background-color: #ffd3b6;
+        /* Light orange */
+    }
+
+    .workflow-graph {
+        min-height: 400px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 20px;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
     // Initialize workflow visualization
     document.addEventListener('DOMContentLoaded', () => {

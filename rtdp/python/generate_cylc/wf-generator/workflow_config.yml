@@ -1,84 +1,184 @@
-components:
-  emulator-1:
-    configuration:
-      latency: 50
-      mem_footprint: 0.05
-      output_size: 0.001
-      threads: 4
-    network:
-      listen_port: 50800
-    resources:
-      cpus_per_task: 4
-      mem: 16G
-      partition: ifarm
-    type: emulator
-  emulator-2:
-    configuration:
-      latency: 50
-      mem_footprint: 0.05
-      output_size: 0.001
-      threads: 4
-    network:
-      listen_port: 50800
-    resources:
-      cpus_per_task: 4
-      mem: 16G
-      partition: ifarm
-    type: emulator
-  emulator-3:
-    configuration:
-      latency: 50
-      mem_footprint: 0.05
-      output_size: 0.001
-      threads: 4
-    network:
-      listen_port: 50800
-    resources:
-      cpus_per_task: 4
-      mem: 16G
-      partition: ifarm
-    type: emulator
-  receiver-1:
-    network:
-      bind_address: 0.0.0.0
-      listen_port: 50000
-    resources:
-      cpus_per_task: 4
-      mem: 8G
-      partition: ifarm
-    type: receiver
-  sender-1:
-    resources:
-      cpus_per_task: 4
-      mem: 8G
-      partition: ifarm
-    test_data:
-      size: 100M
-    type: sender
-containers:
-  image_path: cpu-emu.sif
-edges:
-- description: '1'
-  from: sender-1
-  to: emulator-1
-- description: '4'
-  from: emulator-1
-  to: receiver-1
-- description: '2'
-  from: sender-1
-  to: emulator-2
-- description: '3'
-  from: sender-1
-  to: emulator-3
-- description: '5'
-  from: emulator-2
-  to: receiver-1
-- description: '6'
-  from: emulator-3
-  to: receiver-1
-platform:
-  job_runner: slurm
-  name: jlab_slurm
 workflow:
-  description: Test
-  name: Test
+  name: "data_processing_workflow"
+  description: "Test workflow with load balancer and aggregator"
+
+platform:
+  name: "jlab_slurm"
+  job_runner: "slurm"
+
+components:
+  sender1:
+    type: "sender"
+    resources:
+      partition: "ifarm"
+      cpus_per_task: 4
+      mem: "4G"
+    network:
+      listen_port: 50800
+      bind_address: "0.0.0.0"
+    test_data:
+      size: "100M"
+      pattern: "random"
+    sender_config:
+      data_format: "raw"
+      chunk_size: "1M"
+    container:
+      image: "rtdp-components:latest"
+      command: "python -m components.sender"
+
+  load_balancer1:
+    type: "load_balancer"
+    resources:
+      partition: "ifarm"
+      cpus_per_task: 4
+      mem: "8G"
+    network:
+      listen_port: 50800
+      bind_address: "0.0.0.0"
+      connect_to:
+        - host: "localhost"
+          port: 50800
+    load_balancer_config:
+      strategy: "round_robin"
+      max_queue_size: "100M"
+      health_check_interval: 5
+      backpressure_threshold: 0.8
+      rebalance_threshold: 0.2
+    container:
+      image: "rtdp-components:latest"
+      command: "python -m components.load_balancer"
+
+  emulator1:
+    type: "emulator"
+    resources:
+      partition: "ifarm"
+      cpus_per_task: 8
+      mem: "16G"
+    network:
+      listen_port: 50801
+      bind_address: "0.0.0.0"
+      connect_to:
+        - host: "localhost"
+          port: 50800
+    configuration:
+      threads: 8
+      latency: 50
+      mem_footprint: 0.05
+      output_size: 0.001
+      processing_type: "cpu_intensive"
+    container:
+      image: "cpu-emu:latest"
+      command: "./cpu_emu"
+
+  emulator2:
+    type: "emulator"
+    resources:
+      partition: "ifarm"
+      cpus_per_task: 8
+      mem: "16G"
+    network:
+      listen_port: 50802
+      bind_address: "0.0.0.0"
+      connect_to:
+        - host: "localhost"
+          port: 50800
+    configuration:
+      threads: 8
+      latency: 50
+      mem_footprint: 0.05
+      output_size: 0.001
+      processing_type: "cpu_intensive"
+    container:
+      image: "cpu-emu:latest"
+      command: "./cpu_emu"
+
+  aggregator1:
+    type: "aggregator"
+    resources:
+      partition: "ifarm"
+      cpus_per_task: 4
+      mem: "8G"
+    network:
+      listen_port: 50803
+      bind_address: "0.0.0.0"
+      connect_to:
+        - host: "localhost"
+          port: 50801
+        - host: "localhost"
+          port: 50802
+    aggregator_config:
+      strategy: "ordered"
+      buffer_size: "256M"
+      max_delay: 1000
+      batch_size: 100
+      window_size: "1s"
+    container:
+      image: "rtdp-components:latest"
+      command: "python -m components.aggregator"
+
+  receiver1:
+    type: "receiver"
+    resources:
+      partition: "ifarm"
+      cpus_per_task: 4
+      mem: "4G"
+    network:
+      listen_port: 50804
+      bind_address: "0.0.0.0"
+      connect_to:
+        - host: "localhost"
+          port: 50803
+    receiver_config:
+      output_dir: "received_data"
+      data_validation: true
+      buffer_size: "64M"
+      compression: false
+    container:
+      image: "rtdp-components:latest"
+      command: "python -m components.receiver"
+
+edges:
+  - from: "sender1"
+    to: "load_balancer1"
+    description: "Raw data flow"
+    data_type: "raw"
+    buffer_size: "1M"
+
+  - from: "load_balancer1"
+    to: "emulator1"
+    description: "Load balanced data to emulator 1"
+    data_type: "raw"
+    buffer_size: "1M"
+
+  - from: "load_balancer1"
+    to: "emulator2"
+    description: "Load balanced data to emulator 2"
+    data_type: "raw"
+    buffer_size: "1M"
+
+  - from: "emulator1"
+    to: "aggregator1"
+    description: "Processed data from emulator 1"
+    data_type: "processed"
+    buffer_size: "1M"
+
+  - from: "emulator2"
+    to: "aggregator1"
+    description: "Processed data from emulator 2"
+    data_type: "processed"
+    buffer_size: "1M"
+
+  - from: "aggregator1"
+    to: "receiver1"
+    description: "Aggregated processed data"
+    data_type: "processed"
+    buffer_size: "1M"
+
+containers:
+  images:
+    - name: "cpu-emu"
+      path: "cpu-emu.sif"
+      type: "singularity"
+    - name: "rtdp-components"
+      path: "rtdp-components.sif"
+      type: "singularity"
