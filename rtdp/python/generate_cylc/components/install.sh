@@ -78,7 +78,12 @@ fi
 # Make sure we're in the correct directory for Cylc operations
 cd "${CYLC_DIR}"
 CYLC_RUN_DIR=~/cylc-run/${WORKFLOW_NAME}
-mkdir -p ${CYLC_RUN_DIR}
+
+# Remove any existing workflow installation
+echo "Cleaning up any existing workflow installation..."
+cylc clean "${WORKFLOW_NAME}" 2>/dev/null || true
+rm -rf "${CYLC_RUN_DIR}"
+mkdir -p "${CYLC_RUN_DIR}"
 
 # Install the workflow using Cylc
 echo "Installing workflow..."
