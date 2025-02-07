@@ -7,9 +7,6 @@
 #SBATCH --mem=16G
 #SBATCH --time=2:00:00
 
-# Load any required modules
-module load singularity
-
 # Set environment variables
 export OUTPUT_DIR="$PWD/../output"
 export CONFIG_DIR="$PWD/../config"
@@ -27,6 +24,6 @@ SENDER_IP=$(cat sender_ip)
 # Start emulator with configuration
 apptainer run --bind ${OUTPUT_DIR}:/output \
     ../sifs/cpu-emu.sif \
-    ./cpu_emu \
+    /usr/local/bin/cpu_emu \
     -y ${CONFIG_DIR}/emulator_config.yml \
     --sender-ip ${SENDER_IP} 
