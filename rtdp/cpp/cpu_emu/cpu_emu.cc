@@ -55,10 +55,10 @@ void   Usage()
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
-void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
+void func(char* buff, size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
     if(vrbs) std::cout << "Threading ..." << endl;
-    ssize_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
+    size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) std::cout << "Allocating " << memSz << " bytes ..." << endl;
     double* x = new double[memSz];
     //usefull work emeulation 
@@ -82,10 +82,10 @@ void func(char* buff, ssize_t nmrd, ssize_t scs_GB, double memGB, bool psdS, boo
         timer.it_interval.tv_sec = 0;
         timer.it_interval.tv_usec = 0;
         setitimer (ITIMER_REAL, &timer, 0);
-        ssize_t sz1k = 1024;
-        ssize_t strtMem = 0;
+        size_t sz1k = 1024;
+        size_t strtMem = 0;
         while (!timeoutExpired) { 
-            for (ssize_t i = strtMem; i<std::min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
+            for (size_t i = strtMem; i<std::min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
             strtMem += sz1k;
             if(strtMem > memSz - sz1k) strtMem = 0;
         }
@@ -330,8 +330,8 @@ int main (int argc, char *argv[])
   
     // Read in event data 
     char buff[MAX];
-    ssize_t nmrd = 0;
-    ssize_t nmrd0 = 0;
+    size_t nmrd = 0;
+    size_t nmrd0 = 0;
     // loop for input event 
     do { 
   
@@ -391,9 +391,11 @@ int main (int argc, char *argv[])
         else 
             if(vrbs) std::cout << "connected to the server.." << endl;   
 
-        uint64_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
+        size_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
         double* x = new double[outSz]; //harvested data
-        ssize_t nr = write(sockfd, x, outSz);
+        size_t nw = write(sockfd, x, outSz);
+        if(vrbs) std::cout << "output Num written " << nw  << endl;
+        if(nw != outSz) cerr << "Destination data incorrect size\n";
         close(sockfd);
     } 
 }
