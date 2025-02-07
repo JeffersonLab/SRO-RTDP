@@ -1,0 +1,28 @@
+connections:
+- buffer_size: 1M
+  data_type: raw
+  source: sender1
+- buffer_size: 1M
+  data_type: raw
+  target: emulator1
+- buffer_size: 1M
+  data_type: raw
+  target: emulator2
+id: load_balancer1
+load_balancer_config:
+  backpressure_threshold: 0.8
+  health_check_interval: 5
+  max_queue_size: 100M
+  rebalance_threshold: 0.2
+  strategy: round_robin
+network:
+  bind_address: 0.0.0.0
+  connect_to:
+  - host: localhost
+    port: 50800
+  listen_port: 50800
+resources:
+  cpus_per_task: 4
+  mem: 8G
+  partition: ifarm
+type: load_balancer

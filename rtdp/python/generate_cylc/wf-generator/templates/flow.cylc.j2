@@ -30,7 +30,8 @@
             --error = slurm_%j.log
         
         [[[environment]]]
-            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ config.containers.image_path }}"
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ config.containers.images|selectattr('name', 'equalto', 'cpu-emu')|first|attr('path') }}"
+            RTDP_COMPONENTS_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ config.containers.images|selectattr('name', 'equalto', 'rtdp-components')|first|attr('path') }}"
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
@@ -53,10 +54,9 @@
 
             {% if component.type == "receiver" %}
             # Start receiver
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} receive \
-                {{ component.network.listen_port }} \
-                "{{ component.network.bind_address }}" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/{{ component_id }}/apptainer.log &
+            apptainer run --bind ${OUTPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} {{ component.container.command }} \
+                --config $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_config.yml &
             
             PROC_PID=$!
             sleep 2
@@ -64,37 +64,8 @@
             # Signal readiness and monitor
             if kill -0 $PROC_PID 2>/dev/null; then
                 cylc message "ready"
-                
-                # Initialize size tracking
-                PREV_SIZE=0
-                STABLE_COUNT=0
-                MAX_STABLE_COUNT=6  # Wait for 30 seconds of stable size
-                
-                # Monitor until completion
-                while kill -0 $PROC_PID 2>/dev/null; do
-                    if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                        CURR_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
-                        
-                        if [ $CURR_SIZE -gt $PREV_SIZE ]; then
-                            # Size increased, reset stable counter
-                            STABLE_COUNT=0
-                            echo "Data size increased: ${CURR_SIZE} bytes"
-                        elif [ $CURR_SIZE -gt 0 ] && [ $CURR_SIZE -eq $PREV_SIZE ]; then
-                            # Size stable and non-zero
-                            STABLE_COUNT=$((STABLE_COUNT + 1))
-                            echo "Data size stable for $((STABLE_COUNT * 5)) seconds: ${CURR_SIZE} bytes"
-                            
-                            if [ $STABLE_COUNT -ge $MAX_STABLE_COUNT ]; then
-                                echo "Transfer completed successfully"
-                                cylc message -- "Transfer completed successfully"
-                                exit 0
-                            fi
-                        fi
-                        
-                        PREV_SIZE=$CURR_SIZE
-                    fi
-                    sleep 5
-                done
+                wait $PROC_PID
+                exit $?
             fi
             exit 1
 
@@ -109,17 +80,11 @@
             # Connect to {{ target.id }}
             TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target.id }}_ip)
             TARGET_PORT={{ config.components[target.id].network.listen_port }}
-            
-            # Start emulator
+
+            # Start emulator with YAML configuration
             apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} --output-dir /output \
-                -t {{ component.configuration.threads }} \
-                -b {{ component.configuration.latency }} \
-                -m {{ component.configuration.mem_footprint }} \
-                -o {{ component.configuration.output_size }} \
-                -r {{ component.network.listen_port }} \
-                -p ${TARGET_PORT} \
-                -i ${TARGET_IP} -v 1 &
+                ${CPU_EMU_SIF} {{ component.container.command }} \
+                -y $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_config.yml &
             
             PROC_PID=$!
             sleep 2
@@ -133,46 +98,63 @@
             exit 1
 
             {% elif component.type == "sender" %}
-            # Find data target from edges
-            {% set target = namespace(id=None) %}
-            {% for edge in config.edges %}
-                {% if edge.from == component_id %}
-                    {% set target.id = edge.to %}
-                {% endif %}
-            {% endfor %}
-            # Connect to {{ target.id }}
-            TARGET_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ target.id }}_ip)
-            TARGET_PORT={{ config.components[target.id].network.listen_port }}
-            
-            # Generate and send data
-            dd if=/dev/urandom bs={{ component.test_data.size }} count=1 of=${INPUT_DIR}/data.bin 2>/dev/null
-            
+            # Start sender
             apptainer run --bind ${INPUT_DIR}:/data \
-                ${CPU_EMU_SIF} send \
-                "/data/data.bin" \
-                ${TARGET_IP} \
-                ${TARGET_PORT}
+                ${RTDP_COMPONENTS_SIF} {{ component.container.command }} \
+                --config $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_config.yml &
             
-            STATUS=$?
-            rm -f ${INPUT_DIR}/data.bin
+            PROC_PID=$!
+            sleep 2
             
-            if [ $STATUS -eq 0 ]; then
-                cylc message -- "sender:succeeded"
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
             fi
-            exit $STATUS
+            exit 1
+
+            {% elif component.type == "load_balancer" %}
+            # Start load balancer
+            apptainer run --bind ${OUTPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} {{ component.container.command }} \
+                --config $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
+
+            {% elif component.type == "aggregator" %}
+            # Start aggregator
+            apptainer run --bind ${OUTPUT_DIR}:/data \
+                ${RTDP_COMPONENTS_SIF} {{ component.container.command }} \
+                --config $CYLC_WORKFLOW_SHARE_DIR/{{ component_id }}_config.yml &
+            
+            PROC_PID=$!
+            sleep 2
+            
+            # Signal readiness and monitor
+            if kill -0 $PROC_PID 2>/dev/null; then
+                cylc message "ready"
+                wait $PROC_PID
+                exit $?
+            fi
+            exit 1
             {% endif %}
         """
         [[[directives]]]
-            --job-name = cpu-emu-{{ component_id }}
+            --job-name = rtdp-{{ component_id }}
             --cpus-per-task = {{ component.resources.cpus_per_task }}
             --mem = {{ component.resources.mem }}
         
         [[[outputs]]]
-            {% if component.type == "receiver" %}
             ready = "ready"
-            completed = "Transfer completed successfully"
-            {% else %}
-            ready = "ready"
-            {% endif %}
 
     {% endfor %} 
