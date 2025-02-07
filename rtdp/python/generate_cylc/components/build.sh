@@ -17,13 +17,16 @@ convert_to_sif() {
     local description=$3
     
     echo "Converting $description Docker image to SIF format..."
-    apptainer pull "sifs/$sif_name" "docker://$docker_image"
-    
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to convert $description image"
-        return 1
+    if [ ! -f "sifs/$sif_name" ]; then
+        apptainer pull "sifs/$sif_name" "docker://$docker_image"
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to convert $description image"
+            return 1
+        fi
+        echo "Successfully created sifs/$sif_name"
+    else
+        echo "SIF file sifs/$sif_name already exists, skipping conversion"
     fi
-    echo "Successfully created sifs/$sif_name"
     return 0
 }
 
@@ -48,29 +51,33 @@ copy_to_cylc() {
     echo "Files copied successfully to Cylc workflow directory"
 }
 
+# Step 1: Convert CPU emulator image
 echo "Step 1: Converting CPU emulator image..."
-convert_to_sif "jlabtsai/rtdp-cpu_emu:v0.1" "cpu-emu.sif" "CPU emulator" || exit 1
-
-echo "Step 2: Building and converting components image..."
-# Ensure we're in the components directory for Docker build
-cd "${SCRIPT_DIR}"
-
-echo "Building components Docker image..."
-docker build -t rtdp-components:latest -f Dockerfile . || {
-    echo "Error: Failed to build components Docker image"
+convert_to_sif "jlabtsai/rtdp-cpu_emu:v0.1" "cpu-emu.sif" "CPU emulator" || {
+    echo "Failed to convert CPU emulator image"
     exit 1
 }
 
-# Tag for Docker Hub
-docker tag rtdp-components:latest jlabtsai/rtdp-components:latest
+# Step 2: Convert components image
+echo "Step 2: Converting components image..."
+convert_to_sif "jlabtsai/rtdp-components:latest" "rtdp-components.sif" "RTDP components" || {
+    echo "Failed to convert components image"
+    exit 1
+}
 
-# Optional: Push to Docker Hub (commented out by default)
-# docker push jlabtsai/rtdp-components:latest
+# Step 3: Verify both SIF files exist
+echo "Step 3: Verifying SIF files..."
+if [ ! -f "sifs/cpu-emu.sif" ]; then
+    echo "Error: cpu-emu.sif not found!"
+    exit 1
+fi
+if [ ! -f "sifs/rtdp-components.sif" ]; then
+    echo "Error: rtdp-components.sif not found!"
+    exit 1
+fi
 
-# Convert components image
-convert_to_sif "jlabtsai/rtdp-components:latest" "rtdp-components.sif" "RTDP components" || exit 1
-
-echo "Step 3: Copying files to Cylc directory..."
+# Step 4: Copy to Cylc directory
+echo "Step 4: Copying files to Cylc directory..."
 if [ -d "$CYLC_DIR" ]; then
     copy_to_cylc "$CYLC_DIR"
 else
@@ -81,12 +88,12 @@ fi
 echo
 echo "Build process completed successfully!"
 echo "Generated SIF files:"
-ls -l sifs/
+ls -lh sifs/
 echo
 if [ -d "$CYLC_DIR" ]; then
     echo "Files copied to Cylc workflow directory:"
     echo "  - $CYLC_DIR/sifs/"
-    ls -l "$CYLC_DIR/sifs/"
+    ls -lh "$CYLC_DIR/sifs/"
     echo "  - $CYLC_DIR/share/"
-    ls -l "$CYLC_DIR/share/" 2>/dev/null || echo "    (No configuration files found)"
+    ls -lh "$CYLC_DIR/share/" 2>/dev/null || echo "    (No configuration files found)"
 fi 
