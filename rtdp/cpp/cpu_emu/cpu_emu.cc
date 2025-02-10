@@ -330,8 +330,9 @@ int main (int argc, char *argv[])
   
     // Read in event data 
     char buff[MAX];
-    size_t nmrd = 0;
-    size_t nmrd0 = 0;
+    ssize_t nmrd = 0;
+    ssize_t nmrd0 = 0;
+
     // loop for input event 
     do { 
   
@@ -339,9 +340,9 @@ int main (int argc, char *argv[])
         nmrd += nmrd0 = read(connfd, buff, sizeof(buff));
 
     } while(nmrd0>0);
+    if(vrbs) std::cout << "Num read " << nmrd  << " Num read0 " << nmrd0  << endl;
 
     close(sockfd); 
-    if(vrbs) std::cout << "Num read " << nmrd  << endl;
 
     // if output size should not exceed input size
     // if(otmemGB*(1024*1024*1024) > nmrd) { cerr << "Output cannot exceed input size\n"; exit(EXIT_FAILURE); }
