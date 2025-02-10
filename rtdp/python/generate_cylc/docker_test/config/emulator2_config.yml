@@ -1,0 +1,12 @@
+output_dir: "/output"
+threads: 4
+latency: 50
+mem_footprint: 0.05
+output_size: 0.001
+processing_type: "cpu_intensive"
+network:
+  listen_port: 50802
+  bind_address: "0.0.0.0"
+  target_host: "receiver"
+  target_port: 50804
+  verbosity: 1 
