@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  receiver:
+    build:
+      context: ../components
+      dockerfile: Dockerfile
+    container_name: rtdp-receiver
+    network_mode: host
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+      - type: bind
+        source: ./output
+        target: /data
+    command: >
+      sh -c "cd /app && PYTHONPATH=/app python3 receiver.py --config /config/receiver_config.yml"
+    environment:
+      - PYTHONUNBUFFERED=1
+    user: "${UID:-1000}:${GID:-1000}"
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50804" ]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  sender1:
+    build:
+      context: ../components
+      dockerfile: Dockerfile
+    container_name: rtdp-sender1
+    network_mode: host
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+      - type: bind
+        source: ./output
+        target: /data
+    command: >
+      sh -c "cd /app && PYTHONPATH=/app python3 sender.py --config /config/sender1_config.yml"
+    environment:
+      - PYTHONUNBUFFERED=1
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      receiver:
+        condition: service_healthy
+
+  sender2:
+    build:
+      context: ../components
+      dockerfile: Dockerfile
+    container_name: rtdp-sender2
+    network_mode: host
+    volumes:
+      - type: bind
+        source: ./config
+        target: /config
+      - type: bind
+        source: ./output
+        target: /data
+    command: >
+      sh -c "cd /app && PYTHONPATH=/app python3 sender.py --config /config/sender2_config.yml"
+    environment:
+      - PYTHONUNBUFFERED=1
+    user: "${UID:-1000}:${GID:-1000}"
+    depends_on:
+      receiver:
+        condition: service_healthy
+
+networks:
+  rtdp_net:
+    driver: bridge
