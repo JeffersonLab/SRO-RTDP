@@ -1,0 +1,10 @@
+id: receiver1
+type: receiver
+network:
+  listen_port: 50804
+  bind_address: "0.0.0.0"
+receiver_config:
+  output_dir: "/data/received_data"
+  data_validation: true
+  buffer_size: "64M"
+  compression: false 

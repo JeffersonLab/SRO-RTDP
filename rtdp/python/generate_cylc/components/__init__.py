@@ -1,11 +1,13 @@
-"""Component implementations for the workflow system."""
-from typing import Dict, Any, Type
+"""RTDP Components package."""
 
 from .base import Component
-from .sender import Sender
 from .receiver import Receiver
-from .load_balancer import LoadBalancer
-from .aggregator import Aggregator
+from .sender import Sender
+
+__all__ = ['Component', 'Receiver', 'Sender']
+
+"""Component implementations for the workflow system."""
+
 
 # Component type registry
 COMPONENT_TYPES: Dict[str, Type[Component]] = {

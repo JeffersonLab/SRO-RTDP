@@ -1,9 +1,13 @@
 """Sender component implementation."""
 import os
 import time
+import argparse
 from typing import Dict, Any, Optional
 import numpy as np
-from .base import Component
+import yaml
+from base import Component
+import zmq
+import logging
 
 
 class Sender(Component):
@@ -30,6 +34,13 @@ class Sender(Component):
         )
         self.test_data_pattern = self.test_data.get('pattern', 'random')
 
+        # Component identification
+        self.component_id = config.get('id', 'unknown_sender')
+        self.emulator_id = config.get('emulator_id', 'unknown_emulator')
+
+        # Completion flag
+        self.data_sent = False
+
     def _parse_size(self, size_str: str) -> int:
         """Parse size string (e.g., '1M', '100K') to number of bytes.
 
@@ -50,6 +61,10 @@ class Sender(Component):
         self.logger.info("Initializing sender component")
         self.bytes_sent = 0
         self.chunks_sent = 0
+        if not self.senders:
+            self.logger.error("No sender sockets initialized")
+            return
+        self.logger.info(f"Connected to {len(self.senders)} targets")
 
     def _generate_test_data(self, size: int) -> bytes:
         """Generate test data of specified size.
@@ -85,29 +100,96 @@ class Sender(Component):
 
     def process(self) -> None:
         """Process and send data."""
-        # Check if we've sent all test data
-        if self.bytes_sent >= self.test_data_size:
-            self.logger.info(
-                f"Completed sending {self.bytes_sent} bytes "
-                f"in {self.chunks_sent} chunks"
-            )
-            self.stop()
-            return
+        try:
+            if not self.senders:
+                self.logger.error("No sender sockets initialized")
+                time.sleep(1)
+                return
 
-        # Determine chunk size for this iteration
-        remaining = self.test_data_size - self.bytes_sent
-        chunk_size = min(self.chunk_size, remaining)
+            # Check if we've sent all test data
+            if self.bytes_sent >= self.test_data_size:
+                if not self.data_sent:
+                    self.logger.info(
+                        f"Completed sending {self.bytes_sent} bytes "
+                        f"in {self.chunks_sent} chunks"
+                    )
+                    self.data_sent = True
+                    # Wait for a bit to ensure data is processed
+                    time.sleep(2)
+                    self.stop()
+                return
 
-        # Get data to send
-        data = self._read_source_data(chunk_size)
-        if data is None:
-            data = self._generate_test_data(chunk_size)
+            # Determine chunk size for this iteration
+            remaining = self.test_data_size - self.bytes_sent
+            chunk_size = min(self.chunk_size, remaining)
 
-        # Send the data
-        self.send_data(data)
+            # Get data to send
+            data = self._read_source_data(chunk_size)
+            if data is None:
+                data = self._generate_test_data(chunk_size)
 
-        self.bytes_sent += len(data)
-        self.chunks_sent += 1
+            # Create multipart message with source and routing information
+            source_info = f"sender:{self.component_id}"
+            routing_info = f"emulator:{self.emulator_id}"
+            message = [source_info.encode(), routing_info.encode(), data]
 
-        # Add some delay to control sending rate
-        time.sleep(0.001)  # 1ms delay
+            # Send the data
+            try:
+                for socket in self.senders.values():
+                    socket.send_multipart(message)
+                self.bytes_sent += len(data)
+                self.chunks_sent += 1
+
+                # Log progress periodically
+                if self.chunks_sent % 100 == 0:
+                    self.logger.info(
+                        f"Sent {self.chunks_sent} chunks "
+                        f"({self.bytes_sent} bytes) "
+                        f"via {routing_info}"
+                    )
+
+                # Add some delay to control sending rate
+                time.sleep(0.001)  # 1ms delay
+            except zmq.Again:
+                # Socket would block, wait a bit
+                time.sleep(0.1)
+            except Exception as e:
+                self.logger.error(f"Error sending data: {e}")
+                time.sleep(0.1)  # Wait before retrying
+        except Exception as e:
+            self.logger.error(f"Process error: {e}")
+            time.sleep(1)  # Wait before retrying
+
+
+def main() -> None:
+    """Main entry point for the sender component."""
+    parser = argparse.ArgumentParser(description='RTDP Sender Component')
+    parser.add_argument('--config', required=True, help='Path to config file')
+    args = parser.parse_args()
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.DEBUG,  # Set to DEBUG for more verbose output
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger('sender')
+    logger.setLevel(logging.DEBUG)
+
+    try:
+        # Load configuration
+        logger.info(f"Loading config from {args.config}")
+        with open(args.config, 'r') as f:
+            config = yaml.safe_load(f)
+            logger.debug(f"Loaded config: {config}")
+
+        # Create and start sender
+        logger.info("Creating sender component")
+        sender = Sender(config)
+        sender.start()
+    except Exception as e:
+        logger.error(f"Failed to start sender: {e}", exc_info=True)
+        raise
+
+
+if __name__ == '__main__':
+    main()
