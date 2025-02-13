@@ -9,11 +9,7 @@
 
 ## cpu emu destination system:
 
-        nc -l <nic ip> <port> > <file> 
-
-e.g.,
-
-        nc -l 129.57.177.6 8080 > /tmp/junk
+        <some ZeroMQ based receiver> 
 
 
 ## cpu emu host system:
@@ -36,7 +32,7 @@ where the structure of <yaml_file> is as follows:
         mem_footprint: 0.05         # Thread Memory footprint in GB
         output_size: 0.001          # Destination Output size in GB
         verbose: 1                  # disables/enables verbose mode.
-
+        terminal: 0                 # if 1 do not forward result to destination
 
 Any of the <yaml_file> settigs may be overidden at the commamnd line via the following options:
 
@@ -54,19 +50,11 @@ Any of the <yaml_file> settigs may be overidden at the commamnd line via the fol
         -t num threads (default = 10)
         -y <yaml_file>
         -v verbose (= 0/1 - default = false (0))
+        -z act as terminal node
 
 
 ## Source data system:
 
-        cat <file> | nc -N -q 0 <cpu emu host nic> <port> 
-
-e.g., 
-
-        cat <file> | nc -N -q 0 ejfat-5-daq.jlab.org 8888
-
-## Notes
-
-netcat (nc) switches vary somewhat by Linux distro.
-
+        <some ZeroMQ based sender> 
 
 

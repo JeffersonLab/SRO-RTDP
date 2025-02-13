@@ -37,6 +37,7 @@ void   Usage()
         -s sleep versus burn cpu  \n\
         -t num threads (default = 10)  \n\
         -y yaml config file  \n\
+        -z act as terminal node  \n\
         -v verbose (= 0/1 - default = false (0))  \n\n";
 
     cout <<  usage_str;
@@ -106,6 +107,7 @@ void parse_yaml(const char *filename, bool vrbs=false) {
     lbls.push_back("destination"); lbls.push_back("dst_port"); lbls.push_back("rcv_port");
     lbls.push_back("sleep"); lbls.push_back("threads"); lbls.push_back("latency");
     lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
+    lbls.push_back("terminal");
     auto it = lbls.begin(); //a hack to get the type
 
     while (yaml_parser_parse(&parser, &event)) {
@@ -171,6 +173,7 @@ int main (int argc, char *argv[])
 
     bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
     bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
+    bool     psdZ=false;
     string   yfn = "cpu_emu.yaml";
     char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
     uint16_t rcv_prt = 8888; // receive port default
@@ -181,7 +184,7 @@ int main (int argc, char *argv[])
     double   memGB   = 10;    // thread memory footprint in GB
     double   otmemGB = 0.01;    // program putput in GB
 
-    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:y:")) != -1)
+    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:y:z")) != -1)
     {
         switch (optc)
         {
@@ -237,6 +240,10 @@ int main (int argc, char *argv[])
             psdY = true;
             if(DBG) cout << " -y " << yfn;
             break;
+        case 'z':
+            psdZ = true;
+            if(DBG) cout << " -z ";
+            break;
         case '?':
             cout << "Unrecognised option: " << optopt;
             Usage();
@@ -246,10 +253,9 @@ int main (int argc, char *argv[])
 
     if(DBG) cout << endl;
 
-    /////////parse the yaml file if given
-    /////////cmd line parms overide yaml file settings
-    if (psdY) {
+    if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), vrbs);
+        //cmd line parms overide yaml file settings (which are otherwise in the map)
         if(!psdB) scs_GB = stof(mymap["latency"]);
         if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
         if(!psdM) memGB = stof(mymap["mem_footprint"]);
@@ -259,26 +265,29 @@ int main (int argc, char *argv[])
         if(!psdS) psdS = stoi(mymap["sleep"]) == 1;
         if(!psdT) nmThrds = stoi(mymap["threads"]);
         if(!psdV) vrbs = stoi(mymap["verbose"]);
+        if(!psdZ) psdZ = stoi(mymap["terminal"]) == 1;
     }    
     ////////
     if(vrbs) cout << "Operating with scs_GB = " << scs_GB << "\tdst_ip = "
                 << dst_ip << "\tmemGB = " << memGB << "\totmemGB = "
                 << otmemGB << "\tdst_prt = " << dst_prt << "\trcv_prt = "
                 << rcv_prt << "\tsleep = " << psdS << "\tnmThrds = "
-                << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << yfn << '\n';
+                << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << yfn 
+                << "\tterminal = " << psdZ << '\n';
 
     //  Prepare our receiving rcv_cntxt and socket
     context_t rcv_cntxt(1);
     context_t dst_cntxt(1);
     socket_t rcv_sckt(rcv_cntxt, socket_type::rep);
+    socket_t dst_sckt(dst_cntxt, socket_type::req);
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
     if(vrbs) cout << "Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
     
-    //  Prepare our destination socket
-    socket_t dst_sckt(dst_cntxt, socket_type::req);
-
-    if(vrbs) cout << "Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
-    dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
+    if(!psdZ) {
+        //  Prepare our destination socket
+        if(vrbs) cout << "Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
+        dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
+    }
     uint16_t request_nbr = 0;
     while (true) {
         if(vrbs) cout << "Setting up request message ..." << endl;
@@ -307,27 +316,26 @@ int main (int argc, char *argv[])
         for (int i=1; i<=nmThrds; ++i)  //start the threads
             threads.push_back(thread(func, rtcd.value(), scs_GB, memGB, psdS, vrbs));
 
-        if(vrbs) cout << "synchronizing all threads..." << endl;
-
         for (auto& th : threads) th.join();
+        if(vrbs) cout << "synchronized all threads..." << endl;
 
-        //forward to next hop    
+        if(!psdZ) {
+            if(vrbs) cout << "Forwarding to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
+            //forward to next hop    
+            // Send a message to the destination
+            size_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
+            message_t dst_msg(outSz); //harvested data
+            send_result_t sr = dst_sckt.send(dst_msg, send_flags::none);
+            if(vrbs) cout << "output Num written " << sr.value()  << endl;
+            if(sr.value() != outSz) cerr << "Destination data incorrect size" << endl;
 
-        // Send a message to the destination
-        size_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
-        message_t dst_msg(outSz); //harvested data
-        send_result_t sr = dst_sckt.send(dst_msg, send_flags::none);
-
-        // Receive the reply from the destination
-        //  Get the reply.
-        {
+            // Receive the reply from the destination
+            //  Get the reply.
             message_t reply;
             if(vrbs) cout << "Waiting for destination ACK" << endl;
             recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
             if(vrbs) cout << "Destination Actual reply: " << reply << " With rtcd = " << rtcd.value() << endl;
         }
-        if(vrbs) cout << "output Num written " << sr.value()  << endl;
-        if(sr.value() != outSz) cerr << "Destination data incorrect size" << endl;
     }
     return 0;
 }
