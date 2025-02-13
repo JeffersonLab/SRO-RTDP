@@ -45,8 +45,8 @@ void   Usage()
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
 void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
-    const uint32_t ts(scs_GB*nmrd*1e-9);
-    const uint32_t tsns(scs_GB*nmrd);
+    const size_t ts(scs_GB*nmrd*1e-9);
+    const size_t tsns(scs_GB*nmrd);
     if(vrbs) cout << "Threading for " << ts << " secs ..." << endl;
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) cout << "Allocating " << memSz << " bytes ..." << endl;
@@ -54,16 +54,15 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
     //usefull work emulation 
     if(psdS) {
         auto cms = chrono::nanoseconds(tsns);
-        if(vrbs) cout << "Sleeping for " << ts << " secs" << endl;
+        if(vrbs) cout << "Sleeping for " << tsns << " nsecs" << endl;
         this_thread::sleep_for(cms);
     }else{
         //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         auto start_time = std::chrono::high_resolution_clock::now();
         if(vrbs) cout << "Burning ...";
         
-        double musecs, fracsecs, secs;
-        musecs = scs_GB*nmrd*1e-9; //raw microseconds
-        fracsecs = modf (musecs , &secs);
+        double fracsecs, secs;
+        fracsecs = modf (ts , &secs);
         if(vrbs) cout << "secs = " << secs << " fracsecs = " << fracsecs << endl;
         size_t sz1k = 1024;
         size_t strtMem = 0;
