@@ -85,24 +85,6 @@ class ReceiverConfig:
 
 
 @dataclass
-class LoadBalancerConfig:
-    strategy: str = "round_robin"
-    max_queue_size: str = "100M"
-    health_check_interval: int = 5
-    backpressure_threshold: float = 0.8
-    rebalance_threshold: float = 0.2
-
-
-@dataclass
-class AggregatorConfig:
-    strategy: str = "ordered"
-    buffer_size: str = "256M"
-    max_delay: int = 1000
-    batch_size: int = 100
-    window_size: str = "1s"
-
-
-@dataclass
 class TestData:
     size: str = "100M"
 
@@ -110,15 +92,12 @@ class TestData:
 @dataclass
 class Component:
     id: str
-    type: str  # "receiver", "emulator", "sender", "load_balancer", "aggregator"
+    type: str  # "receiver", "emulator", "sender"
     resources: Resources
     network: Optional[Network] = None
     configuration: Optional[EmulatorConfig] = None  # For emulator type
     sender_config: Optional[SenderConfig] = None  # For sender type
     receiver_config: Optional[ReceiverConfig] = None  # For receiver type
-    # For load balancer
-    load_balancer_config: Optional[LoadBalancerConfig] = None
-    aggregator_config: Optional[AggregatorConfig] = None  # For aggregator
     test_data: Optional[TestData] = None  # For sender type
 
 
@@ -160,8 +139,6 @@ class WorkflowManager:
         # Set default memory based on component type
         if component_type == 'emulator':
             resources['mem'] = '16G'
-        elif component_type in ['load_balancer', 'aggregator']:
-            resources['mem'] = '8G'
 
         resources_obj = Resources(**resources)
         component = Component(
@@ -177,10 +154,6 @@ class WorkflowManager:
             component.receiver_config = ReceiverConfig()
         elif component_type == 'emulator':
             component.configuration = EmulatorConfig()
-        elif component_type == 'load_balancer':
-            component.load_balancer_config = LoadBalancerConfig()
-        elif component_type == 'aggregator':
-            component.aggregator_config = AggregatorConfig()
 
         self.components[component_id] = component
 
@@ -198,11 +171,11 @@ class WorkflowManager:
         # Update network configuration
         if "network" in config and config["network"]:
             network_config = config["network"]
-                component.network = Network(
-                    listen_port=int(network_config["listen_port"]),
+            component.network = Network(
+                listen_port=int(network_config["listen_port"]),
                 bind_address=network_config.get("bind_address"),
                 connect_to=network_config.get("connect_to", [])
-                )
+            )
 
         # Update type-specific configuration
         if component.type == "emulator" and "configuration" in config:
@@ -212,15 +185,6 @@ class WorkflowManager:
         elif component.type == "receiver" and "receiver_config" in config:
             component.receiver_config = ReceiverConfig(
                 **config["receiver_config"])
-        elif (component.type == "load_balancer" and
-              "load_balancer_config" in config):
-            component.load_balancer_config = LoadBalancerConfig(
-                **config["load_balancer_config"]
-            )
-        elif component.type == "aggregator" and "aggregator_config" in config:
-            component.aggregator_config = AggregatorConfig(
-                **config["aggregator_config"]
-            )
 
     def to_dict(self) -> Dict:
         """Convert the workflow to a dictionary format matching the schema."""
@@ -265,24 +229,7 @@ class WorkflowManager:
                         "data_validation": comp.receiver_config.data_validation,
                         "buffer_size": comp.receiver_config.buffer_size,
                         "compression": comp.receiver_config.compression
-                    }} if comp.receiver_config else {}),
-                    **({"load_balancer_config": {
-                        "strategy": comp.load_balancer_config.strategy,
-                        "max_queue_size": comp.load_balancer_config.max_queue_size,
-                        "health_check_interval":
-                            comp.load_balancer_config.health_check_interval,
-                        "backpressure_threshold":
-                            comp.load_balancer_config.backpressure_threshold,
-                        "rebalance_threshold":
-                            comp.load_balancer_config.rebalance_threshold
-                    }} if comp.load_balancer_config else {}),
-                    **({"aggregator_config": {
-                        "strategy": comp.aggregator_config.strategy,
-                        "buffer_size": comp.aggregator_config.buffer_size,
-                        "max_delay": comp.aggregator_config.max_delay,
-                        "batch_size": comp.aggregator_config.batch_size,
-                        "window_size": comp.aggregator_config.window_size
-                    }} if comp.aggregator_config else {})
+                    }} if comp.receiver_config else {})
                 }
                 for comp in self.components.values()
             },
@@ -312,10 +259,8 @@ class WorkflowManager:
 
         # Define valid connections
         valid_flows = {
-            'sender': ['emulator', 'load_balancer'],
-            'emulator': ['emulator', 'receiver', 'aggregator'],
-            'load_balancer': ['emulator'],
-            'aggregator': ['receiver']
+            'sender': ['emulator'],
+            'emulator': ['emulator', 'receiver']
         }
 
         if (from_comp.type not in valid_flows or

@@ -1,27 +1,28 @@
+// Add this at the very top of the file
+console.log('workflow.js loaded');
+
 // Using vis-network for interactive graph editing with drag-and-drop functionality
 class WorkflowGraph {
     constructor(container) {
+        console.log('Initializing WorkflowGraph...');
+        console.log('Container:', container);
+
         if (typeof vis === 'undefined') {
+            console.error('vis-network library not loaded');
             throw new Error('vis-network library not loaded');
         }
+        console.log('vis-network library found');
 
         this.container = container;
         this.network = null;
         this.nodes = new vis.DataSet();
         this.edges = new vis.DataSet();
-        this.clipboard = {
-            nodes: [],
-            edges: [],
-            offset: { x: 0, y: 0 }
-        };  // Enhanced clipboard structure
+        this.clipboard = { nodes: [], edges: [] };
 
         // Store unsaved changes
         this.unsavedChanges = {
-            components: new Map(),  // Map of component ID to its configuration
-            edges: new Map(),        // Map of edge ID to its configuration
-            workflow: null,          // Workflow metadata
-            platform: null,          // Platform configuration
-            container: null          // Container configuration
+            nodes: new Map(),
+            edges: new Map()
         };
 
         // Define valid edge rules based on workflow dependencies
@@ -32,12 +33,16 @@ class WorkflowGraph {
             'receiver': ['sender', 'emulator']
         };
 
+        console.log('Basic initialization complete');
+
         this.init();
         this.setupDragAndDrop();
         this.setupCopyPaste();
         this.setupSaveHandlers();
         this.setupFormHandlers();
         this.loadWorkflowState();  // Load initial state
+
+        console.log('Full initialization complete');
     }
 
     init() {
@@ -77,7 +82,7 @@ class WorkflowGraph {
             },
             manipulation: {
                 enabled: true,
-                addNode: false,  // Disable add node button
+                addNode: false,
                 addEdge: (edgeData, callback) => {
                     this.handleEdgeCreation(edgeData, callback);
                 },
@@ -89,22 +94,12 @@ class WorkflowGraph {
                 }
             },
             interaction: {
-                multiselect: true,  // Enable multi-select
-                selectConnectedEdges: false  // Don't auto-select edges when selecting nodes
+                dragNodes: true,
+                dragView: true,
+                multiselect: true,
+                selectConnectedEdges: false
             },
-            physics: {
-                enabled: true,
-                solver: 'forceAtlas2Based',
-                forceAtlas2Based: {
-                    gravitationalConstant: -50,
-                    springLength: 200,
-                    springConstant: 0.1
-                },
-                stabilization: {
-                    enabled: true,
-                    iterations: 1000
-                }
-            }
+            physics: false
         };
 
         this.network = new vis.Network(
@@ -121,48 +116,142 @@ class WorkflowGraph {
                 this.openEdgeConfig(params.edges[0]);
             }
         });
-
-        // Disable physics after initial layout
-        this.network.once('stabilized', () => {
-            this.network.setOptions({ physics: { enabled: false } });
-        });
     }
 
     setupDragAndDrop() {
+        console.log('Setting up drag and drop handlers...');
         const paletteItems = document.querySelectorAll('.palette-item');
-        const graphContainer = this.container;
+        const graphContainer = document.getElementById('workflow-graph');
 
-        paletteItems.forEach(item => {
-            item.addEventListener('dragstart', (e) => {
-                const type = item.getAttribute('data-type');
-                e.dataTransfer.setData('componentType', type);
+        if (!graphContainer) {
+            console.error('Graph container not found');
+            return;
+        }
+
+        console.log('Found palette items:', paletteItems.length);
+        console.log('Graph container:', graphContainer);
+
+        // Create a ghost container for drag image
+        const ghostContainer = document.createElement('div');
+        ghostContainer.className = 'drag-ghost';
+        ghostContainer.style.position = 'absolute';
+        ghostContainer.style.pointerEvents = 'none';
+        ghostContainer.style.zIndex = '1000';
+        ghostContainer.style.display = 'none';
+        document.body.appendChild(ghostContainer);
+
+        const handleDragStart = (e) => {
+            console.log('Drag started on palette item');
+            e.stopPropagation();
+
+            const type = e.target.getAttribute('data-component-type');
+            if (!type) {
+                console.error('No component type found');
+                return;
+            }
+
+            console.log('Component type:', type);
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', type);
+
+            ghostContainer.innerHTML = e.target.innerHTML;
+            ghostContainer.style.display = 'block';
+            e.dataTransfer.setDragImage(ghostContainer, 50, 25);
+
+            e.target.classList.add('dragging');
+        };
+
+        const handleDrag = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const handleDragEnd = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.target.classList.remove('dragging');
+            ghostContainer.style.display = 'none';
+        };
+
+        const handleDrop = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            graphContainer.classList.remove('drop-target');
+
+            const type = e.dataTransfer.getData('text/plain');
+            if (!type) {
+                console.error('No component type data received');
+                return;
+            }
+
+            const rect = graphContainer.getBoundingClientRect();
+            const dropPoint = {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+
+            const canvasCoords = this.network.DOMtoCanvas({
+                x: dropPoint.x,
+                y: dropPoint.y
             });
+
+            if (!canvasCoords) {
+                console.error('Failed to calculate drop position');
+                return;
+            }
+
+            const id = `${type}-${Date.now()}`;
+            const nodeData = {
+                id: id,
+                label: `${type}\n#${id}`,
+                x: canvasCoords.x,
+                y: canvasCoords.y,
+                type: type,
+                color: this.getNodeColor(type),
+                physics: false
+            };
+
+            try {
+                this.nodes.add(nodeData);
+                this.showSuccess('Component added successfully');
+            } catch (error) {
+                console.error('Error adding node:', error);
+                this.showError('Failed to add component');
+            }
+        };
+
+        // Setup drag source event handlers
+        paletteItems.forEach(item => {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('drag', handleDrag);
+            item.addEventListener('dragend', handleDragEnd);
+        });
+
+        // Setup drop target event handlers
+        graphContainer.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            graphContainer.classList.add('drop-target');
         });
 
         graphContainer.addEventListener('dragover', (e) => {
             e.preventDefault();
-            graphContainer.classList.add('drop-target');
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'copy';
         });
 
-        graphContainer.addEventListener('dragleave', () => {
-            graphContainer.classList.remove('drop-target');
-        });
-
-        graphContainer.addEventListener('drop', (e) => {
+        graphContainer.addEventListener('dragleave', (e) => {
             e.preventDefault();
-            graphContainer.classList.remove('drop-target');
-
-            const type = e.dataTransfer.getData('componentType');
-            if (!type) return;
-
-            const rect = graphContainer.getBoundingClientRect();
-            const pos = this.network.DOMtoCanvas({
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top
-            });
-
-            this.addComponent(type, pos);
+            e.stopPropagation();
+            if (!e.currentTarget.contains(e.relatedTarget)) {
+                graphContainer.classList.remove('drop-target');
+            }
         });
+
+        graphContainer.addEventListener('drop', handleDrop.bind(this));
+
+        // Ensure the container can accept drops
+        graphContainer.setAttribute('droppable', 'true');
     }
 
     setupCopyPaste() {
@@ -244,26 +333,53 @@ class WorkflowGraph {
         if (containerForm) {
             const imagePathInput = containerForm.querySelector('input[name="image_path"]');
             if (imagePathInput) {
-                // If the input is empty, set and save the default value
+                // Set default value if empty
                 if (!imagePathInput.value) {
                     imagePathInput.value = 'cpu-emu.sif';
-                    // Save the default value immediately
-                    const formData = new FormData();
-                    formData.append('image_path', 'cpu-emu.sif');
+                }
+
+                // Save initial value
+                const formData = new FormData();
+                formData.append('image_path', imagePathInput.value);
+                fetch('/api/workflow/container', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to save container configuration');
+                    }
+                    return response.json();
+                }).catch(error => {
+                    console.error('Error saving container configuration:', error);
+                    this.showError('Failed to save container configuration');
+                });
+
+                // Handle changes
+                containerForm.addEventListener('change', (e) => {
+                    const formData = new FormData(containerForm);
+                    const imagePath = formData.get('image_path');
+
+                    // Ensure we always have a value
+                    this.unsavedChanges.container = {
+                        image_path: imagePath || 'cpu-emu.sif'
+                    };
+
+                    // Save immediately
                     fetch('/api/workflow/container', {
                         method: 'POST',
                         body: formData
+                    }).then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to save container configuration');
+                        }
+                        return response.json();
+                    }).then(() => {
+                        this.showSuccess('Container configuration saved');
                     }).catch(error => {
-                        console.error('Error saving default container image path:', error);
+                        console.error('Error saving container configuration:', error);
+                        this.showError('Failed to save container configuration');
                     });
-                }
 
-                // Handle subsequent changes
-                containerForm.addEventListener('change', (e) => {
-                    const formData = new FormData(containerForm);
-                    this.unsavedChanges.container = {
-                        image_path: formData.get('image_path') || 'cpu-emu.sif'
-                    };
                     this.showUnsavedChanges();
                 });
             }
@@ -292,7 +408,7 @@ class WorkflowGraph {
     }
 
     hasUnsavedChanges() {
-        return this.unsavedChanges.components.size > 0 ||
+        return this.unsavedChanges.nodes.size > 0 ||
             this.unsavedChanges.edges.size > 0 ||
             this.unsavedChanges.workflow !== null ||
             this.unsavedChanges.platform !== null ||
@@ -313,8 +429,7 @@ class WorkflowGraph {
                 });
 
                 if (!workflowResponse.ok) {
-                    const errorData = await workflowResponse.json();
-                    throw new Error(errorData.message || 'Failed to save workflow metadata');
+                    throw new Error('Failed to save workflow metadata');
                 }
             }
 
@@ -330,8 +445,7 @@ class WorkflowGraph {
                 });
 
                 if (!platformResponse.ok) {
-                    const errorData = await platformResponse.json();
-                    throw new Error(errorData.message || 'Failed to save platform configuration');
+                    throw new Error('Failed to save platform configuration');
                 }
             }
 
@@ -346,83 +460,92 @@ class WorkflowGraph {
                 });
 
                 if (!containerResponse.ok) {
-                    const errorData = await containerResponse.json();
-                    throw new Error(errorData.message || 'Failed to save container configuration');
+                    throw new Error('Failed to save container configuration');
                 }
             }
 
             // Save components
-            for (const [id, config] of this.unsavedChanges.components) {
-                // Create the component data structure
-                const componentData = {
-                    type: config.type,
-                    resources: {
-                        partition: config.resources.partition,
-                        cpus_per_task: parseInt(config.resources.cpus_per_task),
-                        mem: config.resources.mem
+            for (const [id, config] of this.unsavedChanges.nodes.entries()) {
+                try {
+                    // Create the component data structure
+                    const componentData = {
+                        type: config.type,
+                        resources: {
+                            partition: config.resources && config.resources.partition || 'ifarm',
+                            cpus_per_task: config.resources && parseInt(config.resources.cpus_per_task) || 4,
+                            mem: config.resources && config.resources.mem || '8G'
+                        }
+                    };
+
+                    // Add network configuration if present and not a sender
+                    if (config.type !== 'sender' && config.network) {
+                        if (config.network && config.network.listen_port) {
+                            componentData.network = {
+                                listen_port: parseInt(config.network.listen_port)
+                            };
+                            if (config.type === 'receiver' && config.network.bind_address) {
+                                componentData.network.bind_address = config.network.bind_address;
+                            }
+                        }
                     }
-                };
 
-                // Add network configuration if present and not a sender
-                if (config.type !== 'sender' && config.network?.listen_port) {
-                    componentData.network = {
-                        listen_port: parseInt(config.network.listen_port)
-                    };
-                    if (config.type === 'receiver' && config.network.bind_address) {
-                        componentData.network.bind_address = config.network.bind_address;
+                    // Add type-specific configuration
+                    if (config.type === 'emulator' && config.configuration) {
+                        componentData.configuration = {
+                            threads: parseInt(config.configuration.threads) || 4,
+                            latency: parseInt(config.configuration.latency) || 50,
+                            mem_footprint: parseFloat(config.configuration.mem_footprint) || 0.05,
+                            output_size: parseFloat(config.configuration.output_size) || 0.001
+                        };
+                    } else if (config.type === 'sender' && config.test_data) {
+                        componentData.test_data = {
+                            size: config.test_data.size || '100M'
+                        };
                     }
-                }
 
-                // Add type-specific configuration
-                if (config.type === 'emulator' && config.configuration) {
-                    componentData.configuration = {
-                        threads: parseInt(config.configuration.threads),
-                        latency: parseInt(config.configuration.latency),
-                        mem_footprint: parseFloat(config.configuration.mem_footprint),
-                        output_size: parseFloat(config.configuration.output_size)
-                    };
-                } else if (config.type === 'sender' && config.test_data) {
-                    componentData.test_data = {
-                        size: config.test_data.size
-                    };
-                }
+                    // Send the component data
+                    const response = await fetch(`/api/components/${id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(componentData)
+                    });
 
-                // Send the component data
-                const componentResponse = await fetch(`/api/components/${id}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(componentData)
-                });
-
-                if (!componentResponse.ok) {
-                    const errorData = await componentResponse.json();
-                    throw new Error(errorData.message || `Failed to save component ${id}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to save component ${id}`);
+                    }
+                } catch (error) {
+                    console.error(`Error saving component ${id}:`, error);
+                    this.showError(`Failed to save component ${id}`);
                 }
             }
 
             // Save edges
-            for (const [id, config] of this.unsavedChanges.edges) {
-                const formData = new FormData();
-                formData.append('from_id', config.from);
-                formData.append('to_id', config.to);
-                formData.append('description', config.description || '');
+            for (const [id, config] of this.unsavedChanges.edges.entries()) {
+                try {
+                    const formData = new FormData();
+                    formData.append('from_id', config.from);
+                    formData.append('to_id', config.to);
+                    formData.append('description', config.description || '');
 
-                const edgeResponse = await fetch('/api/edges', {
-                    method: 'POST',
-                    body: formData
-                });
+                    const response = await fetch('/api/edges', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                if (!edgeResponse.ok) {
-                    const errorData = await edgeResponse.json();
-                    throw new Error(errorData.message || `Failed to save edge ${id}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to save edge ${id}`);
+                    }
+                } catch (error) {
+                    console.error(`Error saving edge ${id}:`, error);
+                    this.showError(`Failed to save edge ${id}`);
                 }
             }
 
             // Clear all unsaved changes
             this.unsavedChanges = {
-                components: new Map(),
+                nodes: new Map(),
                 edges: new Map(),
                 workflow: null,
                 platform: null,
@@ -436,16 +559,11 @@ class WorkflowGraph {
             if (previewBtn) previewBtn.classList.remove('btn-warning');
 
             // Show success message
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.textContent = 'All changes saved successfully';
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 2000);
+            this.showSuccess('All changes saved successfully');
 
         } catch (error) {
             console.error('Error saving changes:', error);
-            alert(`Failed to save changes: ${error.message}`);
-            throw error;  // Re-throw to handle in calling function
+            this.showError(`Failed to save changes: ${error.message}`);
         }
     }
 
@@ -500,10 +618,10 @@ class WorkflowGraph {
                     id: id,
                     type: component.type,
                     config: {
-                        resources: component.config?.resources,
-                        network: component.config?.network,
-                        configuration: component.config?.configuration,
-                        test_data: component.config?.test_data
+                        resources: component.config && component.config.resources,
+                        network: component.config && component.config.network,
+                        configuration: component.config && component.config.configuration,
+                        test_data: component.config && component.config.test_data
                     },
                     position: position
                 };
@@ -682,58 +800,22 @@ class WorkflowGraph {
     }
 
     async getUniqueComponentId(type) {
-        // Get current configuration
-        const response = await fetch('/api/workflow/config');
-        const config = await response.json();
-
-        // Get existing nodes from both visual graph and backend
-        const visualNodes = this.nodes.get({
-            filter: node => node.type === type
-        });
-        const backendNodes = Object.keys(config.components || {})
-            .filter(id => id.startsWith(`${type}-`))
-            .map(id => {
-                const match = id.match(new RegExp(`${type}-(\\d+)`));
-                return match ? parseInt(match[1]) : 0;
-            });
-
-        // Combine and sort all used numbers
-        const usedNumbers = [...new Set([
-            ...visualNodes.map(node => {
-                const match = node.id.match(new RegExp(`${type}-(\\d+)`));
-                return match ? parseInt(match[1]) : 0;
-            }),
-            ...backendNodes
-        ])].sort((a, b) => a - b);
-
-        // Find the first available number
-        let nextNumber = 1;
-        for (const num of usedNumbers) {
-            if (nextNumber < num) {
-                break;
-            }
-            nextNumber = num + 1;
-        }
-
-        return `${type}-${nextNumber}`;
+        let counter = 1;
+        let id;
+        do {
+            id = `${type}${counter}`;
+            counter++;
+        } while (this.nodes.get(id));
+        return id;
     }
 
-    async addComponent(type, position, config = {}, id, skipVisualUpdate = false) {
+    async addComponent(type, position, config = {}, providedId = null, skipVisualUpdate = false) {
         try {
-            // Get current configuration from backend
-            const configResponse = await fetch('/api/workflow/config');
-            const configData = await configResponse.json();
-
-            // If no id provided, generate one
-            if (!id) {
-                id = await this.getUniqueComponentId(type);
+            if (!type || !position) {
+                throw new Error('Invalid component parameters');
             }
 
-            // Double check the ID is truly unique
-            if (configData.components && configData.components[id]) {
-                throw new Error('Component ID collision detected');
-            }
-
+            const id = providedId || await this.getUniqueComponentId(type);
             const nodeData = {
                 id: id,
                 label: `${type}\n#${id.split('-')[1]}`,
@@ -741,7 +823,7 @@ class WorkflowGraph {
                 y: position.y,
                 type: type,
                 color: this.getNodeColor(type),
-                physics: false  // Disable physics for each node
+                physics: false
             };
 
             // Create form data for the request
@@ -749,76 +831,37 @@ class WorkflowGraph {
             formData.append('id', id);
             formData.append('type', type);
 
-            // Set default values if config is not provided
-            const defaultConfig = {
-                resources: {
-                    partition: 'ifarm',
-                    cpus_per_task: '4',
-                    mem: type === 'emulator' ? '16G' : '8G'
-                }
-            };
+            // Set default values
+            formData.append('partition', 'ifarm');
+            formData.append('cpus_per_task', '4');
+            formData.append('mem', type === 'emulator' ? '16G' : '8G');
 
-            // Add default test_data for sender
-            if (type === 'sender') {
-                defaultConfig.test_data = {
-                    size: '100M'
-                };
-            }
+            // Add the node visually first
+            this.nodes.add(nodeData);
 
-            // Merge default config with provided config
-            const finalConfig = {
-                resources: { ...defaultConfig.resources, ...(config.resources || {}) },
-                network: config.network || {},
-                configuration: config.configuration || {},
-                test_data: type === 'sender' ?
-                    (config.test_data || defaultConfig.test_data) :
-                    (config.test_data || {})
-            };
-
-            // Add resources configuration
-            formData.append('partition', finalConfig.resources.partition);
-            formData.append('cpus_per_task', finalConfig.resources.cpus_per_task);
-            formData.append('mem', finalConfig.resources.mem);
-
-            // Add network configuration if present
-            if (finalConfig.network.listen_port) {
-                formData.append('listen_port', finalConfig.network.listen_port);
-                if (type === 'receiver' && finalConfig.network.bind_address) {
-                    formData.append('bind_address', finalConfig.network.bind_address);
-                }
-            }
-
-            // Add emulator configuration if present
-            if (type === 'emulator' && finalConfig.configuration) {
-                if (finalConfig.configuration.threads) formData.append('threads', finalConfig.configuration.threads);
-                if (finalConfig.configuration.latency) formData.append('latency', finalConfig.configuration.latency);
-                if (finalConfig.configuration.mem_footprint) formData.append('mem_footprint', finalConfig.configuration.mem_footprint);
-                if (finalConfig.configuration.output_size) formData.append('output_size', finalConfig.configuration.output_size);
-            } else if (type === 'sender') {
-                // Always include test_data for sender
-                formData.append('data_size', finalConfig.test_data.size);
-            }
-
-            // Make API call to add component
+            // Then make the API call
             const response = await fetch('/api/components', {
                 method: 'POST',
                 body: formData
             });
 
             if (!response.ok) {
-                throw new Error('Failed to add component');
+                // If the API call fails, remove the node
+                this.nodes.remove(id);
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Failed to add component');
             }
 
-            const data = await response.json();
-            if (data.status === 'success' && !skipVisualUpdate) {
-                this.nodes.add(nodeData);
+            // Show configuration modal after successful addition
+            if (!skipVisualUpdate) {
+                await this.openComponentConfig(id);
             }
 
             return nodeData;
         } catch (error) {
             console.error('Error adding component:', error);
-            alert('Failed to add component. Please try again.');
-            throw error;  // Re-throw to handle in calling function
+            this.showError(error.message || 'Failed to add component');
+            throw error;
         }
     }
 
@@ -998,10 +1041,23 @@ class WorkflowGraph {
 
     async openComponentConfig(nodeId) {
         try {
+            if (!nodeId) {
+                throw new Error('Invalid component ID');
+            }
+
             // Get current configuration
-            const config = this.unsavedChanges.components.get(nodeId) ||
-                (await (await fetch('/api/workflow/config')).json()).components[nodeId] || {};
+            const response = await fetch('/api/workflow/config');
+            if (!response.ok) {
+                throw new Error('Failed to fetch component configuration');
+            }
+
+            const configData = await response.json();
+            const config = this.unsavedChanges.nodes.get(nodeId) || configData.components[nodeId] || {};
             const node = this.nodes.get(nodeId);
+
+            if (!node) {
+                throw new Error('Component not found');
+            }
 
             // Create modal if it doesn't exist
             let modal = document.getElementById('componentConfigModal');
@@ -1200,7 +1256,7 @@ class WorkflowGraph {
                     }
 
                     // Store the changes locally after successful backend save
-                    this.unsavedChanges.components.set(nodeId, componentConfig);
+                    this.unsavedChanges.nodes.set(nodeId, componentConfig);
 
                     // Close the modal
                     bsModal.hide();
@@ -1220,9 +1276,20 @@ class WorkflowGraph {
             // Show the modal
             const bsModal = new bootstrap.Modal(modal);
             bsModal.show();
+
+            return new Promise((resolve, reject) => {
+                modal.addEventListener('hidden.bs.modal', () => {
+                    resolve();
+                });
+
+                modal.addEventListener('show.bs.modal.failed', () => {
+                    reject(new Error('Failed to show configuration modal'));
+                });
+            });
         } catch (error) {
-            console.error('Error loading component configuration:', error);
-            alert('Failed to load component configuration');
+            console.error('Error opening component configuration:', error);
+            this.showError(error.message || 'Failed to open component configuration');
+            throw error;
         }
     }
 
@@ -1262,11 +1329,11 @@ class WorkflowGraph {
 
     getNodeColor(type) {
         const colors = {
-            'sender': { background: '#90EE90', border: '#60c060' },
-            'receiver': { background: '#F08080', border: '#d05050' },
-            'emulator': { background: '#ADD8E6', border: '#7ab5cc' }
+            'sender': '#90EE90',
+            'emulator': '#ADD8E6',
+            'receiver': '#F08080'
         };
-        return colors[type] || { background: '#ffffff', border: '#666666' };
+        return colors[type] || '#CCCCCC';
     }
 
     updateFromConfig(config) {
@@ -1428,184 +1495,27 @@ class WorkflowGraph {
             this.network.stabilize();
         } catch (error) {
             console.error('Error loading workflow state:', error);
-            showError('Failed to load workflow state');
+            this.showError('Failed to load workflow state');
         }
     }
-}
 
-// Initialize graph and handle updates
-let workflowGraph;
-
-function initializeWorkflowGraph() {
-    const container = document.getElementById('workflow-graph');
-    if (!container) return;
-
-    // Initialize drag-and-drop
-    initializeDragAndDrop();
-
-    // Initialize graph visualization
-    workflowGraph = new WorkflowGraph(container);
-    workflowGraph.init();
-}
-
-function initializeDragAndDrop() {
-    const paletteItems = document.querySelectorAll('.palette-item');
-
-    paletteItems.forEach(item => {
-        item.addEventListener('dragstart', handleDragStart);
-        item.addEventListener('dragend', handleDragEnd);
-    });
-
-    const graphContainer = document.getElementById('workflow-graph');
-    graphContainer.addEventListener('dragover', handleDragOver);
-    graphContainer.addEventListener('drop', handleDrop);
-}
-
-function handleDragStart(event) {
-    const type = event.target.getAttribute('data-component-type');
-    if (!type) return;
-
-    const style = componentTypes[type];
-    event.dataTransfer.setData('text/plain', JSON.stringify({
-        type,
-        style
-    }));
-
-    event.target.classList.add('dragging');
-}
-
-function handleDragEnd(event) {
-    event.target.classList.remove('dragging');
-}
-
-function handleDragOver(event) {
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-}
-
-function handleDrop(event) {
-    event.preventDefault();
-    const data = JSON.parse(event.dataTransfer.getData('text/plain'));
-
-    const rect = event.target.getBoundingClientRect();
-    const position = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top
-    };
-
-    addComponent(data.type, position);
-}
-
-function addComponent(type, position) {
-    componentCounter++;
-    const id = `${type}${componentCounter}`;
-    const style = componentTypes[type];
-
-    const node = {
-        id,
-        type,
-        position,
-        data: {
-            label: `${style.label} ${componentCounter}`,
-            type
-        },
-        style: {
-            backgroundColor: style.color,
-            padding: '10px',
-            borderRadius: '4px',
-            border: `2px solid ${style.color}`,
-            width: 150,
-            height: type === 'load_balancer' || type === 'aggregator' ? 100 : 80
-        }
-    };
-
-    // Add special shapes for load balancer and aggregator
-    if (type === 'load_balancer') {
-        node.style.clipPath = 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)';
-        node.style.borderRadius = '0';
-    } else if (type === 'aggregator') {
-        node.style.clipPath = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
-        node.style.borderRadius = '0';
+    showError(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.backgroundColor = '#dc3545';
+        toast.style.color = 'white';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
     }
 
-    workflowGraph.addNode(node);
-    showConfigModal(type, id);
-}
-
-class WorkflowGraph {
-    constructor(container) {
-        this.container = container;
-        this.nodes = new Map();
-        this.edges = new Map();
+    showSuccess(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
     }
-
-    init() {
-        // Initialize graph visualization library
-        // (Implementation depends on your chosen library)
-    }
-
-    addNode(node) {
-        this.nodes.set(node.id, node);
-        this.updateVisualization();
-    }
-
-    updateVisualization() {
-        // Update graph visualization
-        // (Implementation depends on your chosen library)
-    }
-}
-
-function showConfigModal(type, id) {
-    const modalId = `${type}-config-form`;
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-
-    // Store the component ID for use when saving
-    modal.dataset.componentId = id;
-
-    // Show the modal
-    const modalInstance = new bootstrap.Modal(modal);
-    modalInstance.show();
-}
-
-function saveLoadBalancerConfig() {
-    const modal = document.getElementById('load-balancer-config-form');
-    const id = modal.dataset.componentId;
-
-    const config = {
-        strategy: document.getElementById('lb-strategy').value,
-        max_queue_size: document.getElementById('lb-max-queue-size').value,
-        health_check_interval: document.getElementById('lb-health-check-interval').value,
-        backpressure_threshold: document.getElementById('lb-backpressure-threshold').value,
-        rebalance_threshold: document.getElementById('lb-rebalance-threshold').value
-    };
-
-    updateComponentConfig(id, config);
-    bootstrap.Modal.getInstance(modal).hide();
-}
-
-function saveAggregatorConfig() {
-    const modal = document.getElementById('aggregator-config-form');
-    const id = modal.dataset.componentId;
-
-    const config = {
-        strategy: document.getElementById('agg-strategy').value,
-        buffer_size: document.getElementById('agg-buffer-size').value,
-        batch_size: document.getElementById('agg-batch-size').value,
-        max_delay: document.getElementById('agg-max-delay').value,
-        window_size: document.getElementById('agg-window-size').value
-    };
-
-    updateComponentConfig(id, config);
-    bootstrap.Modal.getInstance(modal).hide();
-}
-
-function updateComponentConfig(id, config) {
-    const node = workflowGraph.nodes.get(id);
-    if (!node) return;
-
-    node.data.config = config;
-    workflowGraph.updateVisualization();
 }
 
 // Component type definitions and styling
@@ -1638,10 +1548,54 @@ const componentTypes = {
 };
 
 let componentCounter = 0;
+let workflowGraph;
 
-// Initialize the workflow editor
+// Replace the initialization code at the bottom of the file with this:
 document.addEventListener('DOMContentLoaded', () => {
-    initializePalette();
-    initializeGraph();
-    initializeEventListeners();
+    console.log('DOM Content Loaded');
+    try {
+        const container = document.getElementById('workflow-graph');
+        console.log('Looking for workflow-graph container:', container);
+
+        if (!container) {
+            throw new Error('Workflow graph container not found');
+        }
+
+        // Check if vis is loaded
+        if (typeof vis === 'undefined') {
+            console.error('vis library not loaded');
+            const scripts = document.querySelectorAll('script');
+            console.log('Loaded scripts:', Array.from(scripts).map(s => s.src));
+            throw new Error('vis library not loaded');
+        }
+
+        // Initialize the graph
+        try {
+            console.log('Attempting to create WorkflowGraph');
+            window.workflowGraph = new WorkflowGraph(container);
+            console.log('WorkflowGraph created successfully');
+        } catch (error) {
+            console.error('Failed to create WorkflowGraph:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger';
+            errorDiv.textContent = `Failed to initialize workflow graph: ${error.message}`;
+            container.parentNode.insertBefore(errorDiv, container);
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        // Show error on page
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger';
+        errorDiv.style.margin = '20px';
+        errorDiv.textContent = `Initialization error: ${error.message}`;
+        document.body.insertBefore(errorDiv, document.body.firstChild);
+    }
+});
+
+// Add a window error handler to catch any script loading errors
+window.addEventListener('error', (event) => {
+    console.error('Script error:', event.error);
+    if (event.filename) {
+        console.error('In file:', event.filename);
+    }
 }); 

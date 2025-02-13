@@ -48,20 +48,20 @@
                                 </div>
                                 <div class="card-body">
                                     <div class="palette">
-                                        <div class="palette-item" draggable="true" data-component-type="sender">
-                                            <div class="node sender">Sender</div>
+                                        <div class="palette-item-wrapper">
+                                            <div class="palette-item" draggable="true" data-component-type="sender">
+                                                <div class="node sender">Sender</div>
+                                            </div>
                                         </div>
-                                        <div class="palette-item" draggable="true" data-component-type="load_balancer">
-                                            <div class="node load-balancer">Load Balancer</div>
+                                        <div class="palette-item-wrapper">
+                                            <div class="palette-item" draggable="true" data-component-type="emulator">
+                                                <div class="node emulator">Emulator</div>
+                                            </div>
                                         </div>
-                                        <div class="palette-item" draggable="true" data-component-type="emulator">
-                                            <div class="node emulator">Emulator</div>
-                                        </div>
-                                        <div class="palette-item" draggable="true" data-component-type="aggregator">
-                                            <div class="node aggregator">Aggregator</div>
-                                        </div>
-                                        <div class="palette-item" draggable="true" data-component-type="receiver">
-                                            <div class="node receiver">Receiver</div>
+                                        <div class="palette-item-wrapper">
+                                            <div class="palette-item" draggable="true" data-component-type="receiver">
+                                                <div class="node receiver">Receiver</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -79,7 +79,7 @@
                                     </div>
                                 </div>
                                 <div class="card-body">
-                                    <div id="workflow-graph" class="workflow-graph"></div>
+                                    <div id="workflow-graph" class="workflow-graph vis-network"></div>
                                 </div>
                             </div>
                         </div>
@@ -239,11 +239,49 @@
     .palette {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
+        padding: 4px;
+    }
+
+    .palette-item-wrapper {
+        width: 100%;
+        margin: 0;
+        padding: 0;
     }
 
     .palette-item {
-        cursor: move;
+        cursor: grab !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        transition: all 0.2s ease;
+        position: relative;
+        width: 100%;
+        margin: 0;
+        padding: 4px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background-color: white;
+        pointer-events: all !important;
+        -webkit-user-drag: element;
+    }
+
+    .palette-item:hover {
+        border-color: #adb5bd;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .palette-item:active {
+        cursor: grabbing !important;
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+
+    .palette-item.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+        cursor: grabbing !important;
     }
 
     .node {
@@ -251,42 +289,59 @@
         border-radius: 4px;
         text-align: center;
         font-weight: bold;
+        width: 100%;
+        margin: 0;
+        pointer-events: none !important;
+        border: 2px solid transparent;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        display: block;
     }
 
     .sender {
         background-color: #a8e6cf;
-        /* Light green */
-    }
-
-    .load-balancer {
-        background-color: #ffadad;
-        /* Light red */
-        clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-        padding: 15px;
+        border-color: #86c4ad;
     }
 
     .emulator {
         background-color: #bde0fe;
-        /* Light blue */
-    }
-
-    .aggregator {
-        background-color: #e4c1f9;
-        /* Light purple */
-        clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
-        padding: 15px;
+        border-color: #9bbfe0;
     }
 
     .receiver {
         background-color: #ffd3b6;
-        /* Light orange */
+        border-color: #e0b498;
     }
 
     .workflow-graph {
-        min-height: 400px;
-        border: 1px solid #ddd;
+        min-height: 600px;
+        border: 2px solid #dee2e6;
         border-radius: 4px;
-        padding: 20px;
+        background-color: white;
+        transition: all 0.3s ease;
+        position: relative;
+        z-index: 1;
+    }
+
+    .workflow-graph.drop-target {
+        border-color: #2196F3;
+        background-color: #E3F2FD;
+        box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+    }
+
+    .drag-ghost {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.8;
+        background: white;
+        padding: 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: none;
+        min-width: 100px;
     }
 </style>
 {% endblock %}
@@ -295,9 +350,8 @@
 {{ super() }}
 <script>
     // Initialize workflow visualization
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeWorkflowGraph();
-    });
+    // The initialization is now handled in workflow.js
+    // No additional initialization needed here
 
     async function downloadConfig() {
         try {
