@@ -128,52 +128,85 @@ class WorkflowGraph {
             return;
         }
 
-        console.log('Found palette items:', paletteItems.length);
-        console.log('Graph container:', graphContainer);
-
-        // Create a ghost container for drag image
-        const ghostContainer = document.createElement('div');
-        ghostContainer.className = 'drag-ghost';
-        ghostContainer.style.position = 'absolute';
-        ghostContainer.style.pointerEvents = 'none';
-        ghostContainer.style.zIndex = '1000';
-        ghostContainer.style.display = 'none';
-        document.body.appendChild(ghostContainer);
+        // Debug log for found palette items
+        paletteItems.forEach(item => {
+            console.log('Found palette item:', {
+                type: item.getAttribute('data-component-type'),
+                draggable: item.draggable,
+                innerHTML: item.innerHTML
+            });
+        });
 
         const handleDragStart = (e) => {
-            console.log('Drag started on palette item');
+            console.log('DragStart event fired on:', e.target);
             e.stopPropagation();
+            e.stopImmediatePropagation();
 
-            const type = e.target.getAttribute('data-component-type');
+            const paletteItem = e.target.closest('.palette-item');
+            console.log('Found palette item in drag start:', paletteItem);
+
+            if (!paletteItem) {
+                console.error('No palette item found in drag start');
+                return;
+            }
+
+            const type = paletteItem.getAttribute('data-component-type');
+            console.log('Component type for drag:', type);
+
             if (!type) {
                 console.error('No component type found');
                 return;
             }
 
-            console.log('Component type:', type);
+            // Set dragging styles
+            paletteItem.style.opacity = '0.5';
+            document.body.style.cursor = 'move';
+
+            console.log('Setting up drag data transfer');
             e.dataTransfer.effectAllowed = 'copy';
             e.dataTransfer.setData('text/plain', type);
 
-            ghostContainer.innerHTML = e.target.innerHTML;
-            ghostContainer.style.display = 'block';
-            e.dataTransfer.setDragImage(ghostContainer, 50, 25);
+            // Create and set drag image
+            const dragImage = paletteItem.cloneNode(true);
+            dragImage.style.width = '150px';
+            dragImage.style.height = '50px';
+            dragImage.style.position = 'absolute';
+            dragImage.style.top = '-1000px';
+            dragImage.style.opacity = '0.8';
+            document.body.appendChild(dragImage);
+            e.dataTransfer.setDragImage(dragImage, 75, 25);
+            setTimeout(() => document.body.removeChild(dragImage), 0);
 
-            e.target.classList.add('dragging');
+            paletteItem.classList.add('dragging');
+            console.log('Added dragging class to:', paletteItem);
         };
 
         const handleDrag = (e) => {
+            console.log('Drag event fired');
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
         };
 
         const handleDragEnd = (e) => {
+            console.log('DragEnd event fired');
             e.preventDefault();
             e.stopPropagation();
-            e.target.classList.remove('dragging');
-            ghostContainer.style.display = 'none';
+            e.stopImmediatePropagation();
+
+            const paletteItem = e.target.closest('.palette-item');
+            console.log('Found palette item in drag end:', paletteItem);
+
+            if (paletteItem) {
+                paletteItem.classList.remove('dragging');
+                paletteItem.style.opacity = '';
+                document.body.style.cursor = '';
+                console.log('Removed dragging class and reset styles');
+            }
         };
 
         const handleDrop = (e) => {
+            console.log('Drop event fired');
             e.preventDefault();
             e.stopPropagation();
             graphContainer.classList.remove('drop-target');
@@ -183,6 +216,8 @@ class WorkflowGraph {
                 console.error('No component type data received');
                 return;
             }
+
+            console.log('Handling drop for component type:', type);
 
             const rect = graphContainer.getBoundingClientRect();
             const dropPoint = {
@@ -221,37 +256,66 @@ class WorkflowGraph {
         };
 
         // Setup drag source event handlers
+        console.log('Setting up event listeners for palette items...');
         paletteItems.forEach(item => {
-            item.addEventListener('dragstart', handleDragStart);
-            item.addEventListener('drag', handleDrag);
-            item.addEventListener('dragend', handleDragEnd);
-        });
+            // Remove draggable from parent
+            item.setAttribute('draggable', 'false');
 
-        // Setup drop target event handlers
-        graphContainer.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            graphContainer.classList.add('drop-target');
-        });
-
-        graphContainer.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = 'copy';
-        });
-
-        graphContainer.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!e.currentTarget.contains(e.relatedTarget)) {
-                graphContainer.classList.remove('drop-target');
+            // Add handlers to the child node element only
+            const nodeElement = item.querySelector('.node');
+            if (nodeElement) {
+                console.log('Setting up drag handlers for:', item.getAttribute('data-component-type'));
+                nodeElement.setAttribute('draggable', 'true');
+                nodeElement.style.cursor = 'grab';
+                nodeElement.addEventListener('dragstart', handleDragStart, true);
+                nodeElement.addEventListener('drag', handleDrag, true);
+                nodeElement.addEventListener('dragend', handleDragEnd, true);
             }
         });
 
-        graphContainer.addEventListener('drop', handleDrop.bind(this));
+        // Setup drop target event handlers
+        const dropHandlers = {
+            dragenter: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                graphContainer.classList.add('drop-target');
+            },
+            dragover: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = 'copy';
+            },
+            dragleave: (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                    graphContainer.classList.remove('drop-target');
+                }
+            },
+            drop: handleDrop.bind(this)
+        };
 
-        // Ensure the container can accept drops
-        graphContainer.setAttribute('droppable', 'true');
+        Object.entries(dropHandlers).forEach(([event, handler]) => {
+            graphContainer.addEventListener(event, handler, true);
+        });
+
+        // Add CSS styles dynamically
+        const style = document.createElement('style');
+        style.textContent = `
+            .palette-item .node {
+                user-select: none;
+                -webkit-user-drag: element;
+                cursor: grab;
+            }
+            .palette-item .node:active {
+                cursor: grabbing;
+            }
+            .palette-item.dragging .node {
+                opacity: 0.5;
+                cursor: grabbing;
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     setupCopyPaste() {
