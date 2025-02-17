@@ -9,4 +9,13 @@ network:
   bind_address: "0.0.0.0"
   target_host: "receiver"
   target_port: 50804
-  verbosity: 1 
+  verbosity: 1
+receive_port: 50802
+destination_address: rtdp-receiver
+destination_port: 50804
+num_threads: 2
+memory_footprint_gb: 1
+output_size_gb: 1
+latency_seconds_per_gb: 1
+sleep_vs_burn: false
+verbose: true 

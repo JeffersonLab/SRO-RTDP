@@ -3,14 +3,13 @@ import os
 import time
 import zlib
 import argparse
+import socket
 from typing import Dict, Any, Optional, BinaryIO
 import yaml
-from base import Component
-import zmq
 import logging
 
 
-class Receiver(Component):
+class Receiver:
     """Component that receives and processes data."""
 
     def __init__(self, config: Dict[str, Any]):
@@ -19,8 +18,15 @@ class Receiver(Component):
         Args:
             config: Component configuration dictionary
         """
-        super().__init__(config)
+        self.config = config
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.debug(f"Initializing component with config: {config}")
+
         self.receiver_config = config.get('receiver_config', {})
+        self.network_config = config.get('network', {})
+        self.listen_port = self.network_config.get('listen_port')
+        self.bind_address = self.network_config.get('bind_address', '0.0.0.0')
 
         # Output configuration
         self.output_dir = self.receiver_config.get(
@@ -59,6 +65,13 @@ class Receiver(Component):
         self.current_file_handle: Optional[BinaryIO] = None
         self.current_source: Optional[str] = None
 
+        # Socket setup
+        self.socket = None
+        self.running = False
+
+        # Keep track of active client sockets
+        self.client_sockets = []
+
     def _parse_size(self, size_str: str) -> int:
         """Parse size string (e.g., '1M', '100K') to number of bytes.
 
@@ -80,6 +93,15 @@ class Receiver(Component):
             f"Initializing receiver component, output dir: {self.output_dir}"
         )
         self.logger.info(f"Listening on port {self.listen_port}")
+
+        # Create and bind socket
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind((self.bind_address, self.listen_port))
+        self.socket.listen(5)
+        self.socket.settimeout(5)  # 5 second timeout for accepting connections
+        self.logger.info(
+            f"Socket bound to {self.bind_address}:{self.listen_port}")
 
     def _open_output_file(self, source_info: str, routing_info: str) -> None:
         """Open a new output file.
@@ -189,56 +211,45 @@ class Receiver(Component):
     def process(self) -> None:
         """Main processing loop."""
         try:
-            if not self.receiver:
-                self.logger.error("No receiver socket initialized")
+            if not self.socket:
+                self.logger.error("No socket initialized")
                 time.sleep(1)
                 return
 
             try:
-                # Use non-blocking receive with routing info
-                self.logger.debug("Waiting for data...")
+                # Accept new connections
                 try:
-                    multipart_msg = self.receiver.recv_multipart(
-                        flags=zmq.NOBLOCK)
-                    self.logger.debug("Received data from socket")
-                except zmq.Again:
-                    self.logger.debug("No data available")
-                    time.sleep(0.1)
-                    return
+                    client_socket, addr = self.socket.accept()
+                    self.logger.info(f"Accepted connection from {addr}")
+                    client_socket.setblocking(True)  # Use blocking mode
+                    self.client_sockets.append((client_socket, addr))
+                except socket.timeout:
+                    pass
                 except Exception as e:
-                    self.logger.error(
-                        f"Error receiving data: {e}", exc_info=True)
-                    time.sleep(0.1)
-                    return
+                    self.logger.error(f"Error accepting connection: {e}")
 
-                if multipart_msg:
-                    self.logger.debug(
-                        f"Received multipart message with {len(multipart_msg)} parts"
-                    )
-                    # Extract source info and data
-                    if len(multipart_msg) >= 3:  # Now expecting 3 parts
-                        source_info = multipart_msg[0].decode()
-                        # New routing info
-                        routing_info = multipart_msg[1].decode()
-                        data = multipart_msg[-1]
-                        self.logger.debug(
-                            f"Processing message from {source_info} "
-                            f"via {routing_info}, "
-                            f"data size: {len(data)} bytes"
-                        )
-                        self._process_data(data, source_info, routing_info)
+                # Process data from all connected clients
+                for client_socket, addr in list(self.client_sockets):
+                    try:
+                        data = client_socket.recv(65536)  # 64KB chunks
+                        if data:
+                            self.logger.debug(
+                                f"Received {len(data)} bytes from {addr}")
+                            self._process_data(
+                                data, f"client_{addr[0]}", f"port_{addr[1]}")
+                        else:
+                            self.logger.debug(
+                                f"Client {addr} closed connection")
+                            client_socket.close()
+                            self.client_sockets.remove((client_socket, addr))
+                    except BlockingIOError:
+                        continue
+                    except Exception as e:
+                        self.logger.error(
+                            f"Error receiving data from {addr}: {e}")
+                        client_socket.close()
+                        self.client_sockets.remove((client_socket, addr))
 
-                        # Log progress periodically
-                        if self.chunks_received % 100 == 0:
-                            self.logger.info(
-                                f"Received {self.chunks_received} chunks "
-                                f"({self.bytes_received} bytes) "
-                                f"from {source_info} via {routing_info}"
-                            )
-                    else:
-                        self.logger.warning(
-                            "Received incomplete multipart message, skipping"
-                        )
             except Exception as e:
                 self.logger.error(
                     f"Error processing data: {e}",
@@ -251,6 +262,29 @@ class Receiver(Component):
                 exc_info=True
             )
             time.sleep(1)  # Wait before retrying
+
+    def start(self) -> None:
+        """Start the receiver."""
+        self.logger.info("Starting receiver")
+        try:
+            self.initialize()
+            self.running = True
+            while self.running:
+                try:
+                    self.process()
+                except KeyboardInterrupt:
+                    self.logger.info("Received shutdown signal")
+                    break
+                except Exception as e:
+                    self.logger.error(
+                        f"Error in process loop: {e}", exc_info=True)
+                    time.sleep(1)
+        finally:
+            self.cleanup()
+
+    def stop(self) -> None:
+        """Stop the receiver."""
+        self.running = False
 
     def cleanup(self) -> None:
         """Clean up resources."""
@@ -268,7 +302,14 @@ class Receiver(Component):
                     f"Error closing file: {e}",
                     exc_info=True
                 )
-        super().cleanup()
+        # Close all client sockets
+        for client_socket, addr in self.client_sockets:
+            try:
+                client_socket.close()
+            except Exception as e:
+                self.logger.error(f"Error closing client socket {addr}: {e}")
+        if self.socket:
+            self.socket.close()
 
 
 def main() -> None:

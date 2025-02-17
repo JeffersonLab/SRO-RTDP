@@ -6,16 +6,17 @@ services:
       context: ../components
       dockerfile: Dockerfile
     container_name: rtdp-receiver
-    network_mode: host
+    networks:
+      - rtdp_net
     volumes:
       - type: bind
         source: ./config
         target: /config
       - type: bind
-        source: ./output
-        target: /data
+        source: ./output/received_data
+        target: /data/received_data
     command: >
-      sh -c "cd /app && PYTHONPATH=/app python3 receiver.py --config /config/receiver_config.yml"
+      sh -c "mkdir -p /data/received_data && chmod 777 /data/received_data && cd /app && PYTHONPATH=/app python3 receiver.py --config /config/receiver_config.yml"
     environment:
       - PYTHONUNBUFFERED=1
     user: "${UID:-1000}:${GID:-1000}"
@@ -25,47 +26,61 @@ services:
       timeout: 5s
       retries: 10
 
-  sender1:
-    build:
-      context: ../components
-      dockerfile: Dockerfile
-    container_name: rtdp-sender1
-    network_mode: host
+  emulator1:
+    image: cpu-emu:latest
+    container_name: rtdp-emulator1
+    networks:
+      - rtdp_net
     volumes:
       - type: bind
-        source: ./config
-        target: /config
-      - type: bind
-        source: ./output
-        target: /data
-    command: >
-      sh -c "cd /app && PYTHONPATH=/app python3 sender.py --config /config/sender1_config.yml"
-    environment:
-      - PYTHONUNBUFFERED=1
-    user: "${UID:-1000}:${GID:-1000}"
-    depends_on:
-      receiver:
-        condition: service_healthy
+        source: ./output/emulator1
+        target: /output
+    entrypoint: [ "/app/entrypoint.sh" ]
+    command: [ "forward", "50801", "rtdp-receiver", "50804" ]
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50801" ]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
-  sender2:
+  emulator2:
+    image: cpu-emu:latest
+    container_name: rtdp-emulator2
+    networks:
+      - rtdp_net
+    volumes:
+      - type: bind
+        source: ./output/emulator2
+        target: /output
+    entrypoint: [ "/app/entrypoint.sh" ]
+    command: [ "forward", "50802", "rtdp-receiver", "50804" ]
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50802" ]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  sender:
     build:
       context: ../components
       dockerfile: Dockerfile
-    container_name: rtdp-sender2
-    network_mode: host
+    container_name: rtdp-sender
+    networks:
+      - rtdp_net
     volumes:
       - type: bind
         source: ./config
         target: /config
-      - type: bind
-        source: ./output
-        target: /data
     command: >
-      sh -c "cd /app && PYTHONPATH=/app python3 sender.py --config /config/sender2_config.yml"
+      sh -c "cd /app && PYTHONPATH=/app python3 sender.py --config /config/sender_config.yml"
     environment:
       - PYTHONUNBUFFERED=1
     user: "${UID:-1000}:${GID:-1000}"
     depends_on:
+      emulator1:
+        condition: service_healthy
+      emulator2:
+        condition: service_healthy
       receiver:
         condition: service_healthy
 

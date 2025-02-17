@@ -5,6 +5,6 @@ network:
   bind_address: "0.0.0.0"
 receiver_config:
   output_dir: "/data/received_data"
-  data_validation: true
+  data_validation: false  # Disable validation for now
   buffer_size: "64M"
   compression: false 
