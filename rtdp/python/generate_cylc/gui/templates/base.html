@@ -77,6 +77,7 @@
             flex-direction: column;
             gap: 10px;
             padding: 5px;
+            pointer-events: all !important;
         }
 
         .palette-item-wrapper {
@@ -255,6 +256,20 @@
             position: relative;
             z-index: 1;
             pointer-events: all !important;
+        }
+
+        /* Ensure all parent containers allow pointer events */
+        .card,
+        .card-body,
+        .palette,
+        .palette-item {
+            pointer-events: all !important;
+        }
+
+        /* Disable pointer events only on the node content */
+        .node,
+        .node * {
+            pointer-events: none !important;
         }
     </style>
 </head>
