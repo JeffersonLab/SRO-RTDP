@@ -2,15 +2,14 @@
 import os
 import time
 import argparse
+import socket
 from typing import Dict, Any, Optional
 import numpy as np
 import yaml
-from base import Component
-import zmq
 import logging
 
 
-class Sender(Component):
+class Sender:
     """Component that sends data to downstream components."""
 
     def __init__(self, config: Dict[str, Any]):
@@ -19,8 +18,13 @@ class Sender(Component):
         Args:
             config: Component configuration dictionary
         """
-        super().__init__(config)
+        self.config = config
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.debug(f"Initializing component with config: {config}")
+
         self.sender_config = config.get('sender_config', {})
+        self.network_config = config.get('network', {})
         self.data_source = self.sender_config.get('data_source')
         self.data_format = self.sender_config.get('data_format', 'raw')
         self.chunk_size = self._parse_size(
@@ -36,10 +40,22 @@ class Sender(Component):
 
         # Component identification
         self.component_id = config.get('id', 'unknown_sender')
-        self.emulator_id = config.get('emulator_id', 'unknown_emulator')
 
         # Completion flag
         self.data_sent = False
+        self.running = False
+
+        # Socket setup
+        self.sockets = {}
+        for conn in self.network_config.get('connect_to', []):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect((conn['host'], conn['port']))
+                self.sockets[f"{conn['host']}:{conn['port']}"] = sock
+                self.logger.info(f"Connected to {conn['host']}:{conn['port']}")
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to connect to {conn['host']}:{conn['port']}: {e}")
 
     def _parse_size(self, size_str: str) -> int:
         """Parse size string (e.g., '1M', '100K') to number of bytes.
@@ -61,10 +77,10 @@ class Sender(Component):
         self.logger.info("Initializing sender component")
         self.bytes_sent = 0
         self.chunks_sent = 0
-        if not self.senders:
-            self.logger.error("No sender sockets initialized")
+        if not self.sockets:
+            self.logger.error("No sockets initialized")
             return
-        self.logger.info(f"Connected to {len(self.senders)} targets")
+        self.logger.info(f"Connected to {len(self.sockets)} targets")
 
     def _generate_test_data(self, size: int) -> bytes:
         """Generate test data of specified size.
@@ -101,8 +117,8 @@ class Sender(Component):
     def process(self) -> None:
         """Process and send data."""
         try:
-            if not self.senders:
-                self.logger.error("No sender sockets initialized")
+            if not self.sockets:
+                self.logger.error("No sockets initialized")
                 time.sleep(1)
                 return
 
@@ -128,37 +144,54 @@ class Sender(Component):
             if data is None:
                 data = self._generate_test_data(chunk_size)
 
-            # Create multipart message with source and routing information
-            source_info = f"sender:{self.component_id}"
-            routing_info = f"emulator:{self.emulator_id}"
-            message = [source_info.encode(), routing_info.encode(), data]
+            # Send the data through each socket
+            for target, sock in self.sockets.items():
+                try:
+                    sock.sendall(data)
+                    self.logger.info(f"Sent chunk to {target}")
+                except Exception as e:
+                    self.logger.error(f"Error sending data to {target}: {e}")
+                    time.sleep(0.1)  # Wait before retrying
 
-            # Send the data
-            try:
-                for socket in self.senders.values():
-                    socket.send_multipart(message)
-                self.bytes_sent += len(data)
-                self.chunks_sent += 1
+            # Update counters
+            self.bytes_sent += len(data)
+            self.chunks_sent += 1
 
-                # Log progress periodically
-                if self.chunks_sent % 100 == 0:
-                    self.logger.info(
-                        f"Sent {self.chunks_sent} chunks "
-                        f"({self.bytes_sent} bytes) "
-                        f"via {routing_info}"
-                    )
-
-                # Add some delay to control sending rate
-                time.sleep(0.001)  # 1ms delay
-            except zmq.Again:
-                # Socket would block, wait a bit
-                time.sleep(0.1)
-            except Exception as e:
-                self.logger.error(f"Error sending data: {e}")
-                time.sleep(0.1)  # Wait before retrying
+            # Add some delay to control sending rate
+            time.sleep(0.001)  # 1ms delay
         except Exception as e:
             self.logger.error(f"Process error: {e}")
             time.sleep(1)  # Wait before retrying
+
+    def start(self) -> None:
+        """Start the sender."""
+        self.logger.info("Starting sender")
+        try:
+            self.initialize()
+            self.running = True
+            while self.running:
+                try:
+                    self.process()
+                except KeyboardInterrupt:
+                    self.logger.info("Received shutdown signal")
+                    break
+                except Exception as e:
+                    self.logger.error(
+                        f"Error in process loop: {e}", exc_info=True)
+                    time.sleep(1)
+        finally:
+            self.cleanup()
+
+    def stop(self) -> None:
+        """Stop the sender."""
+        self.running = False
+
+    def cleanup(self) -> None:
+        """Clean up resources."""
+        self.logger.info(
+            f"Shutting down sender, sent {self.chunks_sent} chunks")
+        for sock in self.sockets.values():
+            sock.close()
 
 
 def main() -> None:
