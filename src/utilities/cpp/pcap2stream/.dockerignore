@@ -1,0 +1,26 @@
+# Build directories
+**/build/
+**/output/
+
+# Git
+.git
+.gitignore
+
+# Docker
+**/Dockerfile
+**/.container
+.dockerignore
+docker-compose.yml
+
+# Editor files
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+
+# Temporary files
+**/*.log
+**/*.tmp
+
+# PCap files (these should be mounted at runtime)
+**/*.pcap

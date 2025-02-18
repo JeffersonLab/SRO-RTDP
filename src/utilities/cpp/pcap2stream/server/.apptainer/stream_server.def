@@ -1,0 +1,56 @@
+Bootstrap: docker
+From: ubuntu:22.04
+
+%environment
+    export LC_ALL=C
+
+%post
+    # Install dependencies
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential \
+        cmake \
+        g++
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+    # Create app directory and output directory
+    mkdir -p /app /app/output
+    cd /app
+
+%files
+    # Copy source files from the server directory
+    stream_server.cc /app/
+    CMakeLists.txt /app/
+
+%post
+    # Build the application
+    cd /app
+    mkdir -p build
+    cd build
+    cmake ..
+    make
+
+%runscript
+    exec /app/build/stream_server "$@"
+
+%startscript
+    exec /app/build/stream_server 0.0.0.0 5000 3
+
+%labels
+    Author RTDP
+    Version v1.0
+    Description Stream Server component for receiving PCAP streams
+
+%help
+    This container runs the stream server utility.
+
+    Usage:
+        apptainer run stream_server.sif <ip_address> <base_port> <num_ports>
+
+    Example:
+        apptainer run stream_server.sif 0.0.0.0 5000 3
+
+    Instance Usage:
+        apptainer instance start stream_server.sif stream_server
+        apptainer instance stop stream_server
