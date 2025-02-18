@@ -4,6 +4,7 @@
 #include <thread>
 #include <mutex>
 #include <map>
+#include <set>
 #include <filesystem>
 #include <fstream>
 #include <atomic>
@@ -14,6 +15,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <errno.h>
 
 class StreamServer {
 private:
@@ -21,8 +24,11 @@ private:
     int base_port;
     int num_ports;
     std::vector<std::thread> listener_threads;
+    std::vector<int> server_sockets;
     std::map<int, std::ofstream> output_files;
+    std::set<std::thread::id> active_client_threads;
     std::mutex files_mutex;
+    std::mutex clients_mutex;
     std::atomic<bool> running{true};
 
     std::string get_timestamp() {
@@ -34,6 +40,12 @@ private:
     }
 
     void handle_client(int client_socket, int port) {
+        // Register client thread
+        {
+            std::lock_guard<std::mutex> lock(clients_mutex);
+            active_client_threads.insert(std::this_thread::get_id());
+        }
+
         std::string filename;
         {
             std::lock_guard<std::mutex> lock(files_mutex);
@@ -49,14 +61,39 @@ private:
         std::vector<char> buffer(buffer_size);
         ssize_t bytes_received;
 
-        while (running && (bytes_received = recv(client_socket, buffer.data(), buffer_size, 0)) > 0) {
-            std::lock_guard<std::mutex> lock(files_mutex);
-            output_files[port].write(buffer.data(), bytes_received);
-            output_files[port].flush();
+        // Set socket timeout to allow checking running flag
+        struct timeval tv;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+        setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+        while (running) {
+            bytes_received = recv(client_socket, buffer.data(), buffer_size, 0);
+            if (bytes_received > 0) {
+                std::lock_guard<std::mutex> lock(files_mutex);
+                output_files[port].write(buffer.data(), bytes_received);
+                output_files[port].flush();
+            } else if (bytes_received == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // Timeout occurred, continue to check running flag
+                    continue;
+                }
+                // Other error occurred
+                break;
+            } else {
+                // Connection closed by client
+                break;
+            }
         }
 
         close(client_socket);
         std::cout << "Client disconnected from port " << port << std::endl;
+
+        // Unregister client thread
+        {
+            std::lock_guard<std::mutex> lock(clients_mutex);
+            active_client_threads.erase(std::this_thread::get_id());
+        }
     }
 
     void port_listener(int port) {
@@ -66,12 +103,19 @@ private:
             return;
         }
 
+        // Store server socket for cleanup
+        server_sockets.push_back(server_socket);
+
         int opt = 1;
         if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
             std::cerr << "Failed to set socket options for port " << port << std::endl;
             close(server_socket);
             return;
         }
+
+        // Set non-blocking mode
+        int flags = fcntl(server_socket, F_GETFL, 0);
+        fcntl(server_socket, F_SETFL, flags | O_NONBLOCK);
 
         struct sockaddr_in server_addr;
         server_addr.sin_family = AF_INET;
@@ -100,6 +144,11 @@ private:
             if (!running) break;
 
             if (client_socket < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // No pending connections, sleep briefly and continue
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    continue;
+                }
                 std::cerr << "Failed to accept connection on port " << port << std::endl;
                 continue;
             }
@@ -131,11 +180,38 @@ public:
     void stop() {
         running = false;
 
-        // Close all listener threads
+        // Close all server sockets to unblock accept()
+        for (int sock : server_sockets) {
+            shutdown(sock, SHUT_RDWR);
+            close(sock);
+        }
+        server_sockets.clear();
+
+        // Wait for listener threads to finish
         for (auto& thread : listener_threads) {
             if (thread.joinable()) {
                 thread.join();
             }
+        }
+        listener_threads.clear();
+
+        // Wait for client threads to finish (with timeout)
+        auto start = std::chrono::steady_clock::now();
+        while (true) {
+            {
+                std::lock_guard<std::mutex> lock(clients_mutex);
+                if (active_client_threads.empty()) {
+                    break;
+                }
+            }
+
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - start).count() >= 5) {
+                std::cout << "Timeout waiting for client threads to finish" << std::endl;
+                break;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         // Close all output files
@@ -151,12 +227,19 @@ public:
     ~StreamServer() {
         stop();
     }
+
+    void set_running(bool value) {
+        running = value;
+    }
 };
 
-std::atomic<bool> g_running{true};
+StreamServer* g_server = nullptr;
 
 void signal_handler(int signum) {
-    g_running = false;
+    std::cout << "\nReceived signal " << signum << ", initiating shutdown..." << std::endl;
+    if (g_server) {
+        g_server->set_running(false);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -174,15 +257,17 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, signal_handler);
 
     StreamServer server(ip_address, base_port, num_ports);
+    g_server = &server;
     server.start();
 
     std::cout << "Server running. Press Ctrl+C to stop." << std::endl;
 
-    while (g_running) {
+    // Wait for shutdown signal
+    while (g_server->running) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    std::cout << "\nShutting down server..." << std::endl;
+    std::cout << "Shutting down server..." << std::endl;
     server.stop();
     std::cout << "Server stopped." << std::endl;
 
