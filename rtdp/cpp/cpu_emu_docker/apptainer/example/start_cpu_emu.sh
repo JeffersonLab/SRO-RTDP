@@ -59,7 +59,15 @@ OUTPUT_DIR="./output"
 mkdir -p "$OUTPUT_DIR"
 
 # Construct the command
-CMD="apptainer run $SIF_PATH --output-dir /output"
+CMD="apptainer run"
+
+# Add environment variables for debugging
+if [ $VERBOSE -eq 1 ]; then
+    CMD="$CMD --env VERBOSE=1 --env DEBUG=1"
+fi
+
+# Add the SIF file and output directory
+CMD="$CMD $SIF_PATH --output-dir /output"
 
 # Add required parameters
 CMD="$CMD -t $THREADS -b $LATENCY -m $MEM_FOOTPRINT -o $OUTPUT_SIZE"
