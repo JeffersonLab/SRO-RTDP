@@ -52,6 +52,75 @@ To start the server listening on ports 5000, 5001, and 5002 on all interfaces:
 ./stream_server 0.0.0.0 5000 3
 ```
 
+## Container Support
+
+### Using Docker
+
+1. Build the Docker image:
+```bash
+docker build -t stream-server -f .container/Dockerfile .
+```
+
+2. Run with Docker:
+```bash
+# Mount a directory for output files
+docker run -p 5000-5002:5000-5002 -v /path/to/output:/app/output stream-server 0.0.0.0 5000 3
+```
+
+3. Using docker-compose:
+```bash
+# Output files will be saved in ./output directory
+docker-compose up stream-server
+```
+
+### Using Apptainer/Singularity
+
+1. Build the Apptainer image:
+```bash
+# Using the build script from parent directory
+../build_apptainer.sh server
+
+# Or build directly
+apptainer build stream_server.sif .apptainer/stream_server.def
+```
+
+2. Run with Apptainer:
+```bash
+# Basic run (creates output in current directory)
+apptainer run stream_server.sif 0.0.0.0 5000 3
+
+# Run with output to your home directory
+apptainer run --bind $HOME stream_server.sif 0.0.0.0 5000 3
+
+# Run with output to a specific directory (recommended)
+apptainer run --bind /path/to/output:/app/output stream_server.sif 0.0.0.0 5000 3
+```
+
+3. Run as an instance (background service):
+```bash
+# Start instance with output to a specific directory
+apptainer instance start --bind /path/to/output:/app/output stream_server.sif stream_server
+
+# Stop instance
+apptainer instance stop stream_server
+```
+
+Note: When using Apptainer, you need to:
+- Bind directories where you want to save output files
+- Ensure the bound directories have write permissions
+- Use absolute paths for bound directories
+
+Example directory setup:
+```bash
+# Create an output directory in your home
+mkdir -p ~/pcap_output
+
+# Run server with home directory binding
+apptainer run --bind $HOME stream_server.sif 0.0.0.0 5000 3
+
+# The output files will appear in ~/pcap_output
+```
+
 ## Output Files
 
 - All received data is saved in the `output` directory
@@ -73,12 +142,26 @@ To start the server listening on ports 5000, 5001, and 5002 on all interfaces:
 
 1. Start the server first:
 ```bash
+# Native
 ./stream_server 0.0.0.0 5000 3
+
+# Docker
+docker-compose up stream-server
+
+# Apptainer
+apptainer run stream_server.sif 0.0.0.0 5000 3
 ```
 
 2. Then run pcap2stream with matching parameters:
 ```bash
+# Native
 ./pcap2stream capture.pcap 127.0.0.1 5000
+
+# Docker
+docker-compose run pcap-sender /app/pcap/capture.pcap stream-server 5000
+
+# Apptainer
+apptainer run ../sender/pcap2stream.sif capture.pcap 127.0.0.1 5000
 ```
 
 The server will:
@@ -102,3 +185,5 @@ The server will:
 - The server must be running before starting pcap2stream
 - Each port can handle multiple connections over time, but data from all connections to the same port goes to the same output file
 - Files are opened in binary mode to preserve exact data
+- When using containers, ensure the ports are properly exposed and mapped
+- Output directory permissions must allow writing when using containers

@@ -16,6 +16,7 @@
 #include <queue>
 #include <condition_variable>
 #include <atomic>
+#include <signal.h>
 
 // Structure to hold packet data and metadata
 struct PacketData {
@@ -23,6 +24,14 @@ struct PacketData {
     uint32_t ts_sec;
     uint32_t ts_usec;
 };
+
+// Global flag for signal handling
+std::atomic<bool> g_running{true};
+
+void signal_handler(int signum) {
+    std::cout << "\nReceived signal " << signum << ", shutting down..." << std::endl;
+    g_running = false;
+}
 
 // Thread-safe queue for packet data
 class PacketQueue {
@@ -68,7 +77,7 @@ private:
 
     void worker_function() {
         PacketData packet;
-        while (running && packet_queue.pop(packet)) {
+        while (running && g_running && packet_queue.pop(packet)) {
             if (send(sock_fd, packet.payload.data(), packet.payload.size(), 0) < 0) {
                 std::cerr << "Failed to send data for IP " << source_ip << std::endl;
                 break;
@@ -118,7 +127,9 @@ public:
             worker_thread.join();
         }
         if (sock_fd >= 0) {
+            shutdown(sock_fd, SHUT_RDWR);
             close(sock_fd);
+            sock_fd = -1;
         }
     }
 
@@ -132,14 +143,31 @@ private:
     std::unordered_map<std::string, std::unique_ptr<StreamClient>> clients;
     std::string server_ip;
     int base_port;
+    pcap_t* handle;
 
 public:
-    PcapProcessor(const std::string& srv_ip, int port) 
-        : server_ip(srv_ip), base_port(port) {}
+    PcapProcessor(const std::string& srv_ip, int port)
+        : server_ip(srv_ip), base_port(port), handle(nullptr) {}
+
+    ~PcapProcessor() {
+        cleanup();
+    }
+
+    void cleanup() {
+        if (handle) {
+            pcap_close(handle);
+            handle = nullptr;
+        }
+
+        for (auto& client : clients) {
+            client.second->stop();
+        }
+        clients.clear();
+    }
 
     void process_pcap(const std::string& filename) {
         char errbuf[PCAP_ERRBUF_SIZE];
-        pcap_t* handle = pcap_open_offline(filename.c_str(), errbuf);
+        handle = pcap_open_offline(filename.c_str(), errbuf);
         if (!handle) {
             std::cerr << "Could not open file: " << filename << " - " << errbuf << std::endl;
             return;
@@ -149,7 +177,7 @@ public:
         const u_char* packet;
         int res;
 
-        while ((res = pcap_next_ex(handle, &header, &packet)) >= 0) {
+        while (g_running && (res = pcap_next_ex(handle, &header, &packet)) >= 0) {
             if (res == 0) continue;
 
             struct ethhdr* eth = (struct ethhdr*)packet;
@@ -159,7 +187,7 @@ public:
             if (ip->protocol != IPPROTO_TCP) continue;
 
             struct tcphdr* tcp = (struct tcphdr*)(packet + sizeof(struct ethhdr) + ip->ihl * 4);
-            
+
             // Get source IP address
             char src_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &(ip->saddr), src_ip, INET_ADDRSTRLEN);
@@ -168,7 +196,7 @@ public:
             // Calculate payload size and offset
             int payload_offset = sizeof(struct ethhdr) + ip->ihl * 4 + tcp->doff * 4;
             int payload_size = ntohs(ip->tot_len) - (ip->ihl * 4 + tcp->doff * 4);
-            
+
             if (payload_size <= 0) continue;
 
             // Create new client if this is a new source IP
@@ -176,7 +204,7 @@ public:
                 int client_port = base_port + clients.size();
                 auto client = std::make_unique<StreamClient>(source_ip, server_ip, client_port);
                 if (client->connect()) {
-                    std::cout << "New connection established for " << source_ip 
+                    std::cout << "New connection established for " << source_ip
                               << " to " << server_ip << ":" << client_port << std::endl;
                     clients[source_ip] = std::move(client);
                 }
@@ -190,19 +218,19 @@ public:
                 pdata.ts_usec = header->ts.tv_usec;
                 clients[source_ip]->queue_packet(pdata);
             }
+
+            // Check if we should stop
+            if (!g_running) {
+                std::cout << "Stopping packet processing..." << std::endl;
+                break;
+            }
         }
 
         if (res == -1) {
             std::cerr << "Error reading packets: " << pcap_geterr(handle) << std::endl;
         }
 
-        pcap_close(handle);
-        
-        // Clean up clients
-        for (auto& client : clients) {
-            client.second->stop();
-        }
-        clients.clear();
+        cleanup();
     }
 };
 
@@ -212,6 +240,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // Set up signal handling
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
     std::string filename = argv[1];
     std::string server_ip = argv[2];
     int base_port = std::stoi(argv[3]);
@@ -220,4 +252,4 @@ int main(int argc, char* argv[]) {
     processor.process_pcap(filename);
 
     return 0;
-} 
+}
