@@ -231,6 +231,10 @@ public:
     void set_running(bool value) {
         running = value;
     }
+
+    bool is_running() const {
+        return running;
+    }
 };
 
 StreamServer* g_server = nullptr;
@@ -263,7 +267,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Server running. Press Ctrl+C to stop." << std::endl;
 
     // Wait for shutdown signal
-    while (g_server->running) {
+    while (g_server->is_running()) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
