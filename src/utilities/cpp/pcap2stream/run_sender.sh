@@ -12,7 +12,14 @@ print_usage() {
     echo "Options:"
     echo "  -i, --ip <ip>          Server IP address (default: $DEFAULT_SERVER_IP)"
     echo "  -p, --port <port>      Base port number (default: $DEFAULT_BASE_PORT)"
+    echo "                         Note: This should match the server's base port"
     echo "  -h, --help             Show this help message"
+    echo
+    echo "Examples:"
+    echo "  $0 capture.pcap                     # Use defaults"
+    echo "  $0 capture.pcap -p 6000            # Use port 6000 as base port"
+    echo "  $0 capture.pcap -i 192.168.1.100   # Connect to specific server"
+    echo "  $0 capture.pcap -i 10.0.0.1 -p 7000 # Custom IP and port"
 }
 
 # Parse command line arguments
@@ -32,10 +39,26 @@ shift
 while [[ $# -gt 0 ]]; do
     case $1 in
         -i|--ip)
+            if [ -z "$2" ]; then
+                echo "Error: IP address not provided"
+                exit 1
+            fi
             SERVER_IP="$2"
             shift 2
             ;;
         -p|--port)
+            if [ -z "$2" ]; then
+                echo "Error: Port number not provided"
+                exit 1
+            fi
+            if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+                echo "Error: Port must be a number"
+                exit 1
+            fi
+            if [ "$2" -lt 1024 ] || [ "$2" -gt 65535 ]; then
+                echo "Error: Port must be between 1024 and 65535"
+                exit 1
+            fi
             BASE_PORT="$2"
             shift 2
             ;;
@@ -77,6 +100,7 @@ echo "Starting pcap2stream sender..."
 echo "PCAP File: $PCAP_FILE"
 echo "Server IP: $SERVER_IP"
 echo "Base Port: $BASE_PORT"
+echo "Note: Make sure the server is running and using the same base port"
 echo
 
 # Run the sender with the PCAP directory bound
