@@ -1,0 +1,10 @@
+destination: "127.0.0.1"
+dst_port: 8888
+rcv_port: 8888
+sleep: 0
+threads: 5
+latency: 100         # Processing latency in nsec/byte input
+mem_footprint: 10    # Memory footprint in GB
+output_size: 0.01    # Output size in GB
+verbose: 0
+terminal: 0          # if 1 do not forward result to destination 

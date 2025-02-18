@@ -2,49 +2,44 @@
 
 # Default values
 SIF_NAME="cpu-emu.sif"
+DEF_FILE="cpu-emu.def"
 
 # Help message
 show_help() {
-    echo "Usage: $0 -i DOCKER_IMAGE [-o SIF_NAME]"
-    echo "  -i DOCKER_IMAGE  Docker Hub image (e.g., 'username/image:tag')"
+    echo "Usage: $0 [-o SIF_NAME] [-d DEF_FILE]"
     echo "  -o SIF_NAME     Output SIF file name (default: cpu-emu.sif)"
+    echo "  -d DEF_FILE     Definition file path (default: cpu-emu.def)"
     echo "  -h             Show this help message"
     echo
     echo "Example:"
-    echo "  $0 -i jlabtsai/rtdp-cpu_emu:latest"
+    echo "  $0 -o cpu-emu.sif -d cpu-emu.def"
 }
 
-# Check if no arguments were provided
-if [ $# -eq 0 ]; then
-    show_help
-    exit 1
-fi
-
 # Parse command line options
-while getopts "i:o:h" opt; do
+while getopts "o:d:h" opt; do
     case $opt in
-        i) DOCKER_IMAGE="$OPTARG" ;;
         o) SIF_NAME="$OPTARG" ;;
+        d) DEF_FILE="$OPTARG" ;;
         h) show_help; exit 0 ;;
         ?) show_help; exit 1 ;;
     esac
 done
 
-# Check if Docker image is provided
-if [ -z "$DOCKER_IMAGE" ]; then
-    echo "Error: Docker Hub image must be provided with -i flag"
-    show_help
+# Check if definition file exists
+if [ ! -f "$DEF_FILE" ]; then
+    echo "Error: Definition file '$DEF_FILE' not found"
     exit 1
 fi
 
-echo "Converting Docker image $DOCKER_IMAGE to Apptainer SIF format: $SIF_NAME"
+echo "Building Apptainer image from definition file: $DEF_FILE"
+echo "Output SIF file will be: $SIF_NAME"
 
-# Convert Docker image to Apptainer SIF
-apptainer pull $SIF_NAME docker://$DOCKER_IMAGE
+# Build the SIF file from definition file using fakeroot
+apptainer build --fakeroot "$SIF_NAME" "$DEF_FILE"
 
 if [ $? -eq 0 ]; then
-    echo "Conversion complete. SIF file created: $SIF_NAME"
+    echo "Build complete. SIF file created: $SIF_NAME"
 else
-    echo "Error: Failed to convert Docker image to SIF format"
+    echo "Error: Failed to build SIF file"
     exit 1
 fi 

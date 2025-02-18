@@ -1,151 +1,111 @@
-# CPU Emulator Example Scripts
+# CPU Emulator 3-Node Test Setup
 
-This directory contains example scripts to demonstrate the usage of the CPU emulator Docker container. The scripts provide a complete testing setup with source, CPU emulator, and receiver components.
+This directory contains scripts for testing the CPU emulator in a 3-node configuration using ZeroMQ (ZMQ) for communication. The setup consists of:
+
+1. A sender node that generates and sends test data
+2. A CPU emulator node that processes the data
+3. A receiver node that collects the processed data
 
 ## Prerequisites
 
-- Docker installed on your system
-- The CPU emulator Docker image (built using `../build.sh`)
+- Docker installed and running
+- The `cpu-emu` Docker image built (run `./build.sh` in the parent directory)
+- Network connectivity between the nodes if running on different machines
 
-## Scripts Overview
+## Network Architecture
 
-1. `start_receiver.sh`: Starts a netcat listener using the container to receive processed data
-2. `start_cpu_emu.sh`: Runs the CPU emulator Docker container
-3. `send_data.sh`: Sends test data using the container
+The setup uses ZMQ REQ/REP sockets for communication:
 
-## Example Usage
+```
+[Sender] --REQ--> [CPU Emulator] --REQ--> [Receiver]
+          <-REP--              <--REP--
+```
+
+- Sender sends data using a REQ socket and waits for ACK
+- CPU Emulator receives on a REP socket and forwards using a REQ socket
+- Receiver listens on a REP socket and sends ACK for received data
+
+## Running the Test
 
 ### 1. Start the Receiver
 
 ```bash
-./start_receiver.sh -p 50080 -o output.bin -b 0.0.0.0
+./start_receiver.sh -p 8889 -o received_data.bin
 ```
 
 Options:
-- `-p PORT`: Port to listen on (default: 50080)
-- `-o FILE`: Output file (default: received_data.bin)
-- `-b BIND_IP`: IP address to bind to (default: 0.0.0.0)
+- `-p PORT`: Port to listen on (default: 8888)
+- `-o FILE`: Output file for received data
+- `-b IP`: IP address to bind to (default: *)
 
 ### 2. Start the CPU Emulator
 
 ```bash
-./start_cpu_emu.sh -t 10 -b 100 -m 0.1 -o 0.001 -i "127.0.0.1"
+./start_cpu_emu.sh -r 8888 -p 8889 -i receiver_host
 ```
 
 Options:
-- `-t THREADS`: Number of threads (default: 10)
-- `-b LATENCY`: Seconds thread latency per GB input (default: 100)
-- `-m MEM`: Thread memory footprint in GB (default: 0.1)
-- `-o OUTPUT`: Output size in GB (default: 0.001)
-- `-r RECV_PORT`: Receive port (default: 50888)
-- `-p DEST_PORT`: Destination port (default: 50080)
-- `-i DEST_IP`: Destination IP (default: 127.0.0.1)
+- `-t THREADS`: Number of threads (default: 5)
+- `-b LATENCY`: Processing latency in seconds per GB (default: 100)
+- `-m MEM`: Memory footprint in GB per thread (default: 10)
+- `-o OUTPUT`: Output size in GB (default: 0.01)
+- `-r PORT`: Port to receive on (default: 8888)
+- `-p PORT`: Port to forward to (default: 8888)
+- `-i HOST`: Destination host (default: 127.0.0.1)
 - `-s`: Use sleep mode instead of CPU burn
 - `-v`: Enable verbose mode
-
-The CPU emulator will create an `output` directory in the current working directory to store its output files.
+- `-z`: Act as terminal node (don't forward data)
 
 ### 3. Send Test Data
 
 ```bash
-./send_data.sh -s 10M
-```
-
-or
-
-```bash
-./send_data.sh -f input.bin
+./send_data.sh -p 8888 -h emulator_host -s 100M
 ```
 
 Options:
 - `-h HOST`: Target host (default: localhost)
-- `-p PORT`: Target port (default: 50888)
+- `-p PORT`: Target port (default: 8888)
 - `-f FILE`: Input file to send
-- `-s SIZE`: Size of random data to generate if no input file (default: 10M)
+- `-s SIZE`: Size of random data to generate (default: 10M)
 
-The script will create an `input` directory in the current working directory for temporary files when generating random data.
+## Example: Local Testing
 
-## Complete Test Example
-
-1. In terminal 1 (receiver):
+1. Start the receiver:
 ```bash
-./start_receiver.sh -p 50080 -b 0.0.0.0
+./start_receiver.sh -p 8889
 ```
 
-2. In terminal 2 (CPU emulator):
+2. Start the CPU emulator:
 ```bash
-./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -v -i 172.17.0.1 -p 50080 -r 50888
+./start_cpu_emu.sh -r 8888 -p 8889 -i localhost -v
 ```
 
-3. In terminal 3 (source):
+3. Send test data:
 ```bash
-./send_data.sh -s 100M -h 127.0.0.1 -p 50888
+./send_data.sh -p 8888 -s 50M
 ```
 
-This will:
-1. Start a receiver listening on port 50080
-2. Start the CPU emulator with 4 threads, 50 seconds latency per GB, and 0.2GB memory footprint
-3. Send 100MB of random test data through the system
+## Example: Distributed Testing
 
-## Note on Port Numbers
-The scripts use high port numbers by default:
-- Receiver port: 50080
-- CPU emulator receive port: 50888
-
-These high port numbers (above 49152) are in the dynamic/private port range and are less likely to conflict with other services.
-
-## Container Notes
-- The same container image is used for CPU emulator, receiver, and sender functionality
-- The container includes all necessary dependencies (netcat, etc.)
-- Ports are explicitly exposed using Docker's port mapping (-p flag)
-- For production use, consider setting resource limits using Docker's runtime flags
-- The container creates an output directory at `/output` which is mapped to `./output` in the current working directory
-- Input files are mounted into the container at `/data` when sending data
-
-### Multi-Machine Test
-
-Assume we have three machines:
-- Machine A (IP: 192.168.1.10) - Will run the sender
-- Machine B (IP: 192.168.1.20) - Will run the CPU emulator
-- Machine C (IP: 192.168.1.30) - Will run the receiver
-
-1. On Machine C (receiver):
+1. On the receiver machine:
 ```bash
-./start_receiver.sh -p 50080 -b 192.168.1.30
-```
-This exposes port 50080 on Machine C and binds it to 192.168.1.30.
-
-2. On Machine B (CPU emulator):
-```bash
-./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -i "192.168.1.30" -p 50080 -r 50888 -v
-```
-This exposes port 50888 on Machine B for receiving data.
-
-3. On Machine A (sender):
-```bash
-./send_data.sh -h 192.168.1.20 -p 50888 -s 100M
+./start_receiver.sh -p 8889 -b receiver_ip
 ```
 
-This setup:
-1. Starts a receiver on Machine C:
-   - Exposes port 50080 to accept connections
-   - Binds to its IP (192.168.1.30)
-   - Only accepts connections to its specific IP
-2. Starts the CPU emulator on Machine B:
-   - Exposes port 50888 to receive data from the sender
-   - Forwards processed data to Machine C (192.168.1.30:50080)
-3. Sends data from Machine A to Machine B's CPU emulator
+2. On the CPU emulator machine:
+```bash
+./start_cpu_emu.sh -r 8888 -p 8889 -i receiver_ip -v
+```
 
-## Port Exposure
-The scripts expose the following ports:
-- Receiver: Exposes the receiving port (default: 50080)
-- CPU Emulator: Exposes the input port (default: 50888)
-- Sender: No ports exposed (only makes outbound connections)
+3. On the sender machine:
+```bash
+./send_data.sh -h emulator_ip -p 8888 -s 100M
+```
 
-## Network Requirements
-- Ensure the firewall on each machine allows the required ports:
-  - Machine B: Inbound on port 50888 (for receiving data from sender)
-  - Machine C: Inbound on port 50080 (for receiving processed data)
-- All machines must have network connectivity to each other
-- The exposed ports must not be in use by other applications
-- For security, consider restricting the bind IP addresses to specific network interfaces
+## Notes
+
+- All nodes use host networking (`--network host`) for better performance
+- The CPU emulator can be configured via YAML file (automatically generated)
+- Use verbose mode (-v) for debugging and monitoring
+- Memory footprint and thread count should be adjusted based on available resources
+- For testing large data transfers, ensure sufficient disk space for input/output files

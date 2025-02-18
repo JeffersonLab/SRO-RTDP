@@ -1,71 +1,93 @@
 # CPU Emulator Apptainer Setup
 
-This directory contains scripts to convert a CPU emulator Docker image from Docker Hub to Apptainer SIF format and run it using Apptainer.
+This directory contains scripts to build a CPU emulator Apptainer container from a definition file.
 
 ## Prerequisites
 
 - Apptainer (formerly Singularity) installed on your system
-- Internet access to pull from Docker Hub
-- Docker Hub image location (e.g., username/image:tag)
+- Fakeroot support enabled in Apptainer configuration
+- Required source files in parent directory:
+  - cpu_emu.cc
+  - cpu_emu.yaml
+  - buildp
 
-## Converting Docker Image to SIF
+## Building the Container
 
-To convert the Docker image to Apptainer SIF format, run:
+To build the Apptainer container from the definition file, run:
 
 ```bash
-./build.sh -i <docker-hub-image>
+./build.sh [-o SIF_NAME] [-d DEF_FILE]
 ```
 
-Required:
-- `-i DOCKER_IMAGE`: Docker Hub image location (e.g., 'username/image:tag')
-
-Optional:
+Optional arguments:
 - `-o SIF_NAME`: Output SIF file name (default: cpu-emu.sif)
+- `-d DEF_FILE`: Definition file path (default: cpu-emu.def)
 
 Example:
 ```bash
-./build.sh -i jlabtsai/rtdp-cpu_emu:latest
+./build.sh -o cpu-emu.sif -d cpu-emu.def
 ```
 
-This will:
-1. Pull the specified image from Docker Hub
-2. Convert it to a SIF file (default name: cpu-emu.sif)
+Note: The build process uses Apptainer's fakeroot feature, which allows building containers without root privileges. Make sure your Apptainer installation has fakeroot properly configured.
 
-## Example Scripts
+## Container Functionality
 
-The `example` directory contains scripts demonstrating how to use the CPU emulator with Apptainer:
+The container provides three main modes of operation:
 
-1. `start_receiver.sh`: Starts a netcat listener to receive processed data
-2. `start_cpu_emu.sh`: Runs the CPU emulator using Apptainer
-3. `send_data.sh`: Sends test data to the CPU emulator
+1. CPU Emulator Mode (Default):
+   ```bash
+   ./cpu-emu.sif [options]
+   ```
+   Options include:
+   - Standard CPU emulator parameters
+   - `--output-dir`: Specify output directory (default: /output)
 
-### Basic Usage
+2. Data Sender Mode:
+   ```bash
+   ./cpu-emu.sif send <HOST> <PORT>
+   ```
+   Sends data to a specified host and port using ZMQ REQ socket.
 
-1. Start the receiver:
+3. Data Receiver Mode:
+   ```bash
+   ./cpu-emu.sif receive <PORT> [BIND_IP]
+   ```
+   Receives data on specified port using ZMQ REP socket.
+
+## Example Usage
+
+1. Start a receiver:
 ```bash
-cd example
-./start_receiver.sh -p 50080
+./cpu-emu.sif receive 50080
 ```
 
-2. Start the CPU emulator:
+2. Run the CPU emulator:
 ```bash
-./start_cpu_emu.sh -t 4 -b 50 -m 0.2 -o 0.001 -v
+./cpu-emu.sif --output-dir /path/to/output [other options]
 ```
 
-3. Send test data:
+3. Send data:
 ```bash
-./send_data.sh -s 100M
+./cpu-emu.sif send localhost 50080 < input_data
 ```
 
-See the README in the example directory for more detailed usage instructions.
+## Container Details
+
+The container includes:
+- Ubuntu 22.04 base image
+- G++ compiler and build tools
+- ZMQ libraries (libzmq3-dev)
+- Python 3 with pyzmq
+- Built-in sender and receiver scripts
+- Pre-built CPU emulator executable
 
 ## Notes
 
 - The SIF file contains all necessary dependencies
 - Network ports are accessed directly from the host (no network isolation)
-- No root privileges required to run the container
+- No root privileges required to run the container (only for building)
 - The SIF file is portable and can be moved to other systems with Apptainer installed
-- Make sure you have access to the Docker Hub image you're trying to pull
+- Output directory is mounted automatically for data persistence
 
 ## HPC Environment Notes
 - Designed to work in unprivileged HPC environments
