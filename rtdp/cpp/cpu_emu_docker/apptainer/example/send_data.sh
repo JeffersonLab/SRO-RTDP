@@ -53,8 +53,7 @@ if [ ! -f "$INPUT_FILE" ]; then
 fi
 
 echo "Sending $INPUT_FILE to $HOST:$PORT"
-apptainer run --bind "$(dirname "$INPUT_FILE"):/data" \
-    "$SIF_PATH" send "/data/$(basename "$INPUT_FILE")" "$HOST" "$PORT"
+cat "$INPUT_FILE" | apptainer run "$SIF_PATH" send "$HOST" "$PORT"
 
 # Clean up temporary files if we generated them
 if [[ "$INPUT_FILE" == "$TEMP_DIR"* ]]; then

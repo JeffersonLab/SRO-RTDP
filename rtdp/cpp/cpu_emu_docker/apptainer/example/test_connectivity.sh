@@ -39,28 +39,10 @@ fi
 echo "Testing connectivity to $HOST:$PORT from inside container..."
 echo "Using test image: $TEST_DEF"
 
-# Install required packages first
-echo "Installing required packages..."
-if ! apptainer exec --writable-tmpfs "$TEST_DEF" bash -c "
-    export DEBIAN_FRONTEND=noninteractive && \
-    echo 'Creating temporary directories...' && \
-    mkdir -p /tmp/apt/partial /tmp/apt/lists/partial && \
-    echo 'Running apt-get update...' && \
-    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists update && \
-    echo 'Installing packages...' && \
-    apt-get -o Dir::Cache=/tmp/apt -o Dir::State::Lists=/tmp/apt/lists install -y iputils-ping netcat-openbsd
-    "; then
-    echo "Warning: Failed to install required packages. Check error messages above."
-    exit 1
-fi
-
-# Use standard paths for ping and nc
-PING_PATH="/usr/bin/ping"
-NC_PATH="/usr/bin/nc.openbsd"
-
+# Test ping connectivity if not localhost
 if [ "$HOST" != "localhost" ] && [ "$HOST" != "127.0.0.1" ]; then
     echo "Testing ping to $HOST..."
-    if ! apptainer exec --writable-tmpfs "$TEST_DEF" "$PING_PATH" -c 1 -W 2 "$HOST" 2>&1; then
+    if ! apptainer exec "$TEST_DEF" ping -c 1 -W 2 "$HOST" >/dev/null 2>&1; then
         echo "Warning: Unable to ping $HOST"
         echo "Note: This might be normal if ICMP is blocked"
     else
@@ -68,9 +50,9 @@ if [ "$HOST" != "localhost" ] && [ "$HOST" != "127.0.0.1" ]; then
     fi
 fi
 
-# Test TCP connectivity using netcat
+# Test TCP connectivity using ZMQ
 echo "Testing TCP connection to $HOST:$PORT..."
-if apptainer exec --writable-tmpfs "$TEST_DEF" "$NC_PATH" -zv "$HOST" "$PORT" 2>&1; then
+if echo "TEST" | apptainer run "$SIF_PATH" send "$HOST" "$PORT" >/dev/null 2>&1; then
     echo "Success: TCP connection to $HOST:$PORT is possible"
     exit 0
 else
