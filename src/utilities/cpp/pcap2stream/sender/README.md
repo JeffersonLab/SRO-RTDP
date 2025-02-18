@@ -10,24 +10,28 @@ This utility processes pcap files by:
 - Extracting network payloads from the pcap file
 - Streaming the payloads to the corresponding server endpoints
 
-## Building
+## Building and Running
 
-### Prerequisites
+There are three ways to build and run this utility:
+1. Native binary
+2. Docker container
+3. Apptainer/Singularity container
 
+### 1. Native Binary
+
+#### Prerequisites
 - CMake (version 3.10 or higher)
 - C++ compiler with C++20 support
 - libpcap development library
 - pthread library
 
-### Installing Dependencies
-
+#### Installing Dependencies
 On Ubuntu/Debian:
 ```bash
 sudo apt-get install libpcap-dev
 ```
 
-### Build Steps
-
+#### Building
 ```bash
 # Create build directory
 mkdir build
@@ -40,117 +44,107 @@ cmake ..
 make
 ```
 
-## Usage
-
+#### Running
 ```bash
+# Basic usage
 ./pcap2stream <pcap_file> <server_ip> <base_port>
-```
 
-### Parameters
-
-- `pcap_file`: Path to the input pcap file to process
-- `server_ip`: IP address of the server to connect to
-- `base_port`: Base port number. For each unique source IP, the program will use (base_port + N) where N is the Nth unique source IP encountered
-
-### Example
-
-```bash
+# Example
 ./pcap2stream capture.pcap 127.0.0.1 5000
 ```
 
-This will:
-1. Read `capture.pcap`
-2. For each unique source IP found in the pcap:
-   - Create a TCP connection to 127.0.0.1 on port 5000+N
-   - Stream the payloads associated with that source IP to the connection
+### 2. Docker Container
 
-## Container Support
-
-### Using Docker
-
-1. Build the Docker image:
+#### Building
 ```bash
+# Build the image
 docker build -t pcap2stream -f .container/Dockerfile .
 ```
 
-2. Run with Docker:
+#### Running
 ```bash
-# Mount a directory containing your pcap files
-docker run -v /path/to/pcap/dir:/app/pcap pcap2stream /app/pcap/capture.pcap stream-server 5000
-```
+# Basic usage
+docker run -v /path/to/pcap/dir:/app/pcap pcap2stream /app/pcap/capture.pcap <server_ip> <base_port>
 
-3. Using docker-compose:
-```bash
-# First, ensure your pcap files are in the ./pcap directory
+# Example with docker-compose
 docker-compose run pcap-sender /app/pcap/capture.pcap stream-server 5000
+
+# Example with specific paths and ports
+docker run -v $(pwd)/pcap:/app/pcap pcap2stream /app/pcap/capture.pcap 192.168.1.100 6000
 ```
 
-### Using Apptainer/Singularity
+### 3. Apptainer/Singularity Container
 
-1. Build the Apptainer image:
+#### Building
 ```bash
-# Using the build script from parent directory
+# Using the build script
 ../build_apptainer.sh sender
 
 # Or build directly
 apptainer build pcap2stream.sif .apptainer/pcap2stream.def
 ```
 
-2. Run with Apptainer:
+#### Running
+
+##### Using the Helper Script
 ```bash
-# For files in your home directory, bind it with write permissions
-apptainer run --bind $HOME pcap2stream.sif /path/to/capture.pcap 127.0.0.1 5000
+# The script provides an easy way to run with Apptainer
+../run_sender_apptainer.sh <pcap_file> [options]
 
-# For files in other locations, bind the specific directory
-apptainer run --bind /path/to/pcap/dir pcap2stream.sif /path/to/pcap/dir/capture.pcap 127.0.0.1 5000
-
-# If you need write access to the bound directory
-apptainer run --bind /path/to/pcap/dir:/path/to/pcap/dir pcap2stream.sif /path/to/pcap/dir/capture.pcap 127.0.0.1 5000
+# Examples
+../run_sender_apptainer.sh capture.pcap                     # Use defaults
+../run_sender_apptainer.sh capture.pcap -p 6000            # Custom port
+../run_sender_apptainer.sh capture.pcap -i 192.168.1.100   # Custom IP
 ```
 
-Note: When using Apptainer, you need to:
-- Use absolute paths for your pcap files
-- Bind any directories containing your pcap files
-- The bound directories will be available at the same path inside the container
-
-Example with a pcap file in your home directory:
+##### Direct Apptainer Usage
 ```bash
-# If your pcap is at ~/data/capture.pcap
-apptainer run --bind $HOME pcap2stream.sif $HOME/data/capture.pcap 127.0.0.1 5000
+# Basic usage
+apptainer run pcap2stream.sif <pcap_file> <server_ip> <base_port>
+
+# Example with home directory binding
+apptainer run --bind $HOME pcap2stream.sif ~/data/capture.pcap 127.0.0.1 5000
+
+# Example with specific directory binding
+apptainer run --bind /path/to/pcap/dir pcap2stream.sif /path/to/pcap/dir/capture.pcap 192.168.1.100 6000
 ```
 
-## Features
+## Common Usage Patterns
 
-- Thread-safe packet queuing for each source IP
-- Asynchronous transmission of payloads
-- Automatic connection management
-- Preserves packet timing information
-- Graceful cleanup on exit
-
-## Testing with Stream Server
-
-1. Start the stream server first:
+### 1. Local Testing
 ```bash
 # Native
-./stream_server 0.0.0.0 5000 3
+./build/pcap2stream capture.pcap 127.0.0.1 5000
 
 # Docker
-docker-compose up stream-server
+docker run -v $(pwd)/pcap:/app/pcap pcap2stream /app/pcap/capture.pcap 127.0.0.1 5000
 
 # Apptainer
-apptainer run ../server/stream_server.sif 0.0.0.0 5000 3
+./run_sender_apptainer.sh capture.pcap
 ```
 
-2. Then run pcap2stream:
+### 2. Remote Server
 ```bash
 # Native
-./pcap2stream capture.pcap 127.0.0.1 5000
+./build/pcap2stream capture.pcap 192.168.1.100 5000
 
 # Docker
-docker-compose run pcap-sender /app/pcap/capture.pcap stream-server 5000
+docker run -v $(pwd)/pcap:/app/pcap pcap2stream /app/pcap/capture.pcap 192.168.1.100 5000
 
 # Apptainer
-apptainer run pcap2stream.sif capture.pcap 127.0.0.1 5000
+./run_sender_apptainer.sh capture.pcap -i 192.168.1.100
+```
+
+### 3. Custom Port
+```bash
+# Native
+./build/pcap2stream capture.pcap 127.0.0.1 6000
+
+# Docker
+docker run -v $(pwd)/pcap:/app/pcap pcap2stream /app/pcap/capture.pcap 127.0.0.1 6000
+
+# Apptainer
+./run_sender_apptainer.sh capture.pcap -p 6000
 ```
 
 ## Notes
@@ -159,3 +153,5 @@ apptainer run pcap2stream.sif capture.pcap 127.0.0.1 5000
 - Each unique source IP will get its own dedicated TCP connection
 - Make sure the server has enough ports allocated to handle all unique source IPs in your pcap file
 - The program will automatically close connections when finished or if errors occur
+- When using containers, ensure proper volume mounting for accessing PCAP files
+- Base port number should match the server's configuration
