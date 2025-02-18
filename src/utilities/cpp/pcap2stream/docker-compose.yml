@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  stream-server:
+    build:
+      context: ./server
+      dockerfile: .container/Dockerfile
+    ports:
+      - "5000-5010:5000-5010"
+    volumes:
+      - ./output:/app/output
+    command: ["0.0.0.0", "5000", "3"]
+
+  pcap-sender:
+    build:
+      context: ./sender
+      dockerfile: .container/Dockerfile
+    volumes:
+      - ./pcap:/app/pcap
+    depends_on:
+      - stream-server
+    # Command should be provided when running:
+    # e.g., docker-compose run pcap-sender /app/pcap/capture.pcap stream-server 5000

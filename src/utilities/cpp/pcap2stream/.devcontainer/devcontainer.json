@@ -1,0 +1,26 @@
+{
+    "name": "C++ PCAP Development",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "twxs.cmake",
+                "ms-vscode.cpptools-extension-pack"
+            ],
+            "settings": {
+                "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+                "editor.formatOnSave": true,
+                "files.trimTrailingWhitespace": true
+            }
+        }
+    },
+    "forwardPorts": [],
+    "postCreateCommand": "cmake -B build && cmake --build build",
+    "remoteUser": "vscode",
+    "features": {}
+} 
