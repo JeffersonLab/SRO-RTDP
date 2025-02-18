@@ -204,8 +204,8 @@
                 -r ${EMULATOR_PORT} \
                 -p ${RECEIVER_PORT} \
                 -i ${RECV_IP} \
-                -v \
-                --output-dir /output &
+                -v 1 \
+                --output-dir /output 2>${LOG_DIR}/emulator/apptainer.log &
             
             EMU_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
