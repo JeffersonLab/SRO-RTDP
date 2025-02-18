@@ -20,9 +20,9 @@ From: ubuntu:22.04
     cd /app
 
 %files
-    # Copy source files
-    ../pcap2stream.cc /app/
-    ../CMakeLists.txt /app/
+    # Copy source files from the sender directory
+    pcap2stream.cc /app/
+    CMakeLists.txt /app/
 
 %post
     # Build the application

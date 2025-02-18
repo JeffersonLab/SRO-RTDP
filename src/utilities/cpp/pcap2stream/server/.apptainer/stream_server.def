@@ -19,9 +19,9 @@ From: ubuntu:22.04
     cd /app
 
 %files
-    # Copy source files
-    ../stream_server.cc /app/
-    ../CMakeLists.txt /app/
+    # Copy source files from the server directory
+    stream_server.cc /app/
+    CMakeLists.txt /app/
 
 %post
     # Build the application

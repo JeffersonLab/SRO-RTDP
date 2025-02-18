@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Get the script's directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 # Function to print usage
 print_usage() {
     echo "Usage: $0 [sender|server|all]"
@@ -11,17 +14,27 @@ print_usage() {
 # Function to build sender image
 build_sender() {
     echo "Building pcap2stream sender image..."
-    cd sender
+    cd "${SCRIPT_DIR}/sender"
     apptainer build pcap2stream.sif .apptainer/pcap2stream.def
-    cd ..
+    if [ $? -eq 0 ]; then
+        echo "Successfully built pcap2stream sender image"
+    else
+        echo "Failed to build pcap2stream sender image"
+        exit 1
+    fi
 }
 
 # Function to build server image
 build_server() {
     echo "Building stream server image..."
-    cd server
+    cd "${SCRIPT_DIR}/server"
     apptainer build stream_server.sif .apptainer/stream_server.def
-    cd ..
+    if [ $? -eq 0 ]; then
+        echo "Successfully built stream server image"
+    else
+        echo "Failed to build stream server image"
+        exit 1
+    fi
 }
 
 # Check command line arguments
@@ -39,6 +52,7 @@ case "$1" in
         ;;
     "all")
         build_sender
+        cd "${SCRIPT_DIR}"  # Return to original directory
         build_server
         ;;
     *)
