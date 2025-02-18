@@ -13,7 +13,7 @@
             emulator:ready => sender
             
             # Completion chain (separate from start chain)
-            sender:succeeded => !receiver
+            sender:sent => !receiver
             receiver:completed
         """
 
@@ -272,7 +272,7 @@
             
             if [ $SEND_STATUS -eq 0 ]; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data sent successfully"
-                cylc message -- "succeeded"
+                cylc message -- "Data transfer sent"
                 exit 0
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Failed to send data" >&2
@@ -286,4 +286,4 @@
             --mem = 4G
         
         [[[outputs]]]
-            succeeded = "succeeded" 
+            sent = "Data transfer sent" 
