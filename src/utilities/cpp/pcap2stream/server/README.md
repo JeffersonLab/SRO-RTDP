@@ -87,17 +87,26 @@ apptainer build stream_server.sif .apptainer/stream_server.def
 2. Run with Apptainer:
 ```bash
 # Basic run (creates output in current directory)
+mkdir -p output  # Create output directory first
 apptainer run stream_server.sif 0.0.0.0 5000 3
+# Output files will be in ./output/
 
 # Run with output to your home directory
-apptainer run --bind $HOME stream_server.sif 0.0.0.0 5000 3
+mkdir -p ~/pcap_output  # Create output directory first
+apptainer run --bind $HOME/pcap_output:/app/output stream_server.sif 0.0.0.0 5000 3
+# Output files will be in ~/pcap_output/
 
-# Run with output to a specific directory (recommended)
+# Run with output to a specific directory
+mkdir -p /path/to/output  # Create output directory first
 apptainer run --bind /path/to/output:/app/output stream_server.sif 0.0.0.0 5000 3
+# Output files will be in /path/to/output/
 ```
 
 3. Run as an instance (background service):
 ```bash
+# Create output directory first
+mkdir -p /path/to/output
+
 # Start instance with output to a specific directory
 apptainer instance start --bind /path/to/output:/app/output stream_server.sif stream_server
 
@@ -106,19 +115,52 @@ apptainer instance stop stream_server
 ```
 
 Note: When using Apptainer, you need to:
-- Bind directories where you want to save output files
-- Ensure the bound directories have write permissions
-- Use absolute paths for bound directories
+1. Create the output directory before running the container
+2. Choose one of these output options:
+   - Use current directory: Files will be in `./output/`
+   - Use home directory: Files will be in `~/pcap_output/` (or your chosen path)
+   - Use custom directory: Files will be in your specified path
+3. Ensure the output directory has write permissions
+4. Use absolute paths for bound directories
 
-Example directory setup:
+Example directory setups:
+
+1. Using current directory:
 ```bash
-# Create an output directory in your home
+# Setup
+mkdir -p output
+chmod 755 output
+
+# Run
+apptainer run stream_server.sif 0.0.0.0 5000 3
+```
+
+2. Using home directory:
+```bash
+# Setup
 mkdir -p ~/pcap_output
+chmod 755 ~/pcap_output
 
-# Run server with home directory binding
-apptainer run --bind $HOME stream_server.sif 0.0.0.0 5000 3
+# Run
+apptainer run --bind ~/pcap_output:/app/output stream_server.sif 0.0.0.0 5000 3
+```
 
-# The output files will appear in ~/pcap_output
+3. Using a specific directory:
+```bash
+# Setup
+sudo mkdir -p /data/pcap_output
+sudo chmod 777 /data/pcap_output
+
+# Run
+apptainer run --bind /data/pcap_output:/app/output stream_server.sif 0.0.0.0 5000 3
+```
+
+Output File Structure:
+```
+output/
+├── stream_5000_20240315_123456.bin  # Data from port 5000
+├── stream_5001_20240315_123456.bin  # Data from port 5001
+└── stream_5002_20240315_123456.bin  # Data from port 5002
 ```
 
 ## Output Files
