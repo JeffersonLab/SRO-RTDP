@@ -196,11 +196,16 @@
             # Start CPU emulator
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
             apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} --output-dir /output \
-                -t ${EMU_THREADS} -b ${EMU_LATENCY} \
-                -m ${EMU_MEM_FOOTPRINT} -o ${EMU_OUTPUT_SIZE} \
-                -r ${EMULATOR_PORT} -p ${RECEIVER_PORT} \
-                -i ${RECV_IP} -v 1 &
+                ${CPU_EMU_SIF} \
+                -t ${EMU_THREADS} \
+                -b ${EMU_LATENCY} \
+                -m ${EMU_MEM_FOOTPRINT} \
+                -o ${EMU_OUTPUT_SIZE} \
+                -r ${EMULATOR_PORT} \
+                -p ${RECEIVER_PORT} \
+                -i ${RECV_IP} \
+                -v \
+                --output-dir /output &
             
             EMU_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
@@ -256,37 +261,29 @@
             EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
             
-            # Create input directory
-            mkdir -p ${INPUT_DIR}
-            
-            # Generate test data
-            INPUT_FILE="${INPUT_DIR}/random_data.bin"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data: ${TEST_DATA_SIZE}"
-            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
-            
-            # Send data
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${EMU_IP}:${EMULATOR_PORT}"
-            apptainer run --bind ${INPUT_DIR}:/data \
-                ${CPU_EMU_SIF} send \
-                "/data/$(basename ${INPUT_FILE})" \
-                ${EMU_IP} \
-                ${EMULATOR_PORT}
+            # Create test data
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data of size ${TEST_DATA_SIZE}"
+            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 2>/dev/null | \
+                apptainer run ${CPU_EMU_SIF} send \
+                ${EMU_IP} ${EMULATOR_PORT} \
+                2>${LOG_DIR}/sender/apptainer.log
             
             SEND_STATUS=$?
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
-            
-            # Clean up
-            rm -f ${INPUT_FILE}
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
             
             if [ $SEND_STATUS -eq 0 ]; then
-                cylc message -- "sender:succeeded"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data sent successfully"
+                cylc message -- "succeeded"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Failed to send data" >&2
+                cat ${LOG_DIR}/sender/apptainer.log >&2
+                exit 1
             fi
-            
-            # Exit with send status
-            exit ${SEND_STATUS}
         """
         [[[directives]]]
             --job-name = cpu-emu-send
-            --cpus-per-task = 4
-            --mem = 8G 
+            --cpus-per-task = 2
+            --mem = 4G
+        
+        [[[outputs]]]
+            succeeded = "succeeded" 
