@@ -53,7 +53,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Ensure the output directory exists
+# Convert output directory to absolute path
+OUTPUT_DIR=$(realpath "$OUTPUT_DIR")
+
+# Create output directory with proper permissions
 mkdir -p "$OUTPUT_DIR"
 if [ $? -ne 0 ]; then
     echo "Error: Failed to create output directory: $OUTPUT_DIR"
@@ -65,6 +68,9 @@ if [ ! -w "$OUTPUT_DIR" ]; then
     echo "Error: Output directory is not writable: $OUTPUT_DIR"
     exit 1
 fi
+
+# Set proper permissions for the output directory
+chmod 755 "$OUTPUT_DIR"
 
 # Check if the server image exists
 if [ ! -f "server/stream_server.sif" ]; then
@@ -84,5 +90,18 @@ echo "Output Directory: $OUTPUT_DIR"
 echo "Ports that will be used: $BASE_PORT to $((BASE_PORT + NUM_PORTS - 1))"
 echo
 
-# Run the server
-apptainer run --bind "$OUTPUT_DIR":/app/output server/stream_server.sif "$IP_ADDR" "$BASE_PORT" "$NUM_PORTS"
+# Create a subdirectory for this run with timestamp
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+RUN_DIR="$OUTPUT_DIR/run_$TIMESTAMP"
+mkdir -p "$RUN_DIR"
+
+echo "Output files will be saved in: $RUN_DIR"
+echo "You can monitor the output files with:"
+echo "  ls -l $RUN_DIR"
+echo
+
+# Run the server with proper binding
+apptainer run \
+    --bind "$RUN_DIR":/app/output \
+    --pwd /app \
+    server/stream_server.sif "$IP_ADDR" "$BASE_PORT" "$NUM_PORTS"
