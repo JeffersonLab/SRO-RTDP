@@ -55,6 +55,8 @@ Any of the <yaml_file> settigs may be overidden at the commamnd line via the fol
 
 ## Source data system:
 
-        <some ZeroMQ based sender> 
+        <some ZeroMQ based sender> e.g.,
+
+	./zmq-event-clnt
 
 
