@@ -13,7 +13,7 @@ int main ()
     zmq::context_t context (1);
     zmq::socket_t socket (context, zmq::socket_type::req);
 
-    std::cout << "Connecting to hello world server..." << std::endl;
+    std::cout << "Connecting to server..." << std::endl;
     socket.connect ("tcp://ejfat-fs-daq:5555");
 
     //  Do 10 requests, waiting each time for a response
