@@ -2,7 +2,7 @@
 
 # Default values
 HOST="localhost"
-PORT=50888
+PORT=8888
 INPUT_FILE=""
 SIZE="10M"
 
@@ -10,7 +10,7 @@ SIZE="10M"
 show_help() {
     echo "Usage: $0 [-h HOST] [-p PORT] [-f INPUT_FILE] [-s SIZE]"
     echo "  -h HOST        Target host (default: localhost)"
-    echo "  -p PORT        Target port (default: 50888)"
+    echo "  -p PORT        Target port (default: 8888)"
     echo "  -f FILE        Input file to send (optional)"
     echo "  -s SIZE        Size of random data to generate if no input file (default: 10M)"
     echo "  -? | --help    Show this help message"
@@ -42,10 +42,9 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 1
 fi
 
-echo "Sending $INPUT_FILE to $HOST:$PORT"
-docker run -i --rm --network host \
-    -v "$(dirname "$INPUT_FILE"):/data" \
-    cpu-emu send "/data/$(basename "$INPUT_FILE")" "$HOST" "$PORT"
+echo "Sending $INPUT_FILE to $HOST:$PORT using ZMQ REQ socket"
+cat "$INPUT_FILE" | docker run -i --rm --network host \
+    cpu-emu send "$HOST" "$PORT"
 
 # Clean up temporary files if we generated them
 if [[ "$INPUT_FILE" == "$TEMP_DIR"* ]]; then
