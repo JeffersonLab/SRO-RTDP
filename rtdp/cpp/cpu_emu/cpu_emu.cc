@@ -46,8 +46,8 @@ void   Usage()
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
 void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
-    const size_t ts(scs_GB*nmrd*1e-9);
-    const size_t tsns(scs_GB*nmrd);
+    const size_t ts(scs_GB*nmrd*1e-9); //reqd timespan in seconds
+    const size_t tsns(scs_GB*nmrd);    //reqd timespan in nanoseconds
     if(vrbs) cout << "Threading for " << ts << " secs ..." << endl;
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) cout << "Allocating " << memSz << " bytes ..." << endl;
@@ -300,6 +300,7 @@ int main (int argc, char *argv[])
             //  Send reply back to client
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
+            if(vrbs) cout << "Sending ACK ..." << endl;
             rcv_sckt.send (reply, send_flags::none);
             // or
             //string reply = "ACK";
