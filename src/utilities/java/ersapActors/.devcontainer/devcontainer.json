@@ -37,6 +37,7 @@
     "workspaceMount": "source=/home/jeng-yuantsai/RTDP/ersap-actors,target=/workspace,type=bind,consistency=cached",
     "mounts": [
         "source=/home/jeng-yuantsai/RTDP/ersap-actors/src/utilities/cpp/pcap2stream,target=/workspace/src/utilities/cpp/pcap2stream,type=bind,consistency=cached",
-        "source=${localEnv:HOME}/.gitconfig,target=/home/developer/.gitconfig,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.gitconfig,target=/home/developer/.gitconfig,type=bind,consistency=cached",
+        "source=/scratch/jeng-yuantsai,target=/scratch/jeng-yuantsai,type=bind,consistency=cached"
     ]
-} 
+}
