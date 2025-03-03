@@ -15,7 +15,8 @@
                 "vscjava.vscode-java-pack",
                 "vscjava.vscode-gradle",
                 "redhat.java",
-                "ms-azuretools.vscode-docker"
+                "ms-azuretools.vscode-docker",
+                "eamodio.gitlens"
             ],
             "settings": {
                 "java.configuration.updateBuildConfiguration": "automatic",
@@ -35,6 +36,7 @@
     "workspaceFolder": "/workspace",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
     "mounts": [
-        "source=/home/jeng-yuantsai/RTDP/ersap-actors/src/utilities/cpp/pcap2stream,target=/workspace/pcap2stream,type=bind,consistency=cached"
+        "source=/home/jeng-yuantsai/RTDP/ersap-actors/src/utilities/cpp/pcap2stream,target=/workspace/pcap2stream,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.gitconfig,target=/home/developer/.gitconfig,type=bind,consistency=cached"
     ]
 } 
