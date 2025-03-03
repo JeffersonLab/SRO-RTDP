@@ -6,6 +6,20 @@ This document explains how to use Git with the ERSAP Actors project, especially 
 
 The ERSAP Actors project is part of a larger Git repository. The main repository is located at the root of the project, and the `ersapActors` directory is a subdirectory of this repository.
 
+## Important: Avoiding Nested Git Repositories
+
+It's crucial to ensure that there is no `.git` directory inside the `ersapActors` folder. If a `.git` directory exists there, it will cause Git to treat the `ersapActors` directory as a separate repository, and changes in that directory won't be tracked by the main repository.
+
+If you encounter issues where Git shows that all files outside of `ersapActors` are being deleted, check for a nested `.git` directory and remove it:
+
+```bash
+# Check if there's a nested .git directory
+ls -la /path/to/ersap-actors/src/utilities/java/ersapActors/.git
+
+# If it exists, remove it
+rm -rf /path/to/ersap-actors/src/utilities/java/ersapActors/.git
+```
+
 ## Using Git in the Devcontainer
 
 When you open the project in the devcontainer, the main Git repository is mounted into the container. This allows you to use Git commands within the container to interact with the repository.
@@ -67,6 +81,8 @@ If you encounter issues with Git in the devcontainer:
 3. **Git user not configured**: Run the `git-setup.sh` script to configure your Git user name and email.
 
 4. **Changes not being tracked**: Make sure you're working in the correct directory and that the files you're modifying are part of the main repository.
+
+5. **Git shows all files outside ersapActors as deleted**: Check for a nested `.git` directory inside the `ersapActors` folder and remove it if it exists.
 
 ## Best Practices
 
