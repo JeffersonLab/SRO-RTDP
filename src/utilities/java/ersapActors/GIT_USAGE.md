@@ -4,25 +4,23 @@ This document explains how to use Git with the ERSAP Actors project, especially 
 
 ## Repository Structure
 
-The ERSAP Actors project is part of a larger Git repository. The main repository is located at the root of the project, and the `ersapActors` directory is a subdirectory of this repository.
-
-## Important: Avoiding Nested Git Repositories
-
-It's crucial to ensure that there is no `.git` directory inside the `ersapActors` folder. If a `.git` directory exists there, it will cause Git to treat the `ersapActors` directory as a separate repository, and changes in that directory won't be tracked by the main repository.
-
-If you encounter issues where Git shows that all files outside of `ersapActors` are being deleted, check for a nested `.git` directory and remove it:
-
-```bash
-# Check if there's a nested .git directory
-ls -la /path/to/ersap-actors/src/utilities/java/ersapActors/.git
-
-# If it exists, remove it
-rm -rf /path/to/ersap-actors/src/utilities/java/ersapActors/.git
+The ERSAP Actors project is organized as follows:
 ```
+ersap-actors/                    # Main project root
+├── src/
+│   └── utilities/
+│       ├── java/
+│       │   └── ersapActors/    # ERSAP Actors Java code
+│       └── cpp/
+│           └── pcap2stream/    # PCAP stream utilities
+└── ... other project files
+```
+
+When using the devcontainer, the entire project is mounted at `/workspace` to ensure proper Git functionality.
 
 ## Using Git in the Devcontainer
 
-When you open the project in the devcontainer, the main Git repository is mounted into the container. This allows you to use Git commands within the container to interact with the repository.
+When you open the project in the devcontainer, the entire project repository is mounted into the container at `/workspace`. This ensures that Git can track all files correctly and maintain the proper repository structure.
 
 ### Initial Setup
 
@@ -30,6 +28,21 @@ When you first open the devcontainer, the setup script will:
 
 1. Configure Git to recognize the workspace as a safe directory
 2. Mount your local `.gitconfig` file to share your Git configuration with the container
+
+### Working Directory
+
+Most of your work will be in the `/workspace/src/utilities/java/ersapActors` directory, but Git will track changes across the entire project. When you run Git commands, make sure you're aware of your current working directory:
+
+```bash
+# Check your current directory
+pwd
+
+# Change to the ERSAP Actors directory
+cd /workspace/src/utilities/java/ersapActors
+
+# Change to the project root
+cd /workspace
+```
 
 ### Git Commands
 
@@ -71,7 +84,7 @@ This script will:
 
 If you encounter issues with Git in the devcontainer:
 
-1. **Git repository not found**: Make sure the devcontainer is properly configured to mount the main Git repository. Check the `devcontainer.json` file to ensure the `.git` directory is mounted correctly.
+1. **Git repository not found**: Make sure you're in the correct directory. The entire project is mounted at `/workspace`.
 
 2. **Permission denied**: Run the following command to add the workspace as a safe directory:
    ```bash
@@ -80,9 +93,9 @@ If you encounter issues with Git in the devcontainer:
 
 3. **Git user not configured**: Run the `git-setup.sh` script to configure your Git user name and email.
 
-4. **Changes not being tracked**: Make sure you're working in the correct directory and that the files you're modifying are part of the main repository.
+4. **Changes not being tracked**: Make sure you're working in the correct directory structure under `/workspace`.
 
-5. **Git shows all files outside ersapActors as deleted**: Check for a nested `.git` directory inside the `ersapActors` folder and remove it if it exists.
+5. **Files appear to be deleted**: If Git shows files as deleted that shouldn't be, check that you're at the project root (`/workspace`) when running Git commands that affect the whole repository.
 
 ## Best Practices
 
@@ -90,4 +103,6 @@ If you encounter issues with Git in the devcontainer:
 2. Commit your changes frequently with descriptive commit messages.
 3. Push your changes to the remote repository regularly to back up your work.
 4. Create feature branches for new features or bug fixes.
-5. Use meaningful commit messages that describe what changes were made and why. 
+5. Use meaningful commit messages that describe what changes were made and why.
+6. Be aware of your working directory when running Git commands.
+7. When making changes that affect multiple parts of the project, run Git commands from the project root (`/workspace`). 
