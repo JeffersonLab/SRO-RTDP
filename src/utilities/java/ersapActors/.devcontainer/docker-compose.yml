@@ -1,0 +1,35 @@
+version: '3'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../../../..:/workspace:cached
+    network_mode: host
+    command: sleep infinity
+    environment:
+      - ERSAP_HOME=/opt/ersap
+      - ERSAP_USER_DATA=/workspace/ersap-data
+    
+  stream-server:
+    build:
+      context: ../../../../src/utilities/cpp/pcap2stream/server/.container
+      dockerfile: Dockerfile
+    ports:
+      - "5000-5002:5000-5002"
+    volumes:
+      - ../../../../src/utilities/cpp/pcap2stream:/app:cached
+    command: /app/server/build/stream_server 0.0.0.0 5000 3
+    
+  pcap-sender:
+    build:
+      context: ../../../../src/utilities/cpp/pcap2stream/sender/.container
+      dockerfile: Dockerfile
+    volumes:
+      - ../../../../src/utilities/cpp/pcap2stream:/app:cached
+    depends_on:
+      - stream-server
+    # This is a placeholder command - you'll need to specify the pcap file when running
+    command: /bin/bash -c "sleep 5 && /app/sender/build/pcap2stream /app/sample.pcap stream-server 5000" 

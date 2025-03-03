@@ -1,0 +1,40 @@
+{
+    "name": "ERSAP Actors Development",
+    "dockerFile": "Dockerfile",
+    "runArgs": [
+        "--network=host"
+    ],
+    "forwardPorts": [
+        5000,
+        5001,
+        5002
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vscjava.vscode-java-pack",
+                "vscjava.vscode-gradle",
+                "redhat.java",
+                "ms-azuretools.vscode-docker"
+            ],
+            "settings": {
+                "java.configuration.updateBuildConfiguration": "automatic",
+                "java.server.launchMode": "Standard",
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": true
+                }
+            }
+        }
+    },
+    "remoteEnv": {
+        "ERSAP_HOME": "/opt/ersap",
+        "ERSAP_USER_DATA": "/workspace/ersap-data"
+    },
+    "postCreateCommand": "bash .devcontainer/setup.sh",
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "mounts": [
+        "source=/home/jeng-yuantsai/RTDP/ersap-actors/src/utilities/cpp/pcap2stream,target=/workspace/pcap2stream,type=bind,consistency=cached"
+    ]
+} 
