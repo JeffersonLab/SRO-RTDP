@@ -2,68 +2,15 @@
 
 # This script helps with Git operations in the devcontainer
 
+# Configure Git to recognize the workspace as safe
+git config --global --add safe.directory /workspace
+
 # Check if we're in a Git repository
 if [ ! -d ".git" ]; then
-    echo "Not in a Git repository. Initializing..."
-    git init
-    git config --global --add safe.directory $(pwd)
-    
-    # Create .gitignore file if it doesn't exist
-    if [ ! -f ".gitignore" ]; then
-        echo "Creating .gitignore file..."
-        cat > .gitignore << EOF
-# Gradle
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-
-# Eclipse
-.classpath
-.project
-.settings/
-
-# IntelliJ IDEA
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# VS Code
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# Compiled class files
-*.class
-
-# Log files
-*.log
-
-# Package files
-*.jar
-*.war
-*.ear
-
-# ERSAP data
-ersap-data/
-
-# Generated PCAP files
-samples/test.pcap
-
-# OS-specific files
-.DS_Store
-Thumbs.db
-EOF
-    fi
-    
-    # Add all files and make initial commit
-    git add .
-    git commit -m "Initial commit"
-    echo "Git repository initialized."
+    echo "Git repository not found. This is unexpected as the main repository should be mounted."
+    echo "Please check your devcontainer configuration."
 else
-    echo "Already in a Git repository."
+    echo "Git repository found."
 fi
 
 # Configure Git user if not already configured
@@ -93,6 +40,8 @@ echo "  git commit -m \"Message\"    # Commit changes with a message"
 echo "  git status                 # Check the status of your repository"
 echo "  git log                    # View commit history"
 echo ""
-echo "If you need to connect to a remote repository, use:"
-echo "  git remote add origin <repository-url>"
-echo "  git push -u origin main" 
+echo "If you need to push changes to the remote repository, use:"
+echo "  git push origin <branch-name>"
+echo ""
+echo "If you need to pull changes from the remote repository, use:"
+echo "  git pull origin <branch-name>" 

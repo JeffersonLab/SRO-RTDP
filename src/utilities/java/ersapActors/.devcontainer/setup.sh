@@ -50,64 +50,8 @@ if [ ! -f "/workspace/samples/test.pcap" ]; then
     ./samples/generate_test_pcap.sh
 fi
 
-# Set up Git if not already initialized
-cd /workspace
-if [ ! -d ".git" ]; then
-    echo "Initializing Git repository..."
-    git init
-    git config --global --add safe.directory /workspace
-    
-    # Create .gitignore file
-    cat > .gitignore << EOF
-# Gradle
-.gradle/
-build/
-!gradle/wrapper/gradle-wrapper.jar
-
-# Eclipse
-.classpath
-.project
-.settings/
-
-# IntelliJ IDEA
-.idea/
-*.iml
-*.iws
-*.ipr
-
-# VS Code
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# Compiled class files
-*.class
-
-# Log files
-*.log
-
-# Package files
-*.jar
-*.war
-*.ear
-
-# ERSAP data
-ersap-data/
-
-# Generated PCAP files
-samples/test.pcap
-
-# OS-specific files
-.DS_Store
-Thumbs.db
-EOF
-
-    git add .
-    git commit -m "Initial commit"
-    echo "Git repository initialized."
-fi
+# Configure Git to recognize the workspace as safe
+git config --global --add safe.directory /workspace
 
 echo "Environment setup complete!"
 echo "ERSAP_HOME: $ERSAP_HOME"
