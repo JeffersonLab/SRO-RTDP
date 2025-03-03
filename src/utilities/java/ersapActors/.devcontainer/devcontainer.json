@@ -30,14 +30,13 @@
     },
     "remoteEnv": {
         "ERSAP_HOME": "/opt/ersap",
-        "ERSAP_USER_DATA": "/workspace/ersap-data"
+        "ERSAP_USER_DATA": "/workspace/src/utilities/java/ersapActors/ersap-data"
     },
-    "postCreateCommand": "bash .devcontainer/setup.sh",
+    "postCreateCommand": "bash src/utilities/java/ersapActors/.devcontainer/setup.sh",
     "workspaceFolder": "/workspace",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceMount": "source=/home/jeng-yuantsai/RTDP/ersap-actors,target=/workspace,type=bind,consistency=cached",
     "mounts": [
-        "source=/home/jeng-yuantsai/RTDP/ersap-actors/src/utilities/cpp/pcap2stream,target=/workspace/pcap2stream,type=bind,consistency=cached",
-        "source=${localEnv:HOME}/.gitconfig,target=/home/developer/.gitconfig,type=bind,consistency=cached",
-        "source=/home/jeng-yuantsai/RTDP/ersap-actors/.git,target=/workspace/.git,type=bind,consistency=cached"
+        "source=/home/jeng-yuantsai/RTDP/ersap-actors/src/utilities/cpp/pcap2stream,target=/workspace/src/utilities/cpp/pcap2stream,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.gitconfig,target=/home/developer/.gitconfig,type=bind,consistency=cached"
     ]
 } 
