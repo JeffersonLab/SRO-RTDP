@@ -1,39 +1,54 @@
 ---
 io-services:
   reader:
-    class: org.jlab.ersap.actor.sampa.SampaStreamReader
-    name: sampa-reader
+    class: org.jlab.ersap.actor.pcap.engine.Pcap2StreamSourceEngine
+    name: pcap-source
   writer:
-    class: org.jlab.ersap.std.services.StreamWriter
-    name: sampa-writer
+    class: org.jlab.epsci.ersap.std.services.StreamWriter
+    name: StreamWriter
 
 services:
-  - class: org.jlab.ersap.actor.sampa.SampaDecoder
-    name: sampa-decoder
-  - class: org.jlab.ersap.actor.sampa.SampaProcessor
-    name: sampa-processor
+  - class: org.jlab.ersap.actor.examples.EchoEngine
+    name: Echo
 
 configuration:
   io-services:
     reader:
-      port: 5000
-      host: localhost
-      max-buffer-size: 65536
+      streamHost: localhost
+      streamPort: 5000
+      ringBufferSize: 1024
+      connectionTimeout: 5000
+      readTimeout: 10000
+      byteOrder: BIG_ENDIAN
     writer:
-      type: binary
-      compression: gzip
-      file-prefix: sampa_data_
-      destination: ${ERSAP_USER_DATA}/data/output
-      
-  services:
-    sampa-decoder:
-      debug: false
-    sampa-processor:
-      debug: false
+      file_path: ${ERSAP_USER_DATA}/output/pcap_data.dat
 
-mime-types:
-  - binary/data-sampa-stream
-  - binary/data-sampa-decoded
-  - binary/data-sampa-processed
+---
+io-services:
+  reader:
+    class: org.jlab.ersap.actor.pcap.engine.Pcap2StreamMultiSourceEngine
+    name: pcap-multi-source
+  writer:
+    class: org.jlab.epsci.ersap.std.services.StreamWriter
+    name: StreamWriter
 
-container: sampa-container 
+services:
+  - class: org.jlab.ersap.actor.examples.EchoEngine
+    name: Echo
+
+configuration:
+  io-services:
+    reader:
+      ringBufferSize: 1024
+      connectionTimeout: 5000
+      readTimeout: 10000
+      byteOrder: BIG_ENDIAN
+      streams:
+        - host: localhost
+          port: 5000
+        - host: localhost
+          port: 5001
+        - host: localhost
+          port: 5002
+    writer:
+      file_path: ${ERSAP_USER_DATA}/output/pcap_multi_data.dat 
