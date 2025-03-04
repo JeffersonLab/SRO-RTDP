@@ -1,100 +1,46 @@
 # ERSAP Actors
 
-A Java-based project for processing SAMPA data streams using the ERSAP framework.
+This repository contains ERSAP (Event Reconstruction Software Architecture Platform) actors for various data processing tasks.
 
-## Overview
+## Directory Structure
 
-ERSAP Actors is a data processing framework built on top of the ERSAP (Event Reconstruction System for Parallel Architecture) framework. It is designed to process data streams from SAMPA (a front-end ASIC for particle detectors) in real-time.
+- **pcap-stream-source**: The main project for streaming PCAP (Packet Capture) data into ERSAP. This includes:
+  - Ring buffer monitoring capabilities
+  - Mock PCAP server for testing
+  - Test client with built-in monitoring
+  - Comprehensive documentation
 
-The project provides a set of services for:
-- Reading data streams from a network source
-- Decoding SAMPA data packets
-- Processing and analyzing the decoded data
-- Writing the processed data to disk
+- **ersap-java**: Core ERSAP Java library that provides the foundation for ERSAP applications.
 
-## Prerequisites
+- **ersap-data**: Data directory for ERSAP applications, containing configuration files, plugins, and output data.
 
-- Java 11 or higher
-- Gradle 7.0 or higher
-- ERSAP framework
-- pcap2stream utility (for testing)
+- **pet-sro**: PET (Positron Emission Tomography) SRO (Streaming Reconstruction and Online) project, which provides utilities for ERSAP actors.
+
+## Getting Started
+
+To use the PCAP Stream Source, refer to the documentation in the `pcap-stream-source` directory.
 
 ## Development Environment
 
-This project includes a devcontainer configuration for consistent development environments. To use it:
+This project uses a devcontainer for development. To set up the development environment:
 
-1. Install Docker and VS Code with the Remote - Containers extension
-2. Open the project folder in VS Code
-3. When prompted, click "Reopen in Container"
+1. Install Docker and Visual Studio Code with the Remote - Containers extension.
+2. Open the repository in Visual Studio Code.
+3. When prompted, click "Reopen in Container" to start the devcontainer.
 
-The devcontainer includes all necessary dependencies and tools.
+## Building
 
-## Project Structure
-
-```
-ersapActors/
-├── main/
-│   ├── java/
-│   │   └── org/jlab/ersap/actor/
-│   │       ├── datatypes/
-│   │       │   └── JavaObjectType.java
-│   │       ├── rtdp/
-│   │       │   ├── engine/
-│   │       │   ├── source/
-│   │       │   └── util/
-│   │       └── sampa/
-│   │           ├── SampaStreamReader.java
-│   │           ├── SampaDecoder.java
-│   │           └── SampaProcessor.java
-│   └── resources/
-│       └── services.yaml
-├── samples/
-│   ├── generate_test_pcap.sh
-│   └── README.md
-├── .devcontainer/
-│   ├── devcontainer.json
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   ├── setup.sh
-│   └── README.md
-├── build.gradle
-├── settings.gradle
-├── README.md
-└── test_pipeline.sh
-```
-
-## Building the Project
+Each project has its own build.gradle file. To build a specific project:
 
 ```bash
-gradle build
+cd <project-directory>
+./gradlew build
 ```
 
-## Deploying the Services
+## Testing
 
-```bash
-gradle deploy
-```
+The `pcap-stream-source` project includes comprehensive testing scripts in the `scripts` directory.
 
-## Running the Test Pipeline
+## License
 
-The project includes a test pipeline script that:
-1. Sets up the necessary environment
-2. Generates a test PCAP file if one doesn't exist
-3. Starts the stream server
-4. Starts the ERSAP shell
-5. Sends PCAP data to the server for processing
-
-To run the test pipeline:
-
-```bash
-./test_pipeline.sh
-```
-
-## Configuration
-
-The services are configured using the `services.yaml` file in the `main/resources` directory. This file defines:
-
-- Input/output services
-- Processing services
-- Service configuration parameters
-- MIME types for data exchange
+This project is licensed under the same license as the ERSAP framework. 

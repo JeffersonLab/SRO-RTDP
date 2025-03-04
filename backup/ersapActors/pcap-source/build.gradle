@@ -1,0 +1,145 @@
+plugins {
+    id 'java-library'
+    id 'application'
+}
+
+group = 'org.jlab.ersap.actor'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    maven {
+        url 'https://clasweb.jlab.org/clas12maven/'
+    }
+    mavenCentral()
+}
+
+dependencies {
+    // ERSAP dependencies
+    implementation files('/workspace/src/utilities/java/ersapActors/ersap-java/build/libs/ersap-java-1.0-SNAPSHOT.jar')
+    implementation 'org.json:json:20210307'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api:1.7.30'
+    implementation 'ch.qos.logback:logback-classic:1.2.3'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// Set the main class for running the ERSAP source engine
+application {
+    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapFileSourceEngine'
+}
+
+// Task to run the ERSAP source engine
+task runSourceEngine(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the ERSAP source engine'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    
+    // Default arguments (can be overridden from command line)
+    args = ['/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap']
+    
+    // Allow passing arguments from command line
+    if (project.hasProperty('pcapFile')) {
+        args[0] = project.getProperty('pcapFile')
+    }
+}
+
+// Task to run the PcapReader with arguments
+task runPcapReader(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the standalone PcapReader'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.jlab.ersap.actor.pcap.standalone.PcapReader'
+    
+    // Default arguments (can be overridden from command line)
+    args = ['/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap']
+    
+    // Allow passing arguments from command line
+    if (project.hasProperty('pcapFile')) {
+        args[0] = project.getProperty('pcapFile')
+    }
+}
+
+// Task to run the PcapSourceTest
+task runTest(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the PcapSourceTest'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.jlab.ersap.actor.pcap.source.PcapSourceTest'
+    
+    // Default arguments (can be overridden from command line)
+    args = ['/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap', '10']
+    
+    // Allow passing arguments from command line
+    if (project.hasProperty('pcapFile')) {
+        args[0] = project.getProperty('pcapFile')
+    }
+    
+    if (project.hasProperty('maxPackets')) {
+        args[1] = project.getProperty('maxPackets')
+    }
+}
+
+// Create a directory structure for package
+task createDirectories {
+    doLast {
+        mkdir 'src/main/java/org/jlab/ersap/actor/pcap/standalone'
+        mkdir 'src/main/resources'
+    }
+}
+
+// Create a README file
+task createReadme {
+    doLast {
+        def readmeFile = file('README.md')
+        readmeFile.text = """# Standalone PCAP Reader
+
+A Java-based standalone PCAP file reader.
+
+## Overview
+
+This project provides a standalone Java application for reading and analyzing PCAP files, including the special format used in the CLAS12 data.
+
+## Prerequisites
+
+- Java 11 or higher
+- Gradle 7.0 or higher
+
+## Building the Project
+
+```bash
+gradle build
+```
+
+## Running the Application
+
+To run the application with the default PCAP file:
+
+```bash
+gradle runPcapReader
+```
+
+To specify a different PCAP file:
+
+```bash
+gradle runPcapReader -PpcapFile=/path/to/your/file.pcap
+```
+
+## Features
+
+- Reads standard PCAP files and the modified format used in CLAS12 data
+- Analyzes Ethernet, IPv4, TCP, and UDP headers
+- Provides detailed packet information and statistics
+"""
+    }
+}
+
+// Run these tasks when the project is initialized
+tasks.register('initProject') {
+    dependsOn createDirectories, createReadme
+} 
