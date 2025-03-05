@@ -4,7 +4,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.concurrent.TimeUnit;
@@ -17,19 +18,20 @@ import org.jlab.epsci.ersap.std.services.AbstractEventReaderService;
 import org.jlab.epsci.ersap.std.services.EventReaderException;
 import org.jlab.epsci.ersap.std.services.ServiceUtils;
 import org.jlab.ersap.actor.pcap.source.IESource;
-import org.jlab.ersap.actor.pcap.source.RingBufferMonitor;
-import org.jlab.ersap.actor.pcap.source.SocketSource;
+import org.jlab.ersap.actor.pcap.source.MultiSocketSource;
 import org.jlab.ersap.actor.pcap.source.StreamParameters;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * ERSAP source engine that reads data from a socket stream.
+ * ERSAP engine that reads events from multiple socket sources.
  */
-public class PcapStreamSourceEngine extends AbstractEventReaderService<SocketSource> {
+public class MultiSocketSourceEngine extends AbstractEventReaderService<MultiSocketSource> {
 
-    private static final Logger LOGGER = Logger.getLogger(PcapStreamSourceEngine.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(MultiSocketSourceEngine.class.getName());
 
+    private static final String CONFIG_CONNECTIONS = "connections";
     private static final String CONFIG_HOST = "host";
     private static final String CONFIG_PORT = "port";
     private static final String CONFIG_CONNECTION_TIMEOUT = "connection_timeout";
@@ -45,15 +47,15 @@ public class PcapStreamSourceEngine extends AbstractEventReaderService<SocketSou
     /**
      * Default constructor.
      */
-    public PcapStreamSourceEngine() {
+    public MultiSocketSourceEngine() {
         // Nothing to do
     }
 
     @Override
-    protected SocketSource createReader(Path file, JSONObject opts) throws EventReaderException {
+    protected MultiSocketSource createReader(Path file, JSONObject opts) throws EventReaderException {
         // For socket sources, we don't use the file parameter
-        // Instead, we create a SocketSource with default parameters that will be configured later
-        return new SocketSource(new StreamParameters(), DEFAULT_BUFFER_SIZE);
+        // Instead, we create an empty MultiSocketSource that will be configured later
+        return new MultiSocketSource();
     }
 
     /**
@@ -63,10 +65,10 @@ public class PcapStreamSourceEngine extends AbstractEventReaderService<SocketSou
      * @return a new reader
      * @throws EventReaderException if the reader could not be created
      */
-    protected SocketSource createReader(String source) throws EventReaderException {
+    protected MultiSocketSource createReader(String source) throws EventReaderException {
         // For socket sources, we don't use the source parameter
-        // Instead, we create a SocketSource with default parameters that will be configured later
-        return new SocketSource(new StreamParameters(), DEFAULT_BUFFER_SIZE);
+        // Instead, we create an empty MultiSocketSource that will be configured later
+        return new MultiSocketSource();
     }
 
     @Override
@@ -123,35 +125,39 @@ public class PcapStreamSourceEngine extends AbstractEventReaderService<SocketSou
             String source = (String) input.getData();
             JSONObject jsonObject = new JSONObject(source);
             
-            if (!jsonObject.has("host")) {
-                return buildErrorResponse("Missing 'host' in configuration");
+            if (!jsonObject.has("connections")) {
+                return buildErrorResponse("Missing 'connections' array in configuration");
             }
             
-            if (!jsonObject.has("port")) {
-                return buildErrorResponse("Missing 'port' in configuration");
+            JSONArray connections = jsonObject.getJSONArray("connections");
+            if (connections.length() == 0) {
+                return buildErrorResponse("No connections specified in configuration");
             }
             
-            String host = jsonObject.getString("host");
-            int port = jsonObject.getInt("port");
-            int connectionTimeout = jsonObject.optInt("connectionTimeout", 5000);
-            int readTimeout = jsonObject.optInt("readTimeout", 5000);
-            int bufferSize = jsonObject.optInt("bufferSize", DEFAULT_BUFFER_SIZE);
-            
-            try {
-                StreamParameters parameters = new StreamParameters(host, port, connectionTimeout, readTimeout);
-                
-                if (reader == null) {
-                    reader = new SocketSource(parameters, bufferSize);
-                } else {
-                    // Close existing reader
-                    closeReader();
-                    reader = new SocketSource(parameters, bufferSize);
+            List<StreamParameters> parametersList = new ArrayList<>();
+            for (int i = 0; i < connections.length(); i++) {
+                JSONObject conn = connections.getJSONObject(i);
+                if (!conn.has("host") || !conn.has("port")) {
+                    return buildErrorResponse("Connection " + i + " missing 'host' or 'port'");
                 }
                 
-                reader.open();
+                String host = conn.getString("host");
+                int port = conn.getInt("port");
+                int connectionTimeout = conn.optInt("connectionTimeout", 5000);
+                int readTimeout = conn.optInt("readTimeout", 5000);
+                
+                parametersList.add(new StreamParameters(host, port, connectionTimeout, readTimeout));
+            }
+            
+            try {
+                if (reader == null) {
+                    reader = new MultiSocketSource();
+                }
+                
+                reader.open(parametersList);
                 return buildOKResponse();
             } catch (Exception e) {
-                return buildErrorResponse("Failed to open connection: " + e.getMessage());
+                return buildErrorResponse("Failed to open connections: " + e.getMessage());
             }
         } else {
             return buildErrorResponse("Invalid mime-type: " + input.getMimeType());
@@ -205,4 +211,13 @@ public class PcapStreamSourceEngine extends AbstractEventReaderService<SocketSou
         ServiceUtils.setError(response, message);
         return response;
     }
-}
+
+    /**
+     * Gets the reader.
+     *
+     * @return the reader
+     */
+    public MultiSocketSource getReader() {
+        return reader;
+    }
+} 

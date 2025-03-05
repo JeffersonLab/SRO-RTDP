@@ -89,12 +89,103 @@ service.configure(input);
 
 3. Connect to downstream services in your ERSAP application.
 
+## Testing Tools
+
+The project includes several testing tools to help you verify the functionality of the PCAP Stream Source:
+
+### MockPcapServer
+
+The `MockPcapServer` is a simple server that reads a PCAP file and streams the packet data to connected clients. It's useful for testing the PCAP Stream Source without needing a real network capture.
+
+To run the MockPcapServer:
+
+```bash
+cd scripts
+javac MockPcapServer.java
+java MockPcapServer <pcap_file> [port]
+```
+
+Where:
+- `<pcap_file>` is the path to a PCAP file
+- `[port]` is the optional port number (default: 9000)
+
+The server will read the PCAP file, parse the packets, and stream them to any connected clients. It supports both standard PCAP format and modified CLAS12 PCAP format.
+
+### TestClientWithMonitoring
+
+The `TestClientWithMonitoring` is a simple client that connects to the MockPcapServer, receives packet data, and monitors the performance of the connection. It's useful for testing the server without the full ERSAP framework.
+
+To run the TestClientWithMonitoring:
+
+```bash
+cd scripts
+javac TestClientWithMonitoring.java
+java TestClientWithMonitoring [host] [port] [buffer_size] [monitor_interval_ms]
+```
+
+Where:
+- `[host]` is the optional hostname or IP address (default: "localhost")
+- `[port]` is the optional port number (default: 9000)
+- `[buffer_size]` is the optional buffer size (default: 1024)
+- `[monitor_interval_ms]` is the optional monitoring interval in milliseconds (default: 1000)
+
+The client will connect to the server, receive packet data, and display performance statistics at regular intervals.
+
+### Testing Scripts
+
+The project includes several scripts to help you test the PCAP Stream Source:
+
+#### run_simple_test.sh
+
+This script runs a simple test using the MockPcapServer and TestClientWithMonitoring:
+
+```bash
+./scripts/run_simple_test.sh [pcap_file] [port] [buffer_size] [monitor_interval_ms]
+```
+
+The script will:
+1. Start the MockPcapServer with the specified PCAP file
+2. Start the TestClientWithMonitoring to connect to the server
+3. Display performance statistics
+4. Clean up resources when you press Ctrl+C
+
+#### run_ersap_test.sh
+
+This script runs a test using the ERSAP framework:
+
+```bash
+./scripts/run_ersap_test.sh
+```
+
+The script will:
+1. Start the MockPcapServer with a default PCAP file
+2. Create and configure an ERSAP container and service
+3. Connect the PCAP Stream Source to the server
+4. Keep the application running until you press Ctrl+C
+
+#### check_ring_buffer.sh
+
+This script checks the ring buffer status of a running PCAP Stream Source:
+
+```bash
+./scripts/check_ring_buffer.sh [options]
+```
+
+Options:
+- `-c, --container CONTAINER_NAME`: Container name (default: pcap-container)
+- `-s, --service SERVICE_NAME`: Service name (default: pcap-source)
+- `-i, --interval SECONDS`: Update interval in seconds (default: 5)
+
+The script will connect to the specified ERSAP service and display the ring buffer status at regular intervals.
+
 ## Integration with pcap2stream
 
 This source actor is designed to work with the `pcap2stream` server, which reads PCAP files and streams the packet data over a socket connection. The `pcap2stream` server should be configured to send packet data in the following format:
 
 1. 4-byte integer representing the packet length
 2. Packet data of the specified length
+
+The MockPcapServer included in this project follows the same protocol and can be used as a drop-in replacement for testing purposes.
 
 ## Data Flow
 
@@ -146,6 +237,8 @@ The data flow through the PCAP Stream Source implementation follows these steps:
 - The LMAX Disruptor is used for high-performance event processing between the socket connection and the ERSAP framework.
 - The buffer size can be adjusted to optimize performance based on the packet rate and available memory.
 - The socket connection is managed in a separate thread to avoid blocking the ERSAP event processing.
+- The MockPcapServer includes performance monitoring to help you understand the throughput of your PCAP data.
+- The TestClientWithMonitoring includes buffer monitoring to help you optimize the buffer size.
 
 ## Ring Buffer Monitoring
 
@@ -199,6 +292,104 @@ The source actor includes robust error handling for socket connections:
 - Timeouts for connection and read operations
 - Graceful shutdown of resources when the service is stopped
 
-## License
+## Multi-Socket Support
 
-This project is licensed under the same license as the ERSAP framework. 
+The PCAP Stream Source also supports connecting to multiple socket servers simultaneously, which is useful for handling different IP streams from a PCAP file. This is implemented through the `MultiSocketSource` and `MultiSocketSourceEngine` classes.
+
+### MultiSocketSource
+
+The `MultiSocketSource` class manages multiple `SocketSource` instances, each connected to a different socket server. It provides the following features:
+
+- Creates and manages multiple socket connections
+- Implements a round-robin strategy for retrieving events from the connections
+- Provides monitoring capabilities for all connections
+- Handles connection failures gracefully
+
+### MultiSocketSourceEngine
+
+The `MultiSocketSourceEngine` class extends `AbstractEventReaderService` to provide an ERSAP source engine that reads data from multiple socket streams. It can be configured using a JSON configuration with an array of connection parameters.
+
+### Configuration
+
+The MultiSocketSourceEngine can be configured using a JSON configuration with the following structure:
+
+```json
+{
+  "connections": [
+    {
+      "host": "localhost",
+      "port": 9001,
+      "connection_timeout": 5000,
+      "read_timeout": 30000,
+      "buffer_size": 1024
+    },
+    {
+      "host": "localhost",
+      "port": 9002,
+      "connection_timeout": 5000,
+      "read_timeout": 30000,
+      "buffer_size": 1024
+    },
+    {
+      "host": "localhost",
+      "port": 9003,
+      "connection_timeout": 5000,
+      "read_timeout": 30000,
+      "buffer_size": 1024
+    }
+  ]
+}
+```
+
+Each connection in the array can have its own configuration parameters, allowing for flexibility in connecting to different socket servers.
+
+### Usage in ERSAP
+
+To use the MultiSocketSourceEngine in an ERSAP service composition:
+
+1. Register the service:
+
+```java
+ServiceRegistrationData registration = new ServiceRegistrationData(
+    "MultiSocketSource",
+    "org.jlab.ersap.actor.pcap.engine.MultiSocketSourceEngine",
+    "PCAP multi-socket stream source service"
+);
+```
+
+2. Configure the service:
+
+```java
+JSONObject config = new JSONObject();
+JSONArray connections = new JSONArray();
+
+// First connection
+JSONObject conn1 = new JSONObject();
+conn1.put("host", "localhost");
+conn1.put("port", 9001);
+connections.put(conn1);
+
+// Second connection
+JSONObject conn2 = new JSONObject();
+conn2.put("host", "localhost");
+conn2.put("port", 9002);
+connections.put(conn2);
+
+config.put("connections", connections);
+
+EngineData input = new EngineData();
+input.setData(EngineDataType.JSON, config.toString());
+
+service.configure(input);
+```
+
+3. Connect to downstream services in your ERSAP application.
+
+### Monitoring Multiple Connections
+
+The MultiSocketSourceEngine provides methods to monitor the status of all connections:
+
+- `getRingBufferStatus()`: Returns a JSON string with the status of all ring buffers
+- `getRingBufferStatusString()`: Returns a formatted string with the status of all ring buffers
+
+You can use these methods to monitor the performance and health of all connections in real-time.
