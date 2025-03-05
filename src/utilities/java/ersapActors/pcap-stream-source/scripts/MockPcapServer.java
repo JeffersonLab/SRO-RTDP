@@ -1,205 +1,211 @@
-import java.io.DataInputStream;
+package scripts;
+
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
- * A mock server that reads a PCAP file and streams packets to clients.
+ * A mock PCAP server that reads a PCAP file and sends its contents over a socket.
+ * This is used for testing the MultiSocketSourceEngine.
  */
 public class MockPcapServer {
-    private static final int DEFAULT_PORT = 9000;
-    private static final int PCAP_HEADER_SIZE = 24;
-    private static final int PACKET_HEADER_SIZE = 16;
-
-    private final int port;
+    
+    private static final Logger LOGGER = Logger.getLogger(MockPcapServer.class.getName());
+    private static final int BUFFER_SIZE = 65536; // 64KB buffer
+    private static final int PCAP_HEADER_SIZE = 24; // PCAP global header size
+    private static final int PACKET_HEADER_SIZE = 16; // PCAP packet header size
+    private static final int MAX_PACKET_SIZE = 1024; // Maximum packet size to send
+    private static final int HEADER_SIZE = 24; // Global header size
+    
     private final String pcapFile;
-    private final AtomicBoolean running = new AtomicBoolean(true);
-
-    public MockPcapServer(String pcapFile, int port) {
-        this.pcapFile = pcapFile;
+    private final int port;
+    private boolean running;
+    private ServerSocket serverSocket;
+    
+    /**
+     * Creates a new MockPcapServer.
+     * 
+     * @param port the port to listen on
+     * @param pcapFile the PCAP file to read
+     */
+    public MockPcapServer(int port, String pcapFile) {
         this.port = port;
+        this.pcapFile = pcapFile;
+        this.running = false;
     }
-
+    
+    /**
+     * Starts the server.
+     */
     public void start() {
-        System.out.println("Starting MockPcapServer on port " + port);
-        System.out.println("Reading PCAP file: " + pcapFile);
-
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Server started. Waiting for connections...");
-
-            // Add shutdown hook to stop the server gracefully
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Shutting down server...");
-                running.set(false);
-            }));
-
-            while (running.get()) {
+        try {
+            serverSocket = new ServerSocket(port);
+            running = true;
+            LOGGER.info("Server started on port " + port);
+            
+            while (running) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-                    System.out.println("Client connected: " + clientSocket.getInetAddress());
-
+                    LOGGER.info("Client connected from " + clientSocket.getRemoteSocketAddress());
+                    
                     // Handle client in a new thread
-                    new Thread(() -> handleClient(clientSocket)).start();
+                    Thread clientThread = new Thread(() -> handleClient(clientSocket));
+                    clientThread.setDaemon(true);
+                    clientThread.start();
                 } catch (IOException e) {
-                    if (running.get()) {
-                        System.err.println("Error accepting client connection: " + e.getMessage());
+                    if (running) {
+                        LOGGER.log(Level.WARNING, "Error accepting client connection", e);
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Error starting server: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error starting server", e);
+        } finally {
+            stop();
         }
     }
-
+    
+    /**
+     * Handles a client connection.
+     * 
+     * @param clientSocket the client socket
+     */
     private void handleClient(Socket clientSocket) {
-        System.out.println("Handling client: " + clientSocket.getInetAddress());
-
-        try (DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
-                FileInputStream fileIn = new FileInputStream(pcapFile);
-                DataInputStream pcapIn = new DataInputStream(fileIn)) {
-
-            // Read PCAP file header
-            byte[] pcapHeader = new byte[PCAP_HEADER_SIZE];
-            int bytesRead = pcapIn.read(pcapHeader);
-
-            if (bytesRead != PCAP_HEADER_SIZE) {
-                System.err.println("Error reading PCAP header");
+        int packetCount = 0;
+        try (InputStream pcapStream = new FileInputStream(pcapFile);
+             DataOutputStream clientOut = new DataOutputStream(clientSocket.getOutputStream())) {
+            
+            LOGGER.info("Waiting before sending data...");
+            Thread.sleep(1000); // Wait 1 second before sending data
+            
+            // Skip the global header (24 bytes)
+            if (pcapStream.skip(HEADER_SIZE) != HEADER_SIZE) {
+                LOGGER.warning("Failed to skip global header");
                 return;
             }
-
-            // Parse magic number to determine byte order
-            ByteBuffer buffer = ByteBuffer.wrap(pcapHeader);
-            int magicNumber = buffer.getInt();
-            ByteOrder byteOrder = ByteOrder.BIG_ENDIAN;
-
-            if (magicNumber == 0xd4c3b2a1) {
-                byteOrder = ByteOrder.LITTLE_ENDIAN;
-                System.out.println("PCAP file is in little-endian format");
-            } else if (magicNumber == 0xa1b2c3d4) {
-                System.out.println("PCAP file is in big-endian format");
-            } else if (magicNumber == 0x4d3cb2a1) {
-                byteOrder = ByteOrder.LITTLE_ENDIAN;
-                System.out.println("PCAP file is in modified little-endian format (CLAS12)");
-            } else {
-                System.err.println("Invalid PCAP file format: " + Integer.toHexString(magicNumber));
-                return;
-            }
-
-            // Read packets and send to client
-            int packetCount = 0;
-            long totalBytes = 0;
-            long startTime = System.currentTimeMillis();
-
-            while (running.get() && clientSocket.isConnected()) {
-                try {
-                    // Read packet header
-                    byte[] packetHeader = new byte[PACKET_HEADER_SIZE];
-                    bytesRead = pcapIn.read(packetHeader);
-
-                    if (bytesRead != PACKET_HEADER_SIZE) {
-                        System.out.println("End of PCAP file reached. Restarting from beginning.");
-                        fileIn.getChannel().position(PCAP_HEADER_SIZE);
-                        continue;
-                    }
-
-                    // Parse packet length
-                    buffer = ByteBuffer.wrap(packetHeader);
-                    buffer.order(byteOrder);
-
-                    // Skip timestamp fields
-                    buffer.position(8);
-
-                    // Get captured length
-                    int capturedLength = buffer.getInt();
-
-                    System.out.println("Packet " + packetCount + ": length = " + capturedLength);
-
-                    // Read packet data
-                    byte[] packetData = new byte[capturedLength];
-                    bytesRead = pcapIn.read(packetData);
-
-                    if (bytesRead != capturedLength) {
-                        System.err.println(
-                                "Error reading packet data: expected " + capturedLength + " bytes, got " + bytesRead);
-                        continue;
-                    }
-
-                    // Send packet length and data to client
-                    out.writeInt(capturedLength);
-                    out.write(packetData);
-                    out.flush();
-
-                    packetCount++;
-                    totalBytes += capturedLength;
-
-                    if (packetCount % 10 == 0) {
-                        long elapsedTime = System.currentTimeMillis() - startTime;
-                        double mbps = (totalBytes * 8.0 / 1000000.0) / (elapsedTime / 1000.0);
-                        System.out.printf("Sent %d packets, %d bytes (%.2f Mbps)%n",
-                                packetCount, totalBytes, mbps);
-                    }
-
-                    // Add a small delay to simulate realistic packet rates
-                    Thread.sleep(10);
-
-                } catch (IOException e) {
-                    System.err.println("Error reading/sending packet: " + e.getMessage());
+            
+            byte[] packetHeader = new byte[PACKET_HEADER_SIZE];
+            byte[] packetData;
+            
+            while (!clientSocket.isClosed() && pcapStream.available() > 0) {
+                // Read packet header (16 bytes)
+                int headerBytesRead = pcapStream.read(packetHeader);
+                if (headerBytesRead < PACKET_HEADER_SIZE) {
+                    LOGGER.warning("Incomplete packet header, skipping");
                     break;
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                }
+                
+                // Extract packet length from header (bytes 8-11, little-endian)
+                int packetLength = ((packetHeader[8] & 0xFF) | 
+                                   ((packetHeader[9] & 0xFF) << 8) | 
+                                   ((packetHeader[10] & 0xFF) << 16) | 
+                                   ((packetHeader[11] & 0xFF) << 24));
+                
+                // Limit packet size to avoid overwhelming the client
+                int actualLength = Math.min(packetLength, MAX_PACKET_SIZE);
+                
+                // Read packet data
+                packetData = new byte[actualLength];
+                int dataBytesRead = pcapStream.read(packetData, 0, actualLength);
+                
+                if (dataBytesRead < actualLength) {
+                    LOGGER.warning("Incomplete packet data, skipping");
+                    // Skip the rest of this packet if we couldn't read it all
+                    if (dataBytesRead > 0 && packetLength > dataBytesRead) {
+                        pcapStream.skip(packetLength - dataBytesRead);
+                    }
+                    continue;
+                }
+                
+                // Skip the rest of the packet if we limited the size
+                if (packetLength > actualLength) {
+                    pcapStream.skip(packetLength - actualLength);
+                }
+                
+                try {
+                    // First send the packet length (4 bytes)
+                    clientOut.writeInt(actualLength);
+                    
+                    // Then send the packet data
+                    clientOut.write(packetData, 0, actualLength);
+                    clientOut.flush();
+                    packetCount++;
+                    
+                    if (packetCount % 100 == 0) {
+                        LOGGER.info("Sent " + packetCount + " packets");
+                    }
+                    
+                    // Small delay between packets to avoid overwhelming the client
+                    Thread.sleep(10);
+                } catch (SocketException e) {
+                    LOGGER.info("Client disconnected: " + e.getMessage());
+                    break;
+                } catch (SocketTimeoutException e) {
+                    LOGGER.info("Socket timeout: " + e.getMessage());
                     break;
                 }
             }
-
-            System.out.println("Client disconnected. Sent " + packetCount + " packets.");
-
+            
+            if (pcapStream.available() <= 0) {
+                LOGGER.info("Reached end of PCAP file");
+            }
+            
         } catch (IOException e) {
-            System.err.println("Error handling client: " + e.getMessage());
+            LOGGER.log(Level.SEVERE, "Error handling client", e);
+        } catch (InterruptedException e) {
+            LOGGER.log(Level.WARNING, "Thread interrupted", e);
+            Thread.currentThread().interrupt();
         } finally {
             try {
-                clientSocket.close();
+                if (!clientSocket.isClosed()) {
+                    clientSocket.close();
+                }
             } catch (IOException e) {
-                // Ignore
+                LOGGER.log(Level.WARNING, "Error closing client socket", e);
             }
+            LOGGER.info("Client handler finished after sending " + packetCount + " packets");
         }
     }
-
+    
+    /**
+     * Stops the server.
+     */
     public void stop() {
-        running.set(false);
-    }
-
-    public static void main(String[] args) {
-        if (args.length < 1) {
-            System.out.println("Usage: java MockPcapServer <pcap_file> [port]");
-            System.exit(1);
-        }
-
-        String pcapFile = args[0];
-        int port = DEFAULT_PORT;
-
-        if (args.length >= 2) {
+        running = false;
+        if (serverSocket != null && !serverSocket.isClosed()) {
             try {
-                port = Integer.parseInt(args[1]);
-            } catch (NumberFormatException e) {
-                System.err.println("Invalid port number: " + args[1]);
-                System.exit(1);
+                serverSocket.close();
+            } catch (IOException e) {
+                LOGGER.log(Level.WARNING, "Error closing server socket", e);
             }
         }
-
-        // Check if the PCAP file exists
-        File file = new File(pcapFile);
-        if (!file.exists() || !file.isFile()) {
-            System.err.println("PCAP file not found: " + pcapFile);
+    }
+    
+    /**
+     * Main method to start the server.
+     * 
+     * @param args command line arguments: port pcapFile
+     */
+    public static void main(String[] args) {
+        if (args.length < 2) {
+            System.err.println("Usage: MockPcapServer <port> <pcap_file>");
             System.exit(1);
         }
-
-        MockPcapServer server = new MockPcapServer(pcapFile, port);
+        
+        int port = Integer.parseInt(args[0]);
+        String pcapFile = args[1];
+        
+        MockPcapServer server = new MockPcapServer(port, pcapFile);
         server.start();
     }
 }

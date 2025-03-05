@@ -1,0 +1,25 @@
+{
+    "connections": [
+        {
+            "host": "localhost",
+            "port": 9001,
+            "connection_timeout": 5000,
+            "read_timeout": 30000,
+            "buffer_size": 1024
+        },
+        {
+            "host": "localhost",
+            "port": 9002,
+            "connection_timeout": 5000,
+            "read_timeout": 30000,
+            "buffer_size": 1024
+        },
+        {
+            "host": "localhost",
+            "port": 9003,
+            "connection_timeout": 5000,
+            "read_timeout": 30000,
+            "buffer_size": 1024
+        }
+    ]
+}

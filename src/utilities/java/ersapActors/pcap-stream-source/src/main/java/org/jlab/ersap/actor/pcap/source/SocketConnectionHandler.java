@@ -4,6 +4,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,6 +25,9 @@ public class SocketConnectionHandler extends AbstractConnectionHandler {
 
     private Socket socket;
     private DataInputStream inputStream;
+    private int reconnectAttempts = 0;
+    private static final int MAX_RECONNECT_ATTEMPTS = 3;
+    private static final int RECONNECT_DELAY_MS = 1000;
 
     /**
      * Constructor.
@@ -44,6 +49,7 @@ public class SocketConnectionHandler extends AbstractConnectionHandler {
         this.port = port;
         this.connectionTimeout = connectionTimeout;
         this.readTimeout = readTimeout;
+        running.set(true);
     }
 
     @Override
@@ -59,6 +65,7 @@ public class SocketConnectionHandler extends AbstractConnectionHandler {
             socket.setSoTimeout(readTimeout);
             inputStream = new DataInputStream(socket.getInputStream());
             connected.set(true);
+            reconnectAttempts = 0;
             LOGGER.info("Connected to " + host + ":" + port);
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Error connecting to " + host + ":" + port, e);
@@ -97,7 +104,28 @@ public class SocketConnectionHandler extends AbstractConnectionHandler {
 
             byte[] buffer = new byte[65536]; // 64KB buffer
 
-            while (running.get() && connected.get()) {
+            while (running.get()) {
+                if (!connected.get() || socket == null || socket.isClosed()) {
+                    // Try to reconnect if not connected
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++;
+                        LOGGER.info("Attempting to reconnect (" + reconnectAttempts + "/" + 
+                                   MAX_RECONNECT_ATTEMPTS + ") to " + host + ":" + port);
+                        try {
+                            close();
+                            Thread.sleep(RECONNECT_DELAY_MS);
+                            open();
+                        } catch (Exception e) {
+                            LOGGER.log(Level.WARNING, "Reconnect attempt failed", e);
+                            Thread.sleep(RECONNECT_DELAY_MS);
+                            continue;
+                        }
+                    } else {
+                        LOGGER.warning("Max reconnect attempts reached for " + host + ":" + port);
+                        break;
+                    }
+                }
+
                 try {
                     // Read packet length (4 bytes)
                     int length = inputStream.readInt();
@@ -112,20 +140,24 @@ public class SocketConnectionHandler extends AbstractConnectionHandler {
 
                     // Publish to ring buffer
                     publishEvent(buffer, length);
+                    
+                    // Reset reconnect attempts on successful read
+                    reconnectAttempts = 0;
 
+                } catch (SocketTimeoutException e) {
+                    // This is normal for read timeouts, just continue
+                    LOGGER.fine("Socket read timeout");
+                } catch (SocketException e) {
+                    if (running.get()) {
+                        LOGGER.log(Level.WARNING, "Socket error: " + e.getMessage(), e);
+                        connected.set(false);
+                    } else {
+                        break;
+                    }
                 } catch (IOException e) {
                     if (running.get()) {
-                        LOGGER.log(Level.WARNING, "Error reading from socket", e);
-
-                        // Try to reconnect
-                        try {
-                            close();
-                            Thread.sleep(1000); // Wait 1 second before reconnecting
-                            open();
-                        } catch (Exception reconnectError) {
-                            LOGGER.log(Level.SEVERE, "Error reconnecting", reconnectError);
-                            break;
-                        }
+                        LOGGER.log(Level.WARNING, "Error reading from socket: " + e.getMessage(), e);
+                        connected.set(false);
                     } else {
                         break;
                     }
@@ -140,6 +172,17 @@ public class SocketConnectionHandler extends AbstractConnectionHandler {
                 LOGGER.log(Level.WARNING, "Error closing connection", e);
             }
             running.set(false);
+            LOGGER.info("Connection handler for " + host + ":" + port + " stopped");
         }
+    }
+    
+    /**
+     * Checks if the socket is actually connected and valid.
+     * 
+     * @return true if the socket is connected and valid, false otherwise
+     */
+    @Override
+    public boolean isConnected() {
+        return connected.get() && socket != null && !socket.isClosed() && socket.isConnected();
     }
 }

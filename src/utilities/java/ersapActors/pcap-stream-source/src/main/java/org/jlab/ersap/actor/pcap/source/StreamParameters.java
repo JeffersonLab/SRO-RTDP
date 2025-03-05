@@ -19,6 +19,32 @@ public class StreamParameters {
     public StreamParameters() {
         // Default values are set in field declarations
     }
+    
+    /**
+     * Constructor with host and port.
+     * 
+     * @param host the host
+     * @param port the port
+     */
+    public StreamParameters(String host, int port) {
+        this.host = host;
+        this.port = port;
+    }
+    
+    /**
+     * Constructor with all parameters.
+     * 
+     * @param host the host
+     * @param port the port
+     * @param connectionTimeout the connection timeout
+     * @param readTimeout the read timeout
+     */
+    public StreamParameters(String host, int port, int connectionTimeout, int readTimeout) {
+        this.host = host;
+        this.port = port;
+        this.connectionTimeout = connectionTimeout;
+        this.readTimeout = readTimeout;
+    }
 
     /**
      * Gets the host.
