@@ -21,7 +21,34 @@ echo "Using temporary directory: $TEMP_DIR"
 
 # Create configuration file
 CONFIG_FILE="$TEMP_DIR/multi-socket-config.json"
-echo '{"connections":[{"host":"localhost","port":9000,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},{"host":"localhost","port":9001,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024}]}' > "$CONFIG_FILE"
+cat > "$CONFIG_FILE" << 'EOJ'
+{"connections":[
+  {"host":"localhost","port":9000,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9001,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9002,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9003,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9004,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9005,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9006,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9007,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9008,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9009,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9010,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9011,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9012,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9013,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9014,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9015,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9016,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9017,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9018,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9019,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9020,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9021,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9022,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024},
+  {"host":"localhost","port":9023,"connection_timeout":5000,"read_timeout":30000,"buffer_size":1024}
+]}
+EOJ
 echo "Created configuration file: $CONFIG_FILE"
 
 # Start mock PCAP servers
@@ -77,14 +104,19 @@ if [ ! -f "$SCRIPTS_DIR/scripts/SimpleMultiSocketTest.class" ]; then
 fi
 
 # Start servers in the background
-java -cp "$RUNTIME_CLASSPATH" scripts.MockPcapServer 9000 "$PCAP_FILE" &
-SERVER1_PID=$!
-java -cp "$RUNTIME_CLASSPATH" scripts.MockPcapServer 9001 "$PCAP_FILE" &
-SERVER2_PID=$!
+SERVER_PIDS=()
+
+for port in {9000..9023}; do
+    echo "Starting server on port $port..."
+    java -cp "$RUNTIME_CLASSPATH" scripts.MockPcapServer $port "$PCAP_FILE" &
+    SERVER_PIDS+=($!)
+    # Small delay to avoid overwhelming the system
+    sleep 0.5
+done
 
 # Wait for servers to start
 echo "Waiting for servers to start..."
-sleep 2
+sleep 5
 
 # Run test client
 echo "Running test client with ${TIMEOUT}s timeout..."
@@ -92,7 +124,9 @@ java -cp "$RUNTIME_CLASSPATH" scripts.SimpleMultiSocketTest "$CONFIG_FILE" "$TIM
 
 # Clean up
 echo "Cleaning up..."
-kill $SERVER1_PID $SERVER2_PID 2>/dev/null
+for pid in "${SERVER_PIDS[@]}"; do
+    kill $pid 2>/dev/null
+done
 rm -rf "$TEMP_DIR"
 
 echo "Test completed." 
