@@ -1,0 +1,28 @@
+{
+  "connections": [
+    {"host": "localhost", "port": 9000, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9001, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9002, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9003, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9004, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9005, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9006, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9007, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9008, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9009, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9010, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9011, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9012, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9013, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9014, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9015, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9016, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9017, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9018, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9019, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9020, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9021, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9022, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9023, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024}
+  ]
+}

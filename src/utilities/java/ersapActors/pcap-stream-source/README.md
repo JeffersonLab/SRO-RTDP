@@ -6,32 +6,26 @@ This module provides an ERSAP source actor that reads network packet data from a
 
 The PCAP Stream Source connects to a socket server that streams network packet data, reads the packets, and makes them available to downstream ERSAP actors for processing. It uses the LMAX Disruptor for high-performance event processing between the socket connection and the ERSAP framework.
 
-## Components
+## Core Components
 
-The PCAP Stream Source consists of several key components that work together:
+### ERSAP Integration Components
 
-### Core Components
+- **PcapStreamSourceEngine**: ERSAP engine for a single socket connection, extending `AbstractEventReaderService`.
+- **MultiSocketSourceEngine**: ERSAP engine for multiple socket connections, extending `AbstractEventReaderService`.
+
+### Supporting Components
 
 - **SocketSource**: Manages a single socket connection to a data source, handling the connection lifecycle and data retrieval.
 - **MultiSocketSource**: Manages multiple socket connections simultaneously, implementing a round-robin strategy for event retrieval.
 - **SocketConnectionHandler**: Handles the low-level socket operations, reading data from the socket and publishing it to the ring buffer.
 - **StreamParameters**: Stores configuration parameters for socket connections (host, port, timeouts, etc.).
-
-### ERSAP Integration
-
-- **PcapStreamSourceEngine**: ERSAP engine for a single socket connection, extending `AbstractEventReaderService`.
-- **MultiSocketSourceEngine**: ERSAP engine for multiple socket connections, extending `AbstractEventReaderService`.
-
-### Performance Components
-
-- **Event**: Data container for the Disruptor ring buffer.
 - **RingBufferMonitor**: Monitors the performance and health of the ring buffer.
 
 ## Data Flow
 
 The data flow through the system follows these steps:
 
-1. **Data Source** → External socket server (e.g., MockPcapServer) streams packet data
+1. **Data Source** → External socket server streams packet data
 2. **Socket Connection** → `SocketConnectionHandler` establishes and maintains the connection
 3. **Data Reading** → `SocketConnectionHandler` reads packet data from the socket
 4. **Event Publishing** → Data is published to the Disruptor ring buffer
@@ -43,9 +37,8 @@ The data flow through the system follows these steps:
 ## Prerequisites
 
 - Java 11 or higher
-- Gradle 7.0 or higher
 - ERSAP framework
-- LMAX Disruptor library (automatically downloaded by the build scripts)
+- LMAX Disruptor library
 
 ## Building
 
@@ -58,7 +51,7 @@ cd pcap-stream-source
 
 This will compile the code and create a JAR file in the `build/libs` directory.
 
-## Configuration
+## ERSAP Configuration
 
 ### Single Socket Configuration
 
@@ -99,186 +92,22 @@ The `MultiSocketSourceEngine` can be configured using a JSON configuration with 
 }
 ```
 
-## Testing Tools
+For multiple IP streams (e.g., 24 streams), you can configure multiple connections:
 
-The project includes several testing tools to help you verify functionality:
-
-### MockPcapServer
-
-A simple server that reads a PCAP file and streams the packet data to connected clients.
-
-```bash
-# Usage
-java -cp <classpath> scripts.MockPcapServer <port> <pcap_file>
-
-# Example
-java -cp build/classes/java/main:build/classes/java/scripts scripts.MockPcapServer 9000 /path/to/capture.pcap
+```json
+{
+  "connections": [
+    {"host": "localhost", "port": 9000, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    {"host": "localhost", "port": 9001, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+    // ... additional connections ...
+    {"host": "localhost", "port": 9023, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024}
+  ]
+}
 ```
 
-The server:
-1. Reads the PCAP file
-2. Skips the global header
-3. For each packet:
-   - Reads the packet header
-   - Extracts the packet length
-   - Reads the packet data
-   - Sends the length followed by the data to the client
+## ERSAP Integration
 
-### Test Clients
-
-#### BasicMultiSocketTest
-
-A simple test client that connects to multiple socket servers without using JSON configuration.
-
-```bash
-# Usage
-java -cp <classpath> scripts.BasicMultiSocketTest <timeout_seconds>
-
-# Example
-java -cp build/classes/java/main:build/classes/java/scripts scripts.BasicMultiSocketTest 30
-```
-
-This client:
-1. Creates a `MultiSocketSource` with hardcoded connection parameters
-2. Opens connections to multiple servers
-3. Checks connection status with retries
-4. Processes data for the specified timeout
-5. Reports performance statistics
-
-#### SimpleMultiSocketTest
-
-A test client that connects to multiple socket servers using a JSON configuration file.
-
-```bash
-# Usage
-java -cp <classpath> scripts.SimpleMultiSocketTest <config_file> [timeout_seconds]
-
-# Example
-java -cp build/classes/java/main:build/classes/java/scripts scripts.SimpleMultiSocketTest config.json 30
-```
-
-This client:
-1. Reads connection parameters from a JSON configuration file
-2. Creates a `MultiSocketSource` with the specified parameters
-3. Opens connections to multiple servers
-4. Checks connection status with retries
-5. Processes data for the specified timeout
-6. Reports performance statistics
-
-## Testing Scripts
-
-The project includes four essential scripts to demonstrate its functionality:
-
-### 1. Basic Multi-Socket Test
-
-The `run_basic_test.sh` script demonstrates the core functionality with a simple configuration:
-
-```bash
-# Usage
-./scripts/run_basic_test.sh <pcap_file> [timeout_seconds]
-
-# Example
-./scripts/run_basic_test.sh /path/to/capture.pcap 30
-```
-
-This script:
-- Starts two mock PCAP servers on ports 9000 and 9001
-- Runs the `BasicMultiSocketTest` client that connects to both servers
-- Processes data for the specified timeout
-- Displays performance statistics
-
-### 2. JSON Configuration Test
-
-The `run_multi_socket_test.sh` script demonstrates using JSON configuration:
-
-```bash
-# Usage
-./scripts/run_multi_socket_test.sh <pcap_file> [timeout_seconds]
-
-# Example
-./scripts/run_multi_socket_test.sh /path/to/capture.pcap 30
-```
-
-This script:
-- Creates a JSON configuration file with connection parameters
-- Starts two mock PCAP servers
-- Runs the `SimpleMultiSocketTest` client that reads the JSON configuration
-- Shows how to configure multiple connections via JSON
-
-### 3. ERSAP Integration Test
-
-The `run_ersap_test.sh` script demonstrates integration with the ERSAP framework:
-
-```bash
-# Usage
-./scripts/run_ersap_test.sh
-
-# Example
-./scripts/run_ersap_test.sh
-```
-
-This script:
-- Creates an ERSAP container and service
-- Configures the PCAP Stream Source engine
-- Shows how the source integrates with ERSAP
-
-### 4. Performance Monitoring
-
-The `check_ring_buffer.sh` script demonstrates the monitoring capabilities:
-
-```bash
-# Usage
-./scripts/check_ring_buffer.sh [options]
-
-# Example
-./scripts/check_ring_buffer.sh --container my-container --service my-service --interval 10
-```
-
-Options:
-- `-c, --container CONTAINER_NAME`: Container name (default: pcap-container)
-- `-s, --service SERVICE_NAME`: Service name (default: pcap-source)
-- `-i, --interval SECONDS`: Update interval in seconds (default: 5)
-
-This script:
-- Connects to a running ERSAP service
-- Displays the ring buffer status at regular intervals
-- Shows how to monitor performance in real-time
-
-## Step-by-Step Usage Guide
-
-### 1. Build the Project
-
-```bash
-cd pcap-stream-source
-./gradlew build
-```
-
-### 2. Run a Basic Test
-
-```bash
-./scripts/run_basic_test.sh /path/to/capture.pcap 30
-```
-
-This will:
-- Start two mock PCAP servers on ports 9000 and 9001
-- Connect to both servers using the `BasicMultiSocketTest` client
-- Process data for 30 seconds
-- Display performance statistics
-
-### 3. Run a Test with JSON Configuration
-
-```bash
-./scripts/run_multi_socket_test.sh /path/to/capture.pcap 30
-```
-
-This will:
-- Create a JSON configuration file with connection parameters
-- Start two mock PCAP servers on ports 9000 and 9001
-- Connect to both servers using the `SimpleMultiSocketTest` client
-- Process data for 30 seconds
-- Display performance statistics
-
-### 4. Use in an ERSAP Application
+### Using in an ERSAP Application
 
 To use the PCAP Stream Source in an ERSAP application:
 
@@ -335,6 +164,112 @@ input.setData(EngineDataType.JSON, config.toString());
 service.configure(input);
 ```
 
+### ERSAP Test Script
+
+The `run_ersap_test.sh` script demonstrates integration with the ERSAP framework:
+
+```bash
+# Usage
+./scripts/run_ersap_test.sh
+```
+
+This script:
+- Creates an ERSAP container and service
+- Configures the PCAP Stream Source engine with multiple connections (up to 24)
+- Shows how the source integrates with ERSAP
+
+### Step-by-Step Guide to Run the ERSAP Test
+
+Follow these steps to run the ERSAP integration test:
+
+1. **Build the project**:
+   ```bash
+   cd pcap-stream-source
+   ./gradlew build
+   ```
+
+2. **Create a JSON configuration file**:
+   ```bash
+   mkdir -p custom-config
+   cat > custom-config/multi-socket-config.json << 'EOF'
+   {
+     "connections": [
+       {"host": "localhost", "port": 9000, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9001, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024}
+     ]
+   }
+   EOF
+   ```
+   
+   For testing with more connections (e.g., 24), create a more extensive configuration:
+   ```bash
+   mkdir -p custom-config
+   cat > custom-config/multi-socket-config.json << 'EOF'
+   {
+     "connections": [
+       {"host": "localhost", "port": 9000, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9001, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9002, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9003, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9004, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9005, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9006, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9007, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9008, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9009, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9010, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9011, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9012, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9013, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9014, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9015, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9016, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9017, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9018, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9019, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9020, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9021, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9022, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024},
+       {"host": "localhost", "port": 9023, "connection_timeout": 5000, "read_timeout": 30000, "buffer_size": 1024}
+     ]
+   }
+   EOF
+   ```
+
+3. **Compile the test components**:
+   ```bash
+   javac -d build/classes/java/scripts scripts/MockPcapServer.java
+   javac -d build/classes/java/scripts -cp "build/classes/java/main:lib/json-20231013.jar:lib/disruptor-3.4.4.jar:lib/snakeyaml-2.0.jar" scripts/SimpleMultiSocketTest.java
+   ```
+
+4. **Run the ERSAP test script**:
+   ```bash
+   ./scripts/run_ersap_test.sh
+   ```
+   
+   This script will:
+   - Start mock PCAP servers on the configured ports
+   - Create an ERSAP container and service
+   - Configure the service with the JSON configuration
+   - Run the test for 60 seconds
+   - Display performance statistics
+   - Clean up resources when done
+
+5. **Analyze the results**:
+   - Check the connection status for each socket
+   - Review the throughput metrics
+   - Verify that all connections were established successfully
+   - Examine any error messages or warnings
+
+6. **Clean up after testing**:
+   ```bash
+   # Kill any remaining MockPcapServer processes
+   pkill -f MockPcapServer
+   
+   # Remove the configuration file if no longer needed
+   rm -f custom-config/multi-socket-config.json
+   ```
+
 ## Performance Monitoring
 
 The PCAP Stream Source includes built-in monitoring capabilities for the Disruptor ring buffer.
@@ -348,10 +283,9 @@ The PCAP Stream Source includes built-in monitoring capabilities for the Disrupt
 - **Consumer Lag**: Number of events published but not yet consumed
 - **Total Events Published**: Total number of events published since startup
 - **Total Events Consumed**: Total number of events consumed since startup
-- **Total Bytes Published**: Total number of bytes published since startup
 - **Throughput**: Rate of events and bytes being processed
 
-### Accessing Monitoring Data
+### Accessing Monitoring Data in ERSAP
 
 ```java
 // Get the ring buffer status as a JSON string
@@ -369,9 +303,7 @@ The PCAP Stream Source includes robust error handling for socket connections:
 - Timeouts for connection and read operations
 - Graceful shutdown of resources when the service is stopped
 
-The `SocketConnectionHandler` will attempt to reconnect to the server if the connection is lost, with a configurable number of retry attempts and delay between attempts.
-
-## Advanced Usage
+## Advanced ERSAP Usage
 
 ### Custom Data Processing
 
@@ -396,11 +328,30 @@ The `MultiSocketSourceEngine` can connect to multiple data sources simultaneousl
 - Combining data from multiple capture points
 - Implementing redundant data sources for high availability
 
-### Integration with pcap2stream
+## Troubleshooting
 
-This source actor is designed to work with the `pcap2stream` server, which reads PCAP files and streams the packet data over a socket connection. The `pcap2stream` server should be configured to send packet data in the following format:
+### JSON Configuration Issues
 
-1. 4-byte integer representing the packet length
-2. Packet data of the specified length
+If you encounter errors related to the JSON configuration:
 
-The MockPcapServer included in this project follows the same protocol and can be used as a drop-in replacement for testing purposes.
+1. Ensure the JSON file is properly formatted with no syntax errors
+2. Verify that the top-level object has a "connections" key for multi-socket configurations
+3. Check that each connection object has the required fields (host, port)
+
+### Connection Issues
+
+If you have trouble connecting to the servers:
+
+1. Verify that the servers are running and listening on the expected ports
+2. Check for firewall or network issues that might block connections
+3. Increase the connection timeout if needed
+4. Verify that the host and port values in the configuration are correct
+
+### Performance Issues
+
+If you experience performance problems:
+
+1. Adjust the buffer size to better match your data volume
+2. Monitor the ring buffer status to identify bottlenecks
+3. Consider increasing the read timeout for high-latency connections
+4. Reduce the number of connections if the system is overwhelmed
