@@ -36,3 +36,6 @@ grafana-data/
 # SQLite3 DB files
 *.db
 .nfs*
+
+# Add output directory with large binary files
+output/
