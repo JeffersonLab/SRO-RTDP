@@ -36,7 +36,13 @@ public class SimpleMultiSocketTest {
         MultiSocketSource source = null;
         try {
             // Read configuration
-            JSONObject config = new JSONObject(new FileReader(configFile));
+            System.out.println("Reading configuration from: " + configFile);
+            String jsonContent = new String(Files.readAllBytes(Paths.get(configFile)));
+            System.out.println("Raw JSON content: " + jsonContent);
+            
+            JSONObject config = new JSONObject(jsonContent);
+            System.out.println("Parsed JSON: " + config.toString());
+            
             JSONArray connections = config.getJSONArray("connections");
             System.out.println("Using configuration: " + config.toString(4));
             System.out.println();
