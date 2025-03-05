@@ -5,8 +5,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.sound.midi.Sequence;
-
 import com.lmax.disruptor.*;
 
 /**
@@ -46,7 +44,7 @@ public abstract class AbstractConnectionHandler implements Runnable {
      * @return the next event, or null if no more events are available
      * @throws IOException if an I/O error occurs
      */
-    public byte[] getNextEvent() throws IOException {
+    public Event getEvent() throws IOException {
         try {
             long nextSequence = sequence.get() + 1;
 
@@ -59,12 +57,11 @@ public abstract class AbstractConnectionHandler implements Runnable {
 
             if (availableSequence >= nextSequence) {
                 Event event = disruptorRingBuffer.get(nextSequence);
-                byte[] data = event.getData();
-
+                
                 // Advance the sequence
                 sequence.set(nextSequence);
 
-                return data;
+                return event;
             }
 
             return null; // No more events available

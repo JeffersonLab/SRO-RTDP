@@ -31,6 +31,15 @@ java {
     targetCompatibility = JavaVersion.VERSION_11
 }
 
+// Include scripts directory in the source sets
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java', 'scripts']
+        }
+    }
+}
+
 // Set the main class for running the ERSAP source engine
 application {
     mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine'
@@ -73,5 +82,41 @@ task runTest(type: JavaExec) {
     
     if (project.hasProperty('port')) {
         args[1] = project.getProperty('port')
+    }
+}
+
+// Task to run the MockPcapServer
+task runMockServer(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the MockPcapServer'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'scripts.MockPcapServer'
+    
+    // Default arguments (can be overridden from command line)
+    args = ['test-data/example.pcap', '9000']
+    
+    // Allow passing arguments from command line
+    if (project.hasProperty('pcapFile')) {
+        args[0] = project.getProperty('pcapFile')
+    }
+    
+    if (project.hasProperty('port')) {
+        args[1] = project.getProperty('port')
+    }
+}
+
+// Task to run the TestMultiSocketClient
+task runMultiSocketTest(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the TestMultiSocketClient'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'scripts.TestMultiSocketClient'
+    
+    // Default arguments (can be overridden from command line)
+    args = ['test-data/multi-socket-config.json']
+    
+    // Allow passing arguments from command line
+    if (project.hasProperty('configFile')) {
+        args[0] = project.getProperty('configFile')
     }
 } 

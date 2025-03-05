@@ -1,6 +1,7 @@
 package org.jlab.ersap.actor.pcap.source;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +26,7 @@ public class SocketSource implements IESource {
     private RingBuffer<Event> ringBuffer;
     private SocketConnectionHandler connectionHandler;
     private ExecutorService connectionExecutor;
+    private boolean isOpen = false;
     
     /**
      * Constructor.
@@ -58,6 +60,7 @@ public class SocketSource implements IESource {
         
         connectionExecutor = Executors.newSingleThreadExecutor();
         connectionExecutor.submit(connectionHandler);
+        isOpen = true;
     }
     
     @Override
@@ -85,12 +88,15 @@ public class SocketSource implements IESource {
             disruptor.shutdown();
             disruptor = null;
         }
+        
+        isOpen = false;
     }
     
     @Override
-    public Event getEvent() {
+    public byte[] getNextEvent() throws IOException {
         try {
-            return connectionHandler.getEvent();
+            Event event = connectionHandler.getEvent();
+            return event != null ? event.getData() : null;
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error getting event", e);
             return null;
@@ -98,6 +104,20 @@ public class SocketSource implements IESource {
     }
     
     @Override
+    public ByteOrder getByteOrder() {
+        return parameters.getByteOrder();
+    }
+    
+    @Override
+    public boolean isOpen() {
+        return isOpen && connectionHandler != null && connectionHandler.isConnected();
+    }
+    
+    /**
+     * Checks if the source is connected to the socket.
+     * 
+     * @return true if connected, false otherwise
+     */
     public boolean isConnected() {
         return connectionHandler != null && connectionHandler.isConnected();
     }
@@ -137,5 +157,34 @@ public class SocketSource implements IESource {
      */
     public StreamParameters getParameters() {
         return parameters;
+    }
+    
+    /**
+     * Gets the ring buffer status as a formatted string.
+     *
+     * @return the ring buffer status as a formatted string
+     */
+    public String getRingBufferStatusString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SocketSource Status:\n");
+        sb.append("  Host: ").append(parameters.getHost()).append("\n");
+        sb.append("  Port: ").append(parameters.getPort()).append("\n");
+        sb.append("  Connected: ").append(isConnected()).append("\n");
+        sb.append("  Buffer Size: ").append(bufferSize).append("\n");
+        
+        if (connectionHandler != null && connectionHandler.getMonitor() != null) {
+            RingBufferMonitor monitor = connectionHandler.getMonitor();
+            sb.append("  Used Slots: ").append(monitor.getUsedSlots()).append("\n");
+            sb.append("  Available Slots: ").append(monitor.getAvailableSlots()).append("\n");
+            sb.append("  Fill Level: ").append(monitor.getFillLevelPercentage()).append("%\n");
+            sb.append("  Consumer Lag: ").append(monitor.getConsumerLag()).append("\n");
+            sb.append("  Total Events Published: ").append(monitor.getTotalEventsPublished()).append("\n");
+            sb.append("  Total Events Consumed: ").append(monitor.getTotalEventsConsumed()).append("\n");
+            sb.append("  Publish Throughput: ").append(monitor.getPublishThroughput(TimeUnit.SECONDS)).append(" events/s\n");
+        } else {
+            sb.append("  Ring Buffer Monitor: Not Available\n");
+        }
+        
+        return sb.toString();
     }
 } 
