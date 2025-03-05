@@ -182,13 +182,21 @@ This script:
 
 Follow these steps to run the ERSAP integration test:
 
-1. **Build the project**:
+1. **Prerequisites**:
+   
+   You only need the following to run the ERSAP test:
+   
+   - Java 11 or higher
+   - The `pcap-stream-source` directory with its scripts and source code
+   - A PCAP file for testing (the script will look for this at a specific location)
+
+2. **Build the project**:
    ```bash
    cd pcap-stream-source
    ./gradlew build
    ```
 
-2. **Create a JSON configuration file**:
+3. **Create a JSON configuration file**:
    ```bash
    mkdir -p custom-config
    cat > custom-config/multi-socket-config.json << 'EOF'
@@ -236,13 +244,13 @@ Follow these steps to run the ERSAP integration test:
    EOF
    ```
 
-3. **Compile the test components**:
+4. **Compile the test components**:
    ```bash
    javac -d build/classes/java/scripts scripts/MockPcapServer.java
    javac -d build/classes/java/scripts -cp "build/classes/java/main:lib/json-20231013.jar:lib/disruptor-3.4.4.jar:lib/snakeyaml-2.0.jar" scripts/SimpleMultiSocketTest.java
    ```
 
-4. **Run the ERSAP test script**:
+5. **Run the ERSAP test script**:
    ```bash
    ./scripts/run_ersap_test.sh
    ```
@@ -255,13 +263,15 @@ Follow these steps to run the ERSAP integration test:
    - Display performance statistics
    - Clean up resources when done
 
-5. **Analyze the results**:
+   Note: The script assumes you have the necessary PCAP file at the location specified in the script. You may need to modify the script to point to your PCAP file.
+
+6. **Analyze the results**:
    - Check the connection status for each socket
    - Review the throughput metrics
    - Verify that all connections were established successfully
    - Examine any error messages or warnings
 
-6. **Clean up after testing**:
+7. **Clean up after testing**:
    ```bash
    # Kill any remaining MockPcapServer processes
    pkill -f MockPcapServer
