@@ -1,0 +1,20 @@
+{"connections": [
+  {
+    "port": 9000,
+    "packet_count": 1,
+    "ip": "85.117.217.68",
+    "buffer_size": 1024,
+    "host": "localhost",
+    "read_timeout": 30000,
+    "connection_timeout": 5000
+  },
+  {
+    "port": 9001,
+    "packet_count": 1,
+    "ip": "33.31.165.199",
+    "buffer_size": 1024,
+    "host": "localhost",
+    "read_timeout": 30000,
+    "connection_timeout": 5000
+  }
+]}
