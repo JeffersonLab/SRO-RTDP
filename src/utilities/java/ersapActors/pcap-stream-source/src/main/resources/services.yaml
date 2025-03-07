@@ -1,0 +1,32 @@
+---
+io-services:
+  reader:
+    class: org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine
+    name: PcapSource
+  writer:
+    class: org.jlab.ersap.actor.pcap.engine.PcapSinkEngine
+    name: PcapSink
+services:
+  - class: org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine
+    name: PcapProcessor
+configuration:
+  io-services:
+    reader:
+      host: "localhost"
+      port: 9000
+      connection_timeout: 5000
+      read_timeout: 30000
+      buffer_size: 1024
+    writer:
+      output_directory: "output"
+      file_prefix: "pcap_processed"
+      file_extension: ".dat"
+      max_file_size: 104857600  # 100 MB
+      append_timestamp: true
+  services:
+    PcapProcessor:
+      extract_headers: true
+      filter_by_protocol: false
+      protocol_filter: -1
+mime-types:
+  - binary/data-bytes 

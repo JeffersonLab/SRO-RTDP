@@ -37,6 +37,9 @@ sourceSets {
         java {
             srcDirs = ['src/main/java', 'scripts']
         }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
     }
 }
 
@@ -50,7 +53,7 @@ task runSourceEngine(type: JavaExec) {
     group = 'application'
     description = 'Runs the ERSAP source engine'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = application.mainClass
+    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine'
     
     // Default arguments (can be overridden from command line)
     args = ['localhost', '5000']
@@ -63,6 +66,22 @@ task runSourceEngine(type: JavaExec) {
     if (project.hasProperty('port')) {
         args[1] = project.getProperty('port')
     }
+}
+
+// Task to run the ERSAP processor engine
+task runProcessorEngine(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the ERSAP processor engine'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine'
+}
+
+// Task to run the ERSAP sink engine
+task runSinkEngine(type: JavaExec) {
+    group = 'application'
+    description = 'Runs the ERSAP sink engine'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapSinkEngine'
 }
 
 // Task to run a simple test client
@@ -118,5 +137,26 @@ task runMultiSocketTest(type: JavaExec) {
     // Allow passing arguments from command line
     if (project.hasProperty('configFile')) {
         args[0] = project.getProperty('configFile')
+    }
+}
+
+// Task to run the complete PCAP workflow
+task runWorkflow(type: Exec) {
+    group = 'application'
+    description = 'Runs the complete PCAP workflow'
+    workingDir = project.projectDir
+    commandLine 'scripts/run_pcap_workflow.sh'
+    
+    dependsOn build
+}
+
+// Task to deploy the application
+task deploy(type: Copy, dependsOn: jar) {
+    from jar.archiveFile
+    from configurations.runtimeClasspath
+    into "${buildDir}/deploy"
+    
+    doLast {
+        println "Deployed to ${buildDir}/deploy"
     }
 } 
