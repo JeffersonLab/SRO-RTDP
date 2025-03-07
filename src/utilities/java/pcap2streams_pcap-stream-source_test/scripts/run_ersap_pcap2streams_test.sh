@@ -339,14 +339,8 @@ EOF
     # First, make sure the source directory exists
     mkdir -p build/classes/java/scripts
     
-    # Copy the SimpleMultiSocketTest.java file to the new location if it doesn't exist
-    if [ ! -f "$INTEGRATION_DIR/scripts/SimpleMultiSocketTest.java" ]; then
-        echo "Copying SimpleMultiSocketTest.java to integration directory..."
-        cp "$PCAP_STREAM_DIR/scripts/SimpleMultiSocketTest.java" "$INTEGRATION_DIR/scripts/"
-    fi
-    
     # Compile with the correct classpath
-    javac -d build/classes/java/scripts -cp "build/classes/java/main:lib/json-20231013.jar:lib/disruptor-3.4.4.jar:lib/snakeyaml-2.0.jar:src/main/java" scripts/SimpleMultiSocketTest.java
+    javac -d build/classes/java/scripts -cp "build/classes/java/main:lib/json-20231013.jar:lib/disruptor-3.4.4.jar:lib/snakeyaml-2.0.jar:src/main/java" "$INTEGRATION_DIR/scripts/SimpleMultiSocketTest.java"
     
     # Step 6: Run the SimpleMultiSocketTest with the adapted configuration
     echo "Running SimpleMultiSocketTest with the adapted configuration..."
