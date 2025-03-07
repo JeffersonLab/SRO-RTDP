@@ -144,16 +144,30 @@ public class IPBasedPcapServer implements Runnable {
                 }
 
                 // Extract packet length from header (bytes 8-11, little-endian)
-                int packetLength = ((packetHeader[8] & 0xFF) |
-                        ((packetHeader[9] & 0xFF) << 8) |
-                        ((packetHeader[10] & 0xFF) << 16) |
-                        ((packetHeader[11] & 0xFF) << 24));
+                // Use unsigned int to avoid negative values
+                long packetLengthLong = ((packetHeader[8] & 0xFFL) |
+                        ((packetHeader[9] & 0xFFL) << 8) |
+                        ((packetHeader[10] & 0xFFL) << 16) |
+                        ((packetHeader[11] & 0xFFL) << 24));
+
+                // Check for invalid packet length
+                if (packetLengthLong <= 0 || packetLengthLong > 1000000) {
+                    LOGGER.warning("Invalid packet length: " + packetLengthLong + " at position " + position
+                            + ". Skipping packet.");
+                    continue;
+                }
 
                 // Limit packet size to avoid overwhelming the client
-                int actualLength = Math.min(packetLength, MAX_PACKET_SIZE);
+                int actualLength = (int) Math.min(packetLengthLong, MAX_PACKET_SIZE);
 
                 // Read packet data
-                packetData = new byte[actualLength];
+                try {
+                    packetData = new byte[actualLength];
+                } catch (NegativeArraySizeException e) {
+                    LOGGER.warning("Invalid packet length (negative): " + actualLength + " at position " + position
+                            + ". Skipping packet.");
+                    continue;
+                }
                 int dataBytesRead = pcapRaf.read(packetData, 0, actualLength);
 
                 if (dataBytesRead < actualLength) {
