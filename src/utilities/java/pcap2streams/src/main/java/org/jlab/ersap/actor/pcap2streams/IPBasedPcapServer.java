@@ -117,6 +117,7 @@ public class IPBasedPcapServer implements Runnable {
      */
     private void handleClient(Socket clientSocket) {
         int packetCount = 0;
+        int successCount = 0;
 
         try (RandomAccessFile pcapRaf = new RandomAccessFile(pcapFile, "r");
                 DataOutputStream clientOut = new DataOutputStream(clientSocket.getOutputStream())) {
@@ -150,15 +151,18 @@ public class IPBasedPcapServer implements Runnable {
                         ((packetHeader[10] & 0xFFL) << 16) |
                         ((packetHeader[11] & 0xFFL) << 24));
 
-                // Check for invalid packet length
-                if (packetLengthLong <= 0 || packetLengthLong > 1000000) {
+                // Check for invalid packet length - only consider negative lengths as invalid
+                // For very large packets, we'll still cap at a reasonable maximum
+                if (packetLengthLong <= 0) {
                     LOGGER.warning("Invalid packet length: " + packetLengthLong + " at position " + position
                             + ". Skipping packet.");
                     continue;
                 }
 
                 // Limit packet size to avoid overwhelming the client
-                int actualLength = (int) Math.min(packetLengthLong, MAX_PACKET_SIZE);
+                // Use a much higher maximum size (10MB) but still have some limit for safety
+                final int MAX_REASONABLE_PACKET_SIZE = 10 * 1024 * 1024; // 10MB
+                int actualLength = (int) Math.min(packetLengthLong, MAX_REASONABLE_PACKET_SIZE);
 
                 // Read packet data
                 try {
@@ -176,6 +180,28 @@ public class IPBasedPcapServer implements Runnable {
                 }
 
                 try {
+                    // Log packet information for debugging
+                    if (packetCount % 1000 == 0) {
+                        LOGGER.info("Sending packet #" + packetCount + " for IP " + ipAddress +
+                                ", length=" + actualLength +
+                                ", position=" + position);
+
+                        // Log the first few bytes of the packet header
+                        StringBuilder headerHex = new StringBuilder("Header bytes: ");
+                        for (int i = 0; i < PACKET_HEADER_SIZE; i++) {
+                            headerHex.append(String.format("%02X ", packetHeader[i] & 0xFF));
+                        }
+                        LOGGER.info(headerHex.toString());
+
+                        // Log the first few bytes of the packet data
+                        int bytesToLog = Math.min(dataBytesRead, 16);
+                        StringBuilder dataHex = new StringBuilder("Data bytes: ");
+                        for (int i = 0; i < bytesToLog; i++) {
+                            dataHex.append(String.format("%02X ", packetData[i] & 0xFF));
+                        }
+                        LOGGER.info(dataHex.toString());
+                    }
+
                     // First send the packet length (4 bytes)
                     clientOut.writeInt(actualLength);
 
@@ -183,6 +209,7 @@ public class IPBasedPcapServer implements Runnable {
                     clientOut.write(packetData, 0, actualLength);
                     clientOut.flush();
                     packetCount++;
+                    successCount++;
 
                     if (packetCount % 100 == 0) {
                         LOGGER.info("Sent " + packetCount + " packets for IP " + ipAddress);
@@ -199,7 +226,9 @@ public class IPBasedPcapServer implements Runnable {
                 }
             }
 
-            LOGGER.info("Finished sending packets for IP " + ipAddress);
+            LOGGER.info("Finished sending packets for IP " + ipAddress +
+                    ". Total packets: " + packetCount +
+                    ", Successfully sent: " + successCount);
 
         } catch (IOException e) {
             LOGGER.log(Level.SEVERE, "Error handling client for IP " + ipAddress, e);
