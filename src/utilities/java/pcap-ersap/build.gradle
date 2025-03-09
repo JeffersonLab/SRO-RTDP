@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+    flatDir {
+        dirs 'lib'
+    }
+}
+
+dependencies {
+    implementation files('lib/ersap-base-1.0-SNAPSHOT.jar')
+    implementation files('lib/ersap-engine-1.0-SNAPSHOT.jar')
+    implementation files('lib/ersap-std-services-1.0-SNAPSHOT.jar')
+    implementation files('lib/ersap-java-1.0-SNAPSHOT.jar')
+    implementation 'org.json:json:20231013'
+    implementation 'com.lmax:disruptor:3.4.4'
+    implementation 'org.yaml:snakeyaml:2.0'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'org.jlab.ersap.actor.pcap.ActorSystemMain'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+sourceCompatibility = 11
+targetCompatibility = 11
