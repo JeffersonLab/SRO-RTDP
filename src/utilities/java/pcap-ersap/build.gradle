@@ -14,7 +14,7 @@ dependencies {
     implementation files('lib/ersap-engine-1.0-SNAPSHOT.jar')
     implementation files('lib/ersap-std-services-1.0-SNAPSHOT.jar')
     implementation files('lib/ersap-java-1.0-SNAPSHOT.jar')
-    implementation 'org.json:json:20231013'
+    implementation files('lib/json-20231013.jar')
     implementation 'com.lmax:disruptor:3.4.4'
     implementation 'org.yaml:snakeyaml:2.0'
 }
