@@ -21,17 +21,41 @@ if ! pgrep -f "pcap2streams" > /dev/null; then
     echo "Starting pcap2streams..."
     cd /workspace/src/utilities/java/pcap2streams
     
+    # Create the custom-config directory if it doesn't exist
+    mkdir -p custom-config
+    
+    # Create the ip-based-config.json file
+    echo "Creating ip-based-config.json file..."
+    cat > custom-config/ip-based-config.json << 'EOF'
+{
+  "connections": [
+    {
+      "ip": "192.168.10.1",
+      "port": 9000
+    },
+    {
+      "ip": "192.168.10.2",
+      "port": 9001
+    },
+    {
+      "ip": "192.168.10.3",
+      "port": 9002
+    }
+  ]
+}
+EOF
+    
     # Use the PCAP file from /scratch/jeng-yuantsai/
     PCAP_FILE="/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap"
     
     # Check if the file exists
     if [ -f "$PCAP_FILE" ]; then
         echo "Using PCAP file: $PCAP_FILE"
-        ./pcap2streams -f "$PCAP_FILE" -c /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json &
+        ./pcap2streams -f "$PCAP_FILE" -c custom-config/ip-based-config.json &
     else
         echo "PCAP file not found: $PCAP_FILE"
         echo "Using default test PCAP file"
-        ./pcap2streams -f /workspace/src/utilities/java/pcap2streams/pcap/test.pcap -c /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json &
+        ./pcap2streams -f pcap/test.pcap -c custom-config/ip-based-config.json &
     fi
     
     PCAP2STREAMS_PID=$!
@@ -47,6 +71,10 @@ fi
 
 # Create output directory if it doesn't exist
 mkdir -p $ERSAP_USER_DATA/output
+
+# Update the config file path in pcap-services.yaml
+echo "Updating config file path in pcap-services.yaml..."
+sed -i 's|config_file:.*|config_file: /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json|g' $ERSAP_USER_DATA/config/pcap-services.yaml
 
 # Compile the application
 echo "Compiling application..."
