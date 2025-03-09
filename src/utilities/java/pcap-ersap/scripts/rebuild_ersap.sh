@@ -33,9 +33,13 @@ echo "Creating Orchestrator class..."
 cat > $ERSAP_HOME/build/classes/java/main/org/jlab/epsci/ersap/sys/Orchestrator.java << 'EOF'
 package org.jlab.epsci.ersap.sys;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
@@ -56,6 +60,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Orchestrator {
     private static final Logger LOGGER = Logger.getLogger(Orchestrator.class.getName());
@@ -67,6 +73,7 @@ public class Orchestrator {
     private final AtomicBoolean running = new AtomicBoolean(true);
     private final ConcurrentHashMap<String, BufferedWriter> writers = new ConcurrentHashMap<>();
     private final AtomicLong packetCounter = new AtomicLong(0);
+    private String configFile;
     
     public static void main(String[] args) {
         System.out.println("ERSAP Orchestrator starting...");
@@ -77,6 +84,7 @@ public class Orchestrator {
             
             try {
                 Orchestrator orchestrator = new Orchestrator();
+                orchestrator.configFile = configFile;
                 orchestrator.start();
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Error running orchestrator", e);
@@ -99,8 +107,8 @@ public class Orchestrator {
             LOGGER.info("Using existing output directory: " + OUTPUT_DIR);
         }
 
-        // For simplicity, hardcode some connections
-        setupHardcodedConnections();
+        // Read connections from configuration
+        readConnectionsFromConfig();
 
         if (connections.isEmpty()) {
             LOGGER.warning("No connections configured");
@@ -159,6 +167,68 @@ public class Orchestrator {
         System.out.println("Processing complete.");
     }
     
+    private void readConnectionsFromConfig() {
+        // Extract the IP-based config file path from the YAML config
+        String ipConfigFile = extractIpConfigFilePath();
+        if (ipConfigFile == null) {
+            // Fall back to hardcoded connections if we can't find the config
+            setupHardcodedConnections();
+            return;
+        }
+        
+        LOGGER.info("Reading connections from config file: " + ipConfigFile);
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(ipConfigFile))) {
+            StringBuilder jsonContent = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                jsonContent.append(line);
+            }
+            
+            String content = jsonContent.toString();
+            
+            // Extract connection information using regex
+            Pattern connectionPattern = Pattern.compile("\\{\\s*\"port\":\\s*(\\d+),\\s*\"packet_count\":\\s*(\\d+),\\s*\"ip\":\\s*\"([^\"]+)\",\\s*\"buffer_size\":\\s*(\\d+),\\s*\"host\":\\s*\"([^\"]+)\"");
+            Matcher matcher = connectionPattern.matcher(content);
+            
+            while (matcher.find()) {
+                ConnectionInfo connection = new ConnectionInfo();
+                connection.port = Integer.parseInt(matcher.group(1));
+                connection.ip = matcher.group(3);
+                connection.host = matcher.group(5);
+                
+                connections.add(connection);
+                LOGGER.info("Added connection for IP: " + connection.ip + " on port: " + connection.port);
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Error reading config file: " + ipConfigFile, e);
+            // Fall back to hardcoded connections
+            setupHardcodedConnections();
+        }
+    }
+    
+    private String extractIpConfigFilePath() {
+        if (configFile == null) {
+            return null;
+        }
+        
+        try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
+            String line;
+            Pattern configFilePattern = Pattern.compile("\\s*config_file:\\s*(.+)");
+            
+            while ((line = reader.readLine()) != null) {
+                Matcher matcher = configFilePattern.matcher(line);
+                if (matcher.matches()) {
+                    return matcher.group(1);
+                }
+            }
+        } catch (IOException e) {
+            LOGGER.log(Level.SEVERE, "Error reading YAML config file: " + configFile, e);
+        }
+        
+        return null;
+    }
+    
     private void setupHardcodedConnections() {
         // Add some hardcoded connections for testing
         // These should match the ports used by pcap2streams
@@ -179,73 +249,153 @@ public class Orchestrator {
         try (Socket socket = new Socket(connection.host, connection.port)) {
             LOGGER.info("Connected to " + connection.host + ":" + connection.port + " for IP " + connection.ip);
 
-            InputStream in = socket.getInputStream();
+            // Create a debug file for this connection
+            String debugFileName = "debug_" + connection.ip + "_" + connection.port + ".txt";
+            Path debugFilePath = Paths.get(OUTPUT_DIR, debugFileName);
+            BufferedWriter debugWriter = Files.newBufferedWriter(
+                    debugFilePath,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING,
+                    StandardOpenOption.WRITE);
+            
+            debugWriter.write("Debug log for connection: " + connection.ip + ":" + connection.port + "\n");
+            debugWriter.write("Started at: " + new java.util.Date() + "\n");
+            debugWriter.flush();
+
+            // Use DataInputStream to read binary data
+            DataInputStream in = new DataInputStream(socket.getInputStream());
             byte[] buffer = new byte[16384]; // 16KB buffer
+            int packetCount = 0;
 
             while (running.get()) {
                 try {
-                    // Read packet header (12 bytes)
-                    byte[] header = new byte[12];
-                    int headerBytesRead = in.read(header, 0, 12);
-
-                    if (headerBytesRead < 12) {
-                        LOGGER.warning("Incomplete header received, expected 12 bytes but got " + headerBytesRead);
-                        continue;
+                    // Read packet length (4 bytes)
+                    int packetSize;
+                    try {
+                        packetSize = in.readInt();
+                        debugWriter.write("\n--- Packet #" + packetCount + " ---\n");
+                        debugWriter.write("Packet size read: " + packetSize + "\n");
+                    } catch (EOFException e) {
+                        debugWriter.write("\nEnd of stream reached\n");
+                        debugWriter.flush();
+                        break;
                     }
 
-                    // Parse header
-                    int packetSize = ((header[8] & 0xFF) << 24) |
-                            ((header[9] & 0xFF) << 16) |
-                            ((header[10] & 0xFF) << 8) |
-                            (header[11] & 0xFF);
-
-                    if (packetSize <= 0 || packetSize > buffer.length) {
+                    if (packetSize <= 0) {
                         LOGGER.warning("Invalid packet length: " + packetSize);
+                        debugWriter.write("INVALID PACKET LENGTH: " + packetSize + "\n");
+                        debugWriter.flush();
                         continue;
                     }
+
+                    // Use a reasonable maximum size for safety
+                    final int MAX_REASONABLE_PACKET_SIZE = 10 * 1024 * 1024; // 10MB
+                    int actualSize = Math.min(packetSize, buffer.length);
+                    if (packetSize > buffer.length) {
+                        LOGGER.warning("Packet size " + packetSize + " exceeds buffer size " + buffer.length + 
+                                      ". Reading only " + buffer.length + " bytes.");
+                        debugWriter.write("PACKET SIZE EXCEEDS BUFFER: " + packetSize + " > " + buffer.length + "\n");
+                    }
+                    debugWriter.write("Actual size to read: " + actualSize + "\n");
 
                     // Read packet data
-                    int bytesRead = in.read(buffer, 0, packetSize);
+                    int bytesRead = 0;
+                    int totalBytesRead = 0;
+                    
+                    // Read in chunks until we get all the data or reach the buffer limit
+                    while (totalBytesRead < actualSize) {
+                        bytesRead = in.read(buffer, totalBytesRead, actualSize - totalBytesRead);
+                        if (bytesRead == -1) {
+                            // End of stream
+                            debugWriter.write("END OF STREAM while reading packet data\n");
+                            debugWriter.flush();
+                            break;
+                        }
+                        totalBytesRead += bytesRead;
+                    }
+                    
+                    debugWriter.write("Data bytes read: " + totalBytesRead + "\n");
 
-                    if (bytesRead < packetSize) {
+                    if (totalBytesRead < actualSize) {
                         LOGGER.warning(
-                                "Incomplete packet received, expected " + packetSize + " bytes but got " + bytesRead);
+                                "Incomplete packet received, expected " + actualSize + " bytes but got " + totalBytesRead);
+                        debugWriter.write("INCOMPLETE PACKET: expected " + actualSize + " bytes but got " + totalBytesRead + "\n");
+                        debugWriter.flush();
                         continue;
                     }
 
+                    // Skip remaining bytes if packet is larger than our buffer
+                    if (packetSize > buffer.length) {
+                        long bytesToSkip = packetSize - buffer.length;
+                        long bytesSkipped = 0;
+                        while (bytesSkipped < bytesToSkip) {
+                            long skipped = in.skip(bytesToSkip - bytesSkipped);
+                            if (skipped <= 0) {
+                                break;
+                            }
+                            bytesSkipped += skipped;
+                        }
+                        debugWriter.write("Skipped " + bytesSkipped + " bytes\n");
+                    }
+
+                    // Log first few bytes of data
+                    int bytesToLog = Math.min(totalBytesRead, 32);
+                    debugWriter.write("First " + bytesToLog + " data bytes (hex): ");
+                    for (int i = 0; i < bytesToLog; i++) {
+                        debugWriter.write(String.format("%02X ", buffer[i] & 0xFF));
+                    }
+                    debugWriter.write("\n");
+
                     // Extract MAC addresses and EtherType
-                    String destMac = String.format("%02X:%02X:%02X:%02X:%02X:%02X",
-                            buffer[0] & 0xFF, buffer[1] & 0xFF, buffer[2] & 0xFF,
-                            buffer[3] & 0xFF, buffer[4] & 0xFF, buffer[5] & 0xFF);
+                    if (totalBytesRead >= 14) {
+                        String destMac = String.format("%02X:%02X:%02X:%02X:%02X:%02X",
+                                buffer[0] & 0xFF, buffer[1] & 0xFF, buffer[2] & 0xFF,
+                                buffer[3] & 0xFF, buffer[4] & 0xFF, buffer[5] & 0xFF);
 
-                    String sourceMac = String.format("%02X:%02X:%02X:%02X:%02X:%02X",
-                            buffer[6] & 0xFF, buffer[7] & 0xFF, buffer[8] & 0xFF,
-                            buffer[9] & 0xFF, buffer[10] & 0xFF, buffer[11] & 0xFF);
+                        String sourceMac = String.format("%02X:%02X:%02X:%02X:%02X:%02X",
+                                buffer[6] & 0xFF, buffer[7] & 0xFF, buffer[8] & 0xFF,
+                                buffer[9] & 0xFF, buffer[10] & 0xFF, buffer[11] & 0xFF);
 
-                    int etherType = ((buffer[12] & 0xFF) << 8) | (buffer[13] & 0xFF);
+                        int etherType = ((buffer[12] & 0xFF) << 8) | (buffer[13] & 0xFF);
 
-                    // Create packet event
-                    long packetId = packetCounter.getAndIncrement();
-                    PacketEvent event = new PacketEvent(
-                            packetId,
-                            connection.ip, // sourceIp
-                            "unknown", // destinationIp
-                            "unknown", // protocol
-                            etherType,
-                            buffer,
-                            System.currentTimeMillis());
+                        debugWriter.write("Dest MAC: " + destMac + "\n");
+                        debugWriter.write("Source MAC: " + sourceMac + "\n");
+                        debugWriter.write("EtherType: 0x" + Integer.toHexString(etherType) + "\n");
 
-                    // Process the packet
-                    processPacket(event);
+                        // Create packet event
+                        long packetId = packetCounter.getAndIncrement();
+                        PacketEvent event = new PacketEvent(
+                                packetId,
+                                connection.ip, // sourceIp
+                                "unknown", // destinationIp
+                                "unknown", // protocol
+                                etherType,
+                                buffer,
+                                System.currentTimeMillis());
+
+                        // Process the packet
+                        processPacket(event);
+                        debugWriter.write("Processed packet #" + packetId + "\n");
+                    } else {
+                        debugWriter.write("Packet too small to extract MAC addresses and EtherType\n");
+                    }
+                    
+                    debugWriter.flush();
+                    packetCount++;
 
                 } catch (IOException e) {
                     if (running.get()) {
                         LOGGER.log(Level.WARNING, "Error reading from socket for IP: " + connection.ip, e);
+                        debugWriter.write("ERROR: " + e.getMessage() + "\n");
+                        debugWriter.flush();
                     }
                     break;
                 }
             }
 
+            debugWriter.write("\nConnection closed after processing " + packetCount + " packets\n");
+            debugWriter.write("Ended at: " + new java.util.Date() + "\n");
+            debugWriter.close();
             LOGGER.info("Reader thread for IP " + connection.ip + " completed");
 
         } catch (IOException e) {
