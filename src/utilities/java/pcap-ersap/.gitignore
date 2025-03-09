@@ -1,0 +1,8 @@
+# Build artifacts
+build/
+.gradle/
+*.class
+*.jar
+output/
+*.pcap
+*.log

@@ -1,0 +1,66 @@
+---
+io-services:
+  reader:
+    class: org.jlab.ersap.actor.pcap.services.PcapSourceService
+    name: pcap-source
+    config:
+      config_file: /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json
+      debug: true
+  writer:
+    class: org.jlab.ersap.actor.pcap.services.PcapSinkService
+    name: pcap-sink
+    config:
+      output_dir: /workspace/src/utilities/java/pcap-ersap/output
+      debug: true
+
+services:
+  - class: org.jlab.ersap.actor.pcap.services.PcapProcessorService
+    name: pcap-processor
+    config:
+      protocol_filter: ""
+      ip_filter: ""
+      debug: true
+
+mime-types:
+  - binary/pcap-event
+
+# Container configuration
+container:
+  name: pcap
+  type: java
+  pools:
+    - name: default
+      size: 2
+    - name: processor
+      size: 4
+
+# Service deployment
+services-map:
+  - name: pcap-source
+    container: pcap
+    pool: default
+  - name: pcap-processor
+    container: pcap
+    pool: processor
+  - name: pcap-sink
+    container: pcap
+    pool: default
+
+configuration:
+  io-services:
+    reader:
+      config_file: /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json
+      debug: true
+    writer:
+      output_dir: /workspace/src/utilities/java/pcap-ersap/output
+      debug: true
+  
+  services:
+    pcap-processor:
+      protocol_filter: ""
+      ip_filter: ""
+      debug: true
+
+global:
+  threads: 4
+  log-level: FINEST 

@@ -4,12 +4,9 @@ __pycache__
 
 # Java Binary files
 *.class
-
-# graphviz flowchart files
-*.gv
-*.pdf
-
-# logfiles
+*.jar
+output/
+*.pcap
 *.log
 
 # built files
