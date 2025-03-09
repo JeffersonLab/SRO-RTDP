@@ -24,15 +24,26 @@ This file contains information about the TCP servers created for each unique IP 
 
 ## Running the System
 
-Two scripts are provided to run the system:
+The following scripts are provided to run the system:
 
-### 1. run_ersap_orchestrator.sh
+### 1. rebuild_ersap.sh
 
-This script:
-- Rebuilds the ERSAP environment
-- Fixes package structure and imports
-- Runs `pcap2streams` to generate the configuration file
-- Compiles the application
+This script rebuilds the ERSAP environment from scratch, including:
+- Setting up environment variables
+- Creating necessary directories
+- Compiling Java classes
+- Creating JAR files
+- Setting up configuration files
+
+```bash
+cd /workspace/src/utilities/java/pcap-ersap
+./scripts/rebuild_ersap.sh
+```
+
+### 2. run_ersap_orchestrator.sh
+
+This script runs the ERSAP orchestrator with the rebuilt environment:
+- Starts `pcap2streams` to generate the configuration file
 - Starts the ERSAP orchestrator
 - Processes the data
 - Checks output files
@@ -42,13 +53,28 @@ cd /workspace/src/utilities/java/pcap-ersap
 ./scripts/run_ersap_orchestrator.sh
 ```
 
-### 2. run_ersap_orchestrator_new.sh
+### 3. debug_pcap2streams.sh
 
-This is an alternative script with the same functionality.
+This script helps debug the `pcap2streams` application to understand why the configuration file might not be created:
+- Runs `pcap2streams` with verbose output
+- Checks for the configuration file
+- Provides diagnostic information
 
 ```bash
 cd /workspace/src/utilities/java/pcap-ersap
-./scripts/run_ersap_orchestrator_new.sh
+./scripts/debug_pcap2streams.sh
+```
+
+### 4. test_pcap2streams.sh
+
+This script tests if `pcap2streams` creates the configuration file correctly:
+- Runs `pcap2streams` with specific parameters
+- Verifies the configuration file is created
+- Displays the content of the configuration file
+
+```bash
+cd /workspace/src/utilities/java/pcap-ersap
+./scripts/test_pcap2streams.sh
 ```
 
 ## Troubleshooting
@@ -135,7 +161,6 @@ PacketEvent{packetId=0, sourceIp='192.168.10.1', destinationIp='unknown', protoc
 - **"Invalid packet length" warnings**: This is normal. The `pcap2streams` tool may send data that doesn't match the expected packet format. These packets are skipped by the workflow.
 - **No output files**: Check that the `pcap2streams` tool is running and that the configuration files are correct.
 - **ERSAP orchestrator fails to start**: Check that all the necessary JAR files are present in the correct locations.
-- **Compilation errors**: Run the `fix_package_structure.sh` and `fix_imports.sh` scripts to ensure the code is structured correctly.
 - **Socket connection errors**: Ensure that `pcap2streams` is running and listening on the expected ports.
 
 ## Monitoring
