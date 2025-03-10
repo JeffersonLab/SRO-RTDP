@@ -8,7 +8,7 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
 
    ```bash
     # Only ask for 1 GPU on node sciml2401
-    bash-5.1$ srun -p gpu -w sciml2401 --gres=gpu:A800:1 --mem=24G --pty bash
+    bash-5.1$ srun -p gpu --gres=gpu:A800:1 --mem=24G --pty bash
     srun: job xxxxxxxx queued and waiting for resources
     srun: job xxxxxxxx has been allocated resources
     bash-5.1$ hostname
