@@ -35,15 +35,15 @@ The Orchestrator implementation includes:
 
 ERSAP services are the building blocks of the data processing workflow. Each service performs a specific task, such as reading data from a source, processing data, or writing data to a destination.
 
-In our PCAP processing workflow, we have the following services:
+In our PCAP processing workflow, we have the following engine services:
 
-1. **PcapSourceService**: Connects to socket servers and reads packets.
-2. **PcapProcessorService**: Processes and filters packets based on protocol and IP address.
-3. **PcapSinkService**: Writes processed packets to output files.
+1. **PcapSourceEngine**: Connects to socket servers and reads packets.
+2. **PcapProcessorEngine**: Processes and filters packets based on protocol and IP address.
+3. **PcapSinkEngine**: Writes processed packets to output files.
 
 ### Service Interface
 
-All ERSAP services implement the `IEngine` interface, which defines the following methods:
+All ERSAP engine services implement the `IEngine` interface, which defines the following methods:
 
 - `configure(EngineData input)`: Configures the service with the provided input data.
 - `execute(EngineData input)`: Executes the service with the provided input data.
@@ -76,35 +76,32 @@ The ERSAP orchestration is configured using a YAML file that specifies the servi
 ### Example Configuration
 
 ```yaml
+io-services:
+  reader:
+    class: org.jlab.ersap.actor.pcap.engine.PcapSourceEngine
+    name: Source
+  writer:
+    class: org.jlab.ersap.actor.pcap.engine.PcapSinkEngine
+    name: Sink
 services:
-  - class: org.jlab.ersap.actor.pcap.services.PcapSourceService
-    name: PcapSource
-    inputs:
-      - config
-    outputs:
-      - packets
-    configuration:
-      ip: 192.168.10.1
-      port: 9000
-
-  - class: org.jlab.ersap.actor.pcap.services.PcapProcessorService
-    name: PcapProcessor
-    inputs:
-      - packets
-    outputs:
-      - processed_packets
-    configuration:
+  - class: org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine
+    name: Processor
+configuration:
+  io-services:
+    reader:
+      connections:
+        - ip: "192.168.10.1"
+          host: "localhost"
+          port: 9000
+      ringBufferSize: 1024
+      socketBufferSize: 1024
+      connectionTimeout: 5000
+      readTimeout: 30
+    writer:
+      outputDir: "output"
+  services:
+    Processor:
       filter: "ip.src == 192.168.10.1"
-
-  - class: org.jlab.ersap.actor.pcap.services.PcapSinkService
-    name: PcapSink
-    inputs:
-      - processed_packets
-    outputs:
-      - output
-    configuration:
-      output_dir: /workspace/src/utilities/java/pcap-ersap/output
-```
 
 ## Execution Flow
 
@@ -121,11 +118,11 @@ The execution flow of the ERSAP orchestration is as follows:
 
 In our PCAP processing workflow, packets are processed as follows:
 
-1. The `PcapSourceService` connects to socket servers and reads packets.
-2. The packets are encapsulated in `EngineData` objects and sent to the `PcapProcessorService`.
-3. The `PcapProcessorService` processes and filters the packets based on protocol and IP address.
-4. The processed packets are encapsulated in `EngineData` objects and sent to the `PcapSinkService`.
-5. The `PcapSinkService` writes the processed packets to output files.
+1. The `PcapSourceEngine` connects to socket servers and reads packets.
+2. The packets are encapsulated in `EngineData` objects and sent to the `PcapProcessorEngine`.
+3. The `PcapProcessorEngine` processes and filters the packets based on protocol and IP address.
+4. The processed packets are encapsulated in `EngineData` objects and sent to the `PcapSinkEngine`.
+5. The `PcapSinkEngine` writes the processed packets to output files.
 
 ## Error Handling
 
