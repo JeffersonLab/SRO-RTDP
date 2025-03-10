@@ -360,7 +360,7 @@ int main(int narg, char *argv[]){
         if (!sent) {
             std::cerr << "Error: ZeroMQ send failed!" << std::endl;
         } else {
-            std::cout << "Sent [" << h_out.size() << "] bytes via ZeroMQ socket." << std::endl;
+            std::cout << "Sent [" << h_out.size() * sizeof(float) << "] bytes via ZeroMQ socket.\n" << std::endl;
         }
 
         CUDA_CALL(cudaFree(d_in));

@@ -51,9 +51,9 @@ def main():
     try:
         while True:
             if args.all_ones:
-                data = np.ones(DATA_NUMPY_WIDTH, dtype=np.float32)  # Sending an array of ones
+                data = np.ones(args.group_size, dtype=np.float32)  # Sending an array of ones
             else:
-                data = np.random.rand(DATA_NUMPY_WIDTH).astype(np.float32)  # Sending random floating point values
+                data = np.random.rand(args.group_size).astype(np.float32)  # Sending random floating point values
             
             socket.send(data.tobytes())
     except KeyboardInterrupt:
