@@ -85,8 +85,6 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
 
 3. Prepare a receiver (chained after GPU Proxy) with Python helper
    ```bash
-   (zmq) bash-5.1$ pip install pyzmq numpy
    (zmq) bash-5.1$ python python_zmq_helper/zmq_fp_receiver.py  # receive at localhost:55556
-   Received: [517.65393 513.569   519.39746 527.43134 502.33954 520.2516  501.3357
- 511.63293 506.3226  520.5004 ]
+   Received: [517.65393 513.569   519.39746 527.43134 502.33954 520.2516  501.3357  511.63293 506.3226  520.5004 ]
    ```
