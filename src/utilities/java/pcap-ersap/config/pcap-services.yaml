@@ -1,25 +1,15 @@
 ---
 io-services:
   reader:
-    class: org.jlab.ersap.actor.pcap.services.PcapSourceService
+    class: org.jlab.ersap.actor.pcap.services.PcapSourceEngine
     name: pcap-source
-    config:
-      config_file: /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json
-      debug: true
   writer:
-    class: org.jlab.ersap.actor.pcap.services.PcapSinkService
+    class: org.jlab.ersap.actor.pcap.services.PcapSinkEngine
     name: pcap-sink
-    config:
-      output_dir: /workspace/src/utilities/java/pcap-ersap/output
-      debug: true
 
 services:
-  - class: org.jlab.ersap.actor.pcap.services.PcapProcessorService
+  - class: org.jlab.ersap.actor.pcap.services.PcapProcessorEngine
     name: pcap-processor
-    config:
-      protocol_filter: ""
-      ip_filter: ""
-      debug: true
 
 mime-types:
   - binary/pcap-event
@@ -50,6 +40,11 @@ configuration:
   io-services:
     reader:
       config_file: /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json
+      streamHost: "localhost"
+      streamPort: 7777
+      ringBufferSize: 1024
+      connectionTimeout: 5000
+      readTimeout: 2000
       debug: true
     writer:
       output_dir: /workspace/src/utilities/java/pcap-ersap/output
