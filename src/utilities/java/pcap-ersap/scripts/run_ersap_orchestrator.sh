@@ -3,6 +3,7 @@
 # Default configuration
 SOCKET_BUFFER_SIZE=16384
 RING_BUFFER_SIZE=1024
+PCAP_FILE="/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -15,9 +16,13 @@ while [[ $# -gt 0 ]]; do
       RING_BUFFER_SIZE="${1#*=}"
       shift
       ;;
+    --pcap-file=*)
+      PCAP_FILE="${1#*=}"
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: $0 [--socket-buffer-size=SIZE] [--ring-buffer-size=SIZE]"
+      echo "Usage: $0 [--socket-buffer-size=SIZE] [--ring-buffer-size=SIZE] [--pcap-file=PATH]"
       exit 1
       ;;
   esac
@@ -25,6 +30,7 @@ done
 
 echo "Using socket buffer size: $SOCKET_BUFFER_SIZE"
 echo "Using ring buffer size: $RING_BUFFER_SIZE"
+echo "Using PCAP file: $PCAP_FILE"
 
 # Set environment variables
 export ERSAP_HOME=/workspace/src/utilities/java/ersapActors/ersap-java
@@ -50,14 +56,23 @@ if pgrep -f "pcap2streams" > /dev/null; then
 else
     echo "pcap2streams is not running"
     # Check if PCAP file exists
-    if [ -f "/workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap" ]; then
-        echo "Starting pcap2streams with PCAP file: /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap"
-        cd /workspace/src/utilities/java/pcap2streams && ./pcap2streams /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap &
+    if [ -f "$PCAP_FILE" ]; then
+        echo "Starting pcap2streams with PCAP file: $PCAP_FILE"
+        cd /workspace/src/utilities/java/pcap2streams && ./pcap2streams "$PCAP_FILE" &
         STARTED_PCAP2STREAMS=true
         sleep 2
     else
-        echo "PCAP file does not exist: /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap"
-        exit 1
+        echo "PCAP file does not exist: $PCAP_FILE"
+        echo "Checking for default PCAP file..."
+        if [ -f "/workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap" ]; then
+            echo "Using default PCAP file: /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap"
+            cd /workspace/src/utilities/java/pcap2streams && ./pcap2streams /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap &
+            STARTED_PCAP2STREAMS=true
+            sleep 2
+        else
+            echo "Default PCAP file not found either. Exiting."
+            exit 1
+        fi
     fi
 fi
 
