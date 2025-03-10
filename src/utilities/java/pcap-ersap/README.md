@@ -377,7 +377,6 @@ configuration:
       outputDir: "output"
   services:
     Processor:
-      filter: "ip.src == 192.168.10.1"
 ```
 
 ## Building and Running
@@ -412,7 +411,3 @@ ersap> start
 - LMAX Disruptor: Used for high-performance inter-thread communication.
 - JSON: Used for parsing configuration files.
 - SnakeYAML: Used for parsing YAML configuration files.
-
-## License
-
-This project is licensed under the Apache License 2.0. 
