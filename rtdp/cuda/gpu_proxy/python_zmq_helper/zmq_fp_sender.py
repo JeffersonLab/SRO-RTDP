@@ -35,6 +35,8 @@ def main():
                         "--ip-addr", required=True, help="IP address to send data to")
     parser.add_argument("-p",
                         "--port", type=int, default=55555, help="Port number to send data to (default: 55555)")
+    parser.add_argument("--group-size", type=int, default=DATA_NUMPY_WIDTH,
+                        help="Group data to this width (default: 2048)")
     parser.add_argument("-i",
                         "--all-ones", action="store_true", help="Send all ones if enabled (default: random values)")
     

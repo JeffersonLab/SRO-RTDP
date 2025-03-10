@@ -5,7 +5,7 @@ This script listens for floating-point data sent via ZeroMQ (ZMQ) using a PULL s
 It continuously receives binary-encoded NumPy arrays from a sender and prints them to the screen.
 
 Usage:
-    # Run with the default port (55555)
+    # Run with the default port (55556)
     python zmq_fp_receiver.py
 
     # Run with a custom port
@@ -29,7 +29,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="ZMQ Floating Point Data Receiver")
-    parser.add_argument("-p", "--port", type=int, default=55555, help="Port number to receive data on (default: 55555)")
+    parser.add_argument("-p", "--port", type=int, default=55556, help="Port number to receive data on (default: 55555)")
     
     args = parser.parse_args()
     
@@ -43,7 +43,7 @@ def main():
         while True:
             message = socket.recv()
             data = np.frombuffer(message, dtype=np.float32)
-            print("Received:", data)
+            print("Received:", data[:10])
     except KeyboardInterrupt:
         print("\nTerminating receiver.")
     finally:
