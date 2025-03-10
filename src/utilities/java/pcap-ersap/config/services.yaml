@@ -12,10 +12,21 @@ services:
 configuration:
   io-services:
     reader:
-      streamHost: "localhost"
-      streamPort: 9001
+      connections:
+        - ip: "129.57.69.15"
+          host: "localhost"
+          port: 9000
+        - ip: "129.57.69.14"
+          host: "localhost"
+          port: 9001
+        - ip: "129.57.177.7"
+          host: "localhost"
+          port: 9002
+        - ip: "129.57.69.12"
+          host: "localhost"
+          port: 9003
       ringBufferSize: 1024
-      socketBufferSize: 16384
+      socketBufferSize: 1024
       connectionTimeout: 5000
       readTimeout: 2000
     writer:
