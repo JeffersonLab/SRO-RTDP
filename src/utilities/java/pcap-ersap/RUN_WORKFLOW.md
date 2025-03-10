@@ -52,7 +52,7 @@ If you encounter any issues, please refer to the [Troubleshooting section in the
 
 You can customize the workflow by modifying the following configuration files:
 
-- **pcap-services.yaml**: Located at `/workspace/src/utilities/java/pcap-ersap/config/pcap-services.yaml`. This file configures the ERSAP services.
+- **services.yaml**: Located at `/workspace/src/utilities/java/pcap-ersap/config/services.yaml`. This file configures the ERSAP services.
 - **ip-based-config.json**: Located at `/workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json`. This file configures the pcap2streams tool.
 
 ## Documentation

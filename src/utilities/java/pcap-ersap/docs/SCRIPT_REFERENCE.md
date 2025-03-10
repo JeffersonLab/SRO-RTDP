@@ -80,7 +80,7 @@ ls -la $ERSAP_USER_DATA/lib/
 
 # Start the ERSAP orchestrator
 echo "Starting ERSAP orchestrator..."
-$ERSAP_HOME/scripts/unix/ersap-orchestrator -f $ERSAP_USER_DATA/config/pcap-services.yaml
+$ERSAP_HOME/scripts/unix/ersap-orchestrator -f $ERSAP_USER_DATA/config/services.yaml
 
 # Wait for processing to complete
 echo "Waiting for processing to complete..."
@@ -159,53 +159,48 @@ chmod +x scripts/fix_imports.sh
 
 **What it does:**
 1. Creates a directory for fixed files
-2. Fixes imports in PcapSinkService.java
-3. Fixes imports in PcapSourceService.java
-4. Fixes imports in PcapProcessorService.java
-5. Creates PacketEvent.java and PcapDataTypes.java if needed
+2. Fixes imports in engine classes as needed
+3. Creates PacketEvent.java if needed
 
 ## Configuration Files
 
-### pcap-services.yaml
+### services.yaml
 
 Configures the ERSAP services.
 
 **Location:**
 ```
-/workspace/src/utilities/java/pcap-ersap/config/pcap-services.yaml
+/workspace/src/utilities/java/pcap-ersap/config/services.yaml
 ```
 
 **Example:**
 ```yaml
+io-services:
+  reader:
+    class: org.jlab.ersap.actor.pcap.engine.PcapSourceEngine
+    name: Source
+  writer:
+    class: org.jlab.ersap.actor.pcap.engine.PcapSinkEngine
+    name: Sink
 services:
-  - class: org.jlab.ersap.actor.pcap.services.PcapSourceService
-    name: PcapSource
-    inputs:
-      - config
-    outputs:
-      - packets
-    configuration:
-      ip: 192.168.10.1
-      port: 9000
-
-  - class: org.jlab.ersap.actor.pcap.services.PcapProcessorService
-    name: PcapProcessor
-    inputs:
-      - packets
-    outputs:
-      - processed_packets
-    configuration:
+  - class: org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine
+    name: Processor
+configuration:
+  io-services:
+    reader:
+      connections:
+        - ip: "192.168.10.1"
+          host: "localhost"
+          port: 9000
+      ringBufferSize: 1024
+      socketBufferSize: 1024
+      connectionTimeout: 5000
+      readTimeout: 30
+    writer:
+      outputDir: "output"
+  services:
+    Processor:
       filter: "ip.src == 192.168.10.1"
-
-  - class: org.jlab.ersap.actor.pcap.services.PcapSinkService
-    name: PcapSink
-    inputs:
-      - processed_packets
-    outputs:
-      - output
-    configuration:
-      output_dir: /workspace/src/utilities/java/pcap-ersap/output
-```
 
 ### ip-based-config.json
 

@@ -43,7 +43,7 @@ mkdir -p $ERSAP_USER_DATA/output
 # Copy services.yaml to config directory
 echo "Copying services.yaml to config directory..."
 cp $ERSAP_USER_DATA/config/services.yaml $ERSAP_USER_DATA/config/services.yaml.bak 2>/dev/null || true
-cp $ERSAP_USER_DATA/src/main/resources/org/jlab/ersap/actor/pcap/services.yaml $ERSAP_USER_DATA/config/
+cp $ERSAP_USER_DATA/src/main/java/org/jlab/ersap/actor/pcap/services.yaml $ERSAP_USER_DATA/config/
 
 # Check if pcap2streams is running
 if pgrep -f "java.*Pcap2Streams" > /dev/null; then
