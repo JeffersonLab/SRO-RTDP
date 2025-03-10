@@ -36,6 +36,7 @@ public class PcapSourceEngine implements IEngine {
     private static final String STREAM_HOST_KEY = "streamHost";
     private static final String STREAM_PORT_KEY = "streamPort";
     private static final String RING_BUFFER_SIZE_KEY = "ringBufferSize";
+    private static final String SOCKET_BUFFER_SIZE_KEY = "socketBufferSize";
     private static final String CONNECTION_TIMEOUT_KEY = "connectionTimeout";
     private static final String READ_TIMEOUT_KEY = "readTimeout";
 
@@ -50,12 +51,36 @@ public class PcapSourceEngine implements IEngine {
     private String streamHost = "localhost";
     private int streamPort = 7777;
     private int ringBufferSize = 1024;
+    private int socketBufferSize = 16384;
     private int connectionTimeout = 5000;
     private int readTimeout = 2000;
 
     @Override
     public EngineData configure(EngineData input) {
         LOGGER.log(Level.SEVERE, "PcapSourceEngine: configure called");
+
+        // Check for system properties first
+        String sysPropSocketBufferSize = System.getProperty("socketBufferSize");
+        if (sysPropSocketBufferSize != null) {
+            try {
+                socketBufferSize = Integer.parseInt(sysPropSocketBufferSize);
+                LOGGER.log(Level.SEVERE, "PcapSourceEngine: Using socket buffer size from system property: {0}",
+                        socketBufferSize);
+            } catch (NumberFormatException e) {
+                LOGGER.log(Level.WARNING, "Invalid socketBufferSize system property: {0}", sysPropSocketBufferSize);
+            }
+        }
+
+        String sysPropRingBufferSize = System.getProperty("ringBufferSize");
+        if (sysPropRingBufferSize != null) {
+            try {
+                ringBufferSize = Integer.parseInt(sysPropRingBufferSize);
+                LOGGER.log(Level.SEVERE, "PcapSourceEngine: Using ring buffer size from system property: {0}",
+                        ringBufferSize);
+            } catch (NumberFormatException e) {
+                LOGGER.log(Level.WARNING, "Invalid ringBufferSize system property: {0}", sysPropRingBufferSize);
+            }
+        }
 
         if (input.getMetadata() != null) {
             Map<String, Object> metadata = input.getMetadata();
@@ -78,6 +103,11 @@ public class PcapSourceEngine implements IEngine {
             if (metadata.containsKey(RING_BUFFER_SIZE_KEY)) {
                 ringBufferSize = Integer.parseInt(metadata.get(RING_BUFFER_SIZE_KEY).toString());
                 LOGGER.log(Level.SEVERE, "PcapSourceEngine: Using ring buffer size: {0}", ringBufferSize);
+            }
+
+            if (metadata.containsKey(SOCKET_BUFFER_SIZE_KEY)) {
+                socketBufferSize = Integer.parseInt(metadata.get(SOCKET_BUFFER_SIZE_KEY).toString());
+                LOGGER.log(Level.SEVERE, "PcapSourceEngine: Using socket buffer size: {0}", socketBufferSize);
             }
 
             if (metadata.containsKey(CONNECTION_TIMEOUT_KEY)) {
@@ -253,7 +283,7 @@ public class PcapSourceEngine implements IEngine {
             sockets.put(ip, socket);
 
             InputStream in = socket.getInputStream();
-            byte[] buffer = new byte[16384]; // 16KB buffer
+            byte[] buffer = new byte[socketBufferSize]; // Use configured buffer size
 
             while (running) {
                 try {
@@ -275,18 +305,30 @@ public class PcapSourceEngine implements IEngine {
                             (header[11] & 0xFF);
 
                     if (packetSize <= 0 || packetSize > buffer.length) {
-                        LOGGER.log(Level.SEVERE, "PcapSourceEngine: Invalid packet length: {0}", packetSize);
+                        LOGGER.log(Level.WARNING,
+                                "PcapSourceEngine: Packet size {0} exceeds buffer size {1}. Reading only {2} bytes.",
+                                new Object[] { packetSize, buffer.length, buffer.length });
+                    }
+
+                    // Read packet data (up to buffer size)
+                    int bytesToRead = Math.min(packetSize, buffer.length);
+                    int bytesRead = in.read(buffer, 0, bytesToRead);
+
+                    if (bytesRead < bytesToRead) {
+                        LOGGER.log(Level.SEVERE,
+                                "PcapSourceEngine: Incomplete packet received, expected {0} bytes but got {1}",
+                                new Object[] { bytesToRead, bytesRead });
                         continue;
                     }
 
-                    // Read packet data
-                    int bytesRead = in.read(buffer, 0, packetSize);
-
-                    if (bytesRead < packetSize) {
-                        LOGGER.log(Level.SEVERE,
-                                "PcapSourceEngine: Incomplete packet received, expected {0} bytes but got {1}",
-                                new Object[] { packetSize, bytesRead });
-                        continue;
+                    // Skip remaining bytes if packet is larger than buffer
+                    if (packetSize > buffer.length) {
+                        long bytesToSkip = packetSize - buffer.length;
+                        long bytesSkipped = 0;
+                        while (bytesSkipped < bytesToSkip) {
+                            bytesSkipped += in.skip(bytesToSkip - bytesSkipped);
+                        }
+                        LOGGER.log(Level.FINE, "PcapSourceEngine: Skipped {0} bytes", bytesSkipped);
                     }
 
                     // Extract MAC addresses and EtherType

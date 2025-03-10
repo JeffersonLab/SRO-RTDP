@@ -1,152 +1,84 @@
 #!/bin/bash
 
-# This script runs the ERSAP orchestrator with our rebuilt environment
+# Default configuration
+SOCKET_BUFFER_SIZE=16384
+RING_BUFFER_SIZE=1024
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --socket-buffer-size=*)
+      SOCKET_BUFFER_SIZE="${1#*=}"
+      shift
+      ;;
+    --ring-buffer-size=*)
+      RING_BUFFER_SIZE="${1#*=}"
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [--socket-buffer-size=SIZE] [--ring-buffer-size=SIZE]"
+      exit 1
+      ;;
+  esac
+done
+
+echo "Using socket buffer size: $SOCKET_BUFFER_SIZE"
+echo "Using ring buffer size: $RING_BUFFER_SIZE"
 
 # Set environment variables
-export ERSAP_HOME="/workspace/src/utilities/java/ersapActors/ersap-java"
-export ERSAP_USER_DATA="/workspace/src/utilities/java/pcap-ersap"
+export ERSAP_HOME=/workspace/src/utilities/java/ersapActors/ersap-java
+export ERSAP_USER_DATA=/workspace/src/utilities/java/pcap-ersap
 
-# Rebuild the ERSAP environment
-echo "Rebuilding ERSAP environment..."
-./scripts/rebuild_ersap.sh
+# Create directories if they don't exist
+mkdir -p $ERSAP_USER_DATA/config
+mkdir -p $ERSAP_USER_DATA/output
 
-# Fix package structure and imports
-echo "Fixing package structure..."
-./scripts/fix_package_structure.sh
-echo "Fixing imports..."
-./scripts/fix_imports.sh
+# Copy services.yaml to config directory
+echo "Copying services.yaml to config directory..."
+cp $ERSAP_USER_DATA/src/main/resources/org/jlab/ersap/actor/pcap/services.yaml $ERSAP_USER_DATA/config/
 
-# Define the config file path
-CONFIG_DIR="/workspace/src/utilities/java/pcap2streams/custom-config"
-CONFIG_FILE="$CONFIG_DIR/ip-based-config.json"
-
-# Create the custom-config directory if it doesn't exist
-mkdir -p $CONFIG_DIR
-
-# Check if pcap2streams is already running
-PCAP2STREAMS_RUNNING=$(ps aux | grep -v grep | grep -v "run_ersap_orchestrator.sh" | grep "java.*Pcap2Streams")
-if [ ! -z "$PCAP2STREAMS_RUNNING" ]; then
+# Check if pcap2streams is running
+if pgrep -f "pcap2streams" > /dev/null; then
     echo "pcap2streams is already running"
-    PCAP2STREAMS_STARTED=false
-    
-    # Check if the config file exists
-    if [ -f "$CONFIG_FILE" ]; then
-        echo "Configuration file exists: $CONFIG_FILE"
+    # Check if configuration file exists
+    if [ -f "/workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json" ]; then
+        echo "Configuration file exists: /workspace/src/utilities/java/pcap2streams/custom-config/ip-based-config.json"
     else
-        echo "Warning: Configuration file not found. ERSAP orchestrator may not work correctly."
-        echo "Stopping existing pcap2streams to restart it properly..."
-        pkill -f "java.*Pcap2Streams"
-        sleep 2
-        PCAP2STREAMS_STARTED=true
+        echo "Configuration file does not exist"
     fi
 else
     echo "pcap2streams is not running"
-    PCAP2STREAMS_STARTED=true
-fi
-
-# If we need to start pcap2streams or restart it
-if [ "$PCAP2STREAMS_STARTED" = true ]; then
-    echo "Starting pcap2streams..."
-    
-    # Use the PCAP file from /scratch/jeng-yuantsai/
-    PCAP_FILE="/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap"
-    
-    # Check if the file exists
-    if [ ! -f "$PCAP_FILE" ]; then
-        echo "PCAP file not found: $PCAP_FILE"
-        echo "Using default test PCAP file"
-        PCAP_FILE="/workspace/src/utilities/java/pcap2streams/test.pcap"
+    # Check if PCAP file exists
+    if [ -f "/workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap" ]; then
+        echo "Starting pcap2streams with PCAP file: /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap"
+        cd /workspace/src/utilities/java/pcap2streams && ./pcap2streams /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap &
+        STARTED_PCAP2STREAMS=true
+        sleep 2
     else
-        echo "Using PCAP file: $PCAP_FILE"
-    fi
-    
-    # Remove any existing config file to ensure a fresh start
-    if [ -f "$CONFIG_FILE" ]; then
-        echo "Removing existing configuration file: $CONFIG_FILE"
-        rm -f "$CONFIG_FILE"
-    fi
-    
-    # Run pcap2streams using the run_pcap2streams.sh script
-    echo "Changing to pcap2streams directory..."
-    cd /workspace/src/utilities/java/pcap2streams
-    
-    # Make sure the script is executable
-    chmod +x ./scripts/run_pcap2streams.sh
-    
-    # Modified: Run pcap2streams in the background
-    echo "Running pcap2streams to generate configuration file and serve data..."
-    ./scripts/run_pcap2streams.sh "$PCAP_FILE" &
-    PCAP2STREAMS_PID=$!
-    
-    # Return to the original directory
-    cd $ERSAP_USER_DATA
-    
-    # Wait for the configuration file to be created (with timeout)
-    echo "Waiting for configuration file to be created..."
-    MAX_WAIT=60  # Maximum wait time in seconds
-    WAIT_COUNT=0
-    
-    while [ ! -f "$CONFIG_FILE" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-        sleep 1
-        WAIT_COUNT=$((WAIT_COUNT + 1))
-        echo -n "."
-        
-        # Check if pcap2streams is still running
-        if ! ps -p $PCAP2STREAMS_PID > /dev/null; then
-            echo "Error: pcap2streams process terminated unexpectedly"
-            exit 1
-        fi
-    done
-    echo ""
-    
-    # Check if the config file was created
-    if [ -f "$CONFIG_FILE" ]; then
-        echo "Configuration file created: $CONFIG_FILE"
-        # Give pcap2streams a moment to set up the socket servers after creating the config
-        echo "Waiting for socket servers to initialize..."
-        sleep 5
-    else
-        echo "Error: Configuration file not created after $MAX_WAIT seconds. ERSAP orchestrator may not work correctly."
-        echo "Killing pcap2streams process..."
-        kill $PCAP2STREAMS_PID
-        echo "Exiting..."
+        echo "PCAP file does not exist: /workspace/src/utilities/java/pcap2streams/pcap/ersap_test.pcap"
         exit 1
     fi
 fi
 
-# Create output directory if it doesn't exist
-mkdir -p $ERSAP_USER_DATA/output
-
-# Update the config file path in pcap-services.yaml
-echo "Updating config file path in pcap-services.yaml..."
-sed -i "s|config_file:.*|config_file: $CONFIG_FILE|g" $ERSAP_USER_DATA/config/pcap-services.yaml
-
-# Compile the application
+# Compile and deploy the application
 echo "Compiling application..."
-cd $ERSAP_USER_DATA
-gradle clean build -x test
+cd $ERSAP_USER_DATA && ./gradlew build
+echo "Deploying application..."
+cd $ERSAP_USER_DATA && ./gradlew deploy
 
-# Verify JAR files
-echo "Verifying JAR files..."
-ls -la $ERSAP_HOME/lib/ersap/
-ls -la $ERSAP_USER_DATA/lib/
-
-# Start the ERSAP orchestrator with more memory
+# Run the orchestrator directly using our RunOrchestrator class
 echo "Starting ERSAP orchestrator..."
-JAVA_OPTS="-Xmx4g" $ERSAP_HOME/scripts/unix/ersap-orchestrator -f $ERSAP_USER_DATA/config/pcap-services.yaml
-
-# Wait longer for processing to complete (5 minutes)
-echo "Waiting for processing to complete..."
-sleep 300
+cd $ERSAP_USER_DATA && java -DsocketBufferSize=$SOCKET_BUFFER_SIZE -DringBufferSize=$RING_BUFFER_SIZE -cp "build/libs/*:lib/*:$ERSAP_HOME/lib/*" org.jlab.ersap.actor.pcap.RunOrchestrator
 
 # Check output files
 echo "Checking output files..."
-ls -la $ERSAP_USER_DATA/output/
+ls -la $ERSAP_USER_DATA/output
 
-# Stop pcap2streams if we started it
-if [ "$PCAP2STREAMS_STARTED" = true ]; then
+# Stop pcap2streams if it was started by this script
+if [ "$STARTED_PCAP2STREAMS" = true ]; then
     echo "Stopping pcap2streams..."
-    kill $PCAP2STREAMS_PID 2>/dev/null || pkill -f "java.*Pcap2Streams"
+    pkill -f "pcap2streams"
 fi
 
 echo "ERSAP orchestrator completed successfully." 

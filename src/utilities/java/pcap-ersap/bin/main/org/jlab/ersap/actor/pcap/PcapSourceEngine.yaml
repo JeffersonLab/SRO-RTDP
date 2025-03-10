@@ -1,0 +1,11 @@
+---
+name: PcapSourceEngine
+engine: org.jlab.ersap.actor.pcap.engine.PcapSourceEngine
+type: java
+
+author: ERSAP Team
+email: ersap@jlab.org
+
+version: 1.0
+description:
+  PCAP Source Engine: Reads PCAP data from a socket connection 
