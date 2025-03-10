@@ -26,6 +26,9 @@ import zmq
 import argparse
 import numpy as np
 
+
+DATA_NUMPY_WIDTH = 2048   # Sending data grouped by this dimension
+
 def main():
     parser = argparse.ArgumentParser(description="ZMQ Floating Point Data Sender")
     parser.add_argument("-a",
@@ -46,9 +49,9 @@ def main():
     try:
         while True:
             if args.all_ones:
-                data = np.ones(2048, dtype=np.float32)  # Sending an array of ones
+                data = np.ones(DATA_NUMPY_WIDTH, dtype=np.float32)  # Sending an array of ones
             else:
-                data = np.random.rand(2048).astype(np.float32)  # Sending random floating point values
+                data = np.random.rand(DATA_NUMPY_WIDTH).astype(np.float32)  # Sending random floating point values
             
             socket.send(data.tobytes())
     except KeyboardInterrupt:
