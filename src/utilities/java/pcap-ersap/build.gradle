@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'application'
 }
 
 repositories {
@@ -28,6 +29,35 @@ jar {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+// Copy resources to build directory
+task copyResources(type: Copy) {
+    from 'src/main/resources'
+    into 'build/resources/main'
+}
+
+// Make sure resources are copied before jar is created
+jar.dependsOn copyResources
+
+// Task to deploy the application to ERSAP_HOME
+task deploy(type: Copy, dependsOn: jar) {
+    from jar.archiveFile
+    into "$System.env.ERSAP_HOME/plugins/pcap-ersap"
+    
+    doFirst {
+        mkdir "$System.env.ERSAP_HOME/plugins/pcap-ersap"
+    }
+}
+
+// Task to copy YAML files to ERSAP_HOME
+task deployYaml(type: Copy, dependsOn: jar) {
+    from 'src/main/resources/org/jlab/ersap/actor/pcap'
+    include '*.yaml'
+    into "$System.env.ERSAP_HOME/plugins/pcap-ersap"
+}
+
+// Make deploy depend on deployYaml
+deploy.dependsOn deployYaml
 
 sourceCompatibility = 11
 targetCompatibility = 11
