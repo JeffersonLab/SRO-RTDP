@@ -244,7 +244,7 @@ int main(int narg, char *argv[]){
         sender.connect(send_addr.c_str());  // NOTE: connect() not bind()!!!!
         std::cout << "SEND - ZeroMQ pushing to: " << send_addr << "\n";
     }  catch (const zmq::error_t& e) {
-        std::cout << "Error: Failed to bind to the sending address [" << send_addr << "]:" << e.what() << "\n";
+        std::cout << "Error: Failed to connect to the sending address [" << send_addr << "]:" << e.what() << "\n";
         return 1;
     }
     //............................................
