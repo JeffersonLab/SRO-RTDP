@@ -335,7 +335,7 @@ int main(int narg, char *argv[]){
             std::cout << std::endl << std::endl;
         }
 
-        if (options.test) {
+        if (options.test || debug_mode) {
             std::vector<float> h_rand(rand_elements, 0);
             CUDA_CALL(cudaMemcpy(h_rand.data(), d_rand, rand_elements * sizeof(float), cudaMemcpyDeviceToHost));
     
@@ -354,13 +354,13 @@ int main(int narg, char *argv[]){
             std::cout << std::endl << std::endl;
         }
 
-        zmq::message_t message(h_out.data(), h_out.size());
+        zmq::message_t message(h_out.data(), h_out.size() * sizeof(float));   // remember to * sizeof(float)!!!
         std::cout <<"\t Output matrix dimension, (#columns)x(#rows): " << out_cols << "x" << rows << std::endl;
-        bool sent = sender.send(message, zmq::send_flags::dontwait).has_value();
-        if (!sent) {
+        res = sender.send(message, zmq::send_flags::dontwait);   // has to be mq::send_flags::dontwait?
+        if (!res) {
             std::cerr << "Error: ZeroMQ send failed!" << std::endl;
         } else {
-            std::cout << "Sent [" << h_out.size() * sizeof(float) << "] bytes via ZeroMQ socket.\n" << std::endl;
+            std::cout << "Sent [" << res.value() << "] bytes via ZeroMQ socket.\n" << std::endl;
         }
 
         CUDA_CALL(cudaFree(d_in));

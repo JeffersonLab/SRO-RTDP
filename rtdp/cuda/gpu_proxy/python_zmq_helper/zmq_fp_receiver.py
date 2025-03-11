@@ -43,7 +43,8 @@ def main():
         while True:
             message = socket.recv()
             data = np.frombuffer(message, dtype=np.float32)
-            print("Received:", data[:10])
+            print(f"Received bytes: {len(message)}")
+            print(f"First 10 floats: {data[:10]}\n")
     except KeyboardInterrupt:
         print("\nTerminating receiver.")
     finally:
