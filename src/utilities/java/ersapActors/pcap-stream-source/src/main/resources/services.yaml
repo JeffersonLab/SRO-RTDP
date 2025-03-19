@@ -1,14 +1,23 @@
 ---
 io-services:
   reader:
-    class: org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine
+    class: org.jlab.epsci.ersap.actor.pcap.engine.MultiSocketSourceEngine
     name: PcapSource
+    type: java
+    engine: org.jlab.epsci.ersap.actor.pcap.engine.MultiSocketSourceEngine
+    email: developer@example.com
   writer:
-    class: org.jlab.ersap.actor.pcap.engine.PcapSinkEngine
+    class: org.jlab.epsci.ersap.actor.pcap.engine.PcapSinkEngine
     name: PcapSink
+    type: java
+    engine: org.jlab.epsci.ersap.actor.pcap.engine.PcapSinkEngine
+    email: developer@example.com
 services:
-  - class: org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine
+  - class: org.jlab.epsci.ersap.actor.pcap.engine.PcapProcessorEngine
     name: PcapProcessor
+    type: java
+    engine: org.jlab.epsci.ersap.actor.pcap.engine.PcapProcessorEngine
+    email: developer@example.com
 configuration:
   io-services:
     reader:
@@ -18,7 +27,7 @@ configuration:
       read_timeout: 30000
       buffer_size: 1024
     writer:
-      output_directory: "output"
+      output_directory: "$ERSAP_HOME/data/output"
       file_prefix: "pcap_processed"
       file_extension: ".dat"
       max_file_size: 104857600  # 100 MB
@@ -29,4 +38,5 @@ configuration:
       filter_by_protocol: false
       protocol_filter: -1
 mime-types:
-  - binary/data-bytes 
+  - binary/pcap
+container: ersap 
