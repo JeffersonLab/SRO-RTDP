@@ -1,54 +1,32 @@
 ---
 io-services:
   reader:
-    class: org.jlab.ersap.actor.pcap.engine.Pcap2StreamSourceEngine
-    name: pcap-source
+    class: org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine
+    name: PcapSource
   writer:
-    class: org.jlab.epsci.ersap.std.services.StreamWriter
-    name: StreamWriter
-
+    class: org.jlab.ersap.actor.pcap.engine.PcapSinkEngine
+    name: PcapSink
 services:
-  - class: org.jlab.ersap.actor.examples.EchoEngine
-    name: Echo
-
+  - class: org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine
+    name: PcapProcessor
 configuration:
   io-services:
     reader:
-      streamHost: localhost
-      streamPort: 5000
-      ringBufferSize: 1024
-      connectionTimeout: 5000
-      readTimeout: 10000
-      byteOrder: BIG_ENDIAN
+      host: "localhost"
+      port: 9000
+      connection_timeout: 5000
+      read_timeout: 30000
+      buffer_size: 1024
     writer:
-      file_path: ${ERSAP_USER_DATA}/output/pcap_data.dat
-
----
-io-services:
-  reader:
-    class: org.jlab.ersap.actor.pcap.engine.Pcap2StreamMultiSourceEngine
-    name: pcap-multi-source
-  writer:
-    class: org.jlab.epsci.ersap.std.services.StreamWriter
-    name: StreamWriter
-
-services:
-  - class: org.jlab.ersap.actor.examples.EchoEngine
-    name: Echo
-
-configuration:
-  io-services:
-    reader:
-      ringBufferSize: 1024
-      connectionTimeout: 5000
-      readTimeout: 10000
-      byteOrder: BIG_ENDIAN
-      streams:
-        - host: localhost
-          port: 5000
-        - host: localhost
-          port: 5001
-        - host: localhost
-          port: 5002
-    writer:
-      file_path: ${ERSAP_USER_DATA}/output/pcap_multi_data.dat 
+      output_directory: "output"
+      file_prefix: "pcap_processed"
+      file_extension: ".dat"
+      max_file_size: 104857600  # 100 MB
+      append_timestamp: true
+  services:
+    PcapProcessor:
+      extract_headers: true
+      filter_by_protocol: false
+      protocol_filter: -1
+mime-types:
+  - binary/data-bytes 
