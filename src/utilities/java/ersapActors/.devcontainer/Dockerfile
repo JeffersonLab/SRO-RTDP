@@ -25,29 +25,26 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     pkg-config \
-    libpcap-dev \
-    tcpdump \
-    iputils-ping \
-    net-tools \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Java
-RUN apt-get update && apt-get install -y \
-    openjdk-11-jdk \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y openjdk-17-jre openjdk-17-jdk-headless && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$PATH
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:+UseStringDeduplication -XX:+OptimizeStringConcat"
 
 # Install Gradle
-ENV GRADLE_VERSION=7.6
+ENV GRADLE_VERSION=8.5
 RUN wget -q https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip -O /tmp/gradle.zip && \
     unzip -q /tmp/gradle.zip -d /opt && \
     rm /tmp/gradle.zip && \
     ln -s /opt/gradle-${GRADLE_VERSION} /opt/gradle
 
-ENV PATH=$PATH:/opt/gradle/bin
-
-# Create ERSAP directory
-ENV ERSAP_HOME=/opt/ersap
-RUN mkdir -p $ERSAP_HOME/plugins $ERSAP_HOME/bin
+ENV GRADLE_HOME=/opt/gradle
+ENV PATH=$PATH:$GRADLE_HOME/bin
 
 # Create a non-root user
 ARG USERNAME=developer
@@ -63,12 +60,6 @@ RUN groupadd --gid $USER_GID $USERNAME && \
 RUN mkdir -p /home/$USERNAME/.config/git && \
     chown -R $USERNAME:$USERNAME /home/$USERNAME/.config
 
-# Set up ERSAP_USER_DATA
-ENV ERSAP_USER_DATA=/workspace/ersap-data
-RUN mkdir -p $ERSAP_USER_DATA && \
-    chown -R $USERNAME:$USERNAME $ERSAP_USER_DATA && \
-    chown -R $USERNAME:$USERNAME $ERSAP_HOME
-
 # Switch to the non-root user
 USER $USERNAME
 
@@ -78,10 +69,5 @@ RUN git config --global init.defaultBranch main && \
 
 # Set the working directory
 WORKDIR /workspace
-
-# Set up a simple ERSAP shell script
-RUN echo '#!/bin/bash\necho "ERSAP shell started"\nwhile true; do\n  sleep 1\ndone' > /tmp/ersap-shell && \
-    sudo mv /tmp/ersap-shell $ERSAP_HOME/bin/ersap-shell && \
-    sudo chmod +x $ERSAP_HOME/bin/ersap-shell
 
 CMD ["/bin/bash"] 

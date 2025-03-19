@@ -1,5 +1,44 @@
 #!/bin/bash
 
+# Exit on error
+set -e
+
+# Set ERSAP_HOME
+export ERSAP_HOME=$HOME/ersap-install
+
+# Create ERSAP directories
+mkdir -p $ERSAP_HOME/{lib,plugins/jni/lib,bin,config}
+
+# Clone ersap-java if not exists
+if [ ! -d "$HOME/ERSAP/ersap-java" ]; then
+    mkdir -p $HOME/ERSAP
+    cd $HOME/ERSAP
+    git clone https://github.com/JeffersonLab/ersap-java.git
+    cd ersap-java
+    git checkout upgradeGradle
+fi
+
+# Build and deploy ersap-java
+cd $HOME/ERSAP/ersap-java
+./gradlew deploy
+./gradlew publishToMavenLocal
+
+# Create ersap-shell script
+cat > $ERSAP_HOME/bin/ersap-shell << 'EOF'
+#!/bin/bash
+echo "ERSAP shell started"
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+export CLASSPATH=$ERSAP_HOME/lib/*
+while true; do
+  sleep 1
+done
+EOF
+
+chmod +x $ERSAP_HOME/bin/ersap-shell
+
+echo "ERSAP setup completed successfully!"
+
 # This script sets up the development environment after the container starts
 
 # Create ERSAP_USER_DATA directory structure
