@@ -41,3 +41,12 @@ samples/test.pcap
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# Temporary files
+commands.txt
+files.txt
+
+# Sensitive configuration
+config/
+services.yaml
+dataset.txt
