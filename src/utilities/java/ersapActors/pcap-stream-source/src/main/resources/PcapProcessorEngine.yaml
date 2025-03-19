@@ -1,0 +1,13 @@
+name: PcapProcessor
+engine: org.jlab.epsci.ersap.actor.pcap.engine.PcapProcessorEngine
+type: java
+
+author: ERSAP Team
+email: ersap@jlab.org
+
+version: 1.0
+description: PCAP Processor Engine
+
+mime-types:
+  - binary/bytes
+  - text/string 
