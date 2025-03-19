@@ -1,0 +1,14 @@
+---
+name: PcapStreamSourceEngine
+engine: org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine
+type: java
+description: A source engine that reads data from a socket stream
+version: 1.0
+author: ERSAP Team
+email: ersap-support@jlab.org
+language: java
+class: org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine
+input:
+  - binary/data-bytes
+output:
+  - binary/data-bytes 
