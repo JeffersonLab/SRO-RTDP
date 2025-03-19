@@ -1,22 +1,31 @@
 plugins {
-    id 'java-library'
+    id 'java'
     id 'application'
 }
 
-group = 'org.jlab.ersap.actor'
+group = 'org.jlab.epsci.ersap.actor'
 version = '1.0-SNAPSHOT'
 
 repositories {
+    mavenCentral()
+    mavenLocal()
     maven {
         url 'https://clasweb.jlab.org/clas12maven/'
     }
-    mavenCentral()
+    flatDir {
+        dirs "${System.env.ERSAP_HOME}/lib"
+    }
 }
 
 dependencies {
     // ERSAP dependencies
-    implementation files('/workspace/src/utilities/java/ersapActors/ersap-java/build/libs/ersap-java-1.0-SNAPSHOT.jar')
-    implementation 'org.json:json:20210307'
+    implementation name: 'ersap-java-1.0-SNAPSHOT'
+    implementation 'org.jlab.coda:xmsg:2.3'
+    implementation 'com.google.protobuf:protobuf-java:3.15.5'
+    implementation 'org.zeromq:jeromq:0.3.6'
+    implementation 'org.json:json:20201115'
+    implementation 'com.google.guava:guava:30.1-jre'
+    implementation 'org.yaml:snakeyaml:1.28'
     
     // LMAX Disruptor for high-performance event processing
     implementation 'com.lmax:disruptor:3.4.4'
@@ -24,18 +33,23 @@ dependencies {
     // Logging
     implementation 'org.slf4j:slf4j-api:1.7.30'
     implementation 'ch.qos.logback:logback-classic:1.2.3'
+    
+    // jline for the ERSAP shell
+    implementation 'org.jline:jline:3.21.0'
+    
+    testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
-// Include scripts directory in the source sets
 sourceSets {
     main {
         java {
-            srcDirs = ['src/main/java', 'scripts']
+            srcDirs = ['src/main/java']
         }
         resources {
             srcDirs = ['src/main/resources']
@@ -43,65 +57,23 @@ sourceSets {
     }
 }
 
-// Set the main class for running the ERSAP source engine
 application {
-    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine'
+    mainClass = 'org.jlab.epsci.ersap.actor.pcap.source.ErsapRunner'
 }
 
-// Task to run the ERSAP source engine
-task runSourceEngine(type: JavaExec) {
+// Task to run the ERSAP workflow
+task runWorkflow(type: JavaExec) {
     group = 'application'
-    description = 'Runs the ERSAP source engine'
+    description = 'Runs the complete PCAP workflow'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapStreamSourceEngine'
+    mainClass = 'org.jlab.epsci.ersap.actor.pcap.source.ErsapRunner'
     
-    // Default arguments (can be overridden from command line)
-    args = ['localhost', '5000']
+    args = [
+        'config/services.yaml',
+        'config/dataset.txt'
+    ]
     
-    // Allow passing arguments from command line
-    if (project.hasProperty('host')) {
-        args[0] = project.getProperty('host')
-    }
-    
-    if (project.hasProperty('port')) {
-        args[1] = project.getProperty('port')
-    }
-}
-
-// Task to run the ERSAP processor engine
-task runProcessorEngine(type: JavaExec) {
-    group = 'application'
-    description = 'Runs the ERSAP processor engine'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapProcessorEngine'
-}
-
-// Task to run the ERSAP sink engine
-task runSinkEngine(type: JavaExec) {
-    group = 'application'
-    description = 'Runs the ERSAP sink engine'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.jlab.ersap.actor.pcap.engine.PcapSinkEngine'
-}
-
-// Task to run a simple test client
-task runTest(type: JavaExec) {
-    group = 'application'
-    description = 'Runs a simple test client'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.jlab.ersap.actor.pcap.source.PcapStreamTest'
-    
-    // Default arguments (can be overridden from command line)
-    args = ['localhost', '5000']
-    
-    // Allow passing arguments from command line
-    if (project.hasProperty('host')) {
-        args[0] = project.getProperty('host')
-    }
-    
-    if (project.hasProperty('port')) {
-        args[1] = project.getProperty('port')
-    }
+    dependsOn build
 }
 
 // Task to run the MockPcapServer
@@ -109,10 +81,10 @@ task runMockServer(type: JavaExec) {
     group = 'application'
     description = 'Runs the MockPcapServer'
     classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'scripts.MockPcapServer'
+    mainClass = 'org.jlab.epsci.ersap.actor.pcap.source.MockPcapServer'
     
     // Default arguments (can be overridden from command line)
-    args = ['test-data/example.pcap', '9000']
+    args = ['/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap', '9000']
     
     // Allow passing arguments from command line
     if (project.hasProperty('pcapFile')) {
@@ -124,39 +96,38 @@ task runMockServer(type: JavaExec) {
     }
 }
 
-// Task to run the TestMultiSocketClient
-task runMultiSocketTest(type: JavaExec) {
-    group = 'application'
-    description = 'Runs the TestMultiSocketClient'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'scripts.TestMultiSocketClient'
-    
-    // Default arguments (can be overridden from command line)
-    args = ['test-data/multi-socket-config.json']
-    
-    // Allow passing arguments from command line
-    if (project.hasProperty('configFile')) {
-        args[0] = project.getProperty('configFile')
-    }
-}
-
-// Task to run the complete PCAP workflow
-task runWorkflow(type: Exec) {
-    group = 'application'
-    description = 'Runs the complete PCAP workflow'
-    workingDir = project.projectDir
-    commandLine 'scripts/run_pcap_workflow.sh'
-    
-    dependsOn build
-}
-
-// Task to deploy the application
-task deploy(type: Copy, dependsOn: jar) {
-    from jar.archiveFile
-    from configurations.runtimeClasspath
-    into "${buildDir}/deploy"
-    
+// Custom install task to copy the JAR
+task installJar(type: Copy) {
+    from "${buildDir}/libs/${jar.archiveBaseName.get()}-${jar.archiveVersion.get()}.jar"
+    def dest = "$System.env.ERSAP_HOME/lib"
+    into dest
     doLast {
-        println "Deployed to ${buildDir}/deploy"
+        println "JAR installed to " + dest
     }
+
+    doFirst {
+        if (dest == 'null') {
+            throw new GradleException('ERSAP_HOME not set')
+        }
+    }
+}
+
+installJar.dependsOn build
+
+jar {
+    archiveBaseName = 'ersap-pcap-stream-source'
+    archiveVersion = '1.0.0'
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass,
+            'Class-Path': configurations.runtimeClasspath.files.collect { it.name }.join(' ')
+        )
+    }
+    
+    // Include all dependencies in the jar
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 } 
