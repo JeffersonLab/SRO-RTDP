@@ -36,7 +36,7 @@ where the structure of <yaml_file> is as follows:
         verbose: 1                  # disables/enables verbose mode.
         terminal: 0                 # if 1 do not forward result to destination
 
-Any of the <yaml_file> settigs may be overidden at the commamnd line via the following options:
+Any of the <yaml_file> settings may be overidden at the command line via the following options:
 
 
 ## cpu_emu Usage: 
