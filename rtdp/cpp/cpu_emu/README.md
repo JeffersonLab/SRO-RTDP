@@ -11,6 +11,8 @@
 
         <some ZeroMQ based receiver> 
 
+ e.g., ./cpu_emu itself can serve as the destination system by inclusion of the -z switch or use of the yaml file setting for terminal: (see below).
+
 
 ## cpu emu host system:
 
