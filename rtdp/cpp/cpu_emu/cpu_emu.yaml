@@ -1,4 +1,4 @@
-destination: "129.57.177.5" #ejfat-1-daq
+destination: "129.57.177.5" #ejfat-5-daq
 dst_port: 5555
 rcv_port: 5555
 sleep: 0
