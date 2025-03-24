@@ -269,8 +269,8 @@ int main (int argc, char *argv[])
     }    
     ////////
     if(vrbs) cout << "Operating with scs_GB = " << scs_GB << "\tdst_ip = "
-                << dst_ip << "\tmemGB = " << memGB << "\totmemGB = "
-                << otmemGB << "\tdst_prt = " << dst_prt << "\trcv_prt = "
+                << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = " << memGB << "\totmemGB = "
+                << otmemGB << "\tdst_prt = " << (psdZ?"N/A":to_string(dst_prt)) << "\trcv_prt = "
                 << rcv_prt << "\tsleep = " << psdS << "\tnmThrds = "
                 << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << yfn 
                 << "\tterminal = " << psdZ << '\n';
