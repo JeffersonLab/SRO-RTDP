@@ -11,7 +11,7 @@
 
         <some ZeroMQ based receiver> 
 
- e.g., ./cpu_emu itself can serve as the destination system by inclusion of the -z switch or use of the yaml file setting for terminal: (see below).
+ e.g., ./cpu_emu itself can serve as the destination system by inclusion of the -z switch or use of the yaml file setting for terminal: (see below). This facilitates using a single cpu_emu instance as a data sink, or multiple daisey chained cpu_emu instances (all without the -z switch) terminated by a last cpu_emu instance with the -z switch.
 
 
 ## cpu emu host system:
