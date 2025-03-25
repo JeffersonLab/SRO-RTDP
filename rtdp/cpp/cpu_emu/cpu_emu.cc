@@ -159,8 +159,8 @@ void parse_yaml(const char *filename, bool vrbs=false) {
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(vrbs) cout << "All done parsing, got this:" << endl;
-    if(vrbs) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
+    if(DBG) cout << "All done parsing, got this:" << endl;
+    if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << '\n';
     
     yaml_parser_delete(&parser);
@@ -272,7 +272,7 @@ int main (int argc, char *argv[])
                 << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = " << memGB << "\totmemGB = "
                 << otmemGB << "\tdst_prt = " << (psdZ?"N/A":to_string(dst_prt)) << "\trcv_prt = "
                 << rcv_prt << "\tsleep = " << psdS << "\tnmThrds = "
-                << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << yfn 
+                << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << (psdY?yfn:"N/A") 
                 << "\tterminal = " << psdZ << '\n';
 
     //  Prepare our receiving rcv_cntxt and socket
