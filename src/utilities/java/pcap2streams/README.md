@@ -10,19 +10,43 @@ The application consists of the following components:
 2. **IPBasedPcapServer**: A server that streams PCAP packets for a specific IP address.
 3. **Pcap2Streams**: The main application that orchestrates the analysis and server creation.
 4. **IPBasedStreamClient**: A client that connects to the IP-based servers and receives packets.
+5. **PcapPacketAnalyzer**: Handles detailed packet analysis and processing.
 
-## How It Works
+## Project Structure
 
-1. The application reads a PCAP file and analyzes it to identify all unique IP addresses (both source and destination).
-2. For each unique IP address, it creates a separate socket server on a different port.
-3. Each server streams only the packets related to its assigned IP address.
-4. The application generates a configuration file that maps IP addresses to ports.
-5. Clients can connect to specific servers to receive packets for specific IP addresses.
+```
+pcap2streams/
+├── src/
+│   └── main/
+│       └── java/
+│           └── org/
+│               └── jlab/
+│                   └── ersap/
+│                       └── actor/
+│                           └── pcap2streams/
+│                               ├── Pcap2Streams.java
+│                               ├── PcapIPAnalyzer.java
+│                               ├── IPBasedPcapServer.java
+│                               ├── IPBasedStreamClient.java
+│                               └── PcapPacketAnalyzer.java
+├── lib/
+│   ├── json-20231013.jar
+│   ├── disruptor-3.4.4.jar
+│   └── snakeyaml-2.0.jar
+├── scripts/
+├── custom-config/
+├── output/
+└── pcap_analysis/
+```
 
 ## Prerequisites
 
 - Java 11 or higher
 - A PCAP file containing network packet data
+- Required dependencies (included in `lib/` directory):
+  - JSON library (json-20231013.jar)
+  - Disruptor framework (disruptor-3.4.4.jar)
+  - SnakeYAML (snakeyaml-2.0.jar)
 
 ## Building
 
@@ -63,7 +87,7 @@ If no configuration file is specified, it will use the default file at `custom-c
 The client will:
 1. Connect to all servers specified in the configuration file
 2. Receive packets from each server
-3. Process the packets (currently just counting them)
+3. Process the packets using the PcapPacketAnalyzer
 4. Run for 60 seconds and then display statistics
 
 ## Configuration
@@ -81,27 +105,26 @@ The configuration file is a JSON file with the following structure:
       "read_timeout": 30000,
       "buffer_size": 1024,
       "packet_count": 1000
-    },
-    {
-      "ip": "192.168.1.2",
-      "host": "localhost",
-      "port": 9001,
-      "connection_timeout": 5000,
-      "read_timeout": 30000,
-      "buffer_size": 1024,
-      "packet_count": 500
     }
   ]
 }
 ```
 
+## Features
+
+- Efficient packet analysis using the Disruptor framework for high-performance processing
+- YAML configuration support for flexible deployment
+- Detailed packet analysis with PcapPacketAnalyzer
+- Separate output and analysis directories for better organization
+- Configurable connection parameters for each IP-based server
+
 ## ERSAP Integration
 
-This application can be integrated with the ERSAP framework by:
+This application is designed to integrate with the ERSAP framework:
 
-1. Using the generated configuration file to connect to the IP-based servers
-2. Creating an ERSAP service that uses the `IPBasedStreamClient` to receive packets
-3. Processing the packets within the ERSAP service
+1. Uses the standard ERSAP actor package structure
+2. Generates configuration files compatible with ERSAP services
+3. Provides packet streaming capabilities for ERSAP data processing pipelines
 
 ## Troubleshooting
 
@@ -112,6 +135,7 @@ If you encounter connection issues:
 1. Ensure that the servers are running
 2. Check that the ports are not being used by other applications
 3. Verify that the configuration file has the correct host and port information
+4. Check the output directory for any error logs
 
 ### PCAP File Issues
 
@@ -120,6 +144,7 @@ If you encounter issues with the PCAP file:
 1. Ensure that the file exists and is readable
 2. Verify that the file is a valid PCAP file
 3. Check that the file contains IP packets (IPv4)
+4. Review the pcap_analysis directory for detailed analysis results
 
 ## License
 

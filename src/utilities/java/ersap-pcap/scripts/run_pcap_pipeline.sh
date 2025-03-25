@@ -29,8 +29,17 @@ check_executable() {
 check_file() {
     if [ ! -f "$1" ]; then
         echo "Error: $1 does not exist"
+        echo "Please ensure the PCAP file is placed in /scratch/vscode/"
+        echo "And the directory is properly mounted in the devcontainer"
+        echo "See README.md for mounting instructions"
         exit 1
     fi
+}
+
+# Function to list available PCAP files
+list_pcap_files() {
+    echo "Available PCAP files in /scratch/vscode/:"
+    ls -l /scratch/vscode/*.pcap 2>/dev/null || echo "No PCAP files found"
 }
 
 echo "Checking prerequisites..."
@@ -43,8 +52,39 @@ PCAP2STREAMS_DIR="/workspaces/ersap-actors/src/utilities/java/pcap2streams"
 RUN_SCRIPT="$PCAP2STREAMS_DIR/scripts/run_pcap2streams.sh"
 check_executable "$RUN_SCRIPT"
 
-# Use the PCAP file from /scratch/jeng-yuantsai/
-PCAP_FILE="/scratch/jeng-yuantsai/CLAS12_ECAL_PCAL_DC_2024-05-15_17-12-30.pcap"
+# Check if PCAP directory is mounted
+if [ ! -d "/scratch/vscode" ]; then
+    echo "Error: /scratch/vscode directory is not mounted"
+    echo "Please add the following to your .devcontainer/devcontainer.json:"
+    echo '{
+        "mounts": [
+            "source=/scratch/vscode,target=/scratch/vscode,type=bind,consistency=cached"
+        ]
+    }'
+    exit 1
+fi
+
+# Allow PCAP file selection if multiple files exist
+PCAP_FILES=($(ls /scratch/vscode/*.pcap 2>/dev/null))
+if [ ${#PCAP_FILES[@]} -eq 0 ]; then
+    echo "Error: No PCAP files found in /scratch/vscode/"
+    echo "Please place your PCAP files in this directory"
+    exit 1
+elif [ ${#PCAP_FILES[@]} -eq 1 ]; then
+    PCAP_FILE="${PCAP_FILES[0]}"
+else
+    echo "Multiple PCAP files found. Please select one:"
+    for i in "${!PCAP_FILES[@]}"; do
+        echo "$((i+1)). ${PCAP_FILES[$i]}"
+    done
+    read -p "Enter the number of the PCAP file to use (1-${#PCAP_FILES[@]}): " selection
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt ${#PCAP_FILES[@]} ]; then
+        echo "Invalid selection"
+        exit 1
+    fi
+    PCAP_FILE="${PCAP_FILES[$((selection-1))]}"
+fi
+
 check_file "$PCAP_FILE"
 
 # Set ERSAP_HOME to match build_ersap-java.sh
@@ -60,7 +100,7 @@ cd "$PCAP_ACTORS_DIR"
 ./gradlew clean build
 ERSAP_HOME=$ERSAP_HOME ./gradlew install
 
-echo "Starting pcap2streams..."
+echo "Starting pcap2streams with file: $PCAP_FILE"
 # Create a temporary file to store pcap2streams output
 TEMP_LOG=$(mktemp)
 
