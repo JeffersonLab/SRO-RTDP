@@ -25,6 +25,8 @@ public class PcapIPAnalyzer {
     private static final int IP_PROTOCOL_OFFSET = 9; // Offset to IP protocol field
     private static final int IP_HEADER_SRC_ADDR_OFFSET = 12; // Offset to source IP in IP header
     private static final int IP_HEADER_DST_ADDR_OFFSET = 16; // Offset to destination IP in IP header
+    private static final int MAX_PACKET_SIZE = 65535; // Maximum packet size (65535 bytes)
+    private static final int MIN_PACKET_SIZE = 60; // Minimum packet size (60 bytes)
 
     private final String pcapFile;
     private final Map<String, Set<Long>> ipToPacketPositions;
@@ -81,6 +83,21 @@ public class PcapIPAnalyzer {
                         ((packetHeader[9] & 0xFF) << 8) |
                         ((packetHeader[10] & 0xFF) << 16) |
                         ((packetHeader[11] & 0xFF) << 24));
+
+                // Validate packet length
+                if (packetLength < MIN_PACKET_SIZE) {
+                    LOGGER.warning("Invalid packet length: " + packetLength + " at position " + position + 
+                                 ". Must be at least " + MIN_PACKET_SIZE + " bytes.");
+                    // Skip this packet
+                    fis.skip(packetLength);
+                    position += packetLength;
+                    continue;
+                }
+
+                if (packetLength > MAX_PACKET_SIZE) {
+                    LOGGER.info("Large packet detected: " + packetLength + " bytes at position " + position + 
+                              ". Will be truncated to " + MAX_PACKET_SIZE + " bytes.");
+                }
 
                 // Read Ethernet header
                 int ethernetBytesRead = fis.read(ethernetHeader);
