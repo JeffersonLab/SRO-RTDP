@@ -24,6 +24,9 @@ public class IPBasedStreamClient {
 
     private static final Logger LOGGER = Logger.getLogger(IPBasedStreamClient.class.getName());
     private static final int DEFAULT_TIMEOUT = 5000; // 5 seconds
+    private static final int MAX_PACKET_SIZE = 9000; // Maximum packet size (Jumbo frame size)
+    private static final int MIN_PACKET_SIZE = 64; // Minimum packet size (Ethernet minimum)
+    private static final int CHUNK_SIZE = 8192; // Size of chunks when reading data (8KB)
 
     private final String configFile;
     private final ConcurrentMap<String, ConnectionHandler> connections;
@@ -273,14 +276,48 @@ public class IPBasedStreamClient {
                             try {
                                 // Read packet length
                                 int packetLength = in.readInt();
+                                LOGGER.info("Reading packet of length " + packetLength + " for IP " + ip);
 
-                                // Read packet data
+                                // Validate packet length
+                                if (packetLength < MIN_PACKET_SIZE || packetLength > MAX_PACKET_SIZE) {
+                                    LOGGER.warning("Invalid packet length: " + packetLength + " for IP " + ip + 
+                                                 ". Must be between " + MIN_PACKET_SIZE + " and " + MAX_PACKET_SIZE + " bytes.");
+                                    continue;
+                                }
+
+                                // Read packet data in chunks
                                 byte[] packetData = new byte[packetLength];
-                                in.readFully(packetData);
+                                int bytesRead = 0;
+                                while (bytesRead < packetLength) {
+                                    int count = in.read(packetData, bytesRead, 
+                                        Math.min(CHUNK_SIZE, packetLength - bytesRead));
+                                    if (count == -1) {
+                                        LOGGER.warning("End of stream reached while reading packet for IP " + ip);
+                                        break;
+                                    }
+                                    bytesRead += count;
+                                }
 
-                                // Add packet to queue
+                                if (bytesRead < packetLength) {
+                                    LOGGER.warning("Incomplete packet read for IP " + ip + 
+                                                 ". Expected " + packetLength + " bytes, got " + bytesRead);
+                                    continue;
+                                }
+
+                                // Add packet to queue with a maximum size
                                 synchronized (this) {
+                                    while (packetQueue.size() >= 1000) { // Max 1000 packets in queue
+                                        try {
+                                            LOGGER.warning("Packet queue full for IP " + ip + 
+                                                         ", waiting for consumer...");
+                                            wait(100); // Wait up to 100ms
+                                        } catch (InterruptedException e) {
+                                            Thread.currentThread().interrupt();
+                                            break;
+                                        }
+                                    }
                                     packetQueue.add(packetData);
+                                    notifyAll(); // Notify waiting consumers
                                 }
 
                                 packetCount++;
@@ -291,6 +328,23 @@ public class IPBasedStreamClient {
                             } catch (SocketTimeoutException e) {
                                 // This is expected due to the timeout on read
                                 continue;
+                            } catch (IOException e) {
+                                LOGGER.log(Level.WARNING, "Error reading packet for IP " + ip, e);
+                                // Try to reconnect
+                                if (running.get()) {
+                                    LOGGER.info("Attempting to reconnect for IP " + ip);
+                                    try {
+                                        socket.close();
+                                        socket = new Socket(host, port);
+                                        socket.setSoTimeout(readTimeout);
+                                        LOGGER.info("Successfully reconnected for IP " + ip);
+                                    } catch (IOException ex) {
+                                        LOGGER.log(Level.SEVERE, "Failed to reconnect for IP " + ip, ex);
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
                             }
                         }
                     }
