@@ -55,6 +55,23 @@ chmod +x scripts/install_pcap_pipeline.sh
 ./scripts/install_pcap_pipeline.sh
 ```
 
+### 4. Access PCAP Files
+
+The pipeline expects PCAP files to be accessible in the `/scratch/vscode/` directory. To make your PCAP files accessible:
+
+1. Mount your PCAP files directory in the devcontainer by adding the following to your `.devcontainer/devcontainer.json`:
+```json
+{
+    "mounts": [
+        "source=/scratch/vscode,target=/scratch/vscode,type=bind,consistency=cached"
+    ]
+}
+```
+
+2. Place your PCAP files in the `/scratch/vscode/` directory on your host machine.
+
+3. The pipeline will automatically look for PCAP files in this location when running `run_pcap_pipeline.sh`.
+
 ## Usage
 
 ### 1. Test the Setup
