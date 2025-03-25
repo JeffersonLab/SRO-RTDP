@@ -1,0 +1,4 @@
+129.57.69.15 localhost 9000
+129.57.69.14 localhost 9001
+129.57.177.7 localhost 9002
+129.57.69.12 localhost 9003

@@ -1,0 +1,33 @@
+---
+io-services:
+  reader:
+    class: org.jlab.ersap.pcap.PcapSource
+    name: PcapSource
+  writer:
+    class: org.jlab.ersap.pcap.PacketSink
+    name: PacketSink
+
+services:
+  - class: org.jlab.ersap.pcap.PacketProcessor
+    name: PacketProcessor
+
+configuration:
+  io-services:
+    reader:
+      SOCKETS_FILE: input/pcap_sockets.txt
+      CONNECTION_TIMEOUT: 5000
+      READ_TIMEOUT: 30000
+      BUFFER_SIZE: 1024
+    writer:
+      OUTPUT_DIR: output
+      FLUSH_INTERVAL: 1000
+  services:
+    packet_processor:
+      ENABLE_PROTOCOL_ANALYSIS: true
+      ENABLE_PORT_ANALYSIS: true
+      LOG_LEVEL: FINE
+
+mime-types:
+  - binary/bytes
+  - binary/data-jobj 
+  - sfixed32
