@@ -1,0 +1,32 @@
+{
+    "name": "ERSAP Development",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            "VARIANT": "ubuntu"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/git-lfs:1": {}
+    },
+    "forwardPorts": [],
+    "extraHosts": [
+        "cpnode:192.168.0.3"
+    ],
+    "mounts": [
+        "source=/scratch/jeng-yuantsai,target=/scratch/jeng-yuantsai,type=bind,consistency=cached"
+    ],
+    "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.docker",
+    "remoteUser": "vscode"
+} 

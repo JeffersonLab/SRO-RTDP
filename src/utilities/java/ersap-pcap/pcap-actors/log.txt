@@ -1,0 +1,1714 @@
+Warning: ERSAP_USER_DATA environmental variable is not assigned.
+         It will be set to point to the ERSAP_HOME/plugins/epsci.
+         Note that you might face permission exceptions. 
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+
+==========================================
+               ERSAP FE/DPE               
+==========================================
+ Name             = 172.17.0.5%8480_java
+ Session          = vscode_ersap
+ Start time       = 2025-03-24 14:58:18
+ Version          = 1.0
+ Lang             = Java
+ Pool size        = 4
+
+ Proxy Host       = 172.17.0.5
+ Proxy Port       = 8480
+==========================================
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+	LANG = "en_US.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+==========================================
+            ERSAP Orchestrator            
+==========================================
+ Front-end          = 172.17.0.5%8480_java
+ Start time         = 2025-03-24 14:58:19
+ Threads            = 1
+
+ Input directory    = /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input
+ Output directory   = /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output
+ Output file prefix = out_
+ Number of files  = 1
+==========================================
+2025-03-24 14:58:20.011: Waiting for local node...
+2025-03-24 14:58:20.149: Start processing on 172.17.0.5...
+2025-03-24 14:58:20.150: Searching services in 172.17.0.5...
+2025-03-24 14:58:20.157: Deploying services in 172.17.0.5...
+2025-03-24 14:58:20: started container = 172.17.0.5%8480_java:vscode
+DEBUG: PcapSource constructor called
+getInputDataTypes called
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+Mar 24, 2025 2:58:20 PM org.jlab.ersap.pcap.PacketSink getInputDataTypes
+INFO: Supported input types:
+Mar 24, 2025 2:58:20 PM org.jlab.ersap.pcap.PacketSink getInputDataTypes
+INFO: - binary/data-jobj
+Mar 24, 2025 2:58:20 PM org.jlab.ersap.pcap.PacketSink getInputDataTypes
+INFO: - application/json
+Mar 24, 2025 2:58:20 PM org.jlab.ersap.pcap.PacketSink getOutputDataTypes
+INFO: Supported output types:
+Mar 24, 2025 2:58:20 PM org.jlab.ersap.pcap.PacketSink getOutputDataTypes
+INFO: - binary/sfixed32
+2025-03-24 14:58:20: started service = 172.17.0.5%8480_java:vscode:DataManager  pool_size = 1
+2025-03-24 14:58:20: started service = 172.17.0.5%8480_java:vscode:PacketProcessor  pool_size = 8
+2025-03-24 14:58:21: started service = 172.17.0.5%8480_java:vscode:PcapSource  pool_size = 1
+2025-03-24 14:58:21: started service = 172.17.0.5%8480_java:vscode:PacketSink  pool_size = 1
+2025-03-24 14:58:22.594: All services deployed on 172.17.0.5
+2025-03-24 14:58:22.840: Configuring services on 172.17.0.5...
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketProcessor configure
+INFO: Initialized packet processor with protocol analysis: true, port analysis: true
+2025-03-24 14:58:23.119: All services configured on 172.17.0.5
+2025-03-24 14:58:23.163: Opening file pcap_sockets.txt on 172.17.0.5
+getInputDataTypes called
+DEBUG: configure method called with mime-type: application/json
+DEBUG: Received JSON configuration: {"SOCKETS_FILE":"input/pcap_sockets.txt","READ_TIMEOUT":30000,"file":"/workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input/pcap_sockets.txt","CONNECTION_TIMEOUT":5000,"action":"open","BUFFER_SIZE":1024}
+DEBUG: Set SOCKETS_FILE from file parameter: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input/pcap_sockets.txt
+DEBUG: Validating configuration...
+DEBUG: Final configuration:
+DEBUG: - SOCKETS_FILE: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input/pcap_sockets.txt
+DEBUG: - LOG_LEVEL: ALL
+DEBUG: Attempting to load socket configurations from: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input/pcap_sockets.txt
+DEBUG: Verifying file access for: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input/pcap_sockets.txt
+DEBUG: Successfully opened file for reading
+DEBUG: File details:
+DEBUG: - Absolute path: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/input/pcap_sockets.txt
+DEBUG: - File size: 112 bytes
+DEBUG: - Last modified: 1742828297282
+DEBUG: - Can read: true
+DEBUG: - Can write: true
+DEBUG: - Can execute: false
+DEBUG: Added socket config: IP=129.57.69.15, host=localhost, port=9000
+DEBUG: Added socket config: IP=129.57.69.14, host=localhost, port=9001
+DEBUG: Added socket config: IP=129.57.177.7, host=localhost, port=9002
+DEBUG: Added socket config: IP=129.57.69.12, host=localhost, port=9003
+DEBUG: No ip-based-config.json found, using default packet count
+DEBUG: Successfully loaded 4 socket configurations
+DEBUG: Successfully loaded 4 socket configurations during setup
+DEBUG: Initializing client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Client initialized successfully
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: count
+DEBUG: Handling count request
+DEBUG: getEventCount called
+DEBUG: readEventCount called - checking client state
+DEBUG: Setting isEventCountRequest to true
+DEBUG: Client state verified, returning Integer value: 2147483647
+DEBUG: Setting isEventCountRequest to false in finally block
+DEBUG: Setting event count to: 2147483647
+DEBUG: Setting data with mime-type: binary/sfixed32
+DEBUG: Created Integer object with value: 2147483647
+DEBUG: Integer object class: java.lang.Integer
+DEBUG: Output data type after setting: binary/sfixed32
+DEBUG: Output data class: java.lang.Integer
+DEBUG: After getEventCount:
+DEBUG: - Output mime-type: binary/sfixed32
+DEBUG: - Output data class: java.lang.Integer
+DEBUG: - Output description: event count
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: order
+DEBUG: Handling order request
+DEBUG: getFileByteOrder called
+readByteOrder called
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink getInputDataTypes
+INFO: Supported input types:
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink getInputDataTypes
+INFO: - binary/data-jobj
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink getInputDataTypes
+INFO: - application/json
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink configure
+INFO: Setting output directory to absolute path: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink configure
+INFO: Initialized packet sink with output directory: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink getOutputDataTypes
+INFO: Supported output types:
+Mar 24, 2025 2:58:23 PM org.jlab.ersap.pcap.PacketSink getOutputDataTypes
+INFO: - binary/sfixed32
+2025-03-24 14:58:23.222: Using 1 cores on 172.17.0.5 to process 2147483647 events of pcap_sockets.txt [1/1]
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 0
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: No packets available from any socket, waiting before retry
+DEBUG: Creating new client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 0D 83 00 07 0D 90 20 2B 0D 9C 40 28 0D 98 A0 2D 
+0D AC 40 2E 0D A0 80 61 0D C4 00 18 0D C2 20 27 
+0D D8 20 2A 0D DC 40 2A 0D DA A0 2E 0D DF 60 4A 
+0D EC 
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828313409,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:33 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:33.435: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 1
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 4A 87 60 35 4A 96 A0 2F 4A 9F 60 3E 4A A0 00 10 
+4A A2 40 30 4A B4 20 26 4A B4 40 29 4A B8 A0 2D 
+4A C8 80 69 4A CB A0 15 4A D8 80 66 4A DA A0 2F 
+4A EA 
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828315879,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:35 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:35.888: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 2
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 0D 83 00 07 0D 90 20 2B 0D 9C 40 28 0D 98 A0 2D 
+0D AC 40 2E 0D A0 80 61 0D C4 00 18 0D C2 20 27 
+0D D8 20 2A 0D DC 40 2A 0D DA A0 2E 0D DF 60 4A 
+0D EC 
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828316258,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:36 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:36.300: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 3
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 1E 94 00 03 1E 94 80 6D 1E 9E A0 20 1E AE 20 2B 
+1E A7 A0 2B 1E BA 40 30 1E BA 80 74 1E BA A0 29 
+1E BD 60 36 1E C2 00 0D 1E CA A0 2A 1E DE 00 0C 
+1E DC 
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828317208,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:37 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:37.233: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 4
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 2B 9F A0 1E 2B B6 60 0B 2B B8 A0 32 2B B3 60 3A 
+2B DA A0 32 2B D1 60 3D 2B E2 20 26 2B E5 20 07 
+2B FC 40 2B 2B FA A0 25 2B F9 A0 2A 2C 0C A0 23 
+2C 0D 
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828318065,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:38 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:38.077: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 5
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: No packets available from any socket, waiting before retry
+DEBUG: Creating new client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: No packets available from any socket, waiting before retry
+DEBUG: Creating new client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 4A 87 60 35 4A 96 A0 2F 4A 9F 60 3E 4A A0 00 10 
+4A A2 40 30 4A B4 20 26 4A B4 40 29 4A B8 A0 2D 
+4A C8 80 69 4A CB A0 15 4A D8 80 66 4A DA A0 2F 
+4A EA 
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828331377,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:51.387: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 6
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 0D 83 00 07 0D 90 20 2B 0D 9C 40 28 0D 98 A0 2D 
+0D AC 40 2E 0D A0 80 61 0D C4 00 18 0D C2 20 27 
+0D D8 20 2A 0D DC 40 2A 0D DA A0 2E 0D DF 60 4A 
+0D EC 
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828331786,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:51 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:51.794: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 7
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 1E 94 00 03 1E 94 80 6D 1E 9E A0 20 1E AE 20 2B 
+1E A7 A0 2B 1E BA 40 30 1E BA 80 74 1E BA A0 29 
+1E BD 60 36 1E C2 00 0D 1E CA A0 2A 1E DE 00 0C 
+1E DC 
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828332703,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:52 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:52.712: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 8
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 2B 9F A0 1E 2B B6 60 0B 2B B8 A0 32 2B B3 60 3A 
+2B DA A0 32 2B D1 60 3D 2B E2 20 26 2B E5 20 07 
+2B FC 40 2B 2B FA A0 25 2B F9 A0 2A 2C 0C A0 23 
+2C 0D 
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828333532,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:53 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:53.541: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 9
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 68 EF 00 17 68 F4 20 2E 68 FC 60 09 68 FC A0 31 
+69 0C A0 34 69 10 40 35 69 1C 80 6D 69 26 A0 2F 
+69 21 00 1F 69 3A 20 2C 69 4E 40 33 69 49 00 28 
+69 47 
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828334052,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:54 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:54.059: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 10
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 20 44 A0 3B 20 45 60 30 20 4D A0 2F 20 56 A0 37 
+20 55 60 32 20 62 40 30 20 62 60 13 20 61 A0 34 
+20 7A 20 38 20 72 80 65 20 70 A0 34 20 7B 60 32 
+20 77 
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Found potential IP header at offset: 5
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: IP header found at offset 5, version: 4, header length: 20 bytes
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 17: 55.60.32.20
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.50.96.85
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 21: 62.40.30.20
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.48.64.98
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Source IP bytes: 55 60 32 20 -> 32.50.96.85
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Destination IP bytes: 62 40 30 20 -> 32.48.64.98
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":160,"processed_timestamp":1742828338690,"destination_ip":"32.48.64.98","total_header_length":28,"destination_port":4896,"packet_size":9000,"source_port":25184,"transport_header_length":8,"payload_length":8967,"source_ip":"32.50.96.85"}
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Attempting to write packet metadata for IP: 32.50.96.85
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: Creating new CSV file at absolute path: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.50.96.85_packets.csv
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: CSV file created at: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.50.96.85_packets.csv
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: Writing CSV header to new file
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: Successfully created writer for IP: 32.50.96.85
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Writing CSV line to /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.50.96.85_packets.csv
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: CSV line content: 1742828338690,9000,160,32.50.96.85,32.48.64.98,25184,4896,28,8967
+
+Mar 24, 2025 2:58:58 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Successfully wrote and flushed packet metadata for IP: 32.50.96.85
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:58.711: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 11
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 80 6A 7B 54 00 06 7B 5A 80 74 7B 5A A0 2A 7B 5B 
+A0 1B 7B 60 40 28 7B 7E 00 02 7B 7A A0 2C 7B 81 
+00 0F 7B 81 60 42 7B 90 A0 28 7B AE 00 04 7B A0 
+40 2E 
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828339076,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:58:59 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:58:59.083: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 12
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 20 44 A0 3B 20 45 60 30 20 4D A0 2F 20 56 A0 37 
+20 55 60 32 20 62 40 30 20 62 60 13 20 61 A0 34 
+20 7A 20 38 20 72 80 65 20 70 A0 34 20 7B 60 32 
+20 77 
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Found potential IP header at offset: 5
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: IP header found at offset 5, version: 4, header length: 20 bytes
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 17: 55.60.32.20
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.50.96.85
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 21: 62.40.30.20
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.48.64.98
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Source IP bytes: 55 60 32 20 -> 32.50.96.85
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Destination IP bytes: 62 40 30 20 -> 32.48.64.98
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":160,"processed_timestamp":1742828343784,"destination_ip":"32.48.64.98","total_header_length":28,"destination_port":4896,"packet_size":9000,"source_port":25184,"transport_header_length":8,"payload_length":8967,"source_ip":"32.50.96.85"}
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Attempting to write packet metadata for IP: 32.50.96.85
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Writing CSV line to /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.50.96.85_packets.csv
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: CSV line content: 1742828343784,9000,160,32.50.96.85,32.48.64.98,25184,4896,28,8967
+
+Mar 24, 2025 2:59:03 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Successfully wrote and flushed packet metadata for IP: 32.50.96.85
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:03.798: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 13
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 0D 83 00 07 0D 90 20 2B 0D 9C 40 28 0D 98 A0 2D 
+0D AC 40 2E 0D A0 80 61 0D C4 00 18 0D C2 20 27 
+0D D8 20 2A 0D DC 40 2A 0D DA A0 2E 0D DF 60 4A 
+0D EC 
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828346945,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:06 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:06.953: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 14
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: No packets available from any socket, waiting before retry
+DEBUG: Creating new client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 22 69 00 1B 22 78 20 3B 22 78 40 22 22 8A 20 2F 
+22 8C 80 71 22 87 60 45 22 AC 80 69 22 BA 40 2F 
+22 B5 A0 2B 22 C0 20 2A 22 C4 80 70 22 C6 A0 31 
+22 D6 
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Found potential IP header at offset: 23
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: IP header found at offset 23, version: 4, header length: 20 bytes
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 35: 2B.22.C0.20
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.192.34.43
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 39: 2A.22.C4.80
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 128.196.34.42
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Source IP bytes: 2B 22 C0 20 -> 32.192.34.43
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Destination IP bytes: 2A 22 C4 80 -> 128.196.34.42
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":34,"processed_timestamp":1742828353582,"destination_ip":"128.196.34.42","total_header_length":28,"destination_port":50848,"packet_size":9000,"source_port":28706,"transport_header_length":8,"payload_length":8949,"source_ip":"32.192.34.43"}
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Attempting to write packet metadata for IP: 32.192.34.43
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: Creating new CSV file at absolute path: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.192.34.43_packets.csv
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: CSV file created at: /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.192.34.43_packets.csv
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: Writing CSV header to new file
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink lambda$writePacketData$0
+INFO: Successfully created writer for IP: 32.192.34.43
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Writing CSV line to /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.192.34.43_packets.csv
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: CSV line content: 1742828353582,9000,34,32.192.34.43,128.196.34.42,28706,50848,28,8949
+
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Successfully wrote and flushed packet metadata for IP: 32.192.34.43
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:13.588: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 15
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 40 21 05 17 60 32 05 26 00 09 05 28 A0 30 05 29 
+00 0B 05 38 40 22 05 3F 60 32 05 54 A0 1F 05 59 
+00 0E 05 53 A0 18 05 66 00 05 05 78 20 23 05 7A 
+40 1E 
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828353612,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:13 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:13.617: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 16
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 28 2E 80 6B 28 26 A0 26 28 25 60 39 28 3E 00 07 
+28 38 40 2B 28 4A 20 29 28 44 80 6B 28 4A A0 22 
+28 47 A0 17 28 5E 20 31 28 56 40 35 28 58 80 6F 
+28 6E 
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828354044,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:14.050: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 17
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 66 36 20 09 66 74 80 2C 66 98 80 1B 66 C8 40 16 
+66 C0 80 25 66 DC 80 2A 67 02 40 16 67 02 80 2D 
+67 38 20 07 67 36 80 1F 67 48 40 0D 67 68 80 18 
+67 90 
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828354180,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:14.187: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 18
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 41 F8 A0 2B 42 0D 60 33 42 10 20 2B 42 1E 40 26 
+42 1F A0 1D 42 29 60 3B 42 36 40 2D 42 32 80 67 
+42 38 A0 27 42 39 60 36 42 31 A0 19 42 4A 40 31 
+42 47 
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828354645,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:14.650: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 19
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 2A C6 20 2F 2A C0 40 2F 2A C0 80 6C 2A DE 40 34 
+2A DE A0 2A 2A DF 60 36 2A D1 A0 24 2A F8 20 32 
+2A F8 40 34 2A F8 A0 27 2B 08 20 30 2B 0C 40 2F 
+2B 0D 
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828354976,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:14 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:14.982: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 20
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 4A 87 60 35 4A 96 A0 2F 4A 9F 60 3E 4A A0 00 10 
+4A A2 40 30 4A B4 20 26 4A B4 40 29 4A B8 A0 2D 
+4A C8 80 69 4A CB A0 15 4A D8 80 66 4A DA A0 2F 
+4A EA 
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828356815,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:16 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:16.821: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 21
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 0D 83 00 07 0D 90 20 2B 0D 9C 40 28 0D 98 A0 2D 
+0D AC 40 2E 0D A0 80 61 0D C4 00 18 0D C2 20 27 
+0D D8 20 2A 0D DC 40 2A 0D DA A0 2E 0D DF 60 4A 
+0D EC 
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828357183,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:17 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:17.189: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 22
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 1E 94 00 03 1E 94 80 6D 1E 9E A0 20 1E AE 20 2B 
+1E A7 A0 2B 1E BA 40 30 1E BA 80 74 1E BA A0 29 
+1E BD 60 36 1E C2 00 0D 1E CA A0 2A 1E DE 00 0C 
+1E DC 
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828358097,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:18 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:18.102: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 23
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 20 44 A0 3B 20 45 60 30 20 4D A0 2F 20 56 A0 37 
+20 55 60 32 20 62 40 30 20 62 60 13 20 61 A0 34 
+20 7A 20 38 20 72 80 65 20 70 A0 34 20 7B 60 32 
+20 77 
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Found potential IP header at offset: 5
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: IP header found at offset 5, version: 4, header length: 20 bytes
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 17: 55.60.32.20
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.50.96.85
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracting IP from bytes at offset 21: 62.40.30.20
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor extractIpAddress
+INFO: Extracted IP: 32.48.64.98
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Source IP bytes: 55 60 32 20 -> 32.50.96.85
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Destination IP bytes: 62 40 30 20 -> 32.48.64.98
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":160,"processed_timestamp":1742828363164,"destination_ip":"32.48.64.98","total_header_length":28,"destination_port":4896,"packet_size":9000,"source_port":25184,"transport_header_length":8,"payload_length":8967,"source_ip":"32.50.96.85"}
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Attempting to write packet metadata for IP: 32.50.96.85
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Writing CSV line to /workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors/output/32.50.96.85_packets.csv
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: CSV line content: 1742828363164,9000,160,32.50.96.85,32.48.64.98,25184,4896,28,8967
+
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink writePacketData
+INFO: Successfully wrote and flushed packet metadata for IP: 32.50.96.85
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:23.174: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 24
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 80 6A 7B 54 00 06 7B 5A 80 74 7B 5A A0 2A 7B 5B 
+A0 1B 7B 60 40 28 7B 7E 00 02 7B 7A A0 2C 7B 81 
+00 0F 7B 81 60 42 7B 90 A0 28 7B AE 00 04 7B A0 
+40 2E 
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828363560,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:23.567: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 25
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 01 82 80 6A 01 92 80 6E 01 9C A0 38 01 BE 40 27 
+01 B7 60 3F 01 CC 20 39 01 C6 80 69 01 CE A0 36 
+01 C9 60 41 01 D2 40 24 01 D9 00 0B 01 E2 20 33 
+01 E4 
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828363903,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:23 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:23.910: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 26
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 1C 70 40 22 1C 7D 60 40 1C 7F A0 16 1C 84 20 37 
+1C 8E 40 22 1C 8C 80 72 1C 98 A0 30 1C 93 00 0F 
+1C A2 20 33 1C A0 40 27 1C A4 80 75 1C BA 40 2C 
+1C CE 
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828365424,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:25.430: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 27
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 12 84 20 1C 12 86 80 67 12 97 60 2D 12 A8 20 24 
+12 AC 60 04 12 AE 80 62 12 AF 00 06 12 AF A0 2B 
+12 BB 60 37 12 C4 40 20 12 CE A0 29 12 C7 00 04 
+12 EC 
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828365656,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:25 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:25.662: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 28
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 4B 25 A0 12 4B 3C 80 5F 4B 31 00 0E 4B 4C 40 18 
+4B 5C 20 24 4B 66 40 28 4B 62 A0 2B 4B 6F 60 38 
+4B 88 20 29 4B 82 80 62 4B 92 A0 22 4B AE 20 2A 
+4B A0 
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828366023,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:26 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:26.029: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 29
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketProcessor execute
+INFO: Packet header bytes: 60 02 7D AA 20 0F 7D A2 40 0E 7D CE 40 08 7D CE 
+80 3A 7D DE 80 3D 7D F2 40 14 7E 0E 40 0B 7E 3C 
+60 0A 7E 42 20 14 7E 66 20 1A 7E 80 80 3E 7E 96 
+40 12 
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketProcessor execute
+WARNING: Could not find IP header signature (0x45)
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: === PacketSink execute method called ===
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Received data with mime-type: application/json
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Raw data class: java.lang.String
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketSink execute
+INFO: Processing JSON metadata: {"protocol":0,"processed_timestamp":1742828367009,"destination_ip":"0.0.0.0","total_header_length":0,"destination_port":0,"packet_size":9000,"source_port":0,"error":"IP header not found","payload_length":9000,"source_ip":"0.0.0.0"}
+Mar 24, 2025 2:59:27 PM org.jlab.ersap.pcap.PacketSink execute
+WARNING: Received error packet: IP header not found
+DEBUG: execute called with mime-type: binary/sfixed32
+DEBUG: Input data class: java.lang.Integer
+DEBUG: Unknown mime-type: binary/sfixed32
+DEBUG: getOutputDataTypes called
+DEBUG: Returning output data types: [binary/sfixed32, binary/bytes]
+DEBUG: - binary/sfixed32
+DEBUG: - binary/bytes
+2025-03-24 14:59:27.014: Error in 172.17.0.5%8480_java:vscode:PcapSource (ID: 1):
+Wrong input type 'binary/sfixed32'
+getInputDataTypes called
+DEBUG: execute called with mime-type: text/string
+DEBUG: Input data class: java.lang.String
+DEBUG: Received request: next-rec
+DEBUG: Handling next/next-rec request
+DEBUG: getNextEvent called
+DEBUG: readEvent called with eventNumber: 30
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: No packets available from any socket, waiting before retry
+DEBUG: Creating new client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+DEBUG: No packet available from socket 4, trying next socket
+DEBUG: No packets available from any socket, waiting before retry
+DEBUG: Creating new client for host: localhost, port: 9000
+DEBUG: Attempting to create client for host: localhost, port: 9000
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9000
+DEBUG: Reading packet from socket 1 of 4
+DEBUG: No packet available from socket 1, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9001
+DEBUG: Attempting to create client for host: localhost, port: 9001
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9001
+DEBUG: Reading packet from socket 2 of 4
+DEBUG: No packet available from socket 2, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9002
+DEBUG: Attempting to create client for host: localhost, port: 9002
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9002
+DEBUG: Reading packet from socket 3 of 4
+DEBUG: No packet available from socket 3, trying next socket
+DEBUG: Creating new client for host: localhost, port: 9003
+DEBUG: Attempting to create client for host: localhost, port: 9003
+DEBUG: Attempt 1 of 3 to connect
+DEBUG: Successfully connected to localhost:9003
+DEBUG: Reading packet from socket 4 of 4
+2025-03-24 14:59:42: removed service = 172.17.0.5%8480_java:vscode:PacketProcessor
+2025-03-24 14:59:42: removed service = 172.17.0.5%8480_java:vscode:DataManager
+2025-03-24 14:59:42: removed service = 172.17.0.5%8480_java:vscode:PacketSink
+DEBUG: Successfully read packet of size: 9000
+DEBUG: getDataType called
+DEBUG: Current isEventCountRequest flag: false
+DEBUG: Returning BYTES for normal packet data
+DEBUG: BYTES mime-type: binary/bytes
+destroy called
+Disconnected from stream
+Destroyed PCAP source
+2025-03-24 14:59:42: removed service = 172.17.0.5%8480_java:vscode:PcapSource
+2025-03-24 14:59:42: removed container = 172.17.0.5%8480_java:vscode
+2025-03-24 14:59:42: shutdown DPE
