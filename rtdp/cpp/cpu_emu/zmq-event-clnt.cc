@@ -21,9 +21,12 @@ void   Usage()
         "\nUsage: \n\
         -h help  \n\
         -i destination address (string)  \n\
-        -p destination port  \n\n";
+        -p destination port  \n\
+        -c event count (10) \n\
+        -s event size (MB) (10) \n\n";
 
     cout <<  usage_str;
+    cout << "Required: -i -p\n";
 }
 
 
@@ -31,11 +34,13 @@ int main (int argc, char *argv[])
 {
     int optc;
 
-    bool     psdI=false, psdP=false;
+    bool     psdI=false, psdP=false, psdC=false, psdS=false;
     char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
-    uint16_t dst_prt = 0; // target port
+    uint16_t dst_prt   = 0;  // target port
+    uint16_t evnt_cnt  = 10; // event count
+    uint16_t evnt_szMB = 10; // event size (MB)
 
-    while ((optc = getopt(argc, argv, "hi:p:")) != -1)
+    while ((optc = getopt(argc, argv, "hi:p:c:s:")) != -1)
     {
         switch (optc)
         {
@@ -52,6 +57,16 @@ int main (int argc, char *argv[])
             psdP = true;
             if(DBG) cout << " -p " << dst_prt;
             break;
+        case 'c':
+            evnt_cnt = (uint16_t) atoi((const char *) optarg) ;
+            psdC = true;
+            if(DBG) cout << " -c " << evnt_cnt;
+            break;
+        case 's':
+            evnt_szMB = (uint16_t) atoi((const char *) optarg) ;
+            psdS = true;
+            if(DBG) cout << " -s " << evnt_szMB;
+            break;
         case '?':
             cout << "Unrecognised option: " << optopt;
             Usage();
@@ -67,10 +82,10 @@ int main (int argc, char *argv[])
     std::cout << "Connecting to server..." << std::endl;
     socket.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
 
-    //  Do 10 requests, waiting each time for a response
-    for (int request_nbr = 0; request_nbr != 2; request_nbr++) {
+    //  Do evnt_cnt requests, waiting each time for a response
+    for (int request_nbr = 0; request_nbr != evnt_cnt; request_nbr++) {
 	// Send 10MB "event"
-        zmq::message_t request (10*1024*1024);
+        zmq::message_t request (evnt_szMB*1024*1024);
         std::cout << "Sending  " << request_nbr << "..." << std::endl;
         socket.send (request, zmq::send_flags::none);
 
