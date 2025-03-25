@@ -6,6 +6,99 @@ This project implements an ERSAP pipeline for processing multiple data streams f
 2. Processor: Simple data processing component
 3. Sink: Data storage/visualization component
 
+## Prerequisites
+
+- Docker and Docker Compose
+- Visual Studio Code with Remote - Containers extension
+- pcap2streams running and configured
+
+## Installation
+
+### 1. Set Up Development Environment
+
+First, set up the development environment using VS Code DevContainer:
+
+1. Open VS Code
+2. Navigate to and open the `SRO-RTDP` directory
+3. Press F1 and type "Dev Containers: Open Folder in Container"
+
+The container will build and set up the environment automatically, including:
+- Java 17 (OpenJDK)
+- Gradle 8.1.1
+- All required dependencies
+
+> **Note**: The devcontainer configuration is referenced from the jupyter notebook in [ersap-e2sar](https://github.com/JeffersonLab/ersap-e2sar) project.
+
+### 2. Install ERSAP Java Framework
+
+After the container is ready, install the ERSAP Java framework:
+
+```bash
+cd /workspaces/ersap-actors/src/utilities/java
+chmod +x build_ersap-java.sh
+./build_ersap-java.sh
+```
+
+The script will:
+- Set up ERSAP_HOME in your home directory
+- Clone required repositories (ersap-java and ersap-actor)
+- Build and install both repositories
+- Copy necessary JAR files to ERSAP_HOME/lib
+
+### 3. Install PCAP Pipeline
+
+Finally, install the PCAP pipeline:
+
+```bash
+cd ersap-pcap
+chmod +x scripts/install_pcap_pipeline.sh
+./scripts/install_pcap_pipeline.sh
+```
+
+## Usage
+
+### 1. Test the Setup
+
+Before running the full pipeline, you can test the setup using the test script:
+
+```bash
+./scripts/test_pcap2streams.sh
+```
+
+This script will:
+- Verify the ERSAP installation
+- Test basic connectivity
+- Validate configuration files
+
+### 2. Run the PCAP Pipeline
+
+To run the full PCAP pipeline:
+
+```bash
+./scripts/run_pcap_pipeline.sh
+```
+
+The script will:
+- Start pcap2streams which creates ip-based-config.json
+- Generate pcap_sockets.txt from the pcap2streams configuration
+- Start the ERSAP actors in the correct order
+- Monitor the pipeline status
+- Handle logging and error reporting
+
+### Configuration Files
+
+The pipeline uses two important configuration files:
+
+1. `pcap2streams/ip-based-config.json`
+   - Created by pcap2streams during runtime
+   - Contains the mapping between IP addresses and their corresponding socket configurations
+
+2. `pcap-actors/input/pcap_sockets.txt`
+   - Generated from ip-based-config.json
+   - Contains the list of socket connections for the ERSAP actors
+   - Used by PcapSource to connect to the pcap2streams sockets
+   - Format: One socket configuration per line (IP:PORT)
+
 ## Service Descriptions
 
 ### PcapSource
@@ -85,26 +178,22 @@ Output:
 ## Project Structure
 
 ```
-ersap-pcap/
-├── pcap-actors/           # Main actors implementation
-├── scripts/              # Build and deployment scripts
-└── README.md            # This file
+src/utilities/java/
+├── pcap2streams/         # PCAP to streams conversion layer
+│   ├── ip-based-config.json  # Runtime configuration for pcap2streams
+│   └── src/             # Source code for pcap2streams
+├── ersap-pcap/          # ERSAP actors implementation
+│   ├── pcap-actors/     # Main actors implementation
+│   │   ├── input/      # Input configurations
+│   │   │   └── pcap_sockets.txt  # Generated socket configurations
+│   │   └── src/       # Source code for ERSAP actors
+│   ├── scripts/        # Build and deployment scripts
+│   │   ├── install_pcap_pipeline.sh  # Installation script
+│   │   ├── run_pcap_pipeline.sh     # Main pipeline runner
+│   │   └── test_pcap2streams.sh     # Test script
+│   └── README.md      # This file
+└── build_ersap-java.sh # ERSAP Java framework build script
 ```
-
-## Prerequisites
-
-- Java 11 or later
-- Gradle 7.x or later
-- ERSAP Java framework
-- pcap2streams running and configured
-
-## Building the Project
-
-1. Ensure ERSAP_HOME is set in your environment
-2. Run the build script:
-   ```bash
-   ./scripts/build.sh
-   ```
 
 ## Configuration
 
@@ -132,10 +221,4 @@ The pipeline can be configured through the ERSAP configuration system. See the c
 #### Supported MIME Types
 - `binary/bytes`: Raw packet data
 - `binary/data-jobj`: Java object data
-- `sfixed32`: 32-bit fixed-point data
-
-## Usage
-
-1. Start pcap2streams with the desired configuration
-2. Deploy the ERSAP actors using the deployment script
-3. Monitor the pipeline through the ERSAP dashboard 
+- `sfixed32`: 32-bit fixed-point data 
