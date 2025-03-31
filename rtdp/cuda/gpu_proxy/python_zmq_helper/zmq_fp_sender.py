@@ -19,15 +19,18 @@ Dependencies:
     - numpy
 
 Author: ChatGPT, Cissie
-Date: 2025-03-10
+Check-in: 2025-03-10
+Last update: 2025-03-31
 """
 
 import zmq
+import time
 import argparse
 import numpy as np
 
 
-DATA_NUMPY_WIDTH = 2048   # Sending data grouped by this dimension
+DATA_NUMPY_WIDTH = 20480000  # Sending data grouped by this dimension. 40960000 does not work!
+BYTES_PER_MESSAGE = DATA_NUMPY_WIDTH * 4  # float32 = 4 bytes
 
 def main():
     parser = argparse.ArgumentParser(description="ZMQ Floating Point Data Sender")
@@ -35,10 +38,10 @@ def main():
                         "--ip-addr", required=True, help="IP address to send data to")
     parser.add_argument("-p",
                         "--port", type=int, default=55555, help="Port number to send data to (default: 55555)")
-    parser.add_argument("--group-size", type=int, default=DATA_NUMPY_WIDTH,
-                        help="Group data to this width (default: 2048)")
     parser.add_argument("-i",
                         "--all-ones", action="store_true", help="Send all ones if enabled (default: random values)")
+    parser.add_argument("--rate", type=float, default=500.0,
+                        help="Average MB/s to send (default = 500)")
     
     args = parser.parse_args()
     
@@ -48,14 +51,39 @@ def main():
     
     print(f"Sending data to {args.ip_addr}:{args.port} {'(all ones)' if args.all_ones else '(random values)'}")
 
+    if args.rate > 0:
+        print(f"Target send rate: {args.rate} MB/s\n")
+
+    # Calculate time interval between sends to maintain the desired MB/s rate
+    interval = 0
+    if args.rate > 0:
+        interval = max(1.0, BYTES_PER_MESSAGE / (args.rate * 1e6))
+        print(f"Sent interval: {interval * 1000} ms")
+    else:
+        print(f"--rate should be a positive number!!!")
+        exit(-1)
+
+    next_send_time = time.perf_counter()
+
     try:
         while True:
             if args.all_ones:
-                data = np.ones(args.group_size, dtype=np.float32)  # Sending an array of ones
+                data = np.ones(DATA_NUMPY_WIDTH, dtype=np.float32)
             else:
-                data = np.random.rand(args.group_size).astype(np.float32)  # Sending random floating point values
-            
+                data = np.random.rand(DATA_NUMPY_WIDTH).astype(np.float32)
+
             socket.send(data.tobytes())
+
+            if interval > 0:
+                next_send_time += interval
+                now = time.perf_counter()
+                sleep_duration = next_send_time - now
+                if sleep_duration > 0:
+                    print(f"\tSent {data.nbytes / 1e6} MB, sleep for {sleep_duration * 1000} ms...")
+                    time.sleep(sleep_duration)  
+                else:
+                    # Falling behind: skip sleep to catch up
+                    next_send_time = now
     except KeyboardInterrupt:
         print("\nTerminating sender.")
     finally:
