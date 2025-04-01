@@ -12,6 +12,7 @@
 #include <chrono>
 #include <vector>
 #include <cmath>
+#include <atomic>
 #include <unistd.h> // For getpid()
 
 #include <zmq.hpp>
@@ -190,14 +191,23 @@ public:
 
 //.........................................................................
 // The monitoring thread
-void monitorTraffic(size_t* inBytes, size_t* outBytes) {
+std::atomic<size_t> totalInBytes{0};
+std::atomic<size_t> totalOutBytes{0};
+
+void monitorTraffic(std::atomic<size_t>* inBytes, std::atomic<size_t>* outBytes) {
     using namespace std::chrono;
     while (true) {
-        size_t prevIn = *inBytes, prevOut = *outBytes;
+        size_t prevIn = inBytes->load();
+        size_t prevOut = outBytes->load();
         std::this_thread::sleep_for(seconds(2));
-        size_t curIn = *inBytes, curOut = *outBytes;
-        std::cout << "Incoming: " << ((curIn - prevIn) * 8.0 / 1e6) << " Mbps, "
-                  << "Outgoing: " << ((curOut - prevOut) * 8.0 / 1e6) << " Mbps" << std::endl;
+        size_t curIn = inBytes->load();
+        size_t curOut = outBytes->load();
+
+        double inRate_MBps = (curIn - prevIn) / (1000.0 * 1000.0) / 2.0;
+        double outRate_MBps = (curOut - prevOut) / (1000.0 * 1000.0) / 2.0;
+
+        std::cout << "[Monitor] Incoming: [" << inRate_MBps << " MB/s], "
+                  << "Outgoing: [" << outRate_MBps << " MB/s]" << std::endl;
     }
 }
 //.........................................................................
@@ -245,11 +255,11 @@ int main(int narg, char *argv[]){
     }
     //............................................
 
-
     std::cout << "\nWaiting for data ...\n" << std::endl;
 
+    std::thread monitor_thread(monitorTraffic, &totalInBytes, &totalOutBytes);
+    monitor_thread.detach();   // Start the rate monitoring thread
 
-    auto last_time = std::chrono::high_resolution_clock::now();
     while (true) {
         zmq::message_t recv_buffer;
         auto res = receiver.recv(recv_buffer, zmq::recv_flags::none);
@@ -262,6 +272,7 @@ int main(int narg, char *argv[]){
         }
         
         size_t curr_inBytes = recv_buffer.size();
+        totalInBytes += curr_inBytes;
         if( curr_inBytes == 0 ) { 
             if (verbose_mode) {
                 std::cout << "  (skipping empty buffer)" << std::endl;
@@ -344,7 +355,8 @@ int main(int narg, char *argv[]){
         if (!res) {
             std::cerr << "Error: ZeroMQ send failed!" << std::endl;
         }
-        if(verbose_mode) {
+        totalOutBytes += res.value();
+        if (verbose_mode) {
             std::cout << "Sent [" << res.value() << "] bytes via ZeroMQ socket.\n" << std::endl;
         }
 
