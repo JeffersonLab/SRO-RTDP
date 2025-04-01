@@ -38,7 +38,7 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
    /home/xmei/projects/SRO-RTDP/rtdp/cuda/gpu_proxy/  # change dir as needed
    bash-5.1$ rm -rf build  # clean the existing build
    bash-5.1$ mkdir build && cd build
-   bash-5.1$ cmake ..
+   bash-5.1$ cmake -DCMAKE_INSTALL_PREFIX=.. ..  # set install path
    ...
    -- The CUDA compiler identification is NVIDIA 12.8.61
    ...
@@ -47,6 +47,7 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
    bash-5.1$ make -j64
    ...
    [100%] Built target gpu_emu
+   bash-5.1$ make install  # install without sudo
    ```
 
 
