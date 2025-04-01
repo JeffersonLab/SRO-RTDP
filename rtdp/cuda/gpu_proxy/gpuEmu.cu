@@ -363,7 +363,6 @@ int main(int narg, char *argv[]){
         CUDA_CALL(cudaFree(d_in));
         CUDA_CALL(cudaFree(d_rand));
         CUDA_CALL(cudaFree(d_out));
-
     }
 
     return 0;

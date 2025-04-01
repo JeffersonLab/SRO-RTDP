@@ -7,12 +7,12 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
 1. Ask for a GPU node `scimlxxxx` via Slurm. Prefer T4, A100 and A800 nodes equipped with Tensor Cores.
 
    ```bash
-    # Only ask for 1 GPU on node sciml2401
-    bash-5.1$ srun -p gpu --gres=gpu:A800:1 --mem=24G --pty bash
+    # Only ask for 1 GPU on node sciml2302
+    bash-5.1$ srun -p gpu --gres=gpu:A100:1 --mem=100G --pty bash
     srun: job xxxxxxxx queued and waiting for resources
     srun: job xxxxxxxx has been allocated resources
     bash-5.1$ hostname
-    sciml2401.jlab.org
+    sciml2302.jlab.org
 
     # zmq lib (no heeder files) and sqlite3 are available on the GPU node
     bash-5.1$ ldconfig -p | grep zmq
@@ -56,24 +56,29 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
    ```bash
    bash-5.1$ pwd   # on the GPU node
    /home/xmei/projects/SRO-RTDP/rtdp/cuda/gpu_proxy/build
-   bash-5.1$ ./gpu_emu -a 129.57.138.18 -t
+   bash-5.1$ ../bin/gpu_emu -a 172.17.1.54 -v
    RECV - ZeroMQ pulling from: tcp://*:55555
-   SEND - ZeroMQ pushing to: tcp://129.57.138.18:55556
+   SEND - ZeroMQ pushing to: tcp://172.17.1.54:55556
 
    Waiting for data ...
 
-   Received [6553600] bytes from ZeroMQ socket.
-            Input matrix dimension, (#columns)x(#rows): 2048x800
+   Received [8192] bytes from ZeroMQ socket.
+   First 10 elements of h_in:
+   0.351711 0.852162 0.300457 0.894459 0.0352142 0.0829234 0.700032 0.681391 0.0781673 0.242668 
+
+            Input matrix dimension, (#columns)x(#rows): 2048x1
             Random matrix dimension, (#columns)x(#rows): 1024x2048
    First 10 elements of h_out:
-   508.961 508.161 503.566 516.782 506.765 516.568 504.393 499.471 526.027 516.058 
+   513.019 525.493 512.337 528.763 523.848 540.64 535.584 519.227 519.087 513.447 
 
 
    First 10 elements of CPU computed matrix multiplication result:
-   508.961 508.161 503.566 516.781 506.765 516.567 504.393 499.47 526.027 516.058 
+   513.019 525.493 512.338 528.763 523.848 540.64 535.584 519.227 519.086 513.447 
 
-            Output matrix dimension, (#columns)x(#rows): 1024x800
-   Sent [3276800] bytes via ZeroMQ socket.
+            Output matrix dimension, (#columns)x(#rows): 1024x1
+   Sent [4096] bytes via ZeroMQ socket.
+   ...
+   [Monitor] Incoming: [0.012288 MB/s], Outgoing: [0.006144 MB/s]
    ...
 
    ```
@@ -81,14 +86,23 @@ Luckily we have the `ZMQ` (`so` only) and `sqlite` dependency on the native OS, 
 2. Prepare a sender (chained before GPU proxy) with Python venv.
    ```bash
    (zmq) bash-5.1$ pip install pyzmq numpy  # dependecies of python_zmq_helper
-   (zmq) bash-5.1$ python python_zmq_helper/zmq_fp_sender.py -a <GPU_NODE_IP>  # send to <GPU_NODE_IP>:55555
-   Sending data to 129.57.136.236:55555 (random values)
+   (zmq) bash-5.1$ python python_zmq_helper/zmq_fp_sender.py -a <GPU_NODE_IP> -r 25 --group-size 2048 # send to <GPU_NODE_IP>:55555
+   Sending data to 172.17.1.13:55555 (random values)
+   Target send rate: 25.0 MB/s
+
+   Each message needs: 0.32768 ms
+         Sent 0.008192 MB,  curr_send_rate=25.0 MB/s, duration=7.764577865600586 ms
+         Sleep for 992.2354221343994 ms...
+         ...
    ```
 
 3. Prepare a receiver (chained after GPU Proxy) with Python helper
    ```bash
-   (zmq) bash-5.1$ python python_zmq_helper/zmq_fp_receiver.py 
+   (zmq) python rtdp/cuda/gpu_proxy/python_zmq_helper/zmq_fp_receiver.py -v
    Receiving data on port 55556...
-   Received bytes: 3276800
-   First 10 floats: [508.96136 508.16055 503.5662 516.7816 506.7647 516.5677 504.39285 499.47058 526.027 516.0576]
+   Received [4096] bytes
+         First 10 floats: [513.01874 525.4927  512.33746 528.76263 523.84845 540.64    535.58386
+   519.22736 519.0868  513.44714]
+   ...
+   curr_recv_rate = 0.006144 MB/s
    ```
