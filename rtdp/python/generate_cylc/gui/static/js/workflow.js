@@ -128,25 +128,22 @@ class WorkflowGraph {
             return;
         }
 
-        // Debug log for found palette items
-        paletteItems.forEach(item => {
-            console.log('Found palette item:', {
-                type: item.getAttribute('data-component-type'),
-                draggable: item.draggable,
-                innerHTML: item.innerHTML
-            });
-        });
+        // Create a closure to maintain state
+        const dragState = {
+            currentType: null,
+            isDragging: false
+        };
 
         const handleDragStart = (e) => {
             console.log('DragStart event fired on:', e.target);
-            e.stopPropagation();
-            e.stopImmediatePropagation();
 
-            const paletteItem = e.target.closest('.palette-item');
-            console.log('Found palette item in drag start:', paletteItem);
+            // Get the palette item, whether it's the target or a parent
+            const paletteItem = e.target.classList.contains('palette-item')
+                ? e.target
+                : e.target.closest('.palette-item');
 
             if (!paletteItem) {
-                console.error('No palette item found in drag start');
+                console.error('No palette item found');
                 return;
             }
 
@@ -158,13 +155,19 @@ class WorkflowGraph {
                 return;
             }
 
+            // Store the type in our closure
+            dragState.currentType = type;
+            dragState.isDragging = true;
+            console.log('Stored current drag type:', dragState.currentType);
+
             // Set dragging styles
             paletteItem.style.opacity = '0.5';
             document.body.style.cursor = 'move';
 
-            console.log('Setting up drag data transfer');
+            // Set data transfer
             e.dataTransfer.effectAllowed = 'copy';
             e.dataTransfer.setData('text/plain', type);
+            e.dataTransfer.setData('application/json', JSON.stringify({ type: type }));
 
             // Create and set drag image
             const dragImage = paletteItem.cloneNode(true);
@@ -182,20 +185,18 @@ class WorkflowGraph {
         };
 
         const handleDrag = (e) => {
-            console.log('Drag event fired');
             e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
+            console.log('Drag event fired, current type:', dragState.currentType, 'isDragging:', dragState.isDragging);
         };
 
         const handleDragEnd = (e) => {
             console.log('DragEnd event fired');
             e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
 
-            const paletteItem = e.target.closest('.palette-item');
-            console.log('Found palette item in drag end:', paletteItem);
+            // Get the palette item, whether it's the target or a parent
+            const paletteItem = e.target.classList.contains('palette-item')
+                ? e.target
+                : e.target.closest('.palette-item');
 
             if (paletteItem) {
                 paletteItem.classList.remove('dragging');
@@ -208,10 +209,35 @@ class WorkflowGraph {
         const handleDrop = (e) => {
             console.log('Drop event fired');
             e.preventDefault();
-            e.stopPropagation();
             graphContainer.classList.remove('drop-target');
 
-            const type = e.dataTransfer.getData('text/plain');
+            // Try to get the type from multiple sources
+            let type = null;
+
+            // 1. Try from our state
+            type = dragState.currentType;
+            console.log('Type from dragState:', type);
+
+            // 2. Try from JSON data
+            if (!type) {
+                try {
+                    const jsonData = e.dataTransfer.getData('application/json');
+                    if (jsonData) {
+                        const data = JSON.parse(jsonData);
+                        type = data.type;
+                        console.log('Type from JSON data:', type);
+                    }
+                } catch (err) {
+                    console.log('No JSON data available');
+                }
+            }
+
+            // 3. Try from plain text
+            if (!type) {
+                type = e.dataTransfer.getData('text/plain');
+                console.log('Type from text data:', type);
+            }
+
             if (!type) {
                 console.error('No component type data received');
                 return;
@@ -225,10 +251,14 @@ class WorkflowGraph {
                 y: e.clientY - rect.top
             };
 
+            console.log('Drop point:', dropPoint);
+
             const canvasCoords = this.network.DOMtoCanvas({
                 x: dropPoint.x,
                 y: dropPoint.y
             });
+
+            console.log('Canvas coordinates:', canvasCoords);
 
             if (!canvasCoords) {
                 console.error('Failed to calculate drop position');
@@ -246,30 +276,43 @@ class WorkflowGraph {
                 physics: false
             };
 
+            console.log('Adding node:', nodeData);
+
             try {
                 this.nodes.add(nodeData);
                 this.showSuccess('Component added successfully');
             } catch (error) {
                 console.error('Error adding node:', error);
                 this.showError('Failed to add component');
+            } finally {
+                // Clear the drag state
+                dragState.currentType = null;
+                dragState.isDragging = false;
             }
         };
 
         // Setup drag source event handlers
         console.log('Setting up event listeners for palette items...');
         paletteItems.forEach(item => {
-            // Remove draggable from parent
-            item.setAttribute('draggable', 'false');
+            // Make both the palette-item and its node draggable
+            item.setAttribute('draggable', 'true');
+            item.style.cursor = 'grab';
 
-            // Add handlers to the child node element only
+            // Add the event listeners to the palette-item
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('drag', handleDrag);
+            item.addEventListener('dragend', handleDragEnd);
+
+            // Also make the node element draggable
             const nodeElement = item.querySelector('.node');
             if (nodeElement) {
-                console.log('Setting up drag handlers for:', item.getAttribute('data-component-type'));
                 nodeElement.setAttribute('draggable', 'true');
                 nodeElement.style.cursor = 'grab';
-                nodeElement.addEventListener('dragstart', handleDragStart, true);
-                nodeElement.addEventListener('drag', handleDrag, true);
-                nodeElement.addEventListener('dragend', handleDragEnd, true);
+
+                // Add the same event listeners to the node
+                nodeElement.addEventListener('dragstart', handleDragStart);
+                nodeElement.addEventListener('drag', handleDrag);
+                nodeElement.addEventListener('dragend', handleDragEnd);
             }
         });
 
@@ -277,42 +320,49 @@ class WorkflowGraph {
         const dropHandlers = {
             dragenter: (e) => {
                 e.preventDefault();
-                e.stopPropagation();
-                graphContainer.classList.add('drop-target');
+                if (dragState.isDragging) {
+                    graphContainer.classList.add('drop-target');
+                    console.log('Drag entered graph container');
+                }
             },
             dragover: (e) => {
                 e.preventDefault();
-                e.stopPropagation();
-                e.dataTransfer.dropEffect = 'copy';
+                if (dragState.isDragging) {
+                    e.dataTransfer.dropEffect = 'copy';
+                }
             },
             dragleave: (e) => {
                 e.preventDefault();
-                e.stopPropagation();
                 if (!e.currentTarget.contains(e.relatedTarget)) {
                     graphContainer.classList.remove('drop-target');
+                    console.log('Drag left graph container');
                 }
             },
             drop: handleDrop.bind(this)
         };
 
+        // Add the event listeners
         Object.entries(dropHandlers).forEach(([event, handler]) => {
-            graphContainer.addEventListener(event, handler, true);
+            graphContainer.addEventListener(event, handler);
         });
 
         // Add CSS styles dynamically
         const style = document.createElement('style');
         style.textContent = `
-            .palette-item .node {
+            .palette-item, .palette-item .node {
                 user-select: none;
                 -webkit-user-drag: element;
                 cursor: grab;
             }
-            .palette-item .node:active {
+            .palette-item:active, .palette-item .node:active {
                 cursor: grabbing;
             }
-            .palette-item.dragging .node {
+            .palette-item.dragging {
                 opacity: 0.5;
                 cursor: grabbing;
+            }
+            .workflow-graph.drop-target {
+                background-color: rgba(0, 0, 0, 0.05);
             }
         `;
         document.head.appendChild(style);
