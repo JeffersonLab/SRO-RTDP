@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # Default values
-PORT=50080
+PORT=8888
 OUTPUT_FILE="received_data.bin"
-BIND_IP="0.0.0.0"
+BIND_IP="*"
 
 # Help message
 show_help() {
     echo "Usage: $0 [-p PORT] [-o OUTPUT_FILE] [-b BIND_IP]"
-    echo "  -p PORT         Port to listen on (default: 50080)"
+    echo "  -p PORT         Port to listen on (default: 8888)"
     echo "  -o OUTPUT_FILE  File to save received data (default: received_data.bin)"
-    echo "  -b BIND_IP      IP address to bind to (default: 0.0.0.0)"
+    echo "  -b BIND_IP      IP address to bind to (default: *)"
     echo "  -h             Show this help message"
 }
 
@@ -25,9 +25,9 @@ while getopts "p:o:b:h" opt; do
     esac
 done
 
-echo "Starting receiver on $BIND_IP:$PORT, saving to $OUTPUT_FILE"
+echo "Starting ZMQ receiver on $BIND_IP:$PORT, saving to $OUTPUT_FILE"
 
-# Run the container with explicit port mapping
+# Run the container with host networking
 docker run -i --rm \
-    -p $PORT:$PORT \
+    --network host \
     cpu-emu receive "$PORT" "$BIND_IP" > "$OUTPUT_FILE"

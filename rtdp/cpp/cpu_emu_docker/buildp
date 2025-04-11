@@ -3,7 +3,7 @@
 if [ -e $1.cc ]
 then
     g++ -DNO_MAKEFILE -fpermissive -floop-parallelize-all -ffinite-math-only -floop-strip-mine \
-        -fmove-loop-invariants  -std=c++17 -O3 $1.cc -o $1 -lm -lpthread
+        -fmove-loop-invariants -std=c++17 -O3 $1.cc -o $1 -lm -lpthread -lzmq -lyaml
     
     # Check if compilation was successful
     if [ $? -eq 0 ]; then
