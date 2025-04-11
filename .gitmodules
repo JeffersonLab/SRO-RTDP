@@ -1,0 +1,4 @@
+[submodule "src/utilities/emu"]
+	path = src/utilities/emu
+	url = https://github.com/tsaie79/emu.git
+	branch = feature/pcap-tcp-integration
