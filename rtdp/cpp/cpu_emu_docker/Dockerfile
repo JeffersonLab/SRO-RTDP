@@ -4,29 +4,17 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y \
     g++ \
     make \
+    netcat \
     time \
     less \
-    libzmq3-dev \
-    libyaml-dev \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Python ZMQ library
-RUN pip3 install pyzmq
 
 # Set working directory
 WORKDIR /app
 
 # Copy source files
 COPY cpu_emu.cc .
-COPY cpu_emu.yaml .
 COPY buildp .
-
-# Create Python scripts for sender and receiver
-RUN echo 'import zmq\nimport sys\nimport time\n\ndef send_data(host, port, data):\n    context = zmq.Context()\n    socket = context.socket(zmq.REQ)\n    socket.connect(f"tcp://{host}:{port}")\n    socket.send(data)\n    reply = socket.recv()\n    print(f"Received reply: {reply}")\n\nif __name__ == "__main__":\n    if len(sys.argv) != 3:\n        print("Usage: python3 sender.py HOST PORT")\n        sys.exit(1)\n    host = sys.argv[1]\n    port = sys.argv[2]\n    data = sys.stdin.buffer.read()\n    send_data(host, port, data)' > sender.py
-
-RUN echo 'import zmq\nimport sys\n\ndef receive_data(port, bind_ip="*"):\n    context = zmq.Context()\n    socket = context.socket(zmq.REP)\n    socket.bind(f"tcp://{bind_ip}:{port}")\n    while True:\n        message = socket.recv()\n        sys.stdout.buffer.write(message)\n        sys.stdout.buffer.flush()\n        socket.send(b"ACK")\n\nif __name__ == "__main__":\n    if len(sys.argv) < 2:\n        print("Usage: python3 receiver.py PORT [BIND_IP]")\n        sys.exit(1)\n    port = sys.argv[1]\n    bind_ip = sys.argv[2] if len(sys.argv) > 2 else "*"\n    receive_data(port, bind_ip)' > receiver.py
 
 # Make build script executable
 RUN chmod +x buildp
@@ -37,18 +25,30 @@ RUN ./buildp cpu_emu
 # Create output directory
 RUN mkdir -p /output && chmod 777 /output
 
-# Create a script that can act as CPU emulator, sender, or receiver
+# Create a script that can act as CPU emulator, receiver, and sender
 RUN echo '#!/bin/bash\n\
-if [ "$1" = "send" ]; then\n\
-    shift\n\
-    HOST="$1"\n\
-    PORT="$2"\n\
-    python3 /app/sender.py "$HOST" "$PORT"\n\
-elif [ "$1" = "receive" ]; then\n\
+if [ "$1" = "receive" ]; then\n\
     shift\n\
     PORT="$1"\n\
-    BIND_IP="${2:-*}"\n\
-    python3 /app/receiver.py "$PORT" "$BIND_IP"\n\
+    BIND_IP="${2:-0.0.0.0}"\n\
+    echo "Starting netcat listener on $BIND_IP:$PORT..."\n\
+    # Use netcat-traditional for better compatibility\n\
+    if command -v nc.traditional >/dev/null 2>&1; then\n\
+        exec nc.traditional -l -p "$PORT" -s "$BIND_IP"\n\
+    else\n\
+        exec nc -l "$BIND_IP" "$PORT"\n\
+    fi\n\
+elif [ "$1" = "send" ]; then\n\
+    shift\n\
+    FILE="$1"\n\
+    HOST="$2"\n\
+    PORT="$3"\n\
+    echo "Sending $FILE to $HOST:$PORT..."\n\
+    if command -v nc.traditional >/dev/null 2>&1; then\n\
+        cat "$FILE" | nc.traditional -N -q 0 "$HOST" "$PORT"\n\
+    else\n\
+        cat "$FILE" | nc -N -q 0 "$HOST" "$PORT"\n\
+    fi\n\
 else\n\
     # Parse arguments for output directory\n\
     ARGS=("$@")\n\

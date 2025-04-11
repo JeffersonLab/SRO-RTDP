@@ -1,6 +1,6 @@
 # CPU Emulator Docker Image
 
-This Docker image packages the CPU emulator program that can simulate CPU and memory load for testing purposes. It uses ZeroMQ for communication and supports YAML configuration.
+This Docker image packages the CPU emulator program that can simulate CPU and memory load for testing purposes.
 
 ## Building the Image
 
@@ -21,51 +21,21 @@ Show help message:
 docker run cpu-emu
 ```
 
-### Configuration
+### Example Commands
 
-The CPU emulator can be configured either through command-line arguments or a YAML configuration file.
-
-#### YAML Configuration
-
-Create a `cpu_emu.yaml` file:
-```yaml
-destination: "127.0.0.1"
-dst_port: 8888
-rcv_port: 8888
-sleep: 0
-threads: 5
-latency: 100         # Processing latency in nsec/byte input
-mem_footprint: 10    # Memory footprint in GB
-output_size: 0.01    # Output size in GB
-verbose: 0
-terminal: 0          # if 1 do not forward result to destination
-```
-
-Then run with:
+1. Basic example with 10 threads, 100 seconds latency per GB:
 ```bash
-docker run -v $(pwd)/cpu_emu.yaml:/app/cpu_emu.yaml cpu-emu -y cpu_emu.yaml
-```
-
-#### Command Line Arguments
-
-1. Basic example with 5 threads, 100 seconds latency per GB:
-```bash
-docker run cpu-emu -b 100 -i "127.0.0.1" -m 10 -o 0.01 -t 5 -r 8888 -p 8888
+docker run cpu-emu -b 100 -i "127.0.0.1" -m 0.1 -o 0.001 -t 10 -r 50888 -p 50080
 ```
 
 2. Using sleep mode instead of CPU burn:
 ```bash
-docker run cpu-emu -b 100 -i "127.0.0.1" -m 10 -o 0.01 -t 5 -r 8888 -p 8888 -s
-```
-
-3. Running as a terminal node (no forwarding):
-```bash
-docker run cpu-emu -b 100 -i "127.0.0.1" -m 10 -o 0.01 -t 5 -r 8888 -p 8888 -z
+docker run cpu-emu -b 100 -i "127.0.0.1" -m 0.1 -o 0.001 -t 10 -r 50888 -p 50080 -s
 ```
 
 ### Parameters
 
-Required parameters (if not using YAML config):
+Required parameters:
 - `-b` : seconds thread latency per GB input
 - `-i` : destination address (string)
 - `-m` : thread memory footprint in GB
@@ -73,12 +43,10 @@ Required parameters (if not using YAML config):
 - `-t` : number of threads
 
 Optional parameters:
-- `-p` : destination port (default = 8888)
-- `-r` : receive port (default = 8888)
+- `-p` : destination port (default = 50080)
+- `-r` : receive port (default = 50888)
 - `-s` : sleep versus burn cpu
 - `-v` : verbose (0/1, default = 0)
-- `-y` : YAML config file path
-- `-z` : act as terminal node (don't forward data)
 
 ### Network Configuration
 
@@ -91,38 +59,32 @@ docker run --network host cpu-emu [parameters]
 
 2. Exposing specific ports:
 ```bash
-docker run -p 8888:8888 cpu-emu [parameters]
+docker run -p 50888:50888 cpu-emu [parameters]
 ```
 
 ### Testing Setup
 
-1. Start a terminal node:
+1. Start a netcat listener on the destination system:
 ```bash
-docker run cpu-emu -b 100 -m 10 -t 5 -r 8888 -z -v 1
+nc -l <port> > output_file
 ```
 
-2. Start an intermediate node:
+2. Run the CPU emulator container:
 ```bash
-docker run cpu-emu -b 100 -i "127.0.0.1" -m 10 -o 0.01 -t 5 -r 7777 -p 8888 -v 1
+docker run cpu-emu [parameters]
 ```
 
-3. Send data using a ZMQ client (example Python script):
-```python
-import zmq
-
-context = zmq.Context()
-socket = context.socket(zmq.PUSH)
-socket.connect("tcp://localhost:7777")
-socket.send(b"test data")
+3. Send data to the CPU emulator:
+```bash
+cat input_file | nc -N -q 0 <cpu_emu_host> <port>
 ```
 
 ## Notes
 
-- The container uses ZeroMQ (ZMQ) for communication instead of raw sockets
-- YAML configuration support makes it easier to manage complex setups
+- The container needs appropriate network access to communicate with the destination address
 - Memory limits might need to be adjusted using Docker's `-m` flag depending on the memory footprint specified
 - For production use, consider setting resource limits using Docker's runtime flags
-- The default ports are set to 8888 but can be changed via configuration
+- The default ports (50888 and 50080) are in the dynamic/private port range (above 49152) to avoid conflicts with common services
 
 
 

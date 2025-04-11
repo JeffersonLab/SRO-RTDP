@@ -172,12 +172,18 @@ int main (int argc, char *argv[])
     int optc;
 
     bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
+    bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
     bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
     bool     psdZ=false;
     string   yfn = "cpu_emu.yaml";
     char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
     uint16_t rcv_prt = 8888; // receive port default
     uint16_t dst_prt = 8888; // target port default
+    auto     nmThrds = 5;   // default
+    bool     vrbs = false;   // verbose ?
+    double   scs_GB  = 100;    // seconds/(input GB) thread latency
+    double   memGB   = 10;    // thread memory footprint in GB
+    double   otmemGB = 0.01;    // program putput in GB
     auto     nmThrds = 5;   // default
     bool     vrbs = false;   // verbose ?
     double   scs_GB  = 100;    // seconds/(input GB) thread latency

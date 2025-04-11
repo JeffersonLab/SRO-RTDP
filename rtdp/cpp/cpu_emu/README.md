@@ -5,6 +5,13 @@
 (assumes .cc suffix) which shows you any build errors via 'less' - just hit 'q' to exit. 
 
 
+# Build cpu_emu component (program):
+
+        ./buildp cpu_emu
+
+(assumes .cc suffix) which shows you any build errors via 'less' - just hit 'q' to exit. 
+
+
 # Testing cpu_emu component:
 
 ## cpu emu destination system:
