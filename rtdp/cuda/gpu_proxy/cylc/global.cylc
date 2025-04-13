@@ -8,6 +8,13 @@
             sender => gpu_proxy => receiver
         """
 
+[platforms]
+    [[jlab_slurm]]
+        cylc path = /w/epsci-sciwork18/jeng/cylc-env/bin/
+        hosts = tsai@ifarm2402
+        job runner = slurm
+        install target = localhost
+
 [runtime]
     [[root]]
         script = """

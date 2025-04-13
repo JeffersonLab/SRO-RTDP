@@ -24,7 +24,7 @@
 
     [[sender]]
         inherit = root
-        platform = slurm
+        platform = jlab_slurm
         execution time limit = PT2H
         [[[directives]]]
             --partition = ifarm
@@ -39,7 +39,7 @@
 
     [[gpu_proxy]]
         inherit = root
-        platform = slurm
+        platform = jlab_slurm
         execution time limit = PT2H
         [[[directives]]]
             --partition = gpu
@@ -55,7 +55,7 @@
 
     [[receiver]]
         inherit = root
-        platform = slurm
+        platform = jlab_slurm
         execution time limit = PT2H
         [[[directives]]]
             --partition = ifarm
