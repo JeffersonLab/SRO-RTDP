@@ -24,6 +24,14 @@
 
     [[sender]]
         inherit = root
+        [[[job]]]
+            batch system = slurm
+            execution time limit = PT2H
+        [[[directives]]]
+            --partition = ifarm
+            --ntasks = 1
+            --cpus-per-task = 4
+            --mem = 8G
         script = """
             # Run sender application
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
@@ -32,6 +40,15 @@
 
     [[gpu_proxy]]
         inherit = root
+        [[[job]]]
+            batch system = slurm
+            execution time limit = PT2H
+        [[[directives]]]
+            --partition = gpu
+            --ntasks = 1
+            --cpus-per-task = 4
+            --mem = 16G
+            --gres = gpu:1
         script = """
             # Run GPU proxy application
             apptainer exec --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
@@ -40,6 +57,14 @@
 
     [[receiver]]
         inherit = root
+        [[[job]]]
+            batch system = slurm
+            execution time limit = PT2H
+        [[[directives]]]
+            --partition = ifarm
+            --ntasks = 1
+            --cpus-per-task = 4
+            --mem = 8G
         script = """
             # Run receiver application
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
