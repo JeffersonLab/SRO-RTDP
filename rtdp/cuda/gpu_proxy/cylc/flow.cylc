@@ -9,26 +9,39 @@
         """
 
 [runtime]
+    [[root]]
+        script = """
+            # Load necessary modules
+            module load apptainer
+        """
+        [[[environment]]]
+            # Network configuration
+            RECEIVER_PORT = 50080
+            GPU_PROXY_PORT = 50888
+            # Container configuration
+            DOCKER_SOURCE = "jlabtsai/rtdp-gpu_proxy:latest"
+            SIF_FILE = "gpu-proxy.sif"
+
     [[sender]]
         inherit = root
         script = """
             # Run sender application
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/containers/gpu-proxy.sif \
-                python3 /app/sender.py --port ${CYLC_WORKFLOW_PARAM_gpu_proxy_port}
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
+                python3 /app/sender.py --port ${GPU_PROXY_PORT}
         """
 
     [[gpu_proxy]]
         inherit = root
         script = """
             # Run GPU proxy application
-            apptainer exec --nv ${CYLC_WORKFLOW_RUN_DIR}/containers/gpu-proxy.sif \
-                ./gpuEmu --port ${CYLC_WORKFLOW_PARAM_gpu_proxy_port}
+            apptainer exec --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
+                ./gpuEmu --port ${GPU_PROXY_PORT}
         """
 
     [[receiver]]
         inherit = root
         script = """
             # Run receiver application
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/containers/gpu-proxy.sif \
-                python3 /app/receiver.py --port ${CYLC_WORKFLOW_PARAM_receiver_port}
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
+                python3 /app/receiver.py --port ${RECEIVER_PORT}
         """ 

@@ -1,14 +1,19 @@
 #!/bin/bash
 
-# Exit on error
+# Set -e to exit on error
 set -e
 
-# Remove containers
-rm -rf containers
+# Set fixed workflow name
+WORKFLOW_NAME="gpu-proxy"
 
-# Remove workflow run directories
-rm -rf log
-rm -rf share
-rm -rf work
+# Remove workflow run directory
+echo "Removing workflow run directory..."
+rm -rf ~/cylc-run/${WORKFLOW_NAME}
+
+# Remove local directories
+echo "Removing local directories..."
+rm -rf sifs
+rm -rf etc
+rm -rf scripts
 
 echo "Cleanup completed successfully." 

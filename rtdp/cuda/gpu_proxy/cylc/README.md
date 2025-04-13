@@ -16,26 +16,42 @@ This workflow is designed to test the GPU proxy functionality using Cylc workflo
 
 ```
 cylc/
-├── config.yml          # Workflow configuration
-├── global.cylc         # Global workflow settings
-├── flow.cylc          # Workflow graph definition
+├── flow.cylc          # Workflow configuration and graph definition
+├── global.cylc        # Global workflow settings
 ├── build.sh           # Script to build Apptainer container
 ├── cleanup.sh         # Script to clean up workflow artifacts
 ├── install.sh         # Script to install dependencies
-└── containers/        # Directory for Apptainer containers
+├── sifs/              # Directory for Apptainer containers
+├── etc/               # Configuration files
+└── scripts/           # Additional scripts
 ```
+
+## Configuration
+
+All workflow configuration is defined in `flow.cylc`, including:
+- Network ports
+- Container settings
+- Environment variables
 
 ## Setup and Usage
 
-1. **Install Dependencies**
+1. **Install the Workflow**
    ```bash
    ./install.sh
    ```
+   This will:
+   - Create necessary directories
+   - Install the workflow
+   - Validate the workflow configuration
 
 2. **Build Apptainer Container**
    ```bash
    ./build.sh
    ```
+   This will:
+   - Read configuration from flow.cylc
+   - Build the GPU proxy container
+   - Place the container in the `sifs/` directory
 
 3. **Start the Workflow**
    ```bash
@@ -81,6 +97,7 @@ cylc/
    - Check if all required modules are loaded
    - Verify that the Docker image exists
    - Ensure you have sufficient permissions on the cluster
+   - Check if the SIF file is in the correct location (`sifs/gpu-proxy.sif`)
 
 2. If the GPU proxy fails:
    - Check GPU availability
@@ -96,4 +113,6 @@ cylc/
 
 - The workflow uses Apptainer containers for isolation and reproducibility
 - GPU access is enabled through the `--nv` flag in Apptainer
-- All components communicate via TCP/IP sockets 
+- All components communicate via TCP/IP sockets
+- The workflow is installed in `~/cylc-run/gpu-proxy`
+- All configuration is managed in `flow.cylc` 
