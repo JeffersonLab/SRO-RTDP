@@ -24,9 +24,8 @@
 
     [[sender]]
         inherit = root
-        [[[job]]]
-            batch system = slurm
-            execution time limit = PT2H
+        platform = slurm
+        execution time limit = PT2H
         [[[directives]]]
             --partition = ifarm
             --ntasks = 1
@@ -40,9 +39,8 @@
 
     [[gpu_proxy]]
         inherit = root
-        [[[job]]]
-            batch system = slurm
-            execution time limit = PT2H
+        platform = slurm
+        execution time limit = PT2H
         [[[directives]]]
             --partition = gpu
             --ntasks = 1
@@ -57,9 +55,8 @@
 
     [[receiver]]
         inherit = root
-        [[[job]]]
-            batch system = slurm
-            execution time limit = PT2H
+        platform = slurm
+        execution time limit = PT2H
         [[[directives]]]
             --partition = ifarm
             --ntasks = 1
