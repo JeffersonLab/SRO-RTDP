@@ -1,0 +1,16 @@
+[meta]
+    title = "GPU Proxy Workflow"
+    description = "Workflow for testing GPU proxy functionality"
+
+[scheduling]
+    [[dependencies]]
+        graph = """
+            sender => gpu_proxy => receiver
+        """
+
+[runtime]
+    [[root]]
+        script = """
+            # Load necessary modules
+            module load apptainer
+        """ 

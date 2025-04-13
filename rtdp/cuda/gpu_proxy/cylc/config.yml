@@ -1,0 +1,50 @@
+# Configuration for GPU Proxy Workflow
+---
+workflow:
+  name: "gpu-proxy"
+  description: "Cylc-based GPU Proxy Testing Workflow"
+
+platform:
+  name: "jlab_slurm"
+  cylc_path: "/path/to/cylc-env/bin/"
+  hosts: "tsai@ifarm2402"
+  job_runner: "slurm"
+
+resources:
+  receiver:
+    ntasks: 1
+    cpus_per_task: 4
+    mem: "8G"
+    partition: "ifarm"
+    timeout: "2h"
+  gpu_proxy:
+    ntasks: 1
+    cpus_per_task: 4
+    mem: "16G"
+    gpus: 1
+    partition: "gpu"
+    timeout: "2h"
+  sender:
+    ntasks: 1
+    cpus_per_task: 4
+    mem: "8G"
+    partition: "ifarm"
+    timeout: "2h"
+
+network:
+  receiver_port: 50080
+  gpu_proxy_port: 50888
+
+gpu_proxy:
+  threads: 4
+  latency: 50          # Processing latency per GB
+  mem_footprint: 0.05  # Memory footprint in GB
+  output_size: 0.001   # Output size in GB
+
+test_data:
+  size: "100M"        # Size of test data to send
+
+containers:
+  gpu_proxy:
+    image: "gpu-proxy.sif"
+    docker_source: "jlabtsai/rtdp-gpu_proxy:latest" 

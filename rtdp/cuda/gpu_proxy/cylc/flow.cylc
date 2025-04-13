@@ -1,0 +1,34 @@
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    [[graph]]
+        R1 = """
+            sender => gpu_proxy => receiver
+        """
+
+[runtime]
+    [[sender]]
+        inherit = root
+        script = """
+            # Run sender application
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/containers/gpu-proxy.sif \
+                python3 /app/sender.py --port ${CYLC_WORKFLOW_PARAM_gpu_proxy_port}
+        """
+
+    [[gpu_proxy]]
+        inherit = root
+        script = """
+            # Run GPU proxy application
+            apptainer exec --nv ${CYLC_WORKFLOW_RUN_DIR}/containers/gpu-proxy.sif \
+                ./gpuEmu --port ${CYLC_WORKFLOW_PARAM_gpu_proxy_port}
+        """
+
+    [[receiver]]
+        inherit = root
+        script = """
+            # Run receiver application
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/containers/gpu-proxy.sif \
+                python3 /app/receiver.py --port ${CYLC_WORKFLOW_PARAM_receiver_port}
+        """ 
