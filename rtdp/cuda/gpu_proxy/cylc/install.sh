@@ -4,7 +4,7 @@
 set -e
 
 # Load necessary modules
-module load apptainer
+# module load apptainer
 
 # Make scripts executable
 chmod +x build.sh
