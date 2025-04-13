@@ -7,6 +7,6 @@ set -e
 mkdir -p containers
 
 # Build Apptainer container from Docker image
-apptainer build containers/gpu-proxy.sif docker://${CYLC_WORKFLOW_PARAM_containers_gpu_proxy_docker_source}
+apptainer build containers/gpu-proxy.sif docker://jlabtsai/gpu-proxy:latest
 
 echo "Container build completed successfully." 
