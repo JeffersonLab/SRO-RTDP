@@ -25,9 +25,17 @@
         script = """
             #!/bin/bash
             # Store hostname for other tasks
-            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            RECEIVER_IP=$(hostname -i)
+            echo "Receiver IP: ${RECEIVER_IP}"
+            echo "${RECEIVER_IP}" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             
-            echo "Receiver running on $(hostname -i)"
+            # Verify IP file was created
+            if [ ! -f "$CYLC_WORKFLOW_SHARE_DIR/receiver_ip" ]; then
+                echo "ERROR: Failed to create receiver IP file"
+                exit 1
+            fi
+            
+            echo "Receiver running on ${RECEIVER_IP}"
             echo "Listening on port ${OUT_PORT}"
             
             # Run receiver in background
@@ -45,6 +53,7 @@
                 exit 1
             fi
             
+            echo "Receiver is running and ready"
             # Signal task as ready
             cylc message "${CYLC_TASK_JOB}" "ready"
             
@@ -67,13 +76,22 @@
         execution time limit = PT2H
         script = """
             #!/bin/bash
-            # Store hostname for other tasks
-            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip
+            # Check if receiver IP file exists
+            if [ ! -f "$CYLC_WORKFLOW_SHARE_DIR/receiver_ip" ]; then
+                echo "ERROR: Receiver IP file not found"
+                exit 1
+            fi
             
-            # Read receiver IP from shared file
+            # Read receiver IP
             RECEIVER_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "Found receiver IP: ${RECEIVER_IP}"
             
-            echo "GPU Proxy running on $(hostname -i)"
+            # Store hostname for other tasks
+            PROXY_IP=$(hostname -i)
+            echo "Proxy IP: ${PROXY_IP}"
+            echo "${PROXY_IP}" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip
+            
+            echo "GPU Proxy running on ${PROXY_IP}"
             echo "Sending to receiver at ${RECEIVER_IP}:${OUT_PORT}"
             
             # Run proxy in background
@@ -95,6 +113,7 @@
                 exit 1
             fi
             
+            echo "Proxy is running and ready"
             # Signal task as ready
             cylc message "${CYLC_TASK_JOB}" "ready"
             
@@ -118,8 +137,15 @@
         execution time limit = PT2H
         script = """
             #!/bin/bash
+            # Check if GPU proxy IP file exists
+            if [ ! -f "$CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip" ]; then
+                echo "ERROR: GPU proxy IP file not found"
+                exit 1
+            fi
+            
             # Read GPU proxy IP from shared file
             GPU_PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
+            echo "Found GPU proxy IP: ${GPU_PROXY_IP}"
             echo "Sending data to ${GPU_PROXY_IP}:${IN_PORT}"
             
             # Run sender in background
