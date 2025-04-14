@@ -219,7 +219,7 @@
             --job-name = proxy
             --partition = gpu
             --gres = gpu:A800:1
-            --mem = 24G
+            --mem = 12G
             --cpus-per-task = 4
         
         [[[outputs]]]
