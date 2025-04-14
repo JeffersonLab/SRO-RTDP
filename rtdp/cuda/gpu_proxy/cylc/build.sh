@@ -8,7 +8,7 @@ mkdir -p sifs
 
 # Read docker source from flow.cylc
 DOCKER_SOURCE=$(grep "DOCKER_SOURCE =" flow.cylc | awk -F'"' '{print $2}')
-SIF_FILE=$(grep "SIF_FILE =" flow.cylc | awk -F'"' '{print $2}')
+SIF_FILE="gpu-proxy.sif"
 
 # Build Apptainer container from Docker image
 echo "Building GPU proxy container from ${DOCKER_SOURCE}..."
