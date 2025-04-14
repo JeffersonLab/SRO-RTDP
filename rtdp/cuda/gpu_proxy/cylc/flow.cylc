@@ -5,7 +5,7 @@
 [scheduling]
     [[graph]]
         R1 = """
-            receiver => gpu_proxy => sender
+            receiver:ready => gpu_proxy:ready => sender
         """
 
 [runtime]
@@ -27,6 +27,20 @@
             # Store hostname for other tasks
             echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             
+            # Wait for valid IP address in the file
+            while true; do
+                if [ -f "$CYLC_WORKFLOW_SHARE_DIR/receiver_ip" ]; then
+                    IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+                    if [[ $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        break
+                    fi
+                fi
+                sleep 1
+            done
+            
+            # Set task as ready
+            cylc message "${CYLC_TASK_JOB}" "ready"
+            
             echo "Receiver running on $(hostname -i)"
             echo "Listening on port ${OUT_PORT}"
             
@@ -39,6 +53,8 @@
             --mem = 1G
             --time = 00:10:00
             --partition = ifarm
+        [[[outputs]]]
+            ready = "Receiver IP file created"
 
     [[gpu_proxy]]
         inherit = root
@@ -46,11 +62,33 @@
         execution time limit = PT2H
         script = """
             #!/bin/bash
+            # Wait for valid receiver IP address
+            while true; do
+                if [ -f "$CYLC_WORKFLOW_SHARE_DIR/receiver_ip" ]; then
+                    RECEIVER_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+                    if [[ $RECEIVER_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        break
+                    fi
+                fi
+                sleep 1
+            done
+            
             # Store hostname for other tasks
             echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip
             
-            # Read receiver IP from shared file
-            RECEIVER_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            # Wait for valid GPU proxy IP address
+            while true; do
+                if [ -f "$CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip" ]; then
+                    PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
+                    if [[ $PROXY_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        break
+                    fi
+                fi
+                sleep 1
+            done
+            
+            # Set task as ready
+            cylc message "${CYLC_TASK_JOB}" "ready"
             
             echo "GPU Proxy running on $(hostname -i)"
             echo "Sending to receiver at ${RECEIVER_IP}:${OUT_PORT}"
@@ -69,6 +107,8 @@
             --time = 00:10:00
             --partition = gpu
             --gres = gpu:1
+        [[[outputs]]]
+            ready = "GPU Proxy IP file created"
 
     [[sender]]
         inherit = root
@@ -76,8 +116,17 @@
         execution time limit = PT2H
         script = """
             #!/bin/bash
-            # Read GPU proxy IP from shared file
-            GPU_PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
+            # Wait for valid GPU proxy IP address
+            while true; do
+                if [ -f "$CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip" ]; then
+                    GPU_PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
+                    if [[ $GPU_PROXY_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        break
+                    fi
+                fi
+                sleep 1
+            done
+            
             echo "Sending data to ${GPU_PROXY_IP}:${IN_PORT}"
             apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} sender -a ${GPU_PROXY_IP} -p ${IN_PORT}
         """
