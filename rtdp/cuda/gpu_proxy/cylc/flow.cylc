@@ -9,7 +9,12 @@
 
     [[graph]]
         R1 = """
-            receiver:started => gpu_proxy:started => sender:started
+            # Start chain
+            receiver:ready => gpu_proxy:ready => sender
+            
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
+            receiver:completed
         """
 
 [runtime]
@@ -21,121 +26,254 @@
         
         [[[directives]]]
             --ntasks = 1
-            --cpus-per-task = 1
-            --mem = 1G
+            --partition = ifarm
             --output = slurm_%j.log
             --error = slurm_%j.log
         
         [[[environment]]]
+            # Path to SIF file
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
+            
             # Network configuration
-            IN_PORT = 55555
-            OUT_PORT = 55556
-            # Container configuration
-            DOCKER_SOURCE = "jlabtsai/rtdp-gpu_proxy:latest"
-            SIF_FILE = gpu-proxy.sif
+            RECEIVER_PORT = "50080"
+            PROXY_PORT = "50888"
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
 
     [[receiver]]
-        inherit = root
         script = """
-            #!/bin/bash
-            # Store hostname for other tasks
-            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            # Create log directory
+            mkdir -p ${LOG_DIR}/receiver
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
-            echo "Receiver running on $(hostname -i)"
-            echo "Listening on port ${OUT_PORT}"
-            
-            # Run receiver in background
-            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} receiver -p ${OUT_PORT} &
-            
-            # Store the background process ID
-            echo $! > $CYLC_WORKFLOW_SHARE_DIR/receiver.pid
-            
-            # Wait a moment for the receiver to start listening
-            sleep 5
-            
-            # Verify the receiver is running
-            if ! ps -p $(cat $CYLC_WORKFLOW_SHARE_DIR/receiver.pid) > /dev/null; then
-                echo "ERROR: Receiver process failed to start"
+            # Check if port is already in use
+            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
+                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
                 exit 1
             fi
             
-            # Signal that receiver container has started
-            cylc message "receiver:started"
+            # Store hostname for other tasks
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
+            HOSTNAME=$(hostname -f)  # Use fully qualified hostname
+            IP=$(hostname -i | awk '{print $1}')  # Use first IP if multiple
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start receiver with debug output
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT} \
+                > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+            
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+            
+            # Create a flag file to track completion
+            COMPLETION_FILE="${CYLC_WORKFLOW_SHARE_DIR}/receiver_complete"
+            rm -f "${COMPLETION_FILE}"
+            
+            # Initialize file size tracking
+            PREV_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                PREV_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            # Monitor the receiver process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "Process details:" >> ${LOG_DIR}/receiver/process.log
+                ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
+                
+                # Check if data has been received by monitoring file size changes
+                CURRENT_SIZE=0
+                if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                    CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                fi
+                
+                if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${COMPLETION_FILE}" ]; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "Transfer completed successfully"
+                    cylc message -- "Transfer completed successfully"
+                    touch "${COMPLETION_FILE}"
+                fi
+                
+                PREV_SIZE=$CURRENT_SIZE
+                sleep 5
+            done
+            
+            # Check final status
+            FINAL_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                FINAL_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            if [ $FINAL_SIZE -gt 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                echo "Last few lines of apptainer log:" >&2
+                tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
-            --job-name = receiver
-            --output = receiver_%j.log
-            --error = receiver_%j.log
-            --partition = ifarm
+            --job-name = gpu-proxy-recv
+            --cpus-per-task = 4
+            --mem = 8G
+        
         [[[outputs]]]
-            started = "Receiver container has started"
+            ready = "ready"
+            completed = "Transfer completed successfully"
 
     [[gpu_proxy]]
-        inherit = root
         script = """
-            #!/bin/bash
-            # Store hostname for other tasks
-            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip
+            # Create log directory
+            mkdir -p ${LOG_DIR}/proxy
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/proxy/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
             
-            # Read receiver IP from shared file
-            RECEIVER_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
             
-            echo "GPU Proxy running on $(hostname -i)"
-            echo "Sending to receiver at ${RECEIVER_IP}:${OUT_PORT}"
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
             
-            # Run proxy in background
-            apptainer run --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} proxy \
-                --in-port ${IN_PORT} \
-                --out-ip ${RECEIVER_IP} \
-                --out-port ${OUT_PORT} \
-                -t &
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
             
-            # Store the background process ID
-            echo $! > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid
+            # Start GPU proxy
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
+            apptainer run --bind ${OUTPUT_DIR}:/output \
+                ${SIF_FILE} python3 /app/proxy.py --port ${PROXY_PORT} \
+                --receiver-ip ${RECV_IP} --receiver-port ${RECEIVER_PORT} \
+                2>${LOG_DIR}/proxy/apptainer.log &
             
-            # Wait a moment for the proxy to start
-            sleep 5
+            PROXY_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
             
-            # Verify the proxy is running
-            if ! ps -p $(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid) > /dev/null; then
-                echo "ERROR: Proxy process failed to start"
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $PROXY_PID 2>/dev/null; then
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
                 exit 1
             fi
             
-            # Signal that GPU proxy container has started
-            cylc message "gpu_proxy:started"
+            # Monitor memory usage
+            while kill -0 $PROXY_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/proxy/memory.log
+                free -h >> ${LOG_DIR}/proxy/memory.log
+                ps -o pid,ppid,%cpu,%mem,cmd -p $PROXY_PID >> ${LOG_DIR}/proxy/memory.log
+                sleep 5
+            done
+            
+            # Check if process died unexpectedly
+            if ! wait $PROXY_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = gpu-proxy
-            --output = gpu_proxy_%j.log
-            --error = gpu_proxy_%j.log
-            --partition = gpu
+            --cpus-per-task = 4
+            --mem = 16G
             --gres = gpu:1
+        
         [[[outputs]]]
-            started = "GPU Proxy container has started"
-
+            ready = "ready"
 
     [[sender]]
-        inherit = root
         script = """
-            #!/bin/bash
-            # Read GPU proxy IP from shared file
-            GPU_PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
-            echo "Sending data to ${GPU_PROXY_IP}:${IN_PORT}"
+            # Create log directory
+            mkdir -p ${LOG_DIR}/sender
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
             
-            # Run sender in background
-            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} sender -a ${GPU_PROXY_IP} -p ${IN_PORT} &
+            # Get proxy information
+            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Proxy IP: ${PROXY_IP}"
             
-            # Store the background process ID
-            echo $! > $CYLC_WORKFLOW_SHARE_DIR/sender.pid
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
             
-            # Signal that sender container has started
-            cylc message "sender:started"
-        """ 
+            # Generate test data
+            INPUT_FILE="${INPUT_DIR}/random_data.bin"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data"
+            dd if=/dev/urandom bs=1M count=100 of=${INPUT_FILE} 2>/dev/null
+            
+            # Send data
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${PROXY_PORT}"
+            apptainer run --bind ${INPUT_DIR}:/data \
+                ${SIF_FILE} python3 /app/sender.py --port ${PROXY_PORT} \
+                --proxy-ip ${PROXY_IP} --input-file "/data/$(basename ${INPUT_FILE})" \
+                2>${LOG_DIR}/sender/apptainer.log
+            
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+            
+            # Clean up
+            rm -f ${INPUT_FILE}
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
+            
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:succeeded"
+            fi
+            
+            # Exit with send status
+            exit ${SEND_STATUS}
+        """
         [[[directives]]]
-            --job-name = sender
-            --output = sender_%j.log
-            --error = sender_%j.log
-            --partition = ifarm
-        [[[outputs]]]
-            started = "Sender container has started"
+            --job-name = gpu-proxy-send
+            --cpus-per-task = 4
+            --mem = 8G
