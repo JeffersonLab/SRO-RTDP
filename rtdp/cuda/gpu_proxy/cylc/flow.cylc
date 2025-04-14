@@ -22,6 +22,10 @@
         inherit = root
         platform = jlab_slurm
         execution time limit = PT2H
+        script = """
+            #!/bin/bash
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/sender.py --port ${GPU_PROXY_PORT}
+        """
         [[[directives]]]
             --nodes = 1
             --ntasks = 1
@@ -30,15 +34,15 @@
             --time = 00:10:00
             --partition = gpu
             --gres = gpu:1
-        script = """
-            #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/sender.py --port ${GPU_PROXY_PORT}
-        """
 
     [[gpu_proxy]]
         inherit = root
         platform = jlab_slurm
         execution time limit = PT2H
+        script = """
+            #!/bin/bash
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/gpu_proxy.py --port ${GPU_PROXY_PORT}
+        """
         [[[directives]]]
             --nodes = 1
             --ntasks = 1
@@ -47,15 +51,15 @@
             --time = 00:10:00
             --partition = gpu
             --gres = gpu:1
-        script = """
-            #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/gpu_proxy.py --port ${GPU_PROXY_PORT}
-        """
 
     [[receiver]]
         inherit = root
         platform = jlab_slurm
         execution time limit = PT2H
+        script = """
+            #!/bin/bash
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT}
+        """
         [[[directives]]]
             --nodes = 1
             --ntasks = 1
@@ -63,8 +67,4 @@
             --mem = 1G
             --time = 00:10:00
             --partition = gpu
-            --gres = gpu:1
-        script = """
-            #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT}
-        """ 
+            --gres = gpu:1 
