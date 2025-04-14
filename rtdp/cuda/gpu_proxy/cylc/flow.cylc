@@ -12,21 +12,24 @@
     [[root]]
         [[[environment]]]
             # Network configuration
-            RECEIVER_PORT = 50080
-            GPU_PROXY_PORT = 50888
+            RECEIVER_PORT = 5001
+            GPU_PROXY_PORT = 5000
             # Container configuration
             DOCKER_SOURCE = "jlabtsai/rtdp-gpu_proxy:latest"
-            SIF_FILE = "gpu-proxy.sif"
+            SIF_FILE = gpu_proxy.sif
 
     [[sender]]
         inherit = root
         platform = jlab_slurm
         execution time limit = PT2H
         [[[directives]]]
-            --partition = ifarm
+            --nodes = 1
             --ntasks = 1
-            --cpus-per-task = 4
-            --mem = 8G
+            --cpus-per-task = 1
+            --mem = 1G
+            --time = 00:10:00
+            --partition = gpu
+            --gres = gpu:1
         [[[script]]]
             #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/sender.py --port ${GPU_PROXY_PORT}
@@ -36,24 +39,29 @@
         platform = jlab_slurm
         execution time limit = PT2H
         [[[directives]]]
-            --partition = gpu
+            --nodes = 1
             --ntasks = 1
-            --cpus-per-task = 4
-            --mem = 16G
+            --cpus-per-task = 1
+            --mem = 1G
+            --time = 00:10:00
+            --partition = gpu
             --gres = gpu:1
         [[[script]]]
             #!/bin/bash
-            apptainer exec --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} ./gpuEmu --port ${GPU_PROXY_PORT}
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/gpu_proxy.py --port ${GPU_PROXY_PORT}
 
     [[receiver]]
         inherit = root
         platform = jlab_slurm
         execution time limit = PT2H
         [[[directives]]]
-            --partition = ifarm
+            --nodes = 1
             --ntasks = 1
-            --cpus-per-task = 4
-            --mem = 8G
+            --cpus-per-task = 1
+            --mem = 1G
+            --time = 00:10:00
+            --partition = gpu
+            --gres = gpu:1
         [[[script]]]
             #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT} 
