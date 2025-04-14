@@ -7,6 +7,8 @@
         job runner = slurm
         install target = localhost 
 
+
 [install]
     [[symlink dirs]]
-        run = /home/tsai/jeng 
+        [[[localhost]]]
+            run = /home/tsai/jeng
