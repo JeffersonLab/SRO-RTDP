@@ -36,13 +36,6 @@
 
     [[receiver]]
         inherit = root
-        [[[directives]]]
-            --job-name = receiver
-            --output = receiver_%j.log
-            --error = receiver_%j.log
-            --partition = ifarm
-        [[[outputs]]]
-            started = "Receiver container has started"
         script = """
             #!/bin/bash
             # Store hostname for other tasks
@@ -69,17 +62,16 @@
             # Signal that receiver container has started
             cylc message "receiver:started"
         """
+        [[[directives]]]
+            --job-name = receiver
+            --output = receiver_%j.log
+            --error = receiver_%j.log
+            --partition = ifarm
+        [[[outputs]]]
+            started = "Receiver container has started"
 
     [[gpu_proxy]]
         inherit = root
-        [[[directives]]]
-            --job-name = gpu-proxy
-            --output = gpu_proxy_%j.log
-            --error = gpu_proxy_%j.log
-            --partition = gpu
-            --gres = gpu:1
-        [[[outputs]]]
-            started = "GPU Proxy container has started"
         script = """
             #!/bin/bash
             # Store hostname for other tasks
@@ -113,16 +105,18 @@
             # Signal that GPU proxy container has started
             cylc message "gpu_proxy:started"
         """
+        [[[directives]]]
+            --job-name = gpu-proxy
+            --output = gpu_proxy_%j.log
+            --error = gpu_proxy_%j.log
+            --partition = gpu
+            --gres = gpu:1
+        [[[outputs]]]
+            started = "GPU Proxy container has started"
+
 
     [[sender]]
         inherit = root
-        [[[directives]]]
-            --job-name = sender
-            --output = sender_%j.log
-            --error = sender_%j.log
-            --partition = ifarm
-        [[[outputs]]]
-            started = "Sender container has started"
         script = """
             #!/bin/bash
             # Read GPU proxy IP from shared file
@@ -138,3 +132,10 @@
             # Signal that sender container has started
             cylc message "sender:started"
         """ 
+        [[[directives]]]
+            --job-name = sender
+            --output = sender_%j.log
+            --error = sender_%j.log
+            --partition = ifarm
+        [[[outputs]]]
+            started = "Sender container has started"
