@@ -1,6 +1,7 @@
 [scheduler]
     allow implicit tasks = True
     UTC mode = True
+    run directory = /home/tsai/jeng
 
 [scheduling]
     [[graph]]
