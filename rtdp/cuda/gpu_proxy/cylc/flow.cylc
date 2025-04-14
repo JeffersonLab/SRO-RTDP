@@ -16,7 +16,7 @@
             GPU_PROXY_PORT = 5000
             # Container configuration
             DOCKER_SOURCE = "jlabtsai/rtdp-gpu_proxy:latest"
-            SIF_FILE = gpu_proxy.sif
+            SIF_FILE = gpu-proxy.sif
 
     [[sender]]
         inherit = root
