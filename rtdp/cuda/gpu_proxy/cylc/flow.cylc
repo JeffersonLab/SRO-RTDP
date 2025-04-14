@@ -66,4 +66,5 @@
             --gres = gpu:1
         script = """
             #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT} 
+            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT}
+        """ 
