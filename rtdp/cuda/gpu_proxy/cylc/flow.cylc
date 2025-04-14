@@ -36,6 +36,15 @@
             # Store the background process ID
             echo $! > $CYLC_WORKFLOW_SHARE_DIR/receiver.pid
             
+            # Wait a moment for the receiver to start listening
+            sleep 5
+            
+            # Verify the receiver is running
+            if ! ps -p $(cat $CYLC_WORKFLOW_SHARE_DIR/receiver.pid) > /dev/null; then
+                echo "ERROR: Receiver process failed to start"
+                exit 1
+            fi
+            
             # Signal task as ready
             cylc message "${CYLC_TASK_JOB}" "ready"
             
@@ -76,6 +85,15 @@
             
             # Store the background process ID
             echo $! > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid
+            
+            # Wait a moment for the proxy to start
+            sleep 5
+            
+            # Verify the proxy is running
+            if ! ps -p $(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid) > /dev/null; then
+                echo "ERROR: Proxy process failed to start"
+                exit 1
+            fi
             
             # Signal task as ready
             cylc message "${CYLC_TASK_JOB}" "ready"
