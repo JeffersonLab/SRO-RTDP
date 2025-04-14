@@ -35,8 +35,8 @@
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
             
             # Network configuration
-            RECEIVER_PORT = "50080"
-            PROXY_PORT = "50888"
+            IN_PORT = "55555"
+            OUT_PORT = "55556"
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
@@ -55,9 +55,9 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
             # Check if port is already in use
-            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
-                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
+            if netstat -tuln | grep -q ":${OUT_PORT}"; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${OUT_PORT} is already in use" >&2
+                netstat -tuln | grep ":${OUT_PORT}" >&2
                 exit 1
             fi
             
@@ -74,9 +74,7 @@
             
             # Start receiver with debug output
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT} \
-                > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run ${SIF_FILE} receiver > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
@@ -184,10 +182,7 @@
             
             # Start GPU proxy
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${SIF_FILE} python3 /app/proxy.py --port ${PROXY_PORT} \
-                --receiver-ip ${RECV_IP} --receiver-port ${RECEIVER_PORT} \
-                2>${LOG_DIR}/proxy/apptainer.log &
+            apptainer run --nv ${SIF_FILE} proxy --in-port ${IN_PORT} --out-ip ${RECV_IP} --out-port ${OUT_PORT} -t 2>${LOG_DIR}/proxy/apptainer.log &
             
             PROXY_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
@@ -247,24 +242,12 @@
             # Create input directory
             mkdir -p ${INPUT_DIR}
             
-            # Generate test data
-            INPUT_FILE="${INPUT_DIR}/random_data.bin"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data"
-            dd if=/dev/urandom bs=1M count=100 of=${INPUT_FILE} 2>/dev/null
-            
             # Send data
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${PROXY_PORT}"
-            apptainer run --bind ${INPUT_DIR}:/data \
-                ${SIF_FILE} python3 /app/sender.py --port ${PROXY_PORT} \
-                --proxy-ip ${PROXY_IP} --input-file "/data/$(basename ${INPUT_FILE})" \
-                2>${LOG_DIR}/sender/apptainer.log
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT}"
+            apptainer run ${SIF_FILE} sender -a ${PROXY_IP} 2>${LOG_DIR}/sender/apptainer.log
             
             SEND_STATUS=$?
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
-            
-            # Clean up
-            rm -f ${INPUT_FILE}
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
             
             if [ $SEND_STATUS -eq 0 ]; then
                 cylc message -- "sender:succeeded"
