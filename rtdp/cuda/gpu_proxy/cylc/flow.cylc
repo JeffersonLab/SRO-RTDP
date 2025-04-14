@@ -5,52 +5,18 @@
 [scheduling]
     [[graph]]
         R1 = """
-            sender => gpu_proxy => receiver
+            receiver => gpu_proxy => sender
         """
 
 [runtime]
     [[root]]
         [[[environment]]]
             # Network configuration
-            RECEIVER_PORT = 5001
-            GPU_PROXY_PORT = 5000
+            IN_PORT = 55555
+            OUT_PORT = 55556
             # Container configuration
             DOCKER_SOURCE = "jlabtsai/rtdp-gpu_proxy:latest"
-            SIF_FILE = gpu-proxy.sif
-
-    [[sender]]
-        inherit = root
-        platform = jlab_slurm
-        execution time limit = PT2H
-        script = """
-            #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/sender.py --port ${GPU_PROXY_PORT}
-        """
-        [[[directives]]]
-            --nodes = 1
-            --ntasks = 1
-            --cpus-per-task = 1
-            --mem = 1G
-            --time = 00:10:00
-            --partition = gpu
-            --gres = gpu:1
-
-    [[gpu_proxy]]
-        inherit = root
-        platform = jlab_slurm
-        execution time limit = PT2H
-        script = """
-            #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/gpu_proxy.py --port ${GPU_PROXY_PORT}
-        """
-        [[[directives]]]
-            --nodes = 1
-            --ntasks = 1
-            --cpus-per-task = 1
-            --mem = 1G
-            --time = 00:10:00
-            --partition = gpu
-            --gres = gpu:1
+            SIF_FILE = gpu_proxy.sif
 
     [[receiver]]
         inherit = root
@@ -58,7 +24,42 @@
         execution time limit = PT2H
         script = """
             #!/bin/bash
-            apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT}
+            # Store hostname for other tasks
+            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            
+            echo "Receiver running on $(hostname -i)"
+            echo "Listening on port ${OUT_PORT}"
+            
+            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} receiver -p ${OUT_PORT}
+        """
+        [[[directives]]]
+            --nodes = 1
+            --ntasks = 1
+            --cpus-per-task = 1
+            --mem = 1G
+            --time = 00:10:00
+            --partition = ifarm
+
+    [[gpu_proxy]]
+        inherit = root
+        platform = jlab_slurm
+        execution time limit = PT2H
+        script = """
+            #!/bin/bash
+            # Store hostname for other tasks
+            echo "$(hostname -i)" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip
+            
+            # Read receiver IP from shared file
+            RECEIVER_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            
+            echo "GPU Proxy running on $(hostname -i)"
+            echo "Sending to receiver at ${RECEIVER_IP}:${OUT_PORT}"
+            
+            apptainer run --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} proxy \
+                --in-port ${IN_PORT} \
+                --out-ip ${RECEIVER_IP} \
+                --out-port ${OUT_PORT} \
+                -t
         """
         [[[directives]]]
             --nodes = 1
@@ -67,4 +68,23 @@
             --mem = 1G
             --time = 00:10:00
             --partition = gpu
-            --gres = gpu:1 
+            --gres = gpu:1
+
+    [[sender]]
+        inherit = root
+        platform = jlab_slurm
+        execution time limit = PT2H
+        script = """
+            #!/bin/bash
+            # Read GPU proxy IP from shared file
+            GPU_PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
+            echo "Sending data to ${GPU_PROXY_IP}:${IN_PORT}"
+            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} sender -a ${GPU_PROXY_IP} -p ${IN_PORT}
+        """
+        [[[directives]]]
+            --nodes = 1
+            --ntasks = 1
+            --cpus-per-task = 1
+            --mem = 1G
+            --time = 00:10:00
+            --partition = ifarm 
