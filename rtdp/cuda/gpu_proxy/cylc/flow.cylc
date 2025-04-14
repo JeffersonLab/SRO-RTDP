@@ -30,7 +30,17 @@
             echo "Receiver running on $(hostname -i)"
             echo "Listening on port ${OUT_PORT}"
             
-            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} receiver -p ${OUT_PORT}
+            # Run receiver in background
+            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} receiver -p ${OUT_PORT} &
+            
+            # Store the background process ID
+            echo $! > $CYLC_WORKFLOW_SHARE_DIR/receiver.pid
+            
+            # Signal task as ready
+            cylc message "${CYLC_TASK_JOB}" "ready"
+            
+            # Wait for the background process
+            wait $(cat $CYLC_WORKFLOW_SHARE_DIR/receiver.pid)
         """
         [[[directives]]]
             --nodes = 1
@@ -57,11 +67,21 @@
             echo "GPU Proxy running on $(hostname -i)"
             echo "Sending to receiver at ${RECEIVER_IP}:${OUT_PORT}"
             
+            # Run proxy in background
             apptainer run --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} proxy \
                 --in-port ${IN_PORT} \
                 --out-ip ${RECEIVER_IP} \
                 --out-port ${OUT_PORT} \
-                -t
+                -t &
+            
+            # Store the background process ID
+            echo $! > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid
+            
+            # Signal task as ready
+            cylc message "${CYLC_TASK_JOB}" "ready"
+            
+            # Wait for the background process
+            wait $(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid)
         """
         [[[directives]]]
             --nodes = 1
@@ -83,7 +103,15 @@
             # Read GPU proxy IP from shared file
             GPU_PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
             echo "Sending data to ${GPU_PROXY_IP}:${IN_PORT}"
-            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} sender -a ${GPU_PROXY_IP} -p ${IN_PORT}
+            
+            # Run sender in background
+            apptainer run ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} sender -a ${GPU_PROXY_IP} -p ${IN_PORT} &
+            
+            # Store the background process ID
+            echo $! > $CYLC_WORKFLOW_SHARE_DIR/sender.pid
+            
+            # Wait for the background process
+            wait $(cat $CYLC_WORKFLOW_SHARE_DIR/sender.pid)
         """
         [[[directives]]]
             --nodes = 1
