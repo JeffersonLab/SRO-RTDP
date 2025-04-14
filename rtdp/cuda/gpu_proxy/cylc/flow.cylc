@@ -3,13 +3,29 @@
     UTC mode = True
 
 [scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
     [[graph]]
         R1 = """
-            receiver:ready => gpu_proxy:ready => sender
+            receiver:started => gpu_proxy:started => sender:started
         """
 
 [runtime]
     [[root]]
+        # Common settings for all tasks
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --cpus-per-task = 1
+            --mem = 1G
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
         [[[environment]]]
             # Network configuration
             IN_PORT = 55555
@@ -20,8 +36,13 @@
 
     [[receiver]]
         inherit = root
-        platform = jlab_slurm
-        execution time limit = PT2H
+        [[[directives]]]
+            --job-name = receiver
+            --output = receiver_%j.log
+            --error = receiver_%j.log
+            --partition = ifarm
+        [[[outputs]]]
+            started = "Receiver container has started"
         script = """
             #!/bin/bash
             # Store hostname for other tasks
@@ -45,24 +66,20 @@
                 exit 1
             fi
             
-            # Signal task as ready
-            cylc message "${CYLC_TASK_JOB}" "ready"
-            
+            # Signal that receiver container has started
+            cylc message "receiver:started"
         """
-        [[[directives]]]
-            --nodes = 1
-            --ntasks = 1
-            --cpus-per-task = 1
-            --mem = 1G
-            --time = 00:10:00
-            --partition = ifarm
-        [[[outputs]]]
-            ready = "Receiver IP file created"
 
     [[gpu_proxy]]
         inherit = root
-        platform = jlab_slurm
-        execution time limit = PT2H
+        [[[directives]]]
+            --job-name = gpu-proxy
+            --output = gpu_proxy_%j.log
+            --error = gpu_proxy_%j.log
+            --partition = gpu
+            --gres = gpu:1
+        [[[outputs]]]
+            started = "GPU Proxy container has started"
         script = """
             #!/bin/bash
             # Store hostname for other tasks
@@ -93,25 +110,19 @@
                 exit 1
             fi
             
-            # Signal task as ready
-            cylc message "${CYLC_TASK_JOB}" "ready"
-
+            # Signal that GPU proxy container has started
+            cylc message "gpu_proxy:started"
         """
-        [[[directives]]]
-            --nodes = 1
-            --ntasks = 1
-            --cpus-per-task = 1
-            --mem = 1G
-            --time = 00:10:00
-            --partition = gpu
-            --gres = gpu:1
-        [[[outputs]]]
-            ready = "GPU Proxy IP file created"
 
     [[sender]]
         inherit = root
-        platform = jlab_slurm
-        execution time limit = PT2H
+        [[[directives]]]
+            --job-name = sender
+            --output = sender_%j.log
+            --error = sender_%j.log
+            --partition = ifarm
+        [[[outputs]]]
+            started = "Sender container has started"
         script = """
             #!/bin/bash
             # Read GPU proxy IP from shared file
@@ -123,12 +134,7 @@
             
             # Store the background process ID
             echo $! > $CYLC_WORKFLOW_SHARE_DIR/sender.pid
-
-        """
-        [[[directives]]]
-            --nodes = 1
-            --ntasks = 1
-            --cpus-per-task = 1
-            --mem = 1G
-            --time = 00:10:00
-            --partition = ifarm 
+            
+            # Signal that sender container has started
+            cylc message "sender:started"
+        """ 
