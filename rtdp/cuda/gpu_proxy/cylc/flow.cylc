@@ -10,10 +10,6 @@
 
 [runtime]
     [[root]]
-        script = """
-            # Load necessary modules
-            module load apptainer
-        """
         [[[environment]]]
             # Network configuration
             RECEIVER_PORT = 50080
@@ -31,11 +27,10 @@
             --ntasks = 1
             --cpus-per-task = 4
             --mem = 8G
-        script = """
-            # Run sender application
+        [[[script]]]
+            #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
                 python3 /app/sender.py --port ${GPU_PROXY_PORT}
-        """
 
     [[gpu_proxy]]
         inherit = root
@@ -47,11 +42,10 @@
             --cpus-per-task = 4
             --mem = 16G
             --gres = gpu:1
-        script = """
-            # Run GPU proxy application
+        [[[script]]]
+            #!/bin/bash
             apptainer exec --nv ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
                 ./gpuEmu --port ${GPU_PROXY_PORT}
-        """
 
     [[receiver]]
         inherit = root
@@ -62,8 +56,7 @@
             --ntasks = 1
             --cpus-per-task = 4
             --mem = 8G
-        script = """
-            # Run receiver application
+        [[[script]]]
+            #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} \
-                python3 /app/receiver.py --port ${RECEIVER_PORT}
-        """ 
+                python3 /app/receiver.py --port ${RECEIVER_PORT} 
