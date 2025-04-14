@@ -6,3 +6,7 @@
         hosts = tsai@ifarm2401
         job runner = slurm
         install target = localhost 
+
+[install]
+    [[symlink dirs]]
+        run = /home/tsai/jeng 
