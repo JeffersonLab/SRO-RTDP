@@ -47,6 +47,7 @@
             
             # Signal task as ready
             cylc message "${CYLC_TASK_JOB}" "ready"
+            
         """
         [[[directives]]]
             --nodes = 1
@@ -57,9 +58,6 @@
             --partition = ifarm
         [[[outputs]]]
             ready = "Receiver IP file created"
-        [[[post-script]]]
-            # Wait for the background process
-            wait $(cat $CYLC_WORKFLOW_SHARE_DIR/receiver.pid)
 
     [[gpu_proxy]]
         inherit = root
@@ -97,6 +95,7 @@
             
             # Signal task as ready
             cylc message "${CYLC_TASK_JOB}" "ready"
+
         """
         [[[directives]]]
             --nodes = 1
@@ -108,9 +107,6 @@
             --gres = gpu:1
         [[[outputs]]]
             ready = "GPU Proxy IP file created"
-        [[[post-script]]]
-            # Wait for the background process
-            wait $(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy.pid)
 
     [[sender]]
         inherit = root
@@ -127,6 +123,7 @@
             
             # Store the background process ID
             echo $! > $CYLC_WORKFLOW_SHARE_DIR/sender.pid
+
         """
         [[[directives]]]
             --nodes = 1
@@ -134,7 +131,4 @@
             --cpus-per-task = 1
             --mem = 1G
             --time = 00:10:00
-            --partition = ifarm
-        [[[post-script]]]
-            # Wait for the background process
-            wait $(cat $CYLC_WORKFLOW_SHARE_DIR/sender.pid) 
+            --partition = ifarm 
