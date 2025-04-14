@@ -12,6 +12,7 @@
 #include <chrono>
 #include <vector>
 #include <cmath>
+#include <atomic>
 #include <unistd.h> // For getpid()
 
 #include <zmq.hpp>
@@ -120,8 +121,7 @@ public:
 
     std::string out_ip = "127.0.0.1";  // Default out IP is local
     bool useTensorCores = false;
-    bool test = false;
-    bool debug = false;
+    bool verbose = false;
 
     std::string sqliteFilename;      // SQL file parameter
 
@@ -154,10 +154,8 @@ public:
                 }
             } else if (arg == "--tc") {
                 options.useTensorCores = true;
-            } else if (arg == "-t" || arg == "--test") {
-                options.test = true;
-            } else if (arg == "-d" || arg == "--debug") {
-                options.debug = true;
+            } else if (arg == "-v" || arg == "--verbose") {
+                options.verbose = true;
             }
         }
         return options;
@@ -166,7 +164,7 @@ public:
 
     static void PrintUsage() {
         std::cout << "\n" 
-                  << "Usage: gpu_emu [--in-port port] [-a|--out-ip] [--out-port port]\n"
+                  << "Usage: gpu_emu [--in-port] [-a|--out-ip] [--out-port]\n"
                   << "\n"
                   << "-h, --help     Print this help statement\n"
                   << "    --in-port  <port> Set ZMQ port to listen on (default is 55555)\n"
@@ -174,10 +172,9 @@ public:
                   << "    --out-port <port> Set ZMQ port to push to (default is 55556)\n"
                   << "-r, --rate     Control the ratio of output/input volume (default is 0.5)\n"
                   << "-w, --width    Set the GPU input matrix column size (default is 2048)\n"
-                  << "-s, --sqlfile  <file> Specify the SQL rate logger file\n"
+                //   << "-s, --sqlfile  <file> Specify the SQL rate logger file\n"
                 //   << "    --tc       Use GPU Tensor Cores instead of FP units\n"
-                  << "-t, --test     Verify the GPU computation results\n"
-                  << "-d, --debug    Enable the debug mode\n"
+                  << "-v, --verbose    Enable the verbose mode (default is false)\n"
 
                   << "\n"
                   << "This is a GPU Proxy\n"
@@ -185,7 +182,7 @@ public:
                   << "multiplication on the GPU. After that, it copies the result back to CPU and PUSH to\n"
                   << "another ZMQ IP & port.\n"
                   << "\n"
-                  << "If --sqlfile is used, it specifies a SQLite rate logger.\n"
+                //   << "If --sqlfile is used, it specifies a SQLite rate logger.\n"
                   << "\n";
     }
 };
@@ -194,14 +191,23 @@ public:
 
 //.........................................................................
 // The monitoring thread
-void monitorTraffic(size_t* inBytes, size_t* outBytes) {
+std::atomic<size_t> totalInBytes{0};
+std::atomic<size_t> totalOutBytes{0};
+
+void monitorTraffic(std::atomic<size_t>* inBytes, std::atomic<size_t>* outBytes) {
     using namespace std::chrono;
     while (true) {
-        size_t prevIn = *inBytes, prevOut = *outBytes;
-        std::this_thread::sleep_for(seconds(1));
-        size_t curIn = *inBytes, curOut = *outBytes;
-        std::cout << "Incoming: " << ((curIn - prevIn) * 8.0 / 1e6) << " Mbps, "
-                  << "Outgoing: " << ((curOut - prevOut) * 8.0 / 1e6) << " Mbps" << std::endl;
+        size_t prevIn = inBytes->load();
+        size_t prevOut = outBytes->load();
+        std::this_thread::sleep_for(seconds(2));
+        size_t curIn = inBytes->load();
+        size_t curOut = outBytes->load();
+
+        double inRate_MBps = (curIn - prevIn) / (1000.0 * 1000.0) / 2.0;
+        double outRate_MBps = (curOut - prevOut) / (1000.0 * 1000.0) / 2.0;
+
+        std::cout << "[Monitor] Incoming: [" << inRate_MBps << " MB/s], "
+                  << "Outgoing: [" << outRate_MBps << " MB/s]" << std::endl;
     }
 }
 //.........................................................................
@@ -214,8 +220,8 @@ int main(int narg, char *argv[]){
     // Parse command options (will print help and exit if help is asked for)
     CommandLineOptions options = CommandLineOptions::Parse(narg, argv);
 
-    // Enable debug mode if the --debug flag is provided
-    bool debug_mode = options.debug;
+    // Enable the verbose mode if the cmd flag is provided
+    bool verbose_mode = options.verbose;
 
     //............................................
     // Setup network communication via zmq
@@ -249,38 +255,28 @@ int main(int narg, char *argv[]){
     }
     //............................................
 
-    //............................................
-    // Monitoring thread
-    // size_t inBytes = 0, outBytes = 0;
-    // std::thread monitor(monitorTraffic, &inBytes, &outBytes);
-    // monitor.detach();
-    //............................................
-
-    //............................................
-    // SQL logger setup
-    // if (!options.sqliteFilename.empty() && !rate_logger.openDB(options.sqliteFilename)) {
-    //     std::cerr << "Failed to open database: " << options.sqliteFilename << std::endl;
-    //     return 1;
-    // }
-    //............................................
-
-
     std::cout << "\nWaiting for data ...\n" << std::endl;
 
+    std::thread monitor_thread(monitorTraffic, &totalInBytes, &totalOutBytes);
+    monitor_thread.detach();   // Start the rate monitoring thread
 
-    auto last_time = std::chrono::high_resolution_clock::now();
     while (true) {
         zmq::message_t recv_buffer;
         auto res = receiver.recv(recv_buffer, zmq::recv_flags::none);
         if (!res) {
             std::cerr << "Error: ZeroMQ receive failed!" << std::endl;
-        } else {
+        }
+
+        if (verbose_mode) {
             std::cout << "Received [" << res.value() << "] bytes from ZeroMQ socket." << std::endl;
         }
         
         size_t curr_inBytes = recv_buffer.size();
+        totalInBytes += curr_inBytes;
         if( curr_inBytes == 0 ) { 
-            std::cout << "  (skipping empty buffer)" << std::endl;
+            if (verbose_mode) {
+                std::cout << "  (skipping empty buffer)" << std::endl;
+            }
             continue;
         }
 
@@ -293,7 +289,7 @@ int main(int narg, char *argv[]){
         std::vector<float> h_in(rows * in_cols, 0);
         memcpy(h_in.data(), recv_buffer.data(), curr_inBytes);
 
-        if (debug_mode) {
+        if (verbose_mode) {
             std::cout << "First 10 elements of h_in:" << std::endl;
             for (size_t i = 0; i < std::min(h_in.size(), static_cast<size_t>(10)); ++i) {
                 std::cout << h_in[i] << " ";
@@ -303,7 +299,9 @@ int main(int narg, char *argv[]){
 
         // Copy input matrix to GPU
         CUDA_CALL(cudaMalloc(&d_in, rows * in_cols * sizeof(float)));
-        std::cout << "\t Input matrix dimension, (#columns)x(#rows): " << in_cols << "x" << rows << std::endl;
+        if (verbose_mode) {
+            std::cout << "\t Input matrix dimension, (#columns)x(#rows): " << in_cols << "x" << rows << std::endl;
+        }
         CUDA_CALL(cudaMemcpy(d_in, h_in.data(), rows * in_cols * sizeof(float), cudaMemcpyHostToDevice));
 
         // Set the random matrix d_rand on the GPU. d_rand has @var options.width rows.
@@ -313,7 +311,9 @@ int main(int narg, char *argv[]){
 
         int threadsPerBlock = 256;
         int numBlocks = (rand_elements + threadsPerBlock - 1) / threadsPerBlock;
-        std::cout << "\t Random matrix dimension, (#columns)x(#rows): " << out_cols << "x" << options.width << std::endl;
+        if (verbose_mode) {
+            std::cout << "\t Random matrix dimension, (#columns)x(#rows): " << out_cols << "x" << options.width << std::endl;
+        }
         generateRandomMatrix<<<numBlocks, threadsPerBlock>>>(d_rand, options.width, out_cols, time(NULL));
         CUDA_CALL(cudaDeviceSynchronize());
 
@@ -327,15 +327,7 @@ int main(int narg, char *argv[]){
         std::vector<float> h_out(rows * out_cols, 0);
         CUDA_CALL(cudaMemcpy(h_out.data(), d_out, rows * out_cols * sizeof(float), cudaMemcpyDeviceToHost));
 
-        if (debug_mode) {
-            std::cout << "First 10 elements of h_out:" << std::endl;
-            for (size_t i = 0; i < std::min(h_out.size(), static_cast<size_t>(10)); ++i) {
-                std::cout << h_out[i] << " ";
-            }
-            std::cout << std::endl << std::endl;
-        }
-
-        if (options.test || debug_mode) {
+        if (verbose_mode) {
             std::vector<float> h_rand(rand_elements, 0);
             CUDA_CALL(cudaMemcpy(h_rand.data(), d_rand, rand_elements * sizeof(float), cudaMemcpyDeviceToHost));
     
@@ -355,47 +347,23 @@ int main(int narg, char *argv[]){
         }
 
         zmq::message_t message(h_out.data(), h_out.size() * sizeof(float));   // remember to * sizeof(float)!!!
-        std::cout <<"\t Output matrix dimension, (#columns)x(#rows): " << out_cols << "x" << rows << std::endl;
-        res = sender.send(message, zmq::send_flags::dontwait);   // has to be mq::send_flags::dontwait?
+        if (verbose_mode) {
+            std::cout <<"\t Output matrix dimension, (#columns)x(#rows): " << out_cols << "x" << rows << std::endl;
+        }
+
+        res = sender.send(message, zmq::send_flags::dontwait);   // zmq::send_flags::dontwait is non-blocking mode
         if (!res) {
             std::cerr << "Error: ZeroMQ send failed!" << std::endl;
-        } else {
+        }
+        totalOutBytes += res.value();
+        if (verbose_mode) {
             std::cout << "Sent [" << res.value() << "] bytes via ZeroMQ socket.\n" << std::endl;
         }
 
         CUDA_CALL(cudaFree(d_in));
         CUDA_CALL(cudaFree(d_rand));
         CUDA_CALL(cudaFree(d_out));
-
-        // Print statistic
-        /// TODO: move to a monitoring thread instead.
-        auto now = std::chrono::high_resolution_clock::now();
-        // auto duration = std::chrono::duration<double>(now - last_time).count();
-        // auto rateMbps = curr_inBytes / duration * 8.0 / 1.0E6;
-        // auto savePrecision = std::cout.precision();
-        // std::cout << "  INCOMING data rate: " << std::fixed << std::setprecision(3)  << rateMbps << " (Mbps)" << std::endl;
-        // std::cout.precision(savePrecision);
-
-        // Log to SQLite DB
-        // auto utc_timestamp_in_ms =
-        //     std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-        // std::string pid_str = std::to_string(getpid());
-        // std::ostringstream values;
-        // values << std::to_string(utc_timestamp_in_ms) << ", "
-        //     << pid_str << ", "
-        //     << std::fixed << std::setprecision(3)  // Ensure consistent floating-point precision
-        //     << rateHz << ", "
-        //     << rateMbps;
-        // if (!rate_logger.insertRateLog(RATE_DB_COLUMNS, values.str())) {
-        //     std::cerr << "Failed to insert record into the database." << std::endl;
-        // }
-
-        last_time = now;
-
-        // std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    // Close SQLite3 DB
-    // rate_logger.closeDB();
 
     return 0;
 }

@@ -41,3 +41,7 @@ set_target_properties(gpu_emu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link necessary libraries (CUDA, ZeroMQ, SQLite)
 target_link_libraries(gpu_emu CUDA::cudart CUDA::cublas CUDA::curand ${ZMQ_LIBRARY} ${SQLite3_LIBRARIES})
+
+# Install 
+install(TARGETS gpu_emu DESTINATION bin)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python_zmq_helper/" DESTINATION bin FILES_MATCHING PATTERN "*.py")
