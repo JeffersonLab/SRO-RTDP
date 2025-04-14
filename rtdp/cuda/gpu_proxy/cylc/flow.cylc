@@ -224,7 +224,7 @@
             --job-name = gpu-proxy
             --cpus-per-task = 4
             --mem = 16G
-            --gres = gpu:1
+            --gres = gpu:A800:1 
         
         [[[outputs]]]
             ready = "ready"
