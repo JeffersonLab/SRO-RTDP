@@ -30,9 +30,10 @@
             --time = 00:10:00
             --partition = gpu
             --gres = gpu:1
-        [[[script]]]
+        script = """
             #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/sender.py --port ${GPU_PROXY_PORT}
+        """
 
     [[gpu_proxy]]
         inherit = root
@@ -46,9 +47,10 @@
             --time = 00:10:00
             --partition = gpu
             --gres = gpu:1
-        [[[script]]]
+        script = """
             #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/gpu_proxy.py --port ${GPU_PROXY_PORT}
+        """
 
     [[receiver]]
         inherit = root
@@ -62,6 +64,6 @@
             --time = 00:10:00
             --partition = gpu
             --gres = gpu:1
-        [[[script]]]
+        script = """
             #!/bin/bash
             apptainer exec ${CYLC_WORKFLOW_RUN_DIR}/sifs/${SIF_FILE} python3 /app/receiver.py --port ${RECEIVER_PORT} 
