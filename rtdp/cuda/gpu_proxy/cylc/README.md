@@ -1,172 +1,110 @@
-# GPU Proxy Cylc Workflow
+# GPU Proxy Cylc Workflow Setup
 
-This workflow orchestrates a GPU proxy experiment with three main components:
-1. Receiver: Listens for incoming data
-2. GPU Proxy: Processes data using GPU
-3. Sender: Sends processed data to the receiver
+This document provides instructions for building the Apptainer image and installing the Cylc workflow for the GPU proxy system.
 
 ## Prerequisites
 
-- Access to a SLURM cluster with GPU nodes
-- Apptainer installed on the cluster
-- Cylc 8 installed and configured
-- The `gpu-proxy.sif` container image built and available
+- Access to a system with Apptainer/Singularity installed
+- Access to a system with Cylc installed
+- Access to a GPU node (preferably with A100 100G GPU)
 
-## Running the Experiment
+## Building the Apptainer Image
 
-1. **Start the Workflow**:
-   ```bash
-   cylc play gpu-proxy
-   ```
-
-2. **Monitor the Workflow**:
-   ```bash
-   # View workflow status
-   cylc tui gpu-proxy
-   
-   # View task logs
-   cylc cat-log gpu-proxy <task_name>  # e.g., cylc cat-log gpu-proxy receiver
-   ```
-
-3. **Check Component Outputs**:
-
-   - **Receiver**:
-     ```bash
-     # Main logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/receiver/stdout.log
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/receiver/stderr.log
-     
-     # Apptainer container logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/receiver/apptainer.log
-     
-     # Process details
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/receiver/process.log
-     
-     # Check receiver IP file
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/receiver_ip
-     ```
-
-   - **GPU Proxy**:
-     ```bash
-     # Main logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/proxy/stdout.log
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/proxy/stderr.log
-     
-     # Apptainer container logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/proxy/apptainer.log
-     
-     # Memory usage logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/proxy/memory.log
-     
-     # Check proxy IP file
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/proxy_ip
-     ```
-
-   - **Sender**:
-     ```bash
-     # Main logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/sender/stdout.log
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/sender/stderr.log
-     
-     # Apptainer container logs
-     cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/sender/apptainer.log
-     ```
-
-4. **Stop the Workflow**:
-   ```bash
-   cylc stop gpu-proxy
-   ```
-
-## Directory Structure
-
-The workflow creates the following directory structure under `CYLC_WORKFLOW_SHARE_DIR`:
-
-```
-~/<username>/cylc-run/gpu-proxy/run<cycle>/share/
-├── logs/
-│   ├── receiver/
-│   │   ├── stdout.log
-│   │   ├── stderr.log
-│   │   ├── apptainer.log
-│   │   └── process.log
-│   ├── proxy/
-│   │   ├── stdout.log
-│   │   ├── stderr.log
-│   │   ├── apptainer.log
-│   │   └── memory.log
-│   └── sender/
-│       ├── stdout.log
-│       ├── stderr.log
-│       └── apptainer.log
-├── output/
-│   └── received_data.bin
-├── input/
-├── receiver_ip
-└── proxy_ip
-```
-
-For example, to check the receiver's logs:
+1. Navigate to the GPU proxy directory:
 ```bash
-# Replace <username> with your username and <cycle> with the run number
-cat ~/<username>/cylc-run/gpu-proxy/run<cycle>/share/logs/receiver/stdout.log
-
-# Example with actual values:
-cat ~/jeng/cylc-run/gpu-proxy/run7/share/logs/receiver/stdout.log
+cd /home/jeng-yuantsai/RTDP/SRO-RTDP/rtdp/cuda/gpu_proxy/cylc
 ```
 
-The path components are:
-- `~/<username>`: Your home directory
-- `cylc-run/gpu-proxy`: The workflow directory
-- `run<cycle>`: The run number (e.g., run7)
-- `share`: The shared directory containing logs and data
+2. Run the build script:
+```bash
+./build.sh
+```
 
-## Workflow Configuration
+This script will:
+- Create the `sifs` directory if it doesn't exist
+- Build the Apptainer container from the Docker image
+- Place the container in `sifs/gpu-proxy.sif`
 
-The workflow is configured in `flow.cylc` with the following settings:
+## Installing the Cylc Workflow
 
-- **Task Dependencies**: 
-  - Receiver must start before GPU proxy
-  - GPU proxy must start before sender
-  - Each task signals when its container is ready using `cylc message`
+1. Run the install script:
+```bash
+./install.sh
+```
 
-- **Resource Requirements**:
-  - Receiver: 4 CPUs, 8GB memory
-  - GPU Proxy: 1 GPU, 12GB memory, 4 CPUs
-  - Sender: 4 CPUs, 8GB memory
+This script will:
+- Create necessary directories (sifs, etc/config, scripts)
+- Install the workflow using Cylc
+- Validate the workflow configuration
+- Provide instructions for running the workflow
 
-- **Time Limits**:
-  - All tasks: 2 hours (PT2H)
+## Running the Workflow
+
+1. Start the workflow:
+```bash
+cylc play gpu-proxy
+```
+
+2. Monitor the workflow:
+```bash
+# View workflow status
+cylc gui gpu-proxy
+
+# View task logs
+cylc cat-log gpu-proxy//1/<task_name>
+```
+
+3. Stop the workflow:
+```bash
+cylc stop gpu-proxy
+```
 
 ## Troubleshooting
 
-1. **Check SLURM Job Status**:
-   ```bash
-   squeue -u $USER
-   ```
+### Common Issues
 
-2. **View Detailed Job Information**:
-   ```bash
-   scontrol show job <job_id>
-   ```
+1. **Apptainer Build Fails**
+   - Ensure you have sufficient disk space
+   - Check network connectivity
+   - Verify Docker Hub credentials if using private repository
 
-3. **Check Container Logs**:
-   ```bash
-   # For each task, check the apptainer.log file
-   cat ${CYLC_WORKFLOW_SHARE_DIR}/logs/<task_name>/apptainer.log
-   ```
+2. **Workflow Fails to Start**
+   - Check Cylc configuration
+   - Verify all required directories exist
+   - Check permissions on workflow directories
 
-4. **Verify IP Files**:
-   - Ensure `receiver_ip` and `proxy_ip` files are created in `${CYLC_WORKFLOW_SHARE_DIR}`
-   - Check that IP addresses are valid and accessible
+3. **GPU Access Issues**
+   - Verify GPU node allocation
+   - Check GPU driver compatibility
+   - Ensure proper CUDA version
 
-5. **Check Data Transfer**:
-   - Receiver output: `${CYLC_WORKFLOW_SHARE_DIR}/output/received_data.bin`
-   - Check file size changes to verify data transfer
+### Log Files
+
+Workflow logs are stored in:
+- `~/cylc-run/gpu-proxy/log/job/1/`
+- `~/cylc-run/gpu-proxy/share/logs/`
+
+Task-specific logs:
+- Receiver: `~/cylc-run/gpu-proxy/share/logs/receiver/`
+- GPU Proxy: `~/cylc-run/gpu-proxy/share/logs/proxy/`
+- Sender: `~/cylc-run/gpu-proxy/share/logs/sender/`
+
+## Cleanup
+
+To remove the workflow:
+```bash
+cylc clean gpu-proxy
+```
 
 ## Notes
 
-- The workflow uses message triggers to ensure proper task sequencing
-- Each component runs in its own Apptainer container
-- Network communication between components is handled via TCP/IP
-- All components log their activities to dedicated log directories
-- Logs are organized by task and type (stdout, stderr, apptainer, process, memory) 
+- The workflow is configured to use A100 100G GPU with 100GB memory
+- Default ports are 55555 (input) and 55556 (output)
+- Matrix width is set to 2048 by default
+- Send rate is set to 25 MB/s by default
+- Group size is set to 2048 by default
+
+For more information, refer to:
+- [Cylc Documentation](https://cylc.github.io/cylc-doc/stable/html/)
+- [Apptainer Documentation](https://apptainer.org/docs/)
+- [GPU Proxy Documentation](../README.container.md) 
