@@ -45,10 +45,26 @@ Modes:"\n\
     echo "  sender   Run the sender script"\n\
     echo "  receiver Run the receiver script"\n\
     echo "\n\
+Proxy Mode Options:"\n\
+    echo "  --in-port <port>     Input port for ZeroMQ (default: 55555)"\n\
+    echo "  --out-ip <ip>        Output IP address for ZeroMQ"\n\
+    echo "  --out-port <port>    Output port for ZeroMQ (default: 55556)"\n\
+    echo "  -t, --test          Enable test mode with result verification"\n\
+    echo "  -d, --debug         Enable debug mode"\n\
+    echo "  -r, --rate <value>  Control output/input volume ratio (default: 0.5)"\n\
+    echo "  -w, --width <size>  Set GPU input matrix column size (default: 2048)"\n\
+    echo "  -s, --sqlfile <file> Specify SQL rate logger file"\n\
+    echo "\n\
+Sender Mode Options:"\n\
+    echo "  -a, --address <ip>   Target IP address for ZeroMQ communication"\n\
+    echo "  -r, --rate <value>   Target send rate in MB/s (default: 25)"\n\
+    echo "  --group-size <size>  Group size for sending (default: 2048)"\n\
+    echo "\n\
+Receiver Mode Options:"\n\
+    echo "  -v, --verbose       Enable verbose output with detailed monitoring"\n\
+    echo "\n\
 Common Options:"\n\
-    echo "  -a <ip_address>  Specify the target IP address for ZeroMQ communication"\n\
-    echo "  -t              Enable test mode (for proxy)"\n\
-    echo "  -h              Show help for specific mode"\n\
+    echo "  -h, --help         Show this help message"\n\
     exit 0\n\
 fi\n\
 \n\
@@ -64,6 +80,10 @@ case $mode in\n\
         exec /app/build/gpu_emu "$@"\n\
         ;;\n\
     sender)\n\
+        if [ $# -eq 0 ]; then\n\
+            echo "Error: No arguments provided for sender mode. Use -h for help."\n\
+            exit 1\n\
+        fi\n\
         exec python3 /app/python_zmq_helper/zmq_fp_sender.py "$@"\n\
         ;;\n\
     receiver)\n\

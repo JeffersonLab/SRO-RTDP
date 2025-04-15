@@ -192,28 +192,55 @@ RECV - ZeroMQ pulling from: tcp://*:55555
 SEND - ZeroMQ pushing to: tcp://<RECEIVER_NODE_IP>:55556
 
 Waiting for data ...
+
+Received [8192] bytes from ZeroMQ socket.
+First 10 elements of h_in:
+0.351711 0.852162 0.300457 0.894459 0.0352142 0.0829234 0.700032 0.681391 0.0781673 0.242668 
+
+        Input matrix dimension, (#columns)x(#rows): 2048x1
+        Random matrix dimension, (#columns)x(#rows): 1024x2048
+First 10 elements of h_out:
+513.019 525.493 512.337 528.763 523.848 540.64 535.584 519.227 519.087 513.447 
+
+First 10 elements of CPU computed matrix multiplication result:
+513.019 525.493 512.338 528.763 523.848 540.64 535.584 519.227 519.086 513.447 
+
+        Output matrix dimension, (#columns)x(#rows): 1024x1
+Sent [4096] bytes via ZeroMQ socket.
+...
+[Monitor] Incoming: [0.012288 MB/s], Outgoing: [0.006144 MB/s]
+...
 ```
 
 2. **Sender Node Setup** (Node B):
 ```bash
-# Run sender targeting GPU proxy node
-apptainer run gpu_proxy.sif sender -a <GPU_PROXY_NODE_IP> > sender.log
+# Run sender targeting GPU proxy node with specific rate and group size
+apptainer run gpu_proxy.sif sender -a <GPU_PROXY_NODE_IP> -r 25 --group-size 2048 > sender.log
 ```
 Expected output:
 ```
 Sending data to <GPU_PROXY_NODE_IP>:55555 (random values)
+Target send rate: 25.0 MB/s
+
+Each message needs: 0.32768 ms
+      Sent 0.008192 MB,  curr_send_rate=25.0 MB/s, duration=7.764577865600586 ms
+      Sleep for 992.2354221343994 ms...
+      ...
 ```
 
 3. **Receiver Node Setup** (Node C):
 ```bash
-# Run receiver
-apptainer run gpu_proxy.sif receiver > receiver.log
+# Run receiver with verbose output
+apptainer run gpu_proxy.sif receiver -v > receiver.log
 ```
 Expected output:
 ```
 Receiving data on port 55556...
-Received bytes: 3276800
-First 10 floats: [508.96136 508.16055 503.5662 516.7816 506.7647 516.5677 504.39285 499.47058 526.027 516.0576]
+Received [4096] bytes
+      First 10 floats: [513.01874 525.4927  512.33746 528.76263 523.84845 540.64    535.58386
+519.22736 519.0868  513.44714]
+...
+curr_recv_rate = 0.006144 MB/s
 ```
 
 ### Example with Specific IPs
@@ -224,17 +251,17 @@ Assuming:
 
 1. On GPU Proxy Node:
 ```bash
-apptainer run --nv gpu_proxy.sif proxy --in-port 55555 --out-ip 129.57.70.13 --out-port 55556 -t
+apptainer run --nv gpu_proxy.sif proxy --in-port 55555 --out-ip 192.168.1.101 --out-port 55556 -t
 ```
 
 2. On Sender Node:
 ```bash
-apptainer run gpu_proxy.sif sender -a 192.168.1.100 > sender.log
+apptainer run gpu_proxy.sif sender -a 192.168.1.100 -r 25 --group-size 2048 > sender.log
 ```
 
 3. On Receiver Node:
 ```bash
-apptainer run gpu_proxy.sif receiver > receiver.log
+apptainer run gpu_proxy.sif receiver -v > receiver.log
 ```
 
 ### Apptainer Help
@@ -257,6 +284,8 @@ apptainer run gpu_proxy.sif [mode] -h
 - Make sure the ports 55555 and 55556 are accessible between the nodes
 - The GPU node's IP address should be used in the sender command
 - All the matrix dimensions and test values should match the original experiment
+- The sender supports rate control with `-r` option and group size specification with `--group-size`
+- The receiver supports verbose output with `-v` option for detailed monitoring
 
 ## Logging Output
 
