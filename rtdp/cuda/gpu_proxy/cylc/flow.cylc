@@ -1,4 +1,5 @@
 [scheduler]
+    allow implicit tasks = True
     UTC mode = True
 
 [scheduling]
@@ -9,8 +10,7 @@
     [[graph]]
         R1 = """
             # Start chain
-            receiver:ready => emulator
-            emulator:ready => sender
+            receiver:ready => gpu_proxy:ready => sender
             
             # Completion chain (separate from start chain)
             sender:succeeded => !receiver
@@ -32,25 +32,16 @@
         
         [[[environment]]]
             # Path to SIF file
-            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
             
             # Network configuration
-            RECEIVER_PORT = "50080"
-            EMULATOR_PORT = "50888"
+            IN_PORT = "55555"
+            OUT_PORT = "55556"
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
-            
-            # Emulator configuration
-            EMU_THREADS = "4"              # Number of processing threads
-            EMU_LATENCY = "50"            # Processing latency per GB
-            EMU_MEM_FOOTPRINT = "0.05"    # Memory footprint in GB
-            EMU_OUTPUT_SIZE = "0.001"     # Output size in GB
-            
-            # Test data configuration
-            TEST_DATA_SIZE = "100M"       # Size of test data to send
 
     [[receiver]]
         script = """
@@ -64,9 +55,9 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
             # Check if port is already in use
-            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
-                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
+            if netstat -tuln | grep -q ":${OUT_PORT}"; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${OUT_PORT} is already in use" >&2
+                netstat -tuln | grep ":${OUT_PORT}" >&2
                 exit 1
             fi
             
@@ -83,10 +74,7 @@
             
             # Start receiver with debug output
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} receive \
-                ${RECEIVER_PORT} \
-                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run ${SIF_FILE} receiver > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
@@ -96,7 +84,6 @@
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
-                # Make sure to output the exact message that matches the output pattern
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
@@ -160,7 +147,7 @@
             fi
         """
         [[[directives]]]
-            --job-name = cpu-emu-recv
+            --job-name = receiver
             --cpus-per-task = 4
             --mem = 8G
         
@@ -168,16 +155,16 @@
             ready = "ready"
             completed = "Transfer completed successfully"
 
-    [[emulator]]
+    [[gpu_proxy]]
         script = """
             # Create log directory
-            mkdir -p ${LOG_DIR}/emulator
+            mkdir -p ${LOG_DIR}/proxy
 
             # Redirect all output to log files
-            exec 1> >(tee -a "${LOG_DIR}/emulator/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/emulator/stderr.log")
+            exec 1> >(tee -a "${LOG_DIR}/proxy/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
 
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting emulator task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
             
             # Get receiver information
             RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
@@ -186,57 +173,54 @@
             # Store hostname for sender
             HOSTNAME=$(hostname)
             IP=$(hostname -i)
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
             
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
-            # Start CPU emulator
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} --output-dir /output \
-                -t ${EMU_THREADS} -b ${EMU_LATENCY} \
-                -m ${EMU_MEM_FOOTPRINT} -o ${EMU_OUTPUT_SIZE} \
-                -r ${EMULATOR_PORT} -p ${RECEIVER_PORT} \
-                -i ${RECV_IP} -v 1 &
+            # Start GPU proxy
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
+            apptainer run --nv ${SIF_FILE} proxy --in-port ${IN_PORT} --out-ip ${RECV_IP} --out-port ${OUT_PORT} -t 2>${LOG_DIR}/proxy/apptainer.log &
             
-            EMU_PID=$!
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
+            PROXY_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
             
             # Brief pause to let process start
             sleep 2
             
             # Signal readiness if process is running
-            if kill -0 $EMU_PID 2>/dev/null; then
+            if kill -0 $PROXY_PID 2>/dev/null; then
                 cylc message "ready"
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process not running" >&2
-                cat ${LOG_DIR}/emulator/apptainer.log >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
                 exit 1
             fi
             
             # Monitor memory usage
-            while kill -0 $EMU_PID 2>/dev/null; do
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/emulator/memory.log
-                free -h >> ${LOG_DIR}/emulator/memory.log
-                ps -o pid,ppid,%cpu,%mem,cmd -p $EMU_PID >> ${LOG_DIR}/emulator/memory.log
+            while kill -0 $PROXY_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/proxy/memory.log
+                free -h >> ${LOG_DIR}/proxy/memory.log
+                ps -o pid,ppid,%cpu,%mem,cmd -p $PROXY_PID >> ${LOG_DIR}/proxy/memory.log
                 sleep 5
             done
             
             # Check if process died unexpectedly
-            if ! wait $EMU_PID; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process failed" >&2
-                cat ${LOG_DIR}/emulator/apptainer.log >&2
+            if ! wait $PROXY_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
                 exit 1
             fi
         """
         [[[directives]]]
-            --job-name = cpu-emu
+            --job-name = proxy
+            --partition = gpu
+            --gres = gpu:A800:1
+            --mem = 12G
             --cpus-per-task = 4
-            --mem = 16G
         
         [[[outputs]]]
             ready = "ready"
@@ -252,32 +236,19 @@
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
             
-            # Get emulator information
-            EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
+            # Get proxy information
+            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Proxy IP: ${PROXY_IP}"
             
             # Create input directory
             mkdir -p ${INPUT_DIR}
             
-            # Generate test data
-            INPUT_FILE="${INPUT_DIR}/random_data.bin"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data: ${TEST_DATA_SIZE}"
-            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
-            
             # Send data
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${EMU_IP}:${EMULATOR_PORT}"
-            apptainer run --bind ${INPUT_DIR}:/data \
-                ${CPU_EMU_SIF} send \
-                "/data/$(basename ${INPUT_FILE})" \
-                ${EMU_IP} \
-                ${EMULATOR_PORT}
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT}"
+            apptainer run ${SIF_FILE} sender -a ${PROXY_IP} 2>${LOG_DIR}/sender/apptainer.log
             
             SEND_STATUS=$?
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
-            
-            # Clean up
-            rm -f ${INPUT_FILE}
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
             
             if [ $SEND_STATUS -eq 0 ]; then
                 cylc message -- "sender:succeeded"
@@ -287,6 +258,6 @@
             exit ${SEND_STATUS}
         """
         [[[directives]]]
-            --job-name = cpu-emu-send
+            --job-name = sender
             --cpus-per-task = 4
-            --mem = 8G 
+            --mem = 8G
