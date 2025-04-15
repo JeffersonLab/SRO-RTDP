@@ -69,6 +69,29 @@ Run the container with GPU access:
 docker run --gpus all gpu-proxy [mode] [options]
 ```
 
+### Command Line Options
+
+#### Proxy Mode Options:
+- `--in-port <port>`: Input port for ZeroMQ (default: 55555)
+- `--out-ip <ip>`: Output IP address for ZeroMQ
+- `--out-port <port>`: Output port for ZeroMQ (default: 55556)
+- `-t, --test`: Enable test mode with result verification
+- `-d, --debug`: Enable debug mode
+- `-r, --rate <value>`: Control output/input volume ratio (default: 0.5)
+- `-w, --width <size>`: Set GPU input matrix column size (default: 2048)
+- `-s, --sqlfile <file>`: Specify SQL rate logger file
+
+#### Sender Mode Options:
+- `-a, --address <ip>`: Target IP address for ZeroMQ communication
+- `-r, --rate <value>`: Target send rate in MB/s (default: 25)
+- `--group-size <size>`: Group size for sending (default: 2048)
+
+#### Receiver Mode Options:
+- `-v, --verbose`: Enable verbose output with detailed monitoring
+
+#### Common Options:
+- `-h, --help`: Show help message
+
 ### Multi-Node Testing Configuration
 
 #### 3-Node Test Setup
@@ -76,22 +99,30 @@ docker run --gpus all gpu-proxy [mode] [options]
 1. **GPU Proxy Node Setup** (Node A - GPU node):
 ```bash
 # Request a GPU node
-srun -p gpu --gres=gpu:A800:1 --mem=24G --pty bash
+srun -p gpu --gres=gpu:A100:1 --mem=100G --pty bash
 
-# Run the GPU proxy with specific ports
-docker run --gpus all gpu-proxy proxy --in-port 55555 --out-ip <RECEIVER_NODE_IP> --out-port 55556 -t
+# Run the GPU proxy with specific ports and matrix width
+docker run --gpus all gpu-proxy proxy \
+    --in-port 55555 \
+    --out-ip <RECEIVER_NODE_IP> \
+    --out-port 55556 \
+    -t \
+    -w 2048
 ```
 
 2. **Sender Node Setup** (Node B):
 ```bash
-# Run sender targeting GPU proxy node
-docker run gpu-proxy sender -a <GPU_PROXY_NODE_IP> > sender.log
+# Run sender targeting GPU proxy node with rate control
+docker run gpu-proxy sender \
+    -a <GPU_PROXY_NODE_IP> \
+    -r 25 \
+    --group-size 2048
 ```
 
 3. **Receiver Node Setup** (Node C):
 ```bash
-# Run receiver
-docker run gpu-proxy receiver > receiver.log
+# Run receiver with verbose output
+docker run gpu-proxy receiver -v
 ```
 
 ### Example with Specific IPs
@@ -102,17 +133,25 @@ Assuming:
 
 1. On GPU Proxy Node:
 ```bash
-docker run --gpus all gpu-proxy proxy --in-port 55555 --out-ip 192.168.1.101 --out-port 55556 -t
+docker run --gpus all gpu-proxy proxy \
+    --in-port 55555 \
+    --out-ip 192.168.1.101 \
+    --out-port 55556 \
+    -t \
+    -w 2048
 ```
 
 2. On Sender Node:
 ```bash
-docker run gpu-proxy sender -a 192.168.1.100 > sender.log
+docker run gpu-proxy sender \
+    -a 192.168.1.100 \
+    -r 25 \
+    --group-size 2048
 ```
 
 3. On Receiver Node:
 ```bash
-docker run gpu-proxy receiver > receiver.log
+docker run gpu-proxy receiver -v
 ```
 
 ### Container Help
@@ -126,17 +165,6 @@ To see help for a specific mode:
 ```bash
 docker run gpu-proxy [mode] -h
 ```
-
-### Additional Options
-
-The GPU proxy supports several configuration options:
-- `--in-port`: Change the input port (default: 55555)
-- `--out-port`: Change the output port (default: 55556)
-- `-r, --rate`: Control output/input volume ratio (default: 0.5)
-- `-w, --width`: Set GPU input matrix column size (default: 2048)
-- `-s, --sqlfile`: Specify SQL rate logger file
-- `-t, --test`: Enable result verification
-- `-d, --debug`: Enable debug mode
 
 ### Troubleshooting
 
@@ -162,6 +190,9 @@ The GPU proxy supports several configuration options:
 - Test mode (`-t`) enables additional diagnostic output
 - All components (proxy, sender, receiver) are included in the container
 - No separate Python environment setup is required
+- Matrix width is set to 2048 by default
+- Send rate is set to 25 MB/s by default
+- Group size is set to 2048 by default
 
 ## Running the Experiment with Apptainer
 
