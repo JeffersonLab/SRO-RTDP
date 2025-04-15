@@ -7,7 +7,7 @@ set -e
 mkdir -p sifs
 
 # Read docker source from flow.cylc
-DOCKER_SOURCE=$(grep "DOCKER_SOURCE =" flow.cylc | awk -F'"' '{print $2}')
+DOCKER_SOURCE="jlabtsai/rtdp-gpu_proxy:latest"
 SIF_FILE="gpu-proxy.sif"
 
 # Build Apptainer container from Docker image
