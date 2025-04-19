@@ -4,7 +4,7 @@
 mkdir -p sifs
 
 # Build the Apptainer container
-apptainer build sifs/cpu-emu.sif ../Dockerfile
+apptainer build sifs/cpu-emu.sif docker://jlabtsai/rtdp-cpu_emu:latest
 
 # Make sure the container was built successfully
 if [ $? -eq 0 ]; then
