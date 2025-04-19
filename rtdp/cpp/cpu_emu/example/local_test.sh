@@ -19,7 +19,6 @@ check_port() {
 # Function to build the SIF file
 build_sif() {
     local sif_file=$1
-    local dockerfile_dir=$2
     
     echo "Building SIF file..."
     
@@ -32,15 +31,9 @@ build_sif() {
     # Create sifs directory if it doesn't exist
     mkdir -p "$(dirname "$sif_file")"
     
-    # Build the SIF file
-    if [ ! -f "$sif_file" ] || [ "$(find "$dockerfile_dir" -type f -newer "$sif_file" | wc -l)" -gt 0 ]; then
-        echo "Building new SIF file from Dockerfile..."
-        cd "$dockerfile_dir" || exit 1
-        apptainer build --force "$sif_file" Dockerfile
-        cd - > /dev/null || exit 1
-    else
-        echo "Using existing SIF file (no changes detected)"
-    fi
+    # Build the SIF file from Docker Hub
+    echo "Building SIF file from docker://jlabtsai/rtdp-cpu_emu:latest..."
+    apptainer build --force "$sif_file" docker://jlabtsai/rtdp-cpu_emu:latest
     
     if [ ! -f "$sif_file" ]; then
         echo "Error: Failed to build SIF file"
@@ -57,11 +50,10 @@ done
 
 # Get the absolute paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKERFILE_DIR="$(dirname "$SCRIPT_DIR")"
-SIF_FILE="$DOCKERFILE_DIR/sifs/cpu-emu.sif"
+SIF_FILE="$SCRIPT_DIR/../../sifs/cpu-emu.sif"
 
 # Build the SIF file
-build_sif "$SIF_FILE" "$DOCKERFILE_DIR"
+build_sif "$SIF_FILE"
 
 # Create log directory
 LOG_DIR="$SCRIPT_DIR/logs"
