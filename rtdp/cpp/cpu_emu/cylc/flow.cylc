@@ -261,6 +261,7 @@
             
             # Start sender with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender connecting to ${EMU_IP}:${SENDER_PORT}"
             apptainer run --pwd /app ${SIF_FILE} sender \
                 -i ${EMU_IP} \
                 -p ${SENDER_PORT} \
@@ -268,6 +269,7 @@
                 -s 10 \
                 2>${LOG_DIR}/sender/apptainer.log
             
+            # Check if sender process completed successfully
             if [ $? -eq 0 ]; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sender completed successfully"
                 exit 0
