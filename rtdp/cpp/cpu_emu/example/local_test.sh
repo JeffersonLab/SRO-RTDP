@@ -16,6 +16,38 @@ check_port() {
     return 0
 }
 
+# Function to build the SIF file
+build_sif() {
+    local sif_file=$1
+    local dockerfile_dir=$2
+    
+    echo "Building SIF file..."
+    
+    # Check if apptainer is installed
+    if ! command -v apptainer &> /dev/null; then
+        echo "Error: apptainer is not installed"
+        exit 1
+    fi
+    
+    # Create sifs directory if it doesn't exist
+    mkdir -p "$(dirname "$sif_file")"
+    
+    # Build the SIF file
+    if [ ! -f "$sif_file" ] || [ "$(find "$dockerfile_dir" -type f -newer "$sif_file" | wc -l)" -gt 0 ]; then
+        echo "Building new SIF file from Dockerfile..."
+        cd "$dockerfile_dir" || exit 1
+        apptainer build --force "$sif_file" Dockerfile
+        cd - > /dev/null || exit 1
+    else
+        echo "Using existing SIF file (no changes detected)"
+    fi
+    
+    if [ ! -f "$sif_file" ]; then
+        echo "Error: Failed to build SIF file"
+        exit 1
+    fi
+}
+
 # Check all ports before starting
 for port in $RECEIVER_PORT $EMULATOR_RCV_PORT $EMULATOR_SND_PORT $SENDER_PORT; do
     if ! check_port $port; then
@@ -23,15 +55,16 @@ for port in $RECEIVER_PORT $EMULATOR_RCV_PORT $EMULATOR_SND_PORT $SENDER_PORT; d
     fi
 done
 
-# Get the absolute path to the SIF file
-SIF_FILE="$(pwd)/../../sifs/cpu-emu.sif"
-if [ ! -f "$SIF_FILE" ]; then
-    echo "Error: SIF file not found at $SIF_FILE"
-    exit 1
-fi
+# Get the absolute paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCKERFILE_DIR="$(dirname "$SCRIPT_DIR")"
+SIF_FILE="$DOCKERFILE_DIR/sifs/cpu-emu.sif"
+
+# Build the SIF file
+build_sif "$SIF_FILE" "$DOCKERFILE_DIR"
 
 # Create log directory
-LOG_DIR="$(pwd)/logs"
+LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p $LOG_DIR
 
 # Function to run a command in the background and capture its output
