@@ -266,7 +266,6 @@
                 -p ${SENDER_PORT} \
                 -c 10 \
                 -s 10 \
-                -v 1 \
                 2>${LOG_DIR}/sender/apptainer.log
             
             if [ $? -eq 0 ]; then
