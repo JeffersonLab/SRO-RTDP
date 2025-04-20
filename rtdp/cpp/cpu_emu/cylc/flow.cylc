@@ -260,17 +260,22 @@
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
+            # Sender configuration
+            SENDER_EVENT_COUNT = "10"
+            SENDER_EVENT_SIZE = "1"  # Reduced from 10MB to 1MB
+            
             # Start sender with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender connecting to ${EMU_IP}:${SENDER_PORT}"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender command: apptainer run --pwd /app ${SIF_FILE} sender -i ${EMU_IP} -p ${SENDER_PORT} -c 10 -s 10"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender command: apptainer run --pwd /app ${SIF_FILE} sender -i ${EMU_IP} -p ${SENDER_PORT} -c ${SENDER_EVENT_COUNT} -s ${SENDER_EVENT_SIZE} -v 2"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender hostname: $(hostname)"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender IP: $(hostname -i)"
             apptainer run --pwd /app ${SIF_FILE} sender \
                 -i ${EMU_IP} \
                 -p ${SENDER_PORT} \
-                -c 10 \
-                -s 10 \
+                -c ${SENDER_EVENT_COUNT} \
+                -s ${SENDER_EVENT_SIZE} \
+                -v 2 \
                 2>${LOG_DIR}/sender/apptainer.log
             
             # Check if sender process completed successfully
