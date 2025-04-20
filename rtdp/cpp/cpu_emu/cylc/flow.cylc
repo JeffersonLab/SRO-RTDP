@@ -291,17 +291,4 @@
         [[[directives]]]
             --job-name = sender
             --cpus-per-task = 4
-            --mem = 8G
-
-# Sender script
-cat > sender.sh << EOF
-#!/bin/bash
-# Start sender process
-apptainer run --pwd /app \${SIF_FILE} sender \
-    -i \${EMU_IP} \
-    -p \${SENDER_PORT} \
-    -c \${SENDER_EVENT_COUNT} \
-    -s \${SENDER_EVENT_SIZE} \
-    -v \${VERBOSE} \
-    2>${LOG_DIR}/sender/apptainer.log
-EOF 
+            --mem = 8G 
