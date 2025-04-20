@@ -48,6 +48,10 @@
             SLEEP = "0"            # 0 for burn CPU
             VERBOSE = "2"          # Increased verbosity from 1 to 2
             
+            # Sender configuration
+            SENDER_EVENT_COUNT = "10"
+            SENDER_EVENT_SIZE = "1"  # Reduced from 10MB to 1MB
+            
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
@@ -260,10 +264,6 @@
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
-            # Sender configuration
-            SENDER_EVENT_COUNT = "10"
-            SENDER_EVENT_SIZE = "1"  # Reduced from 10MB to 1MB
-            
             # Start sender with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender connecting to ${EMU_IP}:${SENDER_PORT}"
@@ -291,4 +291,17 @@
         [[[directives]]]
             --job-name = sender
             --cpus-per-task = 4
-            --mem = 8G 
+            --mem = 8G
+
+# Sender script
+cat > sender.sh << EOF
+#!/bin/bash
+# Start sender process
+apptainer run --pwd /app \${SIF_FILE} sender \
+    -i \${EMU_IP} \
+    -p \${SENDER_PORT} \
+    -c \${SENDER_EVENT_COUNT} \
+    -s \${SENDER_EVENT_SIZE} \
+    -v \${VERBOSE} \
+    2>${LOG_DIR}/sender/apptainer.log
+EOF 
