@@ -3,9 +3,26 @@
 # Function to clean up any existing processes and ports
 cleanup_ports() {
     echo "Cleaning up any existing processes..."
+    # Kill any existing processes
     pkill -f "apptainer.*receiver" || true
     pkill -f "apptainer.*emulator" || true
     pkill -f "apptainer.*sender" || true
+    
+    # Wait for processes to fully terminate
+    sleep 3
+    
+    # Force kill any remaining processes
+    pkill -9 -f "apptainer.*receiver" || true
+    pkill -9 -f "apptainer.*emulator" || true
+    pkill -9 -f "apptainer.*sender" || true
+    
+    # Additional cleanup for ZMQ sockets
+    fuser -k -n tcp $RECEIVER_PORT 2>/dev/null || true
+    fuser -k -n tcp $EMULATOR_RCV_PORT 2>/dev/null || true
+    fuser -k -n tcp $EMULATOR_SND_PORT 2>/dev/null || true
+    fuser -k -n tcp $SENDER_PORT 2>/dev/null || true
+    
+    # Final wait to ensure cleanup is complete
     sleep 2
 }
 
@@ -88,14 +105,14 @@ cleanup_ports
 # Start the receiver
 run_component "Receiver" "apptainer run --pwd /app $SIF_FILE receiver -z -i 127.0.0.1 -p $RECEIVER_PORT"
 
-# Wait for receiver to start
-sleep 2
+# Wait longer for receiver to start and bind socket
+sleep 5
 
 # Start the emulator
 run_component "Emulator" "apptainer run --pwd /app $SIF_FILE emulator -i 127.0.0.1 -p $EMULATOR_SND_PORT -r $EMULATOR_RCV_PORT -t 1 -b 100 -m 0.01 -o 0.001 -s 1 -v 1"
 
-# Wait for emulator to start
-sleep 2
+# Wait longer for emulator to start
+sleep 5
 
 # Start the sender
 run_component "Sender" "apptainer run --pwd /app $SIF_FILE sender -i 127.0.0.1 -p $EMULATOR_RCV_PORT -c 10 -s 1"
