@@ -35,10 +35,10 @@
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
             
             # Network configuration
-            EMULATOR_RCV_PORT=20001
-            EMULATOR_SND_PORT=20002
-            RECEIVER_PORT=20002
-            SENDER_PORT=20001
+            EMULATOR_RCV_PORT=55555
+            EMULATOR_SND_PORT=55556
+            RECEIVER_PORT=55556
+            SENDER_PORT=55555
             
             # Emulator configuration
             THREADS = "5"
