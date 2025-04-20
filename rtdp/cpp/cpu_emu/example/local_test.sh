@@ -35,7 +35,7 @@ SENDER_PORT=55558
 # Function to check if a port is available
 check_port() {
     local port=$1
-    if netstat -tuln | grep -q ":$port"; then
+    if lsof -i :$port > /dev/null 2>&1; then
         echo "Port $port is already in use"
         return 1
     fi
@@ -102,16 +102,16 @@ run_component() {
 # Clean up before starting
 cleanup_ports
 
-# Start the receiver
-run_component "Receiver" "apptainer run --pwd /app $SIF_FILE receiver -z -i 127.0.0.1 -p $RECEIVER_PORT"
+# Start the receiver (terminal node)
+run_component "Receiver" "apptainer run --pwd /app $SIF_FILE receiver -z -r $RECEIVER_PORT -v 1"
 
-# Wait longer for receiver to start and bind socket
+# Wait for receiver to start
 sleep 5
 
 # Start the emulator
 run_component "Emulator" "apptainer run --pwd /app $SIF_FILE emulator -i 127.0.0.1 -p $EMULATOR_SND_PORT -r $EMULATOR_RCV_PORT -t 1 -b 100 -m 0.01 -o 0.001 -s 1 -v 1"
 
-# Wait longer for emulator to start
+# Wait for emulator to start
 sleep 5
 
 # Start the sender
@@ -137,7 +137,7 @@ cleanup() {
     # Stop all components
     kill $(cat ${LOG_DIR}/*_pid.txt 2>/dev/null) 2>/dev/null
     # Remove temporary files
-    rm -f ${LOG_DIR}/*_pid.txt ${LOG_DIR}/*_tail_pid.txt
+    rm -f ${LOG_DIR}/*_pid.txt ${LOG_DIR}/*_tail_pid.txt ${LOG_DIR}/*_output.log
     exit
 }
 
