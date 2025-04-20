@@ -41,11 +41,11 @@
             SENDER_PORT=55555
             
             # Emulator configuration
-            THREADS = "2"           # Reduced from 5 to 2 threads
-            LATENCY = "500"        # nsec/byte
-            MEM_FOOTPRINT = "0.05" # GB
+            THREADS = "1"           # Reduced from 2 to 1 thread
+            LATENCY = "100"        # Reduced from 500 to 100 nsec/byte
+            MEM_FOOTPRINT = "0.01" # Reduced from 0.05 to 0.01 GB
             OUTPUT_SIZE = "0.001"  # GB
-            SLEEP = "0"            # 0 for burn CPU
+            SLEEP = "0"            # Changed from 1 to 0 to burn CPU instead of sleep
             VERBOSE = "2"          # Increased verbosity from 1 to 2
             
             # Sender configuration
