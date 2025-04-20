@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# Function to clean up any existing processes and ports
+cleanup_ports() {
+    echo "Cleaning up any existing processes..."
+    pkill -f "apptainer.*receiver" || true
+    pkill -f "apptainer.*emulator" || true
+    pkill -f "apptainer.*sender" || true
+    sleep 2
+}
+
 # Configuration
 RECEIVER_PORT=55559
 EMULATOR_RCV_PORT=55558
@@ -72,6 +81,9 @@ run_component() {
     tail -f "${LOG_DIR}/${name}_output.log" &
     echo $! > "${LOG_DIR}/${name}_tail_pid.txt"
 }
+
+# Clean up before starting
+cleanup_ports
 
 # Start the receiver
 run_component "Receiver" "apptainer run --pwd /app $SIF_FILE receiver -z -i 127.0.0.1 -p $RECEIVER_PORT"
