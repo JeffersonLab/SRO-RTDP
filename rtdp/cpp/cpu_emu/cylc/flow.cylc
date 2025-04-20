@@ -1,4 +1,5 @@
 [scheduler]
+    allow implicit tasks = True
     UTC mode = True
 
 [scheduling]
@@ -9,8 +10,7 @@
     [[graph]]
         R1 = """
             # Start chain
-            receiver:ready => emulator
-            emulator:ready => sender
+            receiver:ready => emulator:ready => sender
             
             # Completion chain (separate from start chain)
             sender:succeeded => !receiver
@@ -32,25 +32,29 @@
         
         [[[environment]]]
             # Path to SIF file
-            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
             
             # Network configuration
-            RECEIVER_PORT = "50080"
-            EMULATOR_PORT = "50888"
+            EMULATOR_RCV_PORT=55555
+            EMULATOR_SND_PORT=55556
+            RECEIVER_PORT=55556
+            SENDER_PORT=55555
+            
+            # Emulator configuration
+            THREADS = "1"           # Reduced from 2 to 1 thread
+            LATENCY = "100"        # Reduced from 500 to 100 nsec/byte
+            MEM_FOOTPRINT = "0.01" # Reduced from 0.05 to 0.01 GB
+            OUTPUT_SIZE = "0.001"  # GB
+            SLEEP = "0"            # Changed from 1 to 0 to burn CPU instead of sleep
+            VERBOSE = "2"          # Increased verbosity from 1 to 2
+            
+            # Sender configuration
+            SENDER_EVENT_COUNT = "10"
+            SENDER_EVENT_SIZE = "1"  # Reduced from 10MB to 1MB
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
-            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
-            
-            # Emulator configuration
-            EMU_THREADS = "4"              # Number of processing threads
-            EMU_LATENCY = "50"            # Processing latency per GB
-            EMU_MEM_FOOTPRINT = "0.05"    # Memory footprint in GB
-            EMU_OUTPUT_SIZE = "0.001"     # Output size in GB
-            
-            # Test data configuration
-            TEST_DATA_SIZE = "100M"       # Size of test data to send
 
     [[receiver]]
         script = """
@@ -72,8 +76,8 @@
             
             # Store hostname for other tasks
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
-            HOSTNAME=$(hostname -f)  # Use fully qualified hostname
-            IP=$(hostname -i | awk '{print $1}')  # Use first IP if multiple
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
@@ -81,12 +85,9 @@
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
-            # Start receiver with debug output
+            # Start receiver with verbose output
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} receive \
-                ${RECEIVER_PORT} \
-                "0.0.0.0" > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${RECEIVER_PORT} -v ${VERBOSE} > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
@@ -96,7 +97,6 @@
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
-                # Make sure to output the exact message that matches the output pattern
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
@@ -160,7 +160,7 @@
             fi
         """
         [[[directives]]]
-            --job-name = cpu-emu-recv
+            --job-name = receiver
             --cpus-per-task = 4
             --mem = 8G
         
@@ -177,7 +177,7 @@
             exec 1> >(tee -a "${LOG_DIR}/emulator/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/emulator/stderr.log")
 
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting emulator task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator task"
             
             # Get receiver information
             RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
@@ -193,17 +193,22 @@
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
-            # Start CPU emulator
+            # Start CPU emulator with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
-            apptainer run --bind ${OUTPUT_DIR}:/output \
-                ${CPU_EMU_SIF} --output-dir /output \
-                -t ${EMU_THREADS} -b ${EMU_LATENCY} \
-                -m ${EMU_MEM_FOOTPRINT} -o ${EMU_OUTPUT_SIZE} \
-                -r ${EMULATOR_PORT} -p ${RECEIVER_PORT} \
-                -i ${RECV_IP} -v 1 &
+            apptainer run --pwd /app ${SIF_FILE} emulator \
+                -i ${RECV_IP} \
+                -p ${EMULATOR_SND_PORT} \
+                -r ${EMULATOR_RCV_PORT} \
+                -t ${THREADS} \
+                -b ${LATENCY} \
+                -m ${MEM_FOOTPRINT} \
+                -o ${OUTPUT_SIZE} \
+                -s ${SLEEP} \
+                -v ${VERBOSE} \
+                2>${LOG_DIR}/emulator/apptainer.log &
             
             EMU_PID=$!
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator started with PID ${EMU_PID}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator started with PID ${EMU_PID}"
             
             # Brief pause to let process start
             sleep 2
@@ -213,7 +218,7 @@
                 cylc message "ready"
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process not running" >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process not running" >&2
                 cat ${LOG_DIR}/emulator/apptainer.log >&2
                 exit 1
             fi
@@ -228,14 +233,14 @@
             
             # Check if process died unexpectedly
             if ! wait $EMU_PID; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Emulator process failed" >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process failed" >&2
                 cat ${LOG_DIR}/emulator/apptainer.log >&2
                 exit 1
             fi
         """
         [[[directives]]]
-            --job-name = cpu-emu
-            --cpus-per-task = 4
+            --job-name = emulator
+            --cpus-per-task = 8
             --mem = 16G
         
         [[[outputs]]]
@@ -256,37 +261,33 @@
             EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
             
-            # Create input directory
-            mkdir -p ${INPUT_DIR}
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
             
-            # Generate test data
-            INPUT_FILE="${INPUT_DIR}/random_data.bin"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Generating test data: ${TEST_DATA_SIZE}"
-            dd if=/dev/urandom bs=${TEST_DATA_SIZE} count=1 of=${INPUT_FILE} 2>/dev/null
+            # Start sender with configuration
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender connecting to ${EMU_IP}:${SENDER_PORT}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender command: apptainer run --pwd /app ${SIF_FILE} sender -i ${EMU_IP} -p ${SENDER_PORT} -c ${SENDER_EVENT_COUNT} -s ${SENDER_EVENT_SIZE}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender hostname: $(hostname)"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender IP: $(hostname -i)"
+            apptainer run --pwd /app ${SIF_FILE} sender \
+                -i ${EMU_IP} \
+                -p ${SENDER_PORT} \
+                -c ${SENDER_EVENT_COUNT} \
+                -s ${SENDER_EVENT_SIZE} \
+                2>${LOG_DIR}/sender/apptainer.log
             
-            # Send data
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${EMU_IP}:${EMULATOR_PORT}"
-            apptainer run --bind ${INPUT_DIR}:/data \
-                ${CPU_EMU_SIF} send \
-                "/data/$(basename ${INPUT_FILE})" \
-                ${EMU_IP} \
-                ${EMULATOR_PORT}
-            
-            SEND_STATUS=$?
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
-            
-            # Clean up
-            rm -f ${INPUT_FILE}
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Cleaned up input file"
-            
-            if [ $SEND_STATUS -eq 0 ]; then
-                cylc message -- "sender:succeeded"
+            # Check if sender process completed successfully
+            if [ $? -eq 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sender completed successfully"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Sender process failed" >&2
+                cat ${LOG_DIR}/sender/apptainer.log >&2
+                exit 1
             fi
-            
-            # Exit with send status
-            exit ${SEND_STATUS}
         """
         [[[directives]]]
-            --job-name = cpu-emu-send
+            --job-name = sender
             --cpus-per-task = 4
             --mem = 8G 
