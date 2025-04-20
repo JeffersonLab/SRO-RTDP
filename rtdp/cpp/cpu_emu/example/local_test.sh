@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-RECEIVER_PORT=55556
+RECEIVER_PORT=55557
 EMULATOR_RCV_PORT=55555
-EMULATOR_SND_PORT=55556
+EMULATOR_SND_PORT=55557
 SENDER_PORT=55555
 
 # Function to check if a port is available
