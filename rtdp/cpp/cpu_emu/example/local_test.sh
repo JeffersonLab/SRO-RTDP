@@ -80,13 +80,13 @@ run_component "Receiver" "apptainer run --pwd /app $SIF_FILE receiver -z -i 127.
 sleep 2
 
 # Start the emulator
-run_component "Emulator" "apptainer run --pwd /app $SIF_FILE emulator -i 127.0.0.1 -p $EMULATOR_SND_PORT -r $EMULATOR_RCV_PORT -t 5 -b 500 -m 0.05 -o 0.001 -s 0 -v 1"
+run_component "Emulator" "apptainer run --pwd /app $SIF_FILE emulator -i 127.0.0.1 -p $EMULATOR_SND_PORT -r $EMULATOR_RCV_PORT -t 2 -b 500 -m 0.05 -o 0.001 -s 0 -v 2"
 
 # Wait for emulator to start
 sleep 2
 
 # Start the sender
-run_component "Sender" "apptainer run --pwd /app $SIF_FILE sender -i 127.0.0.1 -p $EMULATOR_RCV_PORT -c 10 -s 10"
+run_component "Sender" "apptainer run --pwd /app $SIF_FILE sender -i 127.0.0.1 -p $EMULATOR_RCV_PORT -c 10 -s 10 -v 2"
 
 echo "Test components started:"
 echo "- Receiver listening on port $RECEIVER_PORT"

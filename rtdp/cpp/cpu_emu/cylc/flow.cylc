@@ -41,12 +41,12 @@
             SENDER_PORT=55555
             
             # Emulator configuration
-            THREADS = "5"
+            THREADS = "2"           # Reduced from 5 to 2 threads
             LATENCY = "500"        # nsec/byte
             MEM_FOOTPRINT = "0.05" # GB
             OUTPUT_SIZE = "0.001"  # GB
             SLEEP = "0"            # 0 for burn CPU
-            VERBOSE = "1"          # Enable verbose output
+            VERBOSE = "2"          # Increased verbosity from 1 to 2
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
