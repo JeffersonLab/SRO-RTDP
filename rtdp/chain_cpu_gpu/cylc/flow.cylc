@@ -40,6 +40,9 @@
             
             # Add local bin to PATH
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+            
+            # Set YQ_PATH to ensure we use the local yq
+            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
 
     [[chain_components]]
         [[[outputs]]]
@@ -79,7 +82,7 @@
                         -o $(echo "$comp" | yq '.params.output_size') &
                 else
                     # GPU component
-                    apptainer exec $GPU_PROXY_SIF ./gpuEmu \
+                    apptainer exec --nv $GPU_PROXY_SIF ./gpuEmu \
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
@@ -115,6 +118,18 @@
                 fi
             done
         """
+        [[[directives]]]
+            # Default directives for CPU components
+            --job-name = chain_components
+            --cpus-per-task = 8
+            --mem = 16G
+            
+            # Override directives for GPU components
+            [[[[gpu]]]]
+                --partition = gpu
+                --gres = gpu:A100:1
+                --mem = 100G
+                --cpus-per-task = 4
 
     [[sender]]
         [[[outputs]]]
@@ -144,34 +159,51 @@
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
         script = """
+            # Check if yq is available
+            if [ ! -x "$YQ_PATH" ]; then
+                echo "ERROR: yq not found at $YQ_PATH"
+                exit 1
+            fi
+
             # Read chain configuration
             if [ ! -f "$CHAIN_CONFIG" ]; then
                 echo "ERROR: Configuration file not found at $CHAIN_CONFIG"
                 exit 1
             fi
             
-            config=$(cat "$CHAIN_CONFIG")
-            if [ -z "$config" ]; then
-                echo "ERROR: Configuration file is empty"
+            # Create a temporary file for yq output
+            TMP_FILE=$(mktemp)
+            trap 'rm -f "$TMP_FILE"' EXIT
+            
+            # Read and validate configuration
+            if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > "$TMP_FILE"; then
+                echo "ERROR: Failed to parse configuration file"
+                exit 1
+            fi
+            
+            if [ ! -s "$TMP_FILE" ]; then
+                echo "ERROR: Configuration file is empty or invalid"
                 exit 1
             fi
             
             # Get the number of components
-            num_components=$(echo "$config" | yq '.chain | length')
+            num_components=$("$YQ_PATH" '. | length' "$TMP_FILE")
             if [ "$num_components" -eq 0 ]; then
                 echo "ERROR: No components found in chain configuration"
                 exit 1
             fi
             
             # Get the last component
-            last_comp=$(echo "$config" | yq ".chain[$((num_components-1))]")
+            last_comp=$("$YQ_PATH" ".[$((num_components-1))]" "$TMP_FILE")
             if [ -z "$last_comp" ]; then
                 echo "ERROR: Failed to get last component from configuration"
                 exit 1
             fi
             
-            last_port=$(echo "$last_comp" | yq '.out_port')
+            # Extract the output port
+            last_port=$(echo "$last_comp" | "$YQ_PATH" '.out_port')
             if [ -z "$last_port" ]; then
                 echo "ERROR: Failed to get output port from last component"
                 exit 1

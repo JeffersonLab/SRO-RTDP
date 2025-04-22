@@ -38,11 +38,15 @@ else
     echo "GPU proxy container already exists at sifs/gpu-proxy.sif"
 fi
 
+# Create local bin directory for tools
+mkdir -p bin
+
 # Install yq for YAML parsing in the workflow directory
-if ! command -v yq &> /dev/null; then
+if [ ! -f "bin/yq" ]; then
     echo "Installing yq..."
-    mkdir -p bin
     wget https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64 -O bin/yq
     chmod +x bin/yq
-    export PATH=$PATH:$(pwd)/bin
-fi 
+fi
+
+# Add local bin to PATH
+export PATH=$(pwd)/bin:$PATH 
