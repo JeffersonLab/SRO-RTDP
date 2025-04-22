@@ -30,32 +30,20 @@ def generate_flow_cylc(config_path):
 
     [[graph]]
         R1 = \"""
-            # Initial sender task
-            sender => receiver
-
-            # Receiver task
-            receiver => processor
-
-            # Processor task
-            processor => sender:ready
-            processor => sender:send_complete
-
-            # Completion chain
-            sender:succeeded => !receiver
-            receiver:completed
-        \"""
+            # Start chain
+            receiver:ready => component_0:ready
 """
     
     # Add component dependencies
     for i in range(len(components)):
         if i < len(components) - 1:
-            flow_content += f"            component_{i}:ready => component_{i+1}\n"
+            flow_content += f"            component_{i}:ready => component_{i+1}:ready\n"
         else:
             flow_content += f"            component_{i}:ready => sender\n"
     
     flow_content += """
-            # Completion chain
-            sender:completed => !receiver
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
             receiver:completed
         \"""
 
