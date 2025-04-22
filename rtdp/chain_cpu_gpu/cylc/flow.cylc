@@ -101,7 +101,8 @@
                 exit 1
             fi
             
-            # Start each component sequentially
+            # Start all components simultaneously
+            echo "Starting all components simultaneously..."
             for i in $(seq 0 $((num_components-1))); do
                 comp=$("$YQ_PATH" ".chain[$i]" "$CHAIN_CONFIG")
                 type=$("$YQ_PATH" '.type' <<< "$comp")
@@ -138,20 +139,34 @@
                 # Store the PID
                 COMP_PID=$!
                 echo $COMP_PID > "$PID_DIR/comp_$i.pid"
-                
-                # Wait for the component to be ready
-                echo "Waiting for component $i to be ready..."
-                sleep 2  # Give it time to start
-                
-                # Check if the process is still running
-                if ! kill -0 $COMP_PID 2>/dev/null; then
-                    echo "ERROR: Component $i failed to start"
-                    cat ${LOG_DIR}/chain_components/${type}_$i.log >&2
-                    exit 1
-                fi
-                
-                echo "Component $i is ready"
             done
+            
+            # Wait a moment for all components to start
+            echo "Waiting for all components to initialize..."
+            sleep 5
+            
+            # Verify all components are running
+            all_running=true
+            for i in $(seq 0 $((num_components-1))); do
+                if [ -f "$PID_DIR/comp_$i.pid" ]; then
+                    pid=$(cat "$PID_DIR/comp_$i.pid")
+                    if ! kill -0 $pid 2>/dev/null; then
+                        echo "ERROR: Component $i failed to start"
+                        cat ${LOG_DIR}/chain_components/*_$i.log >&2
+                        all_running=false
+                    else
+                        echo "Component $i is running (PID: $pid)"
+                    fi
+                else
+                    echo "ERROR: PID file not found for component $i"
+                    all_running=false
+                fi
+            done
+            
+            if [ "$all_running" = false ]; then
+                echo "ERROR: Not all components started successfully"
+                exit 1
+            fi
             
             # Signal that all components are ready
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
