@@ -78,49 +78,26 @@
                 exit 1
             fi
             
-            # Create a temporary file for yq output
-            TMP_FILE=$(mktemp)
-            if [ $? -ne 0 ]; then
-                echo "ERROR: Failed to create temporary file"
-                exit 1
-            fi
-            
-            # Function to clean up temporary file
-            cleanup() {
-                if [ -f "$TMP_FILE" ]; then
-                    rm -f "$TMP_FILE"
-                fi
-            }
-            
             # Read and validate configuration
-            if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > "$TMP_FILE"; then
+            if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > /dev/null; then
                 echo "ERROR: Failed to parse configuration file"
-                cleanup
-                exit 1
-            fi
-            
-            if [ ! -s "$TMP_FILE" ]; then
-                echo "ERROR: Configuration file is empty or invalid"
-                cleanup
                 exit 1
             fi
             
             # Get the number of components
-            num_components=$("$YQ_PATH" '. | length' "$TMP_FILE")
+            num_components=$("$YQ_PATH" '.chain | length' "$CHAIN_CONFIG")
             if [ "$num_components" -eq 0 ]; then
                 echo "ERROR: No components found in chain configuration"
-                cleanup
                 exit 1
             fi
             
             # Start all components simultaneously
             echo "Starting all components simultaneously..."
             for i in $(seq 0 $((num_components-1))); do
-                comp=$("$YQ_PATH" ".chain[$i]" "$CHAIN_CONFIG")
-                type=$("$YQ_PATH" '.type' <<< "$comp")
-                node=$("$YQ_PATH" '.node' <<< "$comp")
-                in_port=$("$YQ_PATH" '.in_port' <<< "$comp")
-                out_port=$("$YQ_PATH" '.out_port' <<< "$comp")
+                type=$("$YQ_PATH" ".chain[$i].type" "$CHAIN_CONFIG")
+                node=$("$YQ_PATH" ".chain[$i].node" "$CHAIN_CONFIG")
+                in_port=$("$YQ_PATH" ".chain[$i].in_port" "$CHAIN_CONFIG")
+                out_port=$("$YQ_PATH" ".chain[$i].out_port" "$CHAIN_CONFIG")
                 next_node=$("$YQ_PATH" ".chain[$((i+1))].node" "$CHAIN_CONFIG")
                 
                 echo "Starting component $i of type $type"
@@ -131,10 +108,10 @@
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
-                        -t $("$YQ_PATH" '.params.threads' <<< "$comp") \
-                        -b $("$YQ_PATH" '.params.latency' <<< "$comp") \
-                        -m $("$YQ_PATH" '.params.mem_footprint' <<< "$comp") \
-                        -o $("$YQ_PATH" '.params.output_size' <<< "$comp") \
+                        -t $("$YQ_PATH" ".chain[$i].params.threads" "$CHAIN_CONFIG") \
+                        -b $("$YQ_PATH" ".chain[$i].params.latency" "$CHAIN_CONFIG") \
+                        -m $("$YQ_PATH" ".chain[$i].params.mem_footprint" "$CHAIN_CONFIG") \
+                        -o $("$YQ_PATH" ".chain[$i].params.output_size" "$CHAIN_CONFIG") \
                         2>${LOG_DIR}/chain_components/cpu_$i.log &
                 else
                     # GPU component
@@ -142,9 +119,9 @@
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
-                        -w $("$YQ_PATH" '.params.matrix_width' <<< "$comp") \
-                        -s $("$YQ_PATH" '.params.send_rate' <<< "$comp") \
-                        -g $("$YQ_PATH" '.params.group_size' <<< "$comp") \
+                        -w $("$YQ_PATH" ".chain[$i].params.matrix_width" "$CHAIN_CONFIG") \
+                        -s $("$YQ_PATH" ".chain[$i].params.send_rate" "$CHAIN_CONFIG") \
+                        -g $("$YQ_PATH" ".chain[$i].params.group_size" "$CHAIN_CONFIG") \
                         2>${LOG_DIR}/chain_components/gpu_$i.log &
                 fi
                 
@@ -177,7 +154,6 @@
             
             if [ "$all_running" = false ]; then
                 echo "ERROR: Not all components started successfully"
-                cleanup
                 exit 1
             fi
             
@@ -192,9 +168,6 @@
                     wait $(cat "$PID_DIR/comp_$i.pid")
                 fi
             done
-            
-            # Clean up temporary file
-            cleanup
         """
         [[[directives]]]
             --job-name = chain_components
