@@ -215,7 +215,7 @@ def generate_flow_cylc(config_path):
             exec 1> >(tee -a "${{LOG_DIR}}/receiver/stdout.log")
             exec 2> >(tee -a "${{LOG_DIR}}/receiver/stderr.log")
 
-            echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
             # Create output directory
             mkdir -p ${{OUTPUT_DIR}}
@@ -223,19 +223,19 @@ def generate_flow_cylc(config_path):
             # Start receiver in background
             apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r {last_comp['out_port']} > ${{OUTPUT_DIR}}/received_data.bin 2>${{LOG_DIR}}/receiver/apptainer.log &
             
-            RECV_PID=\\\$!
-            echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${{RECV_PID}}"
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID $RECV_PID"
             
             # Brief pause to let process start
             sleep 2
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
-                echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
-                echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
-                echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
                 cat ${{LOG_DIR}}/receiver/apptainer.log >&2
                 exit 1
             fi
@@ -251,23 +251,23 @@ def generate_flow_cylc(config_path):
             # Initialize file size tracking
             PREV_SIZE=0
             if [ -f "${{OUTPUT_DIR}}/received_data.bin" ]; then
-                PREV_SIZE=\\\$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
+                PREV_SIZE=$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
             fi
             
             # Monitor the receiver process
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
-                echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
                 echo "Process details:" >> ${{LOG_DIR}}/receiver/process.log
                 ps -fp $RECV_PID >> ${{LOG_DIR}}/receiver/process.log 2>&1 || true
                 
                 # Check if data has been received by monitoring file size changes
                 CURRENT_SIZE=0
                 if [ -f "${{OUTPUT_DIR}}/received_data.bin" ]; then
-                    CURRENT_SIZE=\\\$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
+                    CURRENT_SIZE=$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
                 fi
                 
                 if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${{COMPLETION_FILE}}" ]; then
-                    echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
                     echo "Transfer completed successfully"
                     cylc message -- "Transfer completed successfully"
                     touch "${{COMPLETION_FILE}}"
@@ -280,14 +280,14 @@ def generate_flow_cylc(config_path):
             # Check final status
             FINAL_SIZE=0
             if [ -f "${{OUTPUT_DIR}}/received_data.bin" ]; then
-                FINAL_SIZE=\\\$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
+                FINAL_SIZE=$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
             fi
             
             if [ $FINAL_SIZE -gt 0 ]; then
-                echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
                 exit 0
             else
-                echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
                 echo "Last few lines of apptainer log:" >&2
                 tail -n 20 ${{LOG_DIR}}/receiver/apptainer.log >&2
                 exit 1
