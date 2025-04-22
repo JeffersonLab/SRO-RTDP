@@ -1,0 +1,11 @@
+[cylc]
+    UTC mode = True
+    [[events]]
+        abort on stalled = True
+        abort on timeout = True
+        timeout = PT2H
+
+[scheduler]
+    allow implicit tasks = True
+    [[run hosts]]
+        available = localhost 
