@@ -232,8 +232,8 @@
             # Ensure working directory exists
             mkdir -p "$CYLC_WORKFLOW_RUN_DIR/work/1/receiver"
             
-            # Run receiver with correct working directory and executable path
-            apptainer run --pwd /app $CPU_EMU_SIF cpu_emu -r $last_port -z 1
+            # Run receiver with correct command format for entrypoint
+            apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r $last_port
             
             # Signal completion
             cylc message -- "Transfer completed successfully"
