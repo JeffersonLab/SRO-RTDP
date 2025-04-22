@@ -10,22 +10,32 @@ mkdir -p sifs
 CPU_EMU_SOURCE="jlabtsai/rtdp-cpu_emu:latest"
 GPU_PROXY_SOURCE="jlabtsai/rtdp-gpu_proxy:latest"
 
-# Build CPU emulator container
-echo "Building CPU emulator container from ${CPU_EMU_SOURCE}..."
-apptainer build sifs/cpu-emu.sif docker://${CPU_EMU_SOURCE}
-
-# Build GPU proxy container
-echo "Building GPU proxy container from ${GPU_PROXY_SOURCE}..."
-apptainer build sifs/gpu-proxy.sif docker://${GPU_PROXY_SOURCE}
-
-# Verify both containers were built successfully
-if [ $? -eq 0 ]; then
-    echo "Successfully built both containers:"
-    echo "- cpu-emu.sif"
-    echo "- gpu-proxy.sif"
+# Check and build CPU emulator container if needed
+if [ ! -f "sifs/cpu-emu.sif" ]; then
+    echo "Building CPU emulator container from ${CPU_EMU_SOURCE}..."
+    apptainer build sifs/cpu-emu.sif docker://${CPU_EMU_SOURCE}
+    if [ $? -eq 0 ]; then
+        echo "Successfully built cpu-emu.sif"
+    else
+        echo "Failed to build cpu-emu.sif"
+        exit 1
+    fi
 else
-    echo "Failed to build one or more containers"
-    exit 1
+    echo "CPU emulator container already exists at sifs/cpu-emu.sif"
+fi
+
+# Check and build GPU proxy container if needed
+if [ ! -f "sifs/gpu-proxy.sif" ]; then
+    echo "Building GPU proxy container from ${GPU_PROXY_SOURCE}..."
+    apptainer build sifs/gpu-proxy.sif docker://${GPU_PROXY_SOURCE}
+    if [ $? -eq 0 ]; then
+        echo "Successfully built gpu-proxy.sif"
+    else
+        echo "Failed to build gpu-proxy.sif"
+        exit 1
+    fi
+else
+    echo "GPU proxy container already exists at sifs/gpu-proxy.sif"
 fi
 
 # Install yq for YAML parsing in the workflow directory
