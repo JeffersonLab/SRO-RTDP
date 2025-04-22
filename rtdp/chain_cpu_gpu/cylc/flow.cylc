@@ -142,11 +142,27 @@
 #SBATCH --job-name=comp_$i
 #SBATCH --output=${LOG_DIR}/chain_components/comp_$i.log
 #SBATCH --error=${LOG_DIR}/chain_components/comp_$i.err
-#SBATCH --partition=ifarm
 #SBATCH --ntasks=1
+EOF
+
+                if [ "$type" = "cpu" ]; then
+                    # CPU component directives
+                    cat >> "$JOB_SCRIPT" << EOF
+#SBATCH --partition=ifarm
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
+EOF
+                else
+                    # GPU component directives
+                    cat >> "$JOB_SCRIPT" << EOF
+#SBATCH --partition=gpu
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
 #SBATCH --gres=gpu:A100:1
+EOF
+                fi
+
+                cat >> "$JOB_SCRIPT" << EOF
 
 # Load environment
 source /etc/profile.d/modules.sh
