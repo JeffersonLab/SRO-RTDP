@@ -9,9 +9,6 @@ WORKFLOW_NAME="cpu-emu"
 # Create necessary directories
 mkdir -p sifs etc/config scripts
 
-# Make sure we're in the correct directory
-CYLC_RUN_DIR=~/cylc-run/${WORKFLOW_NAME}
-mkdir -p ${CYLC_RUN_DIR}
 
 # Install the workflow using Cylc
 echo "Installing workflow..."
