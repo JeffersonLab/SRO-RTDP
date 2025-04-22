@@ -8,10 +8,16 @@
     final cycle point = 1
 
     [[graph]]
-        R1 = """
-            # Start chain
-            receiver:ready => component_0
-            component_0:ready => component_1
+        # Initial sender task
+        sender => receiver
+
+        # Receiver task
+        receiver => processor
+
+        # Processor task
+        processor => sender:ready
+        processor => sender:send_complete
+                component_0:ready => component_1
             component_1:ready => component_2
             component_2:ready => sender
 
@@ -151,6 +157,7 @@
     [[sender]]
         [[[outputs]]]
             ready = "ready"
+            completed = "send_complete"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"

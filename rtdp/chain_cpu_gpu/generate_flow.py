@@ -29,10 +29,16 @@ def generate_flow_cylc(config_path):
     final cycle point = 1
 
     [[graph]]
-        R1 = \"""
-            # Start chain
-            receiver:ready => component_0
-"""
+        # Initial sender task
+        sender => receiver
+
+        # Receiver task
+        receiver => processor
+
+        # Processor task
+        processor => sender:ready
+        processor => sender:send_complete
+    """
     
     # Add component dependencies
     for i in range(len(components)):
@@ -167,6 +173,7 @@ def generate_flow_cylc(config_path):
     [[sender]]
         [[[outputs]]]
             ready = "ready"
+            completed = "send_complete"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
