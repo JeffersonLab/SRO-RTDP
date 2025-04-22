@@ -12,7 +12,7 @@
             # Start chain
             receiver:ready => chain_components:ready => sender
             
-            # Completion chain
+            # Completion chain (separate from start chain)
             sender:succeeded => !receiver
             receiver:completed
         """
@@ -43,9 +43,7 @@
 
     [[chain_components]]
         [[[outputs]]]
-            ready = "Components are ready"
-            succeeded = "Components completed successfully"
-            failed = "Components failed"
+            ready = "ready"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -91,9 +89,8 @@
 
     [[sender]]
         [[[outputs]]]
-            ready = "Sender is ready"
-            succeeded = "Sender completed successfully"
-            failed = "Sender failed"
+            ready = "ready"
+            succeeded = "sender:succeeded"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -106,13 +103,15 @@
             
             # Run sender
             apptainer exec $CPU_EMU_SIF ./zmq-event-clnt -i $first_node -p $first_port
+            
+            # Signal success
+            cylc message -- "sender:succeeded"
         """
 
     [[receiver]]
         [[[outputs]]]
-            ready = "Receiver is ready"
-            succeeded = "Receiver completed successfully"
-            failed = "Receiver failed"
+            ready = "ready"
+            completed = "Transfer completed successfully"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -124,4 +123,7 @@
             
             # Run receiver
             apptainer exec $CPU_EMU_SIF ./cpu_emu -r $last_port -z 1
+            
+            # Signal completion
+            cylc message -- "Transfer completed successfully"
         """ 
