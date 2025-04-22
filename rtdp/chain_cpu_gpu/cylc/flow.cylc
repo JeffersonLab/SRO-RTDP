@@ -52,7 +52,7 @@
     [[chain_components]]
         [[[outputs]]]
             ready = "ready"
-            succeeded = "ready"
+            completed = "components_ready"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
