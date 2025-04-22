@@ -86,19 +86,50 @@
             
             # Get the number of components
             num_components=$("$YQ_PATH" '.chain | length' "$CHAIN_CONFIG")
+            if [ -z "$num_components" ]; then
+                echo "ERROR: Failed to get number of components"
+                exit 1
+            fi
+            
             if [ "$num_components" -eq 0 ]; then
                 echo "ERROR: No components found in chain configuration"
                 exit 1
             fi
             
+            echo "Found $num_components components in configuration"
+            
             # Start all components simultaneously
             echo "Starting all components simultaneously..."
             for i in $(seq 0 $((num_components-1))); do
                 type=$("$YQ_PATH" ".chain[$i].type" "$CHAIN_CONFIG")
+                if [ -z "$type" ]; then
+                    echo "ERROR: Failed to get type for component $i"
+                    exit 1
+                fi
+                
                 node=$("$YQ_PATH" ".chain[$i].node" "$CHAIN_CONFIG")
+                if [ -z "$node" ]; then
+                    echo "ERROR: Failed to get node for component $i"
+                    exit 1
+                fi
+                
                 in_port=$("$YQ_PATH" ".chain[$i].in_port" "$CHAIN_CONFIG")
+                if [ -z "$in_port" ]; then
+                    echo "ERROR: Failed to get in_port for component $i"
+                    exit 1
+                fi
+                
                 out_port=$("$YQ_PATH" ".chain[$i].out_port" "$CHAIN_CONFIG")
+                if [ -z "$out_port" ]; then
+                    echo "ERROR: Failed to get out_port for component $i"
+                    exit 1
+                fi
+                
                 next_node=$("$YQ_PATH" ".chain[$((i+1))].node" "$CHAIN_CONFIG")
+                if [ -z "$next_node" ] && [ $i -lt $((num_components-1)) ]; then
+                    echo "ERROR: Failed to get next_node for component $i"
+                    exit 1
+                fi
                 
                 echo "Starting component $i of type $type"
                 
