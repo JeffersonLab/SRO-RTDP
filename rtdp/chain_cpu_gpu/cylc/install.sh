@@ -16,6 +16,10 @@ mkdir -p sifs etc/config scripts bin
 cylc stop ${WORKFLOW_NAME}
 echo "y" | cylc clean ${WORKFLOW_NAME}
 
+# Install the workflow using Cylc
+echo "Installing workflow..."
+cylc install --workflow-name=${WORKFLOW_NAME}
+
 # Validate the workflow
 echo "Validating workflow..."
 cylc validate .
