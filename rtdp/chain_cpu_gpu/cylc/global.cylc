@@ -1,11 +1,14 @@
-[cylc]
-    UTC mode = True
-    [[events]]
-        abort on stalled = True
-        abort on timeout = True
-        timeout = PT2H
+# place this in ~/.cylc/flows/global.cylc
 
-[scheduler]
-    allow implicit tasks = True
-    [[run hosts]]
-        available = localhost 
+[platforms]
+    [[jlab_slurm]]
+        cylc path = /w/epsci-sciwork18/jeng/cylc-env/bin/
+        hosts = tsai@ifarm2401
+        job runner = slurm
+        install target = localhost 
+
+
+[install]
+    [[symlink dirs]]
+        [[[localhost]]]
+            run = /home/tsai/jeng
