@@ -44,6 +44,11 @@
             # Set YQ_PATH to ensure we use the local yq
             YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
 
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+
     [[chain_components]]
         [[[outputs]]]
             ready = "ready"
@@ -52,6 +57,15 @@
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
             YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
         script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/chain_components
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/chain_components/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/chain_components/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting chain components task"
+            
             # Check if yq is available
             if [ ! -x "$YQ_PATH" ]; then
                 echo "ERROR: yq not found at $YQ_PATH"
@@ -99,23 +113,25 @@
                 
                 if [ "$type" = "cpu" ]; then
                     # CPU component
-                    apptainer run --pwd /app $CPU_EMU_SIF cpu_emu \
+                    apptainer run --pwd /app $CPU_EMU_SIF emulator \
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
                         -t $("$YQ_PATH" '.params.threads' <<< "$comp") \
                         -b $("$YQ_PATH" '.params.latency' <<< "$comp") \
                         -m $("$YQ_PATH" '.params.mem_footprint' <<< "$comp") \
-                        -o $("$YQ_PATH" '.params.output_size' <<< "$comp") &
+                        -o $("$YQ_PATH" '.params.output_size' <<< "$comp") \
+                        2>${LOG_DIR}/chain_components/cpu_$i.log &
                 else
                     # GPU component
-                    apptainer run --nv --pwd /app $GPU_PROXY_SIF gpuEmu \
+                    apptainer run --nv --pwd /app $GPU_PROXY_SIF proxy \
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
                         -w $("$YQ_PATH" '.params.matrix_width' <<< "$comp") \
                         -s $("$YQ_PATH" '.params.send_rate' <<< "$comp") \
-                        -g $("$YQ_PATH" '.params.group_size' <<< "$comp") &
+                        -g $("$YQ_PATH" '.params.group_size' <<< "$comp") \
+                        2>${LOG_DIR}/chain_components/gpu_$i.log &
                 fi
                 
                 # Store the PID
@@ -129,6 +145,7 @@
                 # Check if the process is still running
                 if ! kill -0 $COMP_PID 2>/dev/null; then
                     echo "ERROR: Component $i failed to start"
+                    cat ${LOG_DIR}/chain_components/${type}_$i.log >&2
                     exit 1
                 fi
                 
@@ -160,14 +177,26 @@
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
         script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/sender
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            
             # Read chain configuration
             config=$(cat $CHAIN_CONFIG)
             first_comp=$(echo "$config" | yq '.chain[0]')
             first_node=$(echo "$first_comp" | yq '.node')
             first_port=$(echo "$first_comp" | yq '.in_port')
             
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+            
             # Run sender
-            apptainer exec $CPU_EMU_SIF ./zmq-event-clnt -i $first_node -p $first_port
+            apptainer run --pwd /app $CPU_EMU_SIF sender -i $first_node -p $first_port 2>${LOG_DIR}/sender/apptainer.log
             
             # Signal completion
             cylc message -- "send_complete"
@@ -175,6 +204,15 @@
 
     [[receiver]]
         script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/receiver
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            
             # Check if yq is available
             if [ ! -x "$YQ_PATH" ]; then
                 echo "ERROR: yq not found at $YQ_PATH"
@@ -229,11 +267,11 @@
             
             echo "Starting receiver on port $last_port"
             
-            # Ensure working directory exists
-            mkdir -p "$CYLC_WORKFLOW_RUN_DIR/work/1/receiver"
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
             
             # Run receiver with correct command format for entrypoint
-            apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r $last_port
+            apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r $last_port > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log
             
             # Signal completion
             cylc message -- "Transfer completed successfully"
