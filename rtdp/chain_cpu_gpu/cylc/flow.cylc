@@ -146,9 +146,38 @@
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
         script = """
             # Read chain configuration
-            config=$(cat $CHAIN_CONFIG)
-            last_comp=$(echo "$config" | yq '.chain[-1]')
+            if [ ! -f "$CHAIN_CONFIG" ]; then
+                echo "ERROR: Configuration file not found at $CHAIN_CONFIG"
+                exit 1
+            fi
+            
+            config=$(cat "$CHAIN_CONFIG")
+            if [ -z "$config" ]; then
+                echo "ERROR: Configuration file is empty"
+                exit 1
+            fi
+            
+            # Get the number of components
+            num_components=$(echo "$config" | yq '.chain | length')
+            if [ "$num_components" -eq 0 ]; then
+                echo "ERROR: No components found in chain configuration"
+                exit 1
+            fi
+            
+            # Get the last component
+            last_comp=$(echo "$config" | yq ".chain[$((num_components-1))]")
+            if [ -z "$last_comp" ]; then
+                echo "ERROR: Failed to get last component from configuration"
+                exit 1
+            fi
+            
             last_port=$(echo "$last_comp" | yq '.out_port')
+            if [ -z "$last_port" ]; then
+                echo "ERROR: Failed to get output port from last component"
+                exit 1
+            fi
+            
+            echo "Starting receiver on port $last_port"
             
             # Run receiver
             apptainer exec $CPU_EMU_SIF ./cpu_emu -r $last_port -z 1
