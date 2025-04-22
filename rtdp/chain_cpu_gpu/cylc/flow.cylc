@@ -80,6 +80,10 @@
             
             # Create a temporary file for yq output
             TMP_FILE=$(mktemp)
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to create temporary file"
+                exit 1
+            fi
             trap 'rm -f "$TMP_FILE"' EXIT
             
             # Read and validate configuration
