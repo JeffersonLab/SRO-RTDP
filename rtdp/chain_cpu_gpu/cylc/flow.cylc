@@ -174,13 +174,6 @@
         """
 
     [[receiver]]
-        [[[outputs]]]
-            ready = "ready"
-            completed = "Transfer completed successfully"
-        [[[environment]]]
-            # Add local bin to PATH for this task
-            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
-            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
         script = """
             # Check if yq is available
             if [ ! -x "$YQ_PATH" ]; then
@@ -196,6 +189,10 @@
             
             # Create a temporary file for yq output
             TMP_FILE=$(mktemp)
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Failed to create temporary file"
+                exit 1
+            fi
             trap 'rm -f "$TMP_FILE"' EXIT
             
             # Read and validate configuration
@@ -224,7 +221,7 @@
             fi
             
             # Extract the output port
-            last_port=$(echo "$last_comp" | "$YQ_PATH" '.out_port')
+            last_port=$("$YQ_PATH" '.out_port' <<< "$last_comp")
             if [ -z "$last_port" ]; then
                 echo "ERROR: Failed to get output port from last component"
                 exit 1
@@ -237,4 +234,12 @@
             
             # Signal completion
             cylc message -- "Transfer completed successfully"
-        """ 
+        """
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Transfer completed successfully"
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
+            TMP_FILE = "$(mktemp)" 
