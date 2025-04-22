@@ -11,8 +11,8 @@ mkdir -p sifs etc/config scripts
 
 
 # stop and clean up any existing workflow
-cylc stop --all
-cylc clean --all
+cylc stop ${WORKFLOW_NAME}
+cylc clean ${WORKFLOW_NAME}
 
 # Install the workflow using Cylc
 echo "Installing workflow..."
