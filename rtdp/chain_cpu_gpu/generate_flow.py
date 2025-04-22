@@ -208,6 +208,14 @@ def generate_flow_cylc(config_path):
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
         script = \"""
+            # Initialize variables
+            RECV_PID=""
+            KEEP_RUNNING=0
+            PREV_SIZE=0
+            CURRENT_SIZE=0
+            FINAL_SIZE=0
+            COMPLETION_FILE=""
+
             # Create log directory
             mkdir -p ${{LOG_DIR}}/receiver
 
@@ -223,7 +231,13 @@ def generate_flow_cylc(config_path):
             # Start receiver in background
             apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r {last_comp['out_port']} > ${{OUTPUT_DIR}}/received_data.bin 2>${{LOG_DIR}}/receiver/apptainer.log &
             
+            # Get the process ID
             RECV_PID=$!
+            if [ -z "$RECV_PID" ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Failed to start receiver process" >&2
+                exit 1
+            fi
+            
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID $RECV_PID"
             
             # Brief pause to let process start
@@ -249,7 +263,6 @@ def generate_flow_cylc(config_path):
             rm -f "${{COMPLETION_FILE}}"
             
             # Initialize file size tracking
-            PREV_SIZE=0
             if [ -f "${{OUTPUT_DIR}}/received_data.bin" ]; then
                 PREV_SIZE=$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
             fi
@@ -261,7 +274,6 @@ def generate_flow_cylc(config_path):
                 ps -fp $RECV_PID >> ${{LOG_DIR}}/receiver/process.log 2>&1 || true
                 
                 # Check if data has been received by monitoring file size changes
-                CURRENT_SIZE=0
                 if [ -f "${{OUTPUT_DIR}}/received_data.bin" ]; then
                     CURRENT_SIZE=$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
                 fi
@@ -278,7 +290,6 @@ def generate_flow_cylc(config_path):
             done
             
             # Check final status
-            FINAL_SIZE=0
             if [ -f "${{OUTPUT_DIR}}/received_data.bin" ]; then
                 FINAL_SIZE=$(stat -c %s "${{OUTPUT_DIR}}/received_data.bin" || echo 0)
             fi
