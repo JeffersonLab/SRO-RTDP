@@ -1,0 +1,103 @@
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready => chain_components:ready => sender
+            
+            # Completion chain
+            sender:succeeded => !receiver
+            receiver:completed
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF files
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            GPU_PROXY_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
+            
+            # Configuration file
+            CHAIN_CONFIG = "$CYLC_WORKFLOW_RUN_DIR/chain_config.yaml"
+
+    [[sender]]
+        script = """
+            # Read chain configuration
+            config=$(cat $CHAIN_CONFIG)
+            first_comp=$(echo "$config" | yq '.chain[0]')
+            first_node=$(echo "$first_comp" | yq '.node')
+            first_port=$(echo "$first_comp" | yq '.in_port')
+            
+            # Run sender
+            apptainer exec $CPU_EMU_SIF ./zmq-event-clnt -i $first_node -p $first_port
+        """
+
+    [[receiver]]
+        script = """
+            # Read chain configuration
+            config=$(cat $CHAIN_CONFIG)
+            last_comp=$(echo "$config" | yq '.chain[-1]')
+            last_port=$(echo "$last_comp" | yq '.out_port')
+            
+            # Run receiver
+            apptainer exec $CPU_EMU_SIF ./cpu_emu -r $last_port -z 1
+        """
+
+    [[chain_components]]
+        script = """
+            # Read chain configuration
+            config=$(cat $CHAIN_CONFIG)
+            num_components=$(echo "$config" | yq '.chain | length')
+            
+            # Start each component
+            for i in $(seq 0 $((num_components-1))); do
+                comp=$(echo "$config" | yq ".chain[$i]")
+                type=$(echo "$comp" | yq '.type')
+                node=$(echo "$comp" | yq '.node')
+                in_port=$(echo "$comp" | yq '.in_port')
+                out_port=$(echo "$comp" | yq '.out_port')
+                next_node=$(echo "$config" | yq ".chain[$((i+1))].node")
+                
+                if [ "$type" = "cpu" ]; then
+                    # CPU component
+                    apptainer exec $CPU_EMU_SIF ./cpu_emu \
+                        -r $in_port \
+                        -i $next_node \
+                        -p $out_port \
+                        -t $(echo "$comp" | yq '.params.threads') \
+                        -b $(echo "$comp" | yq '.params.latency') \
+                        -m $(echo "$comp" | yq '.params.mem_footprint') \
+                        -o $(echo "$comp" | yq '.params.output_size')
+                else
+                    # GPU component
+                    apptainer exec $GPU_PROXY_SIF ./gpuEmu \
+                        -r $in_port \
+                        -i $next_node \
+                        -p $out_port \
+                        -w $(echo "$comp" | yq '.params.matrix_width') \
+                        -s $(echo "$comp" | yq '.params.send_rate') \
+                        -g $(echo "$comp" | yq '.params.group_size')
+                fi &
+            done
+            
+            # Wait for all components to complete
+            wait
+        """ 
