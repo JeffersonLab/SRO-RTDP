@@ -28,11 +28,13 @@ else
     exit 1
 fi
 
-# Install yq for YAML parsing
+# Install yq for YAML parsing in the workflow directory
 if ! command -v yq &> /dev/null; then
     echo "Installing yq..."
-    wget https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64 -O /usr/local/bin/yq
-    chmod +x /usr/local/bin/yq
+    mkdir -p bin
+    wget https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64 -O bin/yq
+    chmod +x bin/yq
+    export PATH=$PATH:$(pwd)/bin
 fi
 
 # Make scripts executable

@@ -37,6 +37,9 @@
             
             # Configuration file
             CHAIN_CONFIG = "$CYLC_WORKFLOW_RUN_DIR/chain_config.yaml"
+            
+            # Add local bin to PATH
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
 
     [[sender]]
         script = """
