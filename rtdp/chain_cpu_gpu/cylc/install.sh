@@ -7,8 +7,7 @@ set -e
 WORKFLOW_NAME="chain-cpu-gpu"
 
 # Create necessary directories
-mkdir -p sifs etc/config scripts
-
+mkdir -p sifs etc/config scripts bin
 
 # stop and clean up any existing workflow
 cylc stop ${WORKFLOW_NAME}
@@ -33,6 +32,5 @@ echo "To run the workflow:"
 echo "cylc play ${WORKFLOW_NAME}"
 echo ""
 echo "Workflow installed at: ${CYLC_RUN_DIR}" 
-
 
 cylc play ${WORKFLOW_NAME}
