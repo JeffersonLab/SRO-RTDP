@@ -8,16 +8,22 @@
     final cycle point = 1
 
     [[graph]]
-        # Initial sender task
-        sender => receiver
+        R1 = """
+            # Initial sender task
+            sender => receiver
 
-        # Receiver task
-        receiver => processor
+            # Receiver task
+            receiver => processor
 
-        # Processor task
-        processor => sender:ready
-        processor => sender:send_complete
-                component_0:ready => component_1
+            # Processor task
+            processor => sender:ready
+            processor => sender:send_complete
+
+            # Completion chain
+            sender:succeeded => !receiver
+            receiver:completed
+        """
+            component_0:ready => component_1
             component_1:ready => component_2
             component_2:ready => sender
 
