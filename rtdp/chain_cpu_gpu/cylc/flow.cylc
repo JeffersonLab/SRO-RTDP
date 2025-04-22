@@ -9,26 +9,14 @@
 
     [[graph]]
         R1 = """
-            # Initial sender task
-            sender => receiver
-
-            # Receiver task
-            receiver => processor
-
-            # Processor task
-            processor => sender:ready
-            processor => sender:send_complete
-
-            # Completion chain
-            sender:succeeded => !receiver
-            receiver:completed
-        """
-            component_0:ready => component_1
-            component_1:ready => component_2
+            # Start chain
+            receiver:ready => component_0:ready
+            component_0:ready => component_1:ready
+            component_1:ready => component_2:ready
             component_2:ready => sender
 
-            # Completion chain
-            sender:completed => !receiver
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
             receiver:completed
         """
 
