@@ -300,10 +300,14 @@ def generate_flow_cylc(config_path):
 """
     
     # Write the generated flow.cylc file
-    with open('flow.cylc', 'w') as f:
+    cylc_dir = 'cylc'
+    if not os.path.exists(cylc_dir):
+        print(f"Error: {cylc_dir} directory does not exist. Please create it first.")
+        sys.exit(1)
+    with open(os.path.join(cylc_dir, 'flow.cylc'), 'w') as f:
         f.write(flow_content)
     
-    print("Successfully generated flow.cylc")
+    print(f"Successfully generated flow.cylc in {cylc_dir}/ directory")
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:

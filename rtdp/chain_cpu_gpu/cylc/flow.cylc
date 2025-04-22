@@ -10,10 +10,13 @@
     [[graph]]
         R1 = """
             # Start chain
-            receiver:ready => chain_components:ready => sender
-            
+            receiver:ready => component_0
+            component_0:ready => component_1
+            component_1:ready => component_2
+            component_2:ready => sender
+
             # Completion chain
-            sender:succeeded => !receiver
+            sender:completed => !receiver
             receiver:completed
         """
 
@@ -26,7 +29,6 @@
         
         [[[directives]]]
             --ntasks = 1
-            --partition = ifarm
             --output = slurm_%j.log
             --error = slurm_%j.log
         
@@ -49,7 +51,7 @@
             INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
 
-    [[chain_components]]
+    [[component_0]]
         [[[outputs]]]
             ready = "ready"
         [[[environment]]]
@@ -58,210 +60,93 @@
             YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
         script = """
             # Create log directory
-            mkdir -p ${LOG_DIR}/chain_components
+            mkdir -p ${LOG_DIR}/component_0
 
             # Redirect all output to log files
-            exec 1> >(tee -a "${LOG_DIR}/chain_components/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/chain_components/stderr.log")
+            exec 1> >(tee -a "${LOG_DIR}/component_0/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/component_0/stderr.log")
 
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting chain components task"
-            
-            # Check if yq is available
-            if [ ! -x "$YQ_PATH" ]; then
-                echo "ERROR: yq not found at $YQ_PATH"
-                exit 1
-            fi
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component 0 of type cpu"
 
-            # Read chain configuration
-            if [ ! -f "$CHAIN_CONFIG" ]; then
-                echo "ERROR: Configuration file not found at $CHAIN_CONFIG"
-                exit 1
-            fi
-            
-            # Read and validate configuration
-            if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > /dev/null; then
-                echo "ERROR: Failed to parse configuration file"
-                exit 1
-            fi
-            
-            # Get the number of components
-            num_components=$("$YQ_PATH" '.chain | length' "$CHAIN_CONFIG")
-            if [ -z "$num_components" ]; then
-                echo "ERROR: Failed to get number of components"
-                exit 1
-            fi
-            
-            if [ "$num_components" -eq 0 ]; then
-                echo "ERROR: No components found in chain configuration"
-                exit 1
-            fi
-            
-            echo "Found $num_components components in configuration"
-            
-            # Create a directory for component job scripts
-            JOB_DIR="${CYLC_WORKFLOW_RUN_DIR}/jobs"
-            mkdir -p "$JOB_DIR"
-            
-            # Create and submit jobs for each component
-            echo "Creating and submitting jobs for each component..."
-            for i in $(seq 0 $((num_components-1))); do
-                type=$("$YQ_PATH" ".chain[$i].type" "$CHAIN_CONFIG")
-                if [ -z "$type" ]; then
-                    echo "ERROR: Failed to get type for component $i"
-                    exit 1
-                fi
-                
-                node=$("$YQ_PATH" ".chain[$i].node" "$CHAIN_CONFIG")
-                if [ -z "$node" ]; then
-                    echo "ERROR: Failed to get node for component $i"
-                    exit 1
-                fi
-                
-                in_port=$("$YQ_PATH" ".chain[$i].in_port" "$CHAIN_CONFIG")
-                if [ -z "$in_port" ]; then
-                    echo "ERROR: Failed to get in_port for component $i"
-                    exit 1
-                fi
-                
-                out_port=$("$YQ_PATH" ".chain[$i].out_port" "$CHAIN_CONFIG")
-                if [ -z "$out_port" ]; then
-                    echo "ERROR: Failed to get out_port for component $i"
-                    exit 1
-                fi
-                
-                next_node=$("$YQ_PATH" ".chain[$((i+1))].node" "$CHAIN_CONFIG")
-                if [ -z "$next_node" ] && [ $i -lt $((num_components-1)) ]; then
-                    echo "ERROR: Failed to get next_node for component $i"
-                    exit 1
-                fi
-                
-                # Create job script for this component
-                JOB_SCRIPT="$JOB_DIR/comp_$i.sh"
-                cat > "$JOB_SCRIPT" << EOF
-#!/bin/bash
-#SBATCH --job-name=comp_$i
-#SBATCH --output=${LOG_DIR}/chain_components/comp_$i.log
-#SBATCH --error=${LOG_DIR}/chain_components/comp_$i.err
-#SBATCH --ntasks=1
-EOF
+            # CPU component
+            apptainer run --pwd /app $CPU_EMU_SIF emulator                 -r 55555                 -i node2                 -p 55556                 -t 1                 -b 100                 -m 0.01                 -o 0.001                 2>${LOG_DIR}/component_0/apptainer.log
 
-                if [ "$type" = "cpu" ]; then
-                    # CPU component directives
-                    cat >> "$JOB_SCRIPT" << EOF
-#SBATCH --partition=ifarm
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=16G
-EOF
-                else
-                    # GPU component directives
-                    cat >> "$JOB_SCRIPT" << EOF
-#SBATCH --partition=gpu
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
-#SBATCH --gres=gpu:A100:1
-EOF
-                fi
-
-                cat >> "$JOB_SCRIPT" << EOF
-
-# Load environment
-source /etc/profile.d/modules.sh
-module load apptainer
-
-# Create log directory
-mkdir -p ${LOG_DIR}/chain_components
-
-echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component $i of type $type"
-
-if [ "$type" = "cpu" ]; then
-    # CPU component
-    apptainer run --pwd /app $CPU_EMU_SIF emulator \
-        -r $in_port \
-        -i $next_node \
-        -p $out_port \
-        -t $("$YQ_PATH" ".chain[$i].params.threads" "$CHAIN_CONFIG") \
-        -b $("$YQ_PATH" ".chain[$i].params.latency" "$CHAIN_CONFIG") \
-        -m $("$YQ_PATH" ".chain[$i].params.mem_footprint" "$CHAIN_CONFIG") \
-        -o $("$YQ_PATH" ".chain[$i].params.output_size" "$CHAIN_CONFIG") \
-        2>${LOG_DIR}/chain_components/cpu_$i.log
-else
-    # GPU component
-    apptainer run --nv --pwd /app $GPU_PROXY_SIF proxy \
-        -r $in_port \
-        -i $next_node \
-        -p $out_port \
-        -w $("$YQ_PATH" ".chain[$i].params.matrix_width" "$CHAIN_CONFIG") \
-        -s $("$YQ_PATH" ".chain[$i].params.send_rate" "$CHAIN_CONFIG") \
-        -g $("$YQ_PATH" ".chain[$i].params.group_size" "$CHAIN_CONFIG") \
-        2>${LOG_DIR}/chain_components/gpu_$i.log
-fi
-
-# Store the PID
-echo \\\$SLURM_JOB_ID > "$PID_DIR/comp_$i.pid"
-EOF
-                
-                # Make the job script executable
-                chmod +x "$JOB_SCRIPT"
-                
-                # Submit the job
-                echo "Submitting job for component $i"
-                JOB_ID=$(sbatch "$JOB_SCRIPT" | awk '{print $4}')
-                if [ -z "$JOB_ID" ]; then
-                    echo "ERROR: Failed to submit job for component $i"
-                    exit 1
-                fi
-                echo "Component $i job submitted with ID $JOB_ID"
-            done
-            
-            # Wait for all jobs to start
-            echo "Waiting for all jobs to start..."
-            sleep 10
-            
-            # Verify all jobs are running
-            all_running=true
-            for i in $(seq 0 $((num_components-1))); do
-                if [ -f "$PID_DIR/comp_$i.pid" ]; then
-                    job_id=$(cat "$PID_DIR/comp_$i.pid")
-                    if ! squeue -j $job_id > /dev/null 2>&1; then
-                        echo "ERROR: Job for component $i is not running"
-                        cat ${LOG_DIR}/chain_components/comp_$i.err >&2
-                        all_running=false
-                    else
-                        echo "Component $i job is running with ID $job_id"
-                    fi
-                else
-                    echo "ERROR: PID file not found for component $i"
-                    all_running=false
-                fi
-            done
-            
-            if [ "$all_running" = false ]; then
-                echo "ERROR: Not all components started successfully"
-                exit 1
-            fi
-            
-            # Signal that all components are ready
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+            # Signal ready state
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
             cylc message "ready"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
-            
-            # Wait for all jobs to complete
-            for i in $(seq 0 $((num_components-1))); do
-                if [ -f "$PID_DIR/comp_$i.pid" ]; then
-                    job_id=$(cat "$PID_DIR/comp_$i.pid")
-                    echo "Waiting for component $i job $job_id to complete..."
-                    while squeue -j $job_id > /dev/null 2>&1; do
-                        sleep 5
-                    done
-                fi
-            done
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
         """
+
         [[[directives]]]
-            --job-name = chain_components
+            --job-name = component_0
+            --partition = ifarm
             --cpus-per-task = 8
             --mem = 16G
+
+    [[component_1]]
+        [[[outputs]]]
+            ready = "ready"
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/component_1
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/component_1/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/component_1/stderr.log")
+
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component 1 of type gpu"
+
+            # GPU component
+            apptainer run --nv --pwd /app $GPU_PROXY_SIF proxy                 -r 55556                 -i node3                 -p 55557                 -w 2048                 -s 25                 -g 2048                 2>${LOG_DIR}/component_1/apptainer.log
+
+            # Signal ready state
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+            cylc message "ready"
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+        """
+
+        [[[directives]]]
+            --job-name = component_1
             --partition = gpu
+            --cpus-per-task = 4
+            --mem = 8G
             --gres = gpu:A100:1
+
+    [[component_2]]
+        [[[outputs]]]
+            ready = "ready"
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/component_2
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/component_2/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/component_2/stderr.log")
+
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component 2 of type cpu"
+
+            # CPU component
+            apptainer run --pwd /app $CPU_EMU_SIF emulator                 -r 55557                 -i None                 -p 55558                 -t 1                 -b 100                 -m 0.01                 -o 0.001                 2>${LOG_DIR}/component_2/apptainer.log
+
+            # Signal ready state
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+            cylc message "ready"
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+        """
+
+        [[[directives]]]
+            --job-name = component_2
+            --partition = ifarm
+            --cpus-per-task = 8
+            --mem = 16G
 
     [[sender]]
         [[[outputs]]]
@@ -277,25 +162,30 @@ EOF
             exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
 
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
-            
-            # Read chain configuration
-            config=$(cat $CHAIN_CONFIG)
-            first_comp=$(echo "$config" | yq '.chain[0]')
-            first_node=$(echo "$first_comp" | yq '.node')
-            first_port=$(echo "$first_comp" | yq '.in_port')
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
             
             # Create input directory
             mkdir -p ${INPUT_DIR}
             
             # Run sender
-            apptainer run --pwd /app $CPU_EMU_SIF sender -i $first_node -p $first_port 2>${LOG_DIR}/sender/apptainer.log
+            apptainer run --pwd /app $CPU_EMU_SIF sender -i node1 -p 55555 2>${LOG_DIR}/sender/apptainer.log
             
             # Signal completion
             cylc message -- "send_complete"
         """
+        [[[directives]]]
+            --job-name = sender
+            --partition = ifarm
+            --cpus-per-task = 8
+            --mem = 16G
 
     [[receiver]]
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Transfer completed successfully"
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
         script = """
             # Create log directory
             mkdir -p ${LOG_DIR}/receiver
@@ -304,81 +194,27 @@ EOF
             exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
 
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
-            
-            # Check if yq is available
-            if [ ! -x "$YQ_PATH" ]; then
-                echo "ERROR: yq not found at $YQ_PATH"
-                exit 1
-            fi
-
-            # Read chain configuration
-            if [ ! -f "$CHAIN_CONFIG" ]; then
-                echo "ERROR: Configuration file not found at $CHAIN_CONFIG"
-                exit 1
-            fi
-            
-            # Create a temporary file for yq output
-            TMP_FILE=$(mktemp)
-            if [ $? -ne 0 ]; then
-                echo "ERROR: Failed to create temporary file"
-                exit 1
-            fi
-            trap 'rm -f "$TMP_FILE"' EXIT
-            
-            # Read and validate configuration
-            if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > "$TMP_FILE"; then
-                echo "ERROR: Failed to parse configuration file"
-                exit 1
-            fi
-            
-            if [ ! -s "$TMP_FILE" ]; then
-                echo "ERROR: Configuration file is empty or invalid"
-                exit 1
-            fi
-            
-            # Get the number of components
-            num_components=$("$YQ_PATH" '. | length' "$TMP_FILE")
-            if [ "$num_components" -eq 0 ]; then
-                echo "ERROR: No components found in chain configuration"
-                exit 1
-            fi
-            
-            # Get the last component
-            last_comp=$("$YQ_PATH" ".[$((num_components-1))]" "$TMP_FILE")
-            if [ -z "$last_comp" ]; then
-                echo "ERROR: Failed to get last component from configuration"
-                exit 1
-            fi
-            
-            # Extract the output port
-            last_port=$("$YQ_PATH" '.out_port' <<< "$last_comp")
-            if [ -z "$last_port" ]; then
-                echo "ERROR: Failed to get output port from last component"
-                exit 1
-            fi
-            
-            echo "Starting receiver on port $last_port"
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
             
             # Start receiver in background
-            apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r $last_port > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r 55558 > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
-            RECV_PID=$!
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+            RECV_PID=\\$!
+            echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
             
             # Brief pause to let process start
             sleep 2
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+                echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
                 cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
@@ -394,23 +230,23 @@ EOF
             # Initialize file size tracking
             PREV_SIZE=0
             if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                PREV_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                PREV_SIZE=\\$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
             fi
             
             # Monitor the receiver process
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
                 echo "Process details:" >> ${LOG_DIR}/receiver/process.log
                 ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
                 
                 # Check if data has been received by monitoring file size changes
                 CURRENT_SIZE=0
                 if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                    CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                    CURRENT_SIZE=\\$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
                 fi
                 
                 if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${COMPLETION_FILE}" ]; then
-                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
                     echo "Transfer completed successfully"
                     cylc message -- "Transfer completed successfully"
                     touch "${COMPLETION_FILE}"
@@ -423,24 +259,21 @@ EOF
             # Check final status
             FINAL_SIZE=0
             if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
-                FINAL_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                FINAL_SIZE=\\$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
             fi
             
             if [ $FINAL_SIZE -gt 0 ]; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
                 exit 0
             else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                echo "[\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
                 echo "Last few lines of apptainer log:" >&2
                 tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
         """
-        [[[outputs]]]
-            ready = "ready"
-            completed = "Transfer completed successfully"
-        [[[environment]]]
-            # Add local bin to PATH for this task
-            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
-            YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
-            TMP_FILE = "$(mktemp)" 
+        [[[directives]]]
+            --job-name = receiver
+            --partition = ifarm
+            --cpus-per-task = 8
+            --mem = 16G
