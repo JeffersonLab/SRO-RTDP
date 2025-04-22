@@ -1,0 +1,4 @@
+pyyaml>=6.0.1
+black>=24.1.1
+pylint>=3.0.3
+pytest>=8.0.0 
