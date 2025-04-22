@@ -13,7 +13,7 @@
             receiver:ready => chain_components:ready => sender
             
             # Completion chain (separate from start chain)
-            sender:succeeded => !receiver
+            sender:send_complete => !receiver
             receiver:completed
         """
 
@@ -90,7 +90,7 @@
     [[sender]]
         [[[outputs]]]
             ready = "ready"
-            succeeded = "sender:succeeded"
+            send_complete = "send_complete"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -104,8 +104,8 @@
             # Run sender
             apptainer exec $CPU_EMU_SIF ./zmq-event-clnt -i $first_node -p $first_port
             
-            # Signal success
-            cylc message -- "sender:succeeded"
+            # Signal completion
+            cylc message -- "send_complete"
         """
 
     [[receiver]]
