@@ -41,30 +41,10 @@
             # Add local bin to PATH
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
 
-    [[sender]]
-        script = """
-            # Read chain configuration
-            config=$(cat $CHAIN_CONFIG)
-            first_comp=$(echo "$config" | yq '.chain[0]')
-            first_node=$(echo "$first_comp" | yq '.node')
-            first_port=$(echo "$first_comp" | yq '.in_port')
-            
-            # Run sender
-            apptainer exec $CPU_EMU_SIF ./zmq-event-clnt -i $first_node -p $first_port
-        """
-
-    [[receiver]]
-        script = """
-            # Read chain configuration
-            config=$(cat $CHAIN_CONFIG)
-            last_comp=$(echo "$config" | yq '.chain[-1]')
-            last_port=$(echo "$last_comp" | yq '.out_port')
-            
-            # Run receiver
-            apptainer exec $CPU_EMU_SIF ./cpu_emu -r $last_port -z 1
-        """
-
     [[chain_components]]
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
         script = """
             # Read chain configuration
             config=$(cat $CHAIN_CONFIG)
@@ -103,4 +83,33 @@
             
             # Wait for all components to complete
             wait
+        """
+
+    [[sender]]
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+        script = """
+            # Read chain configuration
+            config=$(cat $CHAIN_CONFIG)
+            first_comp=$(echo "$config" | yq '.chain[0]')
+            first_node=$(echo "$first_comp" | yq '.node')
+            first_port=$(echo "$first_comp" | yq '.in_port')
+            
+            # Run sender
+            apptainer exec $CPU_EMU_SIF ./zmq-event-clnt -i $first_node -p $first_port
+        """
+
+    [[receiver]]
+        [[[environment]]]
+            # Add local bin to PATH for this task
+            PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
+        script = """
+            # Read chain configuration
+            config=$(cat $CHAIN_CONFIG)
+            last_comp=$(echo "$config" | yq '.chain[-1]')
+            last_port=$(echo "$last_comp" | yq '.out_port')
+            
+            # Run receiver
+            apptainer exec $CPU_EMU_SIF ./cpu_emu -r $last_port -z 1
         """ 
