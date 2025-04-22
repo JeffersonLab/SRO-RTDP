@@ -52,7 +52,11 @@
             config=$(cat $CHAIN_CONFIG)
             num_components=$(echo "$config" | yq '.chain | length')
             
-            # Start each component
+            # Create a temporary directory for component PIDs
+            PID_DIR=$(mktemp -d)
+            trap 'rm -rf "$PID_DIR"' EXIT
+            
+            # Start each component sequentially
             for i in $(seq 0 $((num_components-1))); do
                 comp=$(echo "$config" | yq ".chain[$i]")
                 type=$(echo "$comp" | yq '.type')
@@ -60,6 +64,8 @@
                 in_port=$(echo "$comp" | yq '.in_port')
                 out_port=$(echo "$comp" | yq '.out_port')
                 next_node=$(echo "$config" | yq ".chain[$((i+1))].node")
+                
+                echo "Starting component $i of type $type"
                 
                 if [ "$type" = "cpu" ]; then
                     # CPU component
@@ -70,7 +76,7 @@
                         -t $(echo "$comp" | yq '.params.threads') \
                         -b $(echo "$comp" | yq '.params.latency') \
                         -m $(echo "$comp" | yq '.params.mem_footprint') \
-                        -o $(echo "$comp" | yq '.params.output_size')
+                        -o $(echo "$comp" | yq '.params.output_size') &
                 else
                     # GPU component
                     apptainer exec $GPU_PROXY_SIF ./gpuEmu \
@@ -79,12 +85,35 @@
                         -p $out_port \
                         -w $(echo "$comp" | yq '.params.matrix_width') \
                         -s $(echo "$comp" | yq '.params.send_rate') \
-                        -g $(echo "$comp" | yq '.params.group_size')
-                fi &
+                        -g $(echo "$comp" | yq '.params.group_size') &
+                fi
+                
+                # Store the PID
+                COMP_PID=$!
+                echo $COMP_PID > "$PID_DIR/comp_$i.pid"
+                
+                # Wait for the component to be ready
+                echo "Waiting for component $i to be ready..."
+                sleep 2  # Give it time to start
+                
+                # Check if the process is still running
+                if ! kill -0 $COMP_PID 2>/dev/null; then
+                    echo "ERROR: Component $i failed to start"
+                    exit 1
+                fi
+                
+                echo "Component $i is ready"
             done
             
+            # Signal that all components are ready
+            cylc message "ready"
+            
             # Wait for all components to complete
-            wait
+            for i in $(seq 0 $((num_components-1))); do
+                if [ -f "$PID_DIR/comp_$i.pid" ]; then
+                    wait $(cat "$PID_DIR/comp_$i.pid")
+                fi
+            done
         """
 
     [[sender]]
