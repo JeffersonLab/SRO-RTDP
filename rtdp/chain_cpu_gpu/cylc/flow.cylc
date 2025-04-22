@@ -99,7 +99,7 @@
                 
                 if [ "$type" = "cpu" ]; then
                     # CPU component
-                    apptainer exec $CPU_EMU_SIF ./cpu_emu \
+                    apptainer run --pwd /app $CPU_EMU_SIF cpu_emu \
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
@@ -109,7 +109,7 @@
                         -o $("$YQ_PATH" '.params.output_size' <<< "$comp") &
                 else
                     # GPU component
-                    apptainer exec --nv $GPU_PROXY_SIF ./gpuEmu \
+                    apptainer run --nv --pwd /app $GPU_PROXY_SIF gpuEmu \
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
