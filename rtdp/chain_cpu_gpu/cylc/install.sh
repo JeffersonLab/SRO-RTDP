@@ -35,4 +35,4 @@ echo ""
 echo "Workflow installed at: ${CYLC_RUN_DIR}" 
 
 
-cylc play chain-cpu-gpu
+cylc play ${WORKFLOW_NAME}
