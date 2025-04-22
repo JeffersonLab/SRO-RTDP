@@ -42,6 +42,10 @@
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
 
     [[chain_components]]
+        [[[outputs]]]
+            ready = "Components are ready"
+            succeeded = "Components completed successfully"
+            failed = "Components failed"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -86,6 +90,10 @@
         """
 
     [[sender]]
+        [[[outputs]]]
+            ready = "Sender is ready"
+            succeeded = "Sender completed successfully"
+            failed = "Sender failed"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -101,6 +109,10 @@
         """
 
     [[receiver]]
+        [[[outputs]]]
+            ready = "Receiver is ready"
+            succeeded = "Receiver completed successfully"
+            failed = "Receiver failed"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
