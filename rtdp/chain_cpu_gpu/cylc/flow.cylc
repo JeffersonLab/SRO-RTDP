@@ -85,17 +85,23 @@
                 exit 1
             fi
             
-            # Set up cleanup trap after TMP_FILE is defined
-            trap 'rm -f "$TMP_FILE"' EXIT
+            # Function to clean up temporary file
+            cleanup() {
+                if [ -f "$TMP_FILE" ]; then
+                    rm -f "$TMP_FILE"
+                fi
+            }
             
             # Read and validate configuration
             if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > "$TMP_FILE"; then
                 echo "ERROR: Failed to parse configuration file"
+                cleanup
                 exit 1
             fi
             
             if [ ! -s "$TMP_FILE" ]; then
                 echo "ERROR: Configuration file is empty or invalid"
+                cleanup
                 exit 1
             fi
             
@@ -103,6 +109,7 @@
             num_components=$("$YQ_PATH" '. | length' "$TMP_FILE")
             if [ "$num_components" -eq 0 ]; then
                 echo "ERROR: No components found in chain configuration"
+                cleanup
                 exit 1
             fi
             
@@ -170,6 +177,7 @@
             
             if [ "$all_running" = false ]; then
                 echo "ERROR: Not all components started successfully"
+                cleanup
                 exit 1
             fi
             
@@ -184,6 +192,9 @@
                     wait $(cat "$PID_DIR/comp_$i.pid")
                 fi
             done
+            
+            # Clean up temporary file
+            cleanup
         """
         [[[directives]]]
             --job-name = chain_components
