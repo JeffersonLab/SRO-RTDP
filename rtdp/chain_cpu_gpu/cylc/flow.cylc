@@ -52,22 +52,48 @@
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
             YQ_PATH = "$CYLC_WORKFLOW_RUN_DIR/bin/yq"
         script = """
+            # Check if yq is available
+            if [ ! -x "$YQ_PATH" ]; then
+                echo "ERROR: yq not found at $YQ_PATH"
+                exit 1
+            fi
+
             # Read chain configuration
-            config=$(cat $CHAIN_CONFIG)
-            num_components=$(echo "$config" | yq '.chain | length')
+            if [ ! -f "$CHAIN_CONFIG" ]; then
+                echo "ERROR: Configuration file not found at $CHAIN_CONFIG"
+                exit 1
+            fi
             
-            # Create a temporary directory for component PIDs
-            PID_DIR=$(mktemp -d)
-            trap 'rm -rf "$PID_DIR"' EXIT
+            # Create a temporary file for yq output
+            TMP_FILE=$(mktemp)
+            trap 'rm -f "$TMP_FILE"' EXIT
+            
+            # Read and validate configuration
+            if ! "$YQ_PATH" '.chain' "$CHAIN_CONFIG" > "$TMP_FILE"; then
+                echo "ERROR: Failed to parse configuration file"
+                exit 1
+            fi
+            
+            if [ ! -s "$TMP_FILE" ]; then
+                echo "ERROR: Configuration file is empty or invalid"
+                exit 1
+            fi
+            
+            # Get the number of components
+            num_components=$("$YQ_PATH" '. | length' "$TMP_FILE")
+            if [ "$num_components" -eq 0 ]; then
+                echo "ERROR: No components found in chain configuration"
+                exit 1
+            fi
             
             # Start each component sequentially
             for i in $(seq 0 $((num_components-1))); do
-                comp=$(echo "$config" | yq ".chain[$i]")
-                type=$(echo "$comp" | yq '.type')
-                node=$(echo "$comp" | yq '.node')
-                in_port=$(echo "$comp" | yq '.in_port')
-                out_port=$(echo "$comp" | yq '.out_port')
-                next_node=$(echo "$config" | yq ".chain[$((i+1))].node")
+                comp=$("$YQ_PATH" ".chain[$i]" "$CHAIN_CONFIG")
+                type=$("$YQ_PATH" '.type' <<< "$comp")
+                node=$("$YQ_PATH" '.node' <<< "$comp")
+                in_port=$("$YQ_PATH" '.in_port' <<< "$comp")
+                out_port=$("$YQ_PATH" '.out_port' <<< "$comp")
+                next_node=$("$YQ_PATH" ".chain[$((i+1))].node" "$CHAIN_CONFIG")
                 
                 echo "Starting component $i of type $type"
                 
@@ -77,19 +103,19 @@
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
-                        -t $(echo "$comp" | yq '.params.threads') \
-                        -b $(echo "$comp" | yq '.params.latency') \
-                        -m $(echo "$comp" | yq '.params.mem_footprint') \
-                        -o $(echo "$comp" | yq '.params.output_size') &
+                        -t $("$YQ_PATH" '.params.threads' <<< "$comp") \
+                        -b $("$YQ_PATH" '.params.latency' <<< "$comp") \
+                        -m $("$YQ_PATH" '.params.mem_footprint' <<< "$comp") \
+                        -o $("$YQ_PATH" '.params.output_size' <<< "$comp") &
                 else
                     # GPU component
                     apptainer exec --nv $GPU_PROXY_SIF ./gpuEmu \
                         -r $in_port \
                         -i $next_node \
                         -p $out_port \
-                        -w $(echo "$comp" | yq '.params.matrix_width') \
-                        -s $(echo "$comp" | yq '.params.send_rate') \
-                        -g $(echo "$comp" | yq '.params.group_size') &
+                        -w $("$YQ_PATH" '.params.matrix_width' <<< "$comp") \
+                        -s $("$YQ_PATH" '.params.send_rate' <<< "$comp") \
+                        -g $("$YQ_PATH" '.params.group_size' <<< "$comp") &
                 fi
                 
                 # Store the PID
