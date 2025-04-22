@@ -273,7 +273,7 @@ def generate_flow_cylc(config_path):
                 
                 if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${{COMPLETION_FILE}}" ]; then
                     TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-                    echo "[$TIMESTAMP] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "[$TIMESTAMP] Data received successfully - size: $CURRENT_SIZE bytes"
                     echo "Transfer completed successfully"
                     cylc message -- "Transfer completed successfully"
                     touch "${{COMPLETION_FILE}}"
@@ -291,7 +291,7 @@ def generate_flow_cylc(config_path):
             
             if [ $FINAL_SIZE -gt 0 ]; then
                 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-                echo "[$TIMESTAMP] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                echo "[$TIMESTAMP] Transfer completed successfully - final size: $FINAL_SIZE bytes"
                 exit 0
             else
                 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
