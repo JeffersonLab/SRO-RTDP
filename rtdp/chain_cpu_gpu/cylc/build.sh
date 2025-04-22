@@ -45,7 +45,4 @@ if ! command -v yq &> /dev/null; then
     wget https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64 -O bin/yq
     chmod +x bin/yq
     export PATH=$PATH:$(pwd)/bin
-fi
-
-# Make scripts executable
-chmod +x $CYLC_WORKFLOW_RUN_DIR/flow.cylc 
+fi 
