@@ -154,7 +154,7 @@
                         cat ${LOG_DIR}/chain_components/*_$i.log >&2
                         all_running=false
                     else
-                        echo "Component $i is running (PID: $pid)"
+                        echo "Component $i is running with PID $pid"
                     fi
                 else
                     echo "ERROR: PID file not found for component $i"
