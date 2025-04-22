@@ -105,7 +105,7 @@ def generate_flow_cylc(config_path):
             exec 1> >(tee -a "${{LOG_DIR}}/component_{i}/stdout.log")
             exec 2> >(tee -a "${{LOG_DIR}}/component_{i}/stderr.log")
 
-            echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component {i} of type {comp_type}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component {i} of type {comp_type}"
 """
         
         if comp_type == 'cpu':
@@ -136,9 +136,9 @@ def generate_flow_cylc(config_path):
         
         flow_content += """
             # Signal ready state
-            echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
             cylc message "ready"
-            echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
         \"""
 """
         
@@ -179,7 +179,7 @@ def generate_flow_cylc(config_path):
             exec 1> >(tee -a "${{LOG_DIR}}/sender/stdout.log")
             exec 2> >(tee -a "${{LOG_DIR}}/sender/stderr.log")
 
-            echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
             
             # Create input directory
             mkdir -p ${{INPUT_DIR}}
@@ -215,16 +215,7 @@ def generate_flow_cylc(config_path):
             exec 1> >(tee -a "${{LOG_DIR}}/receiver/stdout.log")
             exec 2> >(tee -a "${{LOG_DIR}}/receiver/stderr.log")
 
-            # Initialize timestamp
-            TIMESTAMP=""
-
-            # Function to update timestamp
-            update_timestamp() {{
-                TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-            }}
-
-            update_timestamp
-            echo "[$TIMESTAMP] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
             # Create output directory
             mkdir -p ${{OUTPUT_DIR}}
@@ -233,21 +224,18 @@ def generate_flow_cylc(config_path):
             apptainer run --pwd /app $CPU_EMU_SIF receiver -z -r {last_comp['out_port']} > ${{OUTPUT_DIR}}/received_data.bin 2>${{LOG_DIR}}/receiver/apptainer.log &
             
             RECV_PID=$!
-            update_timestamp
-            echo "[$TIMESTAMP] Receiver started with PID $RECV_PID"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID $RECV_PID"
             
             # Brief pause to let process start
             sleep 2
             
             # Signal readiness if process is running
             if kill -0 $RECV_PID 2>/dev/null; then
-                update_timestamp
-                echo "[$TIMESTAMP] Signaling ready state"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
-                echo "[$TIMESTAMP] Ready message sent"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
-                update_timestamp
-                echo "[$TIMESTAMP] ERROR: Receiver process not running" >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
                 cat ${{LOG_DIR}}/receiver/apptainer.log >&2
                 exit 1
             fi
@@ -268,8 +256,7 @@ def generate_flow_cylc(config_path):
             
             # Monitor the receiver process
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
-                update_timestamp
-                echo "[$TIMESTAMP] Receiver process is running with PID $RECV_PID"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running with PID $RECV_PID"
                 echo "Process details:" >> ${{LOG_DIR}}/receiver/process.log
                 ps -fp $RECV_PID >> ${{LOG_DIR}}/receiver/process.log 2>&1 || true
                 
@@ -280,8 +267,7 @@ def generate_flow_cylc(config_path):
                 fi
                 
                 if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${{COMPLETION_FILE}}" ]; then
-                    update_timestamp
-                    echo "[$TIMESTAMP] Data received successfully - size: $CURRENT_SIZE bytes"
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully - size: $CURRENT_SIZE bytes"
                     echo "Transfer completed successfully"
                     cylc message -- "Transfer completed successfully"
                     touch "${{COMPLETION_FILE}}"
@@ -298,12 +284,10 @@ def generate_flow_cylc(config_path):
             fi
             
             if [ $FINAL_SIZE -gt 0 ]; then
-                update_timestamp
-                echo "[$TIMESTAMP] Transfer completed successfully - final size: $FINAL_SIZE bytes"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully - final size: $FINAL_SIZE bytes"
                 exit 0
             else
-                update_timestamp
-                echo "[$TIMESTAMP] ERROR: Transfer failed or incomplete" >&2
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
                 echo "Last few lines of apptainer log:" >&2
                 tail -n 20 ${{LOG_DIR}}/receiver/apptainer.log >&2
                 exit 1
