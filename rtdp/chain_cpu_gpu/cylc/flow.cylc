@@ -98,8 +98,12 @@
             
             echo "Found $num_components components in configuration"
             
-            # Start all components simultaneously
-            echo "Starting all components simultaneously..."
+            # Create a directory for component job scripts
+            JOB_DIR="${CYLC_WORKFLOW_RUN_DIR}/jobs"
+            mkdir -p "$JOB_DIR"
+            
+            # Create and submit jobs for each component
+            echo "Creating and submitting jobs for each component..."
             for i in $(seq 0 $((num_components-1))); do
                 type=$("$YQ_PATH" ".chain[$i].type" "$CHAIN_CONFIG")
                 if [ -z "$type" ]; then
@@ -131,51 +135,83 @@
                     exit 1
                 fi
                 
-                echo "Starting component $i of type $type"
+                # Create job script for this component
+                JOB_SCRIPT="$JOB_DIR/comp_$i.sh"
+                cat > "$JOB_SCRIPT" << EOF
+#!/bin/bash
+#SBATCH --job-name=comp_$i
+#SBATCH --output=${LOG_DIR}/chain_components/comp_$i.log
+#SBATCH --error=${LOG_DIR}/chain_components/comp_$i.err
+#SBATCH --partition=ifarm
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=16G
+#SBATCH --gres=gpu:A100:1
+
+# Load environment
+source /etc/profile.d/modules.sh
+module load apptainer
+
+# Create log directory
+mkdir -p ${LOG_DIR}/chain_components
+
+echo "[\\\$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting component $i of type $type"
+
+if [ "$type" = "cpu" ]; then
+    # CPU component
+    apptainer run --pwd /app $CPU_EMU_SIF emulator \
+        -r $in_port \
+        -i $next_node \
+        -p $out_port \
+        -t $("$YQ_PATH" ".chain[$i].params.threads" "$CHAIN_CONFIG") \
+        -b $("$YQ_PATH" ".chain[$i].params.latency" "$CHAIN_CONFIG") \
+        -m $("$YQ_PATH" ".chain[$i].params.mem_footprint" "$CHAIN_CONFIG") \
+        -o $("$YQ_PATH" ".chain[$i].params.output_size" "$CHAIN_CONFIG") \
+        2>${LOG_DIR}/chain_components/cpu_$i.log
+else
+    # GPU component
+    apptainer run --nv --pwd /app $GPU_PROXY_SIF proxy \
+        -r $in_port \
+        -i $next_node \
+        -p $out_port \
+        -w $("$YQ_PATH" ".chain[$i].params.matrix_width" "$CHAIN_CONFIG") \
+        -s $("$YQ_PATH" ".chain[$i].params.send_rate" "$CHAIN_CONFIG") \
+        -g $("$YQ_PATH" ".chain[$i].params.group_size" "$CHAIN_CONFIG") \
+        2>${LOG_DIR}/chain_components/gpu_$i.log
+fi
+
+# Store the PID
+echo \\\$SLURM_JOB_ID > "$PID_DIR/comp_$i.pid"
+EOF
                 
-                if [ "$type" = "cpu" ]; then
-                    # CPU component
-                    apptainer run --pwd /app $CPU_EMU_SIF emulator \
-                        -r $in_port \
-                        -i $next_node \
-                        -p $out_port \
-                        -t $("$YQ_PATH" ".chain[$i].params.threads" "$CHAIN_CONFIG") \
-                        -b $("$YQ_PATH" ".chain[$i].params.latency" "$CHAIN_CONFIG") \
-                        -m $("$YQ_PATH" ".chain[$i].params.mem_footprint" "$CHAIN_CONFIG") \
-                        -o $("$YQ_PATH" ".chain[$i].params.output_size" "$CHAIN_CONFIG") \
-                        2>${LOG_DIR}/chain_components/cpu_$i.log &
-                else
-                    # GPU component
-                    apptainer run --nv --pwd /app $GPU_PROXY_SIF proxy \
-                        -r $in_port \
-                        -i $next_node \
-                        -p $out_port \
-                        -w $("$YQ_PATH" ".chain[$i].params.matrix_width" "$CHAIN_CONFIG") \
-                        -s $("$YQ_PATH" ".chain[$i].params.send_rate" "$CHAIN_CONFIG") \
-                        -g $("$YQ_PATH" ".chain[$i].params.group_size" "$CHAIN_CONFIG") \
-                        2>${LOG_DIR}/chain_components/gpu_$i.log &
+                # Make the job script executable
+                chmod +x "$JOB_SCRIPT"
+                
+                # Submit the job
+                echo "Submitting job for component $i"
+                JOB_ID=$(sbatch "$JOB_SCRIPT" | awk '{print $4}')
+                if [ -z "$JOB_ID" ]; then
+                    echo "ERROR: Failed to submit job for component $i"
+                    exit 1
                 fi
-                
-                # Store the PID
-                COMP_PID=$!
-                echo $COMP_PID > "$PID_DIR/comp_$i.pid"
+                echo "Component $i job submitted with ID $JOB_ID"
             done
             
-            # Wait a moment for all components to start
-            echo "Waiting for all components to initialize..."
-            sleep 5
+            # Wait for all jobs to start
+            echo "Waiting for all jobs to start..."
+            sleep 10
             
-            # Verify all components are running
+            # Verify all jobs are running
             all_running=true
             for i in $(seq 0 $((num_components-1))); do
                 if [ -f "$PID_DIR/comp_$i.pid" ]; then
-                    pid=$(cat "$PID_DIR/comp_$i.pid")
-                    if ! kill -0 $pid 2>/dev/null; then
-                        echo "ERROR: Component $i failed to start"
-                        cat ${LOG_DIR}/chain_components/*_$i.log >&2
+                    job_id=$(cat "$PID_DIR/comp_$i.pid")
+                    if ! squeue -j $job_id > /dev/null 2>&1; then
+                        echo "ERROR: Job for component $i is not running"
+                        cat ${LOG_DIR}/chain_components/comp_$i.err >&2
                         all_running=false
                     else
-                        echo "Component $i is running with PID $pid"
+                        echo "Component $i job is running with ID $job_id"
                     fi
                 else
                     echo "ERROR: PID file not found for component $i"
@@ -193,10 +229,14 @@
             cylc message "ready"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             
-            # Wait for all components to complete
+            # Wait for all jobs to complete
             for i in $(seq 0 $((num_components-1))); do
                 if [ -f "$PID_DIR/comp_$i.pid" ]; then
-                    wait $(cat "$PID_DIR/comp_$i.pid")
+                    job_id=$(cat "$PID_DIR/comp_$i.pid")
+                    echo "Waiting for component $i job $job_id to complete..."
+                    while squeue -j $job_id > /dev/null 2>&1; do
+                        sleep 5
+                    done
                 fi
             done
         """
