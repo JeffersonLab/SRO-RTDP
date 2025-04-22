@@ -13,7 +13,7 @@
             receiver:ready => chain_components:ready => sender
             
             # Completion chain (separate from start chain)
-            sender:send_complete => !receiver
+            sender:succeeded => !receiver
             receiver:completed
         """
 
@@ -52,6 +52,7 @@
     [[chain_components]]
         [[[outputs]]]
             ready = "ready"
+            succeeded = "ready"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
@@ -153,7 +154,9 @@
             done
             
             # Signal that all components are ready
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
             cylc message "ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             
             # Wait for all components to complete
             for i in $(seq 0 $((num_components-1))); do
@@ -172,7 +175,7 @@
     [[sender]]
         [[[outputs]]]
             ready = "ready"
-            send_complete = "send_complete"
+            succeeded = "send_complete"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
