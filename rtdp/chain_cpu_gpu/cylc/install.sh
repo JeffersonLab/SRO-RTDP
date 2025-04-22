@@ -3,6 +3,9 @@
 # Set -e to exit on error
 set -e
 
+# scancel all jobs
+scancel -u $USER
+
 # Set fixed workflow name
 WORKFLOW_NAME="chain-cpu-gpu"
 
