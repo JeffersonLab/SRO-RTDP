@@ -12,8 +12,8 @@
             # Start chain
             receiver:ready => chain_components:ready => sender
             
-            # Completion chain (separate from start chain)
-            sender:succeeded => !receiver
+            # Completion chain
+            sender:completed => !receiver
             receiver:completed
         """
 
@@ -52,7 +52,7 @@
     [[chain_components]]
         [[[outputs]]]
             ready = "ready"
-            completed = "components_ready"
+            succeeded = "ready"
         [[[environment]]]
             # Add local bin to PATH for this task
             PATH = "$CYLC_WORKFLOW_RUN_DIR/bin:$PATH"
