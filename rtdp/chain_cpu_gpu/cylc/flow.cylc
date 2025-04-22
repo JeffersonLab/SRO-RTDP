@@ -84,6 +84,8 @@
                 echo "ERROR: Failed to create temporary file"
                 exit 1
             fi
+            
+            # Set up cleanup trap after TMP_FILE is defined
             trap 'rm -f "$TMP_FILE"' EXIT
             
             # Read and validate configuration
