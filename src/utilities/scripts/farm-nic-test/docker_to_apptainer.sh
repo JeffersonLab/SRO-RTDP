@@ -6,13 +6,6 @@ if ! command -v apptainer &> /dev/null; then
     exit 1
 fi
 
-# Check if Docker image exists
-if ! docker image inspect jlabtsai/rtdp-farm-nic-test &> /dev/null; then
-    echo "Error: Docker image jlabtsai/rtdp-farm-nic-test not found."
-    echo "Please build the Docker image first using build.sh"
-    exit 1
-fi
-
 # Create a temporary directory for the build
 TMP_DIR=$(mktemp -d)
 echo "Using temporary directory: $TMP_DIR"
