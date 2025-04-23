@@ -41,9 +41,9 @@
             GPU_NIC = "ibp37s0"    # NIC for GPU proxy
             
             # Matrix configuration
-            MATRIX_WIDTH = "20480000"  # Match sender's group size
+            MATRIX_WIDTH = "2048"  # GPU input matrix column size (reduced from 20480000)
             SEND_RATE = "100"      # Target send rate in MB/s
-            GROUP_SIZE = "20480000"    # Match proxy's matrix width
+            GROUP_SIZE = "20480000"    # Keep sender's group size large
             PROXY_RATE = "1.0"     # Proxy processing rate (1.0 means no throttling)
             
             # Directory paths
