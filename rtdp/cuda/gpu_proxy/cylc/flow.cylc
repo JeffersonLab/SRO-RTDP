@@ -37,7 +37,8 @@
             # Network configuration
             IN_PORT = "55555"
             OUT_PORT = "55556"
-            NIC = "ibp94s0"  # Specify the NIC to use
+            NIC = "ibp94s0"        # NIC for sender and receiver
+            GPU_NIC = "ibp37s0"    # NIC for GPU proxy
             
             # Matrix configuration
             MATRIX_WIDTH = "2048"  # Default GPU input matrix column size
@@ -178,10 +179,10 @@
             
             # Store hostname for sender
             HOSTNAME=$(hostname)
-            IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from specified NIC
+            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from GPU NIC
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
             
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
