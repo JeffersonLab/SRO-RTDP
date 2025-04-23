@@ -14,72 +14,43 @@ This tool helps test high-speed network interface card (NIC) performance using i
 
 ## Step-by-Step Instructions
 
-### 1. Receiver Side Setup
+### 1. Initial Setup (One-time setup)
 
-First, on the receiver machine, start the iperf2 server:
-
-#### Using Docker:
+First, build the Docker image and convert it to Apptainer SIF:
 ```bash
-# On receiver machine
-cd src/utilities/scripts/farm-nic-test
-./build.sh
-docker run -d --rm --network=host farm-nic-test iperf -s
-```
-
-#### Using Apptainer:
-```bash
-# On receiver machine
 cd src/utilities/scripts/farm-nic-test
 ./build.sh
 ./docker_to_apptainer.sh
+```
+
+### 2. Running the Test
+
+#### Using Convenience Scripts (Recommended)
+
+1. On the receiver machine:
+```bash
+./run_receiver.sh
+```
+
+2. On the sender machine:
+```bash
+./run_sender.sh <receiver_ip>
+```
+Example:
+```bash
+./run_sender.sh 192.168.1.100
+```
+
+#### Manual Commands
+
+##### Receiver Side:
+```bash
 apptainer run rtdp-farm-nic-test.sif iperf -s
 ```
 
-The server will run in the background and listen on port 5201. Keep this running while performing the test.
-
-### 2. Sender Side Setup and Test
-
-On the sender machine:
-
-#### Using Docker:
-
-1. Build the test image (if not already built):
+##### Sender Side:
 ```bash
-cd src/utilities/scripts/farm-nic-test
-./build.sh
-```
-
-2. Run the test:
-```bash
-docker run --network=host farm-nic-test <receiver_ip>
-```
-
-Example:
-```bash
-docker run --network=host farm-nic-test 192.168.1.100
-```
-
-#### Using Apptainer:
-
-1. Build the Docker image (if not already built):
-```bash
-cd src/utilities/scripts/farm-nic-test
-./build.sh
-```
-
-2. Convert to Apptainer SIF (if not already done):
-```bash
-./docker_to_apptainer.sh
-```
-
-3. Run the test:
-```bash
-apptainer run rtdp-farm-nic-test.sif <receiver_ip>
-```
-
-Example:
-```bash
-apptainer run rtdp-farm-nic-test.sif 192.168.1.100
+apptainer run rtdp-farm-nic-test.sif /usr/local/bin/nic_test.py <receiver_ip>
 ```
 
 ## Test Configuration
