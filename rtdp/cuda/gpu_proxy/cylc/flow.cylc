@@ -37,10 +37,11 @@
             # Network configuration
             IN_PORT = "55555"
             OUT_PORT = "55556"
+            NIC = "ibp94s0"  # Specify the NIC to use
             
             # Matrix configuration
             MATRIX_WIDTH = "2048"  # Default GPU input matrix column size
-            SEND_RATE = "25"       # Default send rate in MB/s
+            SEND_RATE = "100"      # Increased send rate in MB/s
             GROUP_SIZE = "2048"    # Default group size for sending
             
             # Directory paths
@@ -69,7 +70,7 @@
             # Store hostname for other tasks
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
             HOSTNAME=$(hostname -f)  # Use fully qualified hostname
-            IP=$(hostname -i | awk '{print $1}')  # Use first IP if multiple
+            IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from specified NIC
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
@@ -177,7 +178,7 @@
             
             # Store hostname for sender
             HOSTNAME=$(hostname)
-            IP=$(hostname -i)
+            IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from specified NIC
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
@@ -249,13 +250,12 @@
             
             # Get proxy information
             PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Proxy IP: ${PROXY_IP}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT} (using NIC ${NIC})"
             
             # Create input directory
             mkdir -p ${INPUT_DIR}
             
             # Send data with rate control and group size
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT}"
             apptainer run ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
                 -r ${SEND_RATE} \
