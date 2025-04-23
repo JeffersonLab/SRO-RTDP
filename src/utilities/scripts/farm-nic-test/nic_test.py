@@ -5,41 +5,47 @@ import sys
 import argparse
 import re
 
-def run_iperf_test(receiver_ip):
+def run_iperf_test(receiver_ip, port=52011):
     """
-    Run iperf2 test using Docker containers for both sender and receiver.
+    Run iperf2 test directly.
     Returns the transmission rate in Gbits/sec.
     """
     try:
-        # Start iperf server (receiver) in Docker
-        server_cmd = [
-            "docker", "run", "-d", "--rm",
-            "--network=host",
-            "networkstatic/iperf2",
-            "iperf", "-s"
-        ]
-        server_container = subprocess.run(server_cmd, capture_output=True, text=True)
-        server_id = server_container.stdout.strip()
-
-        # Run iperf client (sender) in Docker
+        # Run iperf client
         client_cmd = [
-            "docker", "run", "--rm",
-            "--network=host",
-            "networkstatic/iperf2",
-            "iperf", "-c", receiver_ip, "-t", "10"
+            "iperf", "-c", receiver_ip, "-t", "10", "-p", str(port)
         ]
         result = subprocess.run(client_cmd, capture_output=True, text=True)
 
-        # Clean up server container
-        subprocess.run(["docker", "stop", server_id])
+        # Print raw output for debugging
+        print("\nRaw iperf output:")
+        print("=" * 50)
+        print(result.stdout)
+        print("=" * 50)
+        print("Stderr:", result.stderr)
+        print("=" * 50)
 
         # Parse the output to get the transmission rate
-        match = re.search(r'(\d+\.\d+)\s*Gbits/sec', result.stdout)
-        if match:
-            return float(match.group(1))
-        else:
-            print("Error: Could not parse iperf output")
-            return None
+        # Try different patterns that might appear in iperf output
+        patterns = [
+            r'(\d+\.\d+)\s*Gbits/sec',  # Gbits/sec
+            r'(\d+\.\d+)\s*Mbits/sec',  # Mbits/sec
+            r'(\d+\.\d+)\s*Kbits/sec'   # Kbits/sec
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, result.stdout)
+            if match:
+                rate = float(match.group(1))
+                # Convert to Gbits/sec if needed
+                if 'Mbits/sec' in result.stdout:
+                    rate = rate / 1000
+                elif 'Kbits/sec' in result.stdout:
+                    rate = rate / 1000000
+                return rate
+
+        print("Error: Could not find transmission rate in iperf output")
+        return None
 
     except Exception as e:
         print(f"Error running iperf test: {str(e)}")
@@ -48,10 +54,11 @@ def run_iperf_test(receiver_ip):
 def main():
     parser = argparse.ArgumentParser(description='Test NIC speed using iperf2')
     parser.add_argument('receiver_ip', help='IP address of the receiver NIC')
+    parser.add_argument('port', nargs='?', default=52011, type=int, help='Port number to use (default: 52011)')
     args = parser.parse_args()
 
-    print(f"Testing NIC speed with receiver IP: {args.receiver_ip}")
-    rate = run_iperf_test(args.receiver_ip)
+    print(f"Testing NIC speed with receiver IP: {args.receiver_ip} on port {args.port}")
+    rate = run_iperf_test(args.receiver_ip, args.port)
     
     if rate is not None:
         print(f"Transmission rate: {rate} Gbits/sec")

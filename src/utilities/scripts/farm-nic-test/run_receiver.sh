@@ -12,9 +12,9 @@ if [ ! -f "rtdp-farm-nic-test.sif" ]; then
     exit 1
 fi
 
-echo "Starting iperf2 server..."
+echo "Starting iperf2 server on port 52011..."
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-# Run the server
-apptainer run rtdp-farm-nic-test.sif iperf -s 
+# Run the server with high-number port
+apptainer run rtdp-farm-nic-test.sif iperf -s -p 52011 

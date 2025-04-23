@@ -20,8 +20,8 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-echo "Running NIC test with receiver IP: $1"
+echo "Running NIC test with receiver IP: $1 on port 52011"
 echo ""
 
-# Run the test
-apptainer run rtdp-farm-nic-test.sif /usr/local/bin/nic_test.py "$1" 
+# Run the test with high-number port
+apptainer run rtdp-farm-nic-test.sif /usr/local/bin/nic_test.py "$1" 52011 
