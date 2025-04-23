@@ -61,6 +61,12 @@
             exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
             
             # Check if port is already in use
             if netstat -tuln | grep -q ":${OUT_PORT}"; then
@@ -173,6 +179,15 @@
             exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - GPU_NIC: ${GPU_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
+            echo "  - PROXY_RATE: ${PROXY_RATE}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
             
             # Get receiver information
             RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
@@ -250,6 +265,14 @@
             exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - SEND_RATE: ${SEND_RATE} MB/s"
+            echo "  - GROUP_SIZE: ${GROUP_SIZE}"
+            echo "  - INPUT_DIR: ${INPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
             
             # Get proxy information
             PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
