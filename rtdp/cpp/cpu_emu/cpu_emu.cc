@@ -1,3 +1,6 @@
+//
+//  CPU Emulator for Real Time Development Program (RTDP)
+//
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
@@ -16,6 +19,7 @@
 #include <map>
 #include <zmq.hpp>
 #include <netinet/in.h>
+#include "buffer_packet.hh"
 
 using namespace std;
 using namespace zmq;
@@ -36,6 +40,7 @@ void   Usage()
         -r receive port (default = 8888)  \n\
         -s sleep versus burn cpu  \n\
         -t num threads (default = 10)  \n\
+        -x run in sim mode  \n\
         -y yaml config file  \n\
         -z act as terminal node  \n\
         -v verbose (= 0/1 - default = false (0))  \n\n";
@@ -107,7 +112,7 @@ void parse_yaml(const char *filename, bool vrbs=false) {
     lbls.push_back("destination"); lbls.push_back("dst_port"); lbls.push_back("rcv_port");
     lbls.push_back("sleep"); lbls.push_back("threads"); lbls.push_back("latency");
     lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
-    lbls.push_back("terminal");
+    lbls.push_back("terminal"); lbls.push_back("sim_mode");
     
 auto it = lbls.begin(); //a hack to get the type
 
@@ -174,7 +179,7 @@ int main (int argc, char *argv[])
 
     bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
     bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
-    bool     psdZ=false;
+    bool     psdZ=false, psdX=false;
     string   yfn = "cpu_emu.yaml";
     char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
     uint16_t rcv_prt = 8888; // receive port default
@@ -185,7 +190,7 @@ int main (int argc, char *argv[])
     double   memGB   = 10;    // thread memory footprint in GB
     double   otmemGB = 0.01;    // program putput in GB
 
-    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:y:z")) != -1)
+    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:xy:z")) != -1)
     {
         switch (optc)
         {
@@ -236,6 +241,10 @@ int main (int argc, char *argv[])
             psdV = true;
             if(DBG) cout << " -v " << vrbs;
             break;
+        case 'x':
+            psdX = true;
+            if(DBG) cout << " -x ";
+            break;
         case 'y':
             yfn = (const char *) optarg ;
             psdY = true;
@@ -266,13 +275,14 @@ int main (int argc, char *argv[])
         if(!psdS) psdS = stoi(mymap["sleep"]) == 1;
         if(!psdT) nmThrds = stoi(mymap["threads"]);
         if(!psdV) vrbs = stoi(mymap["verbose"]);
+        if(!psdX) psdX = stoi(mymap["sim_mode"]) == 1;
         if(!psdZ) psdZ = stoi(mymap["terminal"]) == 1;
     }    
     ////////
     if(vrbs) cout << "[cpu_emu]: Operating with scs_GB = " << scs_GB << "\tdst_ip = "
                 << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = " << memGB << "\totmemGB = "
                 << otmemGB << "\tdst_prt = " << (psdZ?"N/A":to_string(dst_prt)) << "\trcv_prt = "
-                << rcv_prt << "\tsleep = " << psdS << "\tnmThrds = "
+                << rcv_prt << "\tsleep = " << psdS << "\tsim_mode = " << psdX  << "\tnmThrds = "
                 << nmThrds << "\tverbose = " << vrbs << "\tyfn = " << (psdY?yfn:"N/A") 
                 << "\tterminal = " << psdZ << '\n';
 
@@ -297,7 +307,22 @@ int main (int argc, char *argv[])
         //  Wait for next request from client
         if(vrbs) cout << "[cpu_emu]: Waiting for source ..." << endl;
         recv_result_t rtcd = rcv_sckt.recv (request, recv_flags::none);
-        if(vrbs) cout << "[cpu_emu]: Received request " << request_nbr++ << ": rtcd = " << rtcd.value() << " from client " << endl;
+        if(vrbs) cout << "[cpu_emu]: Received request " << request_nbr++ << ": rtcd = " << (psdX?printf("(%d)",int(rtcd.value())):int(rtcd.value())) << " from client " << endl;
+        size_t bufSiz = 0;
+        if (psdX) { //parse recvd message to get simlated data size recvd
+        
+            BufferPacket pkt = BufferPacket::from_message(request);
+
+            if(vrbs) cout << "[cpu_emu]: Got: size="   << pkt.size
+                      << ", stream_id=" << pkt.stream_id
+                      << ", timestamp=" << pkt.timestamp << std::endl;
+            bufSiz = pkt.size;
+        } else {
+            bufSiz = rtcd.value();
+        }
+        if(vrbs) cout << "[cpu_emu]: event size = " 
+                      << (psdX?printf("(Spec'd) %d",int(bufSiz)):int(bufSiz)) 
+                      << " from client " << endl;
 
         //  Do some 'work'
         //load (or emulate load on) system with ensuing work
@@ -305,7 +330,7 @@ int main (int argc, char *argv[])
         vector<thread> threads;
 
         for (int i=1; i<=nmThrds; ++i)  //start the threads
-            threads.push_back(thread(func, rtcd.value(), scs_GB, memGB, psdS, vrbs));
+            threads.push_back(thread(func, bufSiz, scs_GB, memGB, psdS, vrbs));
 
         for (auto& th : threads) th.join();
         if(vrbs) cout << "[cpu_emu]: synchronized all threads..." << endl;
