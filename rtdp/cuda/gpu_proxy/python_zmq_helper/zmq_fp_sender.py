@@ -20,7 +20,7 @@ Dependencies:
 
 Author: ChatGPT, Cissie
 Check-in: 2025-03-10
-Last update: 2025-03-31
+Last update: 2025-04-24
 """
 
 import zmq
@@ -66,8 +66,6 @@ def main():
         print(f"--rate should be a positive number!!!")
         exit(-1)
 
-    next_send_time = time.perf_counter()
-
     try:
         while True:
             start = time.time()
@@ -79,10 +77,10 @@ def main():
             socket.send(data.tobytes())  # blocks until all data is sent
             duration = time.time() - start  # data is handled to ZMQ queue but not fully sent out
 
-            remaining = 1.0 - duration
+            remaining = interval - duration
             if remaining > 0:
                 print(f"\tSent {data.nbytes / 1e6} MB, ",
-                    f"curr_send_rate={max(args.rate, data.nbytes / (duration * 1e6))} MB/s, duration={duration * 1000} ms")
+                    f"curr_send_rate={data.nbytes / (duration * 1e6)} MB/s, duration={duration * 1000} ms")
                 print(f"\tSleep for {remaining * 1000} ms...\n")
                 time.sleep(remaining)
             else:
