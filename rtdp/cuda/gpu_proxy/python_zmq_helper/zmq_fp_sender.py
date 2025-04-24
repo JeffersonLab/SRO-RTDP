@@ -45,15 +45,18 @@ def main():
     parser.add_argument("-r",
                         "--rate", type=float, default=500.0,
                         help="Average MB/s to send (default = 500)")
+    parser.add_argument("--hwm", type=int, default=1000,
+                        help="Socket high water mark (default = 1000)")
     
     args = parser.parse_args()
     
     context = zmq.Context()
     socket = context.socket(zmq.PUSH)
-    socket.setsockopt(zmq.SNDHWM, 1000)  # set send high-water mark to 1000 messages
+    socket.setsockopt(zmq.SNDHWM, args.hwm)  # set send high-water mark
     socket.connect(f"tcp://{args.ip_addr}:{args.port}")
     
     print(f"Sending data to {args.ip_addr}:{args.port} {'(all ones)' if args.all_ones else '(random values)'}")
+    print(f"Socket HWM: {args.hwm}")
 
     if args.rate > 0:
         print(f"Target send rate: {args.rate} MB/s\n")
@@ -73,6 +76,10 @@ def main():
                 data = np.ones(args.group_size, dtype=np.float32)
             else:
                 data = np.random.rand(args.group_size).astype(np.float32)
+
+            # Get queue size before send
+            queue_size = socket.getsockopt(zmq.SNDHWM) - socket.getsockopt(zmq.SNDBUF)
+            print(f"\tQueue size before send: {queue_size}")
 
             socket.send(data.tobytes())  # blocks until all data is sent
             send_duration = time.time() - cycle_start  # data is handled to ZMQ queue but not fully sent out
