@@ -25,8 +25,8 @@ void   Usage()
         -c event count (10) \n\
         -s event size (MB) (10) \n\n";
 
-    cout <<  usage_str;
-    cout << "Required: -i -p\n";
+    cout << "[zmq-event-clnt]: " << usage_str;
+    cout << "[zmq-event-clnt]: Required: -i -p\n";
 }
 
 
@@ -68,7 +68,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -s " << evnt_szMB;
             break;
         case '?':
-            cout << "Unrecognised option: " << optopt;
+            cout << "[zmq-event-clnt]: Unrecognised option: " << optopt;
             Usage();
             exit(1);
         }
@@ -79,21 +79,21 @@ int main (int argc, char *argv[])
     zmq::context_t context (1);
     zmq::socket_t socket (context, zmq::socket_type::req);
 
-    std::cout << "Connecting to server..." << std::endl;
+    std::cout << "[zmq-event-clnt]: Connecting to server..." << std::endl;
     socket.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
 
     //  Do evnt_cnt requests, waiting each time for a response
     for (int request_nbr = 0; request_nbr != evnt_cnt; request_nbr++) {
 	// Send 10MB "event"
         zmq::message_t request (evnt_szMB*1024*1024);
-        std::cout << "Sending  " << request_nbr << "..." << std::endl;
+        std::cout << "[zmq-event-clnt]: Sending  " << request_nbr << "..." << std::endl;
         socket.send (request, zmq::send_flags::none);
 
         //  Get the reply.
         zmq::message_t reply;
         zmq::recv_result_t rtcd = socket.recv (reply, zmq::recv_flags::none);
-        //std::cout << "Connect return code: " << rtcd << '\n';
-        std::cout << "Received  " << request_nbr << "rtcd = " << rtcd.value() << " Actual reply: " << reply << std::endl;
+        //std::cout << "[zmq-event-clnt]: Connect return code: " << rtcd << '\n';
+        std::cout << "[zmq-event-clnt]: Received  " << request_nbr << " rtcd = " << rtcd.value() << " Actual reply: " << reply << std::endl;
     }
     return 0;
 }
