@@ -80,7 +80,7 @@ def main():
             remaining = interval - duration
             if remaining > 0:
                 print(f"\tSent {data.nbytes / 1e6} MB, ",
-                    f"curr_send_rate={data.nbytes / (duration * 1e6)} MB/s, duration={duration * 1000} ms")
+                    f"curr_send_rate={data.nbytes / (duration * 1e6)} MB/s, duration={duration * 1000} ms, interval={interval * 1000} ms")
                 print(f"\tSleep for {remaining * 1000} ms...\n")
                 time.sleep(remaining)
             else:
