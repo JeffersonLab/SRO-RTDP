@@ -68,23 +68,31 @@ def main():
 
     try:
         while True:
-            start = time.time()
+            cycle_start = time.time()
             if args.all_ones:
                 data = np.ones(args.group_size, dtype=np.float32)
             else:
                 data = np.random.rand(args.group_size).astype(np.float32)
 
             socket.send(data.tobytes())  # blocks until all data is sent
-            duration = time.time() - start  # data is handled to ZMQ queue but not fully sent out
+            send_duration = time.time() - cycle_start  # data is handled to ZMQ queue but not fully sent out
 
-            remaining = interval - duration
+            remaining = interval - send_duration
             if remaining > 0:
-                print(f"\tSent {data.nbytes / 1e6} MB, ",
-                    f"curr_send_rate={data.nbytes / (duration * 1e6)} MB/s, duration={duration * 1000} ms, interval={interval * 1000} ms")
-                print(f"\tSleep for {remaining * 1000} ms...\n")
+                sleep_start = time.time()
                 time.sleep(remaining)
+                sleep_duration = time.time() - sleep_start
+                total_duration = send_duration + sleep_duration
+                avg_rate = data.nbytes / (total_duration * 1e6)
+                print(f"\tSent {data.nbytes / 1e6} MB, "
+                    f"curr_send_rate={avg_rate:.2f} MB/s, "
+                    f"send_duration={send_duration * 1000:.2f} ms, "
+                    f"sleep_duration={sleep_duration * 1000:.2f} ms, "
+                    f"total_duration={total_duration * 1000:.2f} ms")
             else:
-                print(f"\tSent {data.nbytes / 1e6} MB, curr_send_rate={data.nbytes / (duration * 1e6)} MB/s, duration={duration * 1000} ms")
+                print(f"\tSent {data.nbytes / 1e6} MB, "
+                    f"curr_send_rate={data.nbytes / (send_duration * 1e6):.2f} MB/s, "
+                    f"send_duration={send_duration * 1000:.2f} ms")
 
     except KeyboardInterrupt:
         print("\nTerminating sender.")
