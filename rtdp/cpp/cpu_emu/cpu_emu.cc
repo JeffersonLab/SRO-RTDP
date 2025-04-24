@@ -40,7 +40,7 @@ void   Usage()
         -z act as terminal node  \n\
         -v verbose (= 0/1 - default = false (0))  \n\n";
 
-    cout <<  usage_str;
+    cout << "[cpu_emu]: " << usage_str;
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
@@ -48,36 +48,36 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
 { 
     const size_t ts(scs_GB*nmrd*1e-9); //reqd timespan in seconds
     const size_t tsns(scs_GB*nmrd);    //reqd timespan in nanoseconds
-    if(vrbs) cout << "Threading for " << ts << " secs ..." << endl;
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
-    if(vrbs) cout << "Allocating " << memSz << " bytes ..." << endl;
+    if(vrbs) cout << "[cpu_emu]: Allocating " << memSz << " bytes ..." << endl;
     double* x = new double[memSz];
     //usefull work emulation 
+    if(vrbs) cout << "[cpu_emu]: Threading for " << ts << " secs ..." << endl;
     if(psdS) {
         auto cms = chrono::nanoseconds(tsns);
-        if(vrbs) cout << "Sleeping for " << tsns << " nsecs" << endl;
+        if(vrbs) cout << "[cpu_emu]: Sleeping for " << tsns << " nsecs" << endl;
         this_thread::sleep_for(cms);
     }else{
         //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         auto start_time = std::chrono::high_resolution_clock::now();
-        if(vrbs) cout << "Burning ...";
+        if(vrbs) cout << "[cpu_emu]: Burning ...";
         
         double fracsecs, secs;
         fracsecs = modf (ts , &secs);
-        if(vrbs) cout << "secs = " << secs << " fracsecs = " << fracsecs << endl;
+        if(vrbs) cout << "[cpu_emu]: secs = " << secs << " fracsecs = " << fracsecs << endl;
         size_t sz1k = 1024;
         size_t strtMem = 0;
         auto end_time = std::chrono::high_resolution_clock::now();
         duration<double> time_span = duration_cast<duration<double>>(end_time - start_time);
         while (time_span.count() < ts) { 
-            //if(vrbs) cout << "Checking " << time_span.count() << " against "<< ts  << endl;
+            //if(vrbs) cout << "[cpu_emu]: Checking " << time_span.count() << " against "<< ts  << endl;
             for (size_t i = strtMem; i<min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
             strtMem += sz1k;
             if(strtMem > memSz - sz1k) strtMem = 0;
             end_time = std::chrono::high_resolution_clock::now();
             time_span = duration_cast<duration<double>>(end_time - start_time);
         }
-        if(vrbs) cout << "Threaded for " << time_span.count() << " secs Done" << endl;
+        if(vrbs) cout << "[cpu_emu]: Threaded for " << time_span.count() << " secs Done" << endl;
     }
 }
 
@@ -108,58 +108,59 @@ void parse_yaml(const char *filename, bool vrbs=false) {
     lbls.push_back("sleep"); lbls.push_back("threads"); lbls.push_back("latency");
     lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
     lbls.push_back("terminal");
-    auto it = lbls.begin(); //a hack to get the type
+    
+auto it = lbls.begin(); //a hack to get the type
 
     while (yaml_parser_parse(&parser, &event)) {
         switch (event.type) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(DBG) printf("Stream started\n");
+            if(DBG) printf("[cpu_emu]: Stream started\n");
             break;
         case YAML_STREAM_END_EVENT:
-            if(DBG) printf("Stream ended\n");
+            if(DBG) printf("[cpu_emu]: Stream ended\n");
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(DBG) printf("Document started\n");
+            if(DBG) printf("[cpu_emu]: Document started\n");
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(DBG) printf("Document ended\n");
+            if(DBG) printf("[cpu_emu]: Document ended\n");
             break;
         case YAML_MAPPING_START_EVENT:
-            if(DBG) printf("Mapping started\n");
+            if(DBG) printf("[cpu_emu]: Mapping started\n");
             break;
         case YAML_MAPPING_END_EVENT:
-            if(DBG) printf("Mapping ended\n");
+            if(DBG) printf("[cpu_emu]: Mapping ended\n");
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(DBG) printf("Sequence started\n");
+            if(DBG) printf("[cpu_emu]: Sequence started\n");
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(DBG) printf("Sequence ended\n");
+            if(DBG) printf("[cpu_emu]: Sequence ended\n");
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(DBG) cout << "Label: " << s << '\n';
+                if(DBG) cout << "[cpu_emu]: Label: " << s << '\n';
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(DBG) cout << "Label: " << s1 << " Datum: " << s << '\n';
+                if(DBG) cout << "[cpu_emu]: Label: " << s1 << " Datum: " << s << '\n';
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
             break;
         default:
-            if(DBG) cout << "(Default)" << endl;
+            if(DBG) cout << "[cpu_emu]: (Default)" << endl;
             break;
         }
 
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(DBG) cout << "All done parsing, got this:" << endl;
+    if(DBG) cout << "[cpu_emu]: All done parsing, got this:" << endl;
     if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << '\n';
     
@@ -245,7 +246,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -z ";
             break;
         case '?':
-            cout << "Unrecognised option: " << optopt;
+            cout << "[cpu_emu]: Unrecognised option: " << optopt;
             Usage();
             exit(1);
         }
@@ -268,7 +269,7 @@ int main (int argc, char *argv[])
         if(!psdZ) psdZ = stoi(mymap["terminal"]) == 1;
     }    
     ////////
-    if(vrbs) cout << "Operating with scs_GB = " << scs_GB << "\tdst_ip = "
+    if(vrbs) cout << "[cpu_emu]: Operating with scs_GB = " << scs_GB << "\tdst_ip = "
                 << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = " << memGB << "\totmemGB = "
                 << otmemGB << "\tdst_prt = " << (psdZ?"N/A":to_string(dst_prt)) << "\trcv_prt = "
                 << rcv_prt << "\tsleep = " << psdS << "\tnmThrds = "
@@ -281,33 +282,33 @@ int main (int argc, char *argv[])
     socket_t rcv_sckt(rcv_cntxt, socket_type::rep);
     socket_t dst_sckt(dst_cntxt, socket_type::req);
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
-    if(vrbs) cout << "Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
+    if(vrbs) cout << "[cpu_emu]: Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
     
     if(!psdZ) {
         //  Prepare our destination socket
-        if(vrbs) cout << "Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
+        if(vrbs) cout << "[cpu_emu]: Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
     uint16_t request_nbr = 0;
     while (true) {
-        if(vrbs) cout << "Setting up request message ..." << endl;
+        //if(vrbs) cout << "[cpu_emu]: Setting up request message ..." << endl;
         message_t request;
 
         //  Wait for next request from client
-        if(vrbs) cout << "Waiting for source ..." << endl;
+        if(vrbs) cout << "[cpu_emu]: Waiting for source ..." << endl;
         recv_result_t rtcd = rcv_sckt.recv (request, recv_flags::none);
+        if(vrbs) cout << "[cpu_emu]: Received request " << request_nbr++ << ": rtcd = " << rtcd.value() << " from client " << endl;
         {
             //  Send reply back to client
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
-            if(vrbs) cout << "Sending ACK ..." << endl;
+            if(vrbs) cout << "[cpu_emu]: Sending ACK ..." << endl;
             rcv_sckt.send (reply, send_flags::none);
             // or
             //string reply = "ACK";
             //socket.send(buffer(reply), send_flags::none);
         }        
         
-        if(vrbs) cout << "Received request " << request_nbr++ << ": rtcd = " << rtcd.value() << " from client " << endl;
 
         //  Do some 'work'
         //load (or emulate load on) system with ensuing work
@@ -318,24 +319,24 @@ int main (int argc, char *argv[])
             threads.push_back(thread(func, rtcd.value(), scs_GB, memGB, psdS, vrbs));
 
         for (auto& th : threads) th.join();
-        if(vrbs) cout << "synchronized all threads..." << endl;
+        if(vrbs) cout << "[cpu_emu]: synchronized all threads..." << endl;
 
         if(!psdZ) {
-            if(vrbs) cout << "Forwarding to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
+            if(vrbs) cout << "[cpu_emu]: Forwarding to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
             //forward to next hop    
             // Send a message to the destination
             size_t outSz = otmemGB*1.024*1.024*1.024*1e9; //output size in bytes
             message_t dst_msg(outSz); //harvested data
             send_result_t sr = dst_sckt.send(dst_msg, send_flags::none);
-            if(vrbs) cout << "output Num written " << sr.value()  << endl;
+            if(vrbs) cout << "[cpu_emu]: output Num written " << sr.value()  << endl;
             if(sr.value() != outSz) cerr << "Destination data incorrect size" << endl;
 
             // Receive the reply from the destination
             //  Get the reply.
             message_t reply;
-            if(vrbs) cout << "Waiting for destination ACK" << endl;
+            if(vrbs) cout << "[cpu_emu]: Waiting for destination ACK" << endl;
             recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
-            if(vrbs) cout << "Destination Actual reply: " << reply << " With rtcd = " << rtcd.value() << endl;
+            if(vrbs) cout << "[cpu_emu]: Destination Actual reply: " << reply << " With rtcd = " << rtcd.value() << endl;
         }
     }
     return 0;
