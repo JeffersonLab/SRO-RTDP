@@ -43,8 +43,8 @@
             
             # Matrix configuration
             MATRIX_WIDTH = "2048"  # GPU input matrix column size
-            SEND_RATE = "250"      # Target send rate in MB/s (decreased from 300)
-            GROUP_SIZE = "51200000"    # Group size to achieve 250 MB/s (51200000 * 4 bytes = 250 MB)
+            SEND_RATE = "200"      # Target send rate in MB/s (decreased from 250)
+            GROUP_SIZE = "40960000"    # Group size to achieve 200 MB/s (40960000 * 4 bytes = 200 MB)
             PROXY_RATE = "1.0"     # Proxy processing rate (1.0 means no throttling)
             
             # Directory paths
