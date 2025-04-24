@@ -279,8 +279,8 @@ int main (int argc, char *argv[])
     //  Prepare our receiving rcv_cntxt and socket
     context_t rcv_cntxt(1);
     context_t dst_cntxt(1);
-    socket_t rcv_sckt(rcv_cntxt, socket_type::rep);
-    socket_t dst_sckt(dst_cntxt, socket_type::req);
+    socket_t rcv_sckt(rcv_cntxt, socket_type::pull);
+    socket_t dst_sckt(dst_cntxt, socket_type::push);
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
     if(vrbs) cout << "[cpu_emu]: Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
     
@@ -298,17 +298,6 @@ int main (int argc, char *argv[])
         if(vrbs) cout << "[cpu_emu]: Waiting for source ..." << endl;
         recv_result_t rtcd = rcv_sckt.recv (request, recv_flags::none);
         if(vrbs) cout << "[cpu_emu]: Received request " << request_nbr++ << ": rtcd = " << rtcd.value() << " from client " << endl;
-        {
-            //  Send reply back to client
-            message_t reply (3+1);
-            memcpy (reply.data (), "ACK", 3);
-            if(vrbs) cout << "[cpu_emu]: Sending ACK ..." << endl;
-            rcv_sckt.send (reply, send_flags::none);
-            // or
-            //string reply = "ACK";
-            //socket.send(buffer(reply), send_flags::none);
-        }        
-        
 
         //  Do some 'work'
         //load (or emulate load on) system with ensuing work
@@ -330,13 +319,6 @@ int main (int argc, char *argv[])
             send_result_t sr = dst_sckt.send(dst_msg, send_flags::none);
             if(vrbs) cout << "[cpu_emu]: output Num written " << sr.value()  << endl;
             if(sr.value() != outSz) cerr << "Destination data incorrect size" << endl;
-
-            // Receive the reply from the destination
-            //  Get the reply.
-            message_t reply;
-            if(vrbs) cout << "[cpu_emu]: Waiting for destination ACK" << endl;
-            recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
-            if(vrbs) cout << "[cpu_emu]: Destination Actual reply: " << reply << " With rtcd = " << rtcd.value() << endl;
         }
     }
     return 0;
