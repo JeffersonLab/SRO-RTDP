@@ -40,6 +40,9 @@
             # NIC and GPU_NIC are optional - if not provided, use default interface
             NIC = "${NIC:-$(ip route | grep default | awk '{print $5}')}"        # Default to system's default interface
             GPU_NIC = "${GPU_NIC:-$(ip route | grep default | awk '{print $5}')}"    # Default to system's default interface
+
+            NIC = "ibp94s0"
+            GPU_NIC = "ibp37s0"
             
             # Matrix configuration
             MATRIX_WIDTH = "2048"  # GPU input matrix column size
