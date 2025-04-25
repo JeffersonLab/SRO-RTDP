@@ -78,8 +78,16 @@ def main():
                 data = np.random.rand(args.group_size).astype(np.float32)
 
             # Get queue size before send
-            queue_size = socket.getsockopt(zmq.SNDHWM) - socket.getsockopt(zmq.SNDBUF)
-            print(f"\tQueue size before send: {queue_size}")
+            try:
+                # Get the number of messages in the queue
+                events = socket.getsockopt(zmq.EVENTS)
+                if events & zmq.POLLOUT:
+                    queue_size = 0
+                else:
+                    queue_size = args.hwm
+                print(f"\tQueue status: {'full' if queue_size == args.hwm else 'not full'}")
+            except zmq.error.ZMQError:
+                print(f"\tQueue status: unknown")
 
             socket.send(data.tobytes())  # blocks until all data is sent
             send_duration = time.time() - cycle_start  # data is handled to ZMQ queue but not fully sent out
