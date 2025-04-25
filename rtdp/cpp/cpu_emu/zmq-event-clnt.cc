@@ -103,7 +103,8 @@ int main (int argc, char *argv[])
             zmq::message_t request (pkt.size);
             socket.send (request, zmq::send_flags::none);
         }
-        std::cout << "[zmq-event-clnt]: sent: size=" << (psdX?printf("(%d)",int(pkt.size)):int(pkt.size)) << std::endl;
+        std::cout << "[zmq-event-clnt]: sent: size=" 
+                  << (psdX?"(Spec'd) ":"(actual) ") << pkt.size << std::endl;
     }
     return 0;
 }

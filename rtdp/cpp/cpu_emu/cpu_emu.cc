@@ -307,21 +307,21 @@ int main (int argc, char *argv[])
         //  Wait for next request from client
         if(vrbs) cout << "[cpu_emu]: Waiting for source ..." << endl;
         recv_result_t rtcd = rcv_sckt.recv (request, recv_flags::none);
-        if(vrbs) cout << "[cpu_emu]: Received request " << request_nbr++ << ": rtcd = " << (psdX?printf("(%d)",int(rtcd.value())):int(rtcd.value())) << " from client " << endl;
-        size_t bufSiz = 0;
+        if(vrbs) cout << "[cpu_emu]: Received request " 
+                      << request_nbr++ << ": rtcd = " 
+                      << int(rtcd.value()) << " from client " << endl;
+                      
+        uint32_t bufSiz = 0;
         if (psdX) { //parse recvd message to get simlated data size recvd
         
             BufferPacket pkt = BufferPacket::from_message(request);
 
-            if(vrbs) cout << "[cpu_emu]: Got: size="   << pkt.size
-                      << ", stream_id=" << pkt.stream_id
-                      << ", timestamp=" << pkt.timestamp << std::endl;
             bufSiz = pkt.size;
         } else {
             bufSiz = rtcd.value();
         }
         if(vrbs) cout << "[cpu_emu]: event size = " 
-                      << (psdX?printf("(Spec'd) %d",int(bufSiz)):int(bufSiz)) 
+                      << (psdX?"(Spec'd) ":"(actual) ") << bufSiz
                       << " from client " << endl;
 
         //  Do some 'work'
