@@ -308,8 +308,8 @@ int main (int argc, char *argv[])
         if(vrbs) cout << "[cpu_emu]: Waiting for source ..." << endl;
         recv_result_t rtcd = rcv_sckt.recv (request, recv_flags::none);
         if(vrbs) cout << "[cpu_emu]: Received request " 
-                      << request_nbr++ << ": rtcd = " 
-                      << int(rtcd.value()) << " from client " << endl;
+                      << request_nbr++ << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
+                      << " rtcd = " << int(rtcd.value()) << " from client " << endl;
                       
         uint32_t bufSiz = 0;
         if (psdX) { //parse recvd message to get simlated data size recvd
