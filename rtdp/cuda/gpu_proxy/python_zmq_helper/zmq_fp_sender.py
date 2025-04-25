@@ -77,15 +77,15 @@ def main():
             else:
                 data = np.random.rand(args.group_size).astype(np.float32)
 
-            # Get queue size before send
+            # Get queue status before send
             try:
-                # Get the number of messages in the queue
+                # Check if socket is ready to send
                 events = socket.getsockopt(zmq.EVENTS)
                 if events & zmq.POLLOUT:
-                    queue_size = 0
+                    queue_status = "ready"
                 else:
-                    queue_size = args.hwm
-                print(f"\tQueue status: {'full' if queue_size == args.hwm else 'not full'}")
+                    queue_status = "backpressure"
+                print(f"\tQueue status: {queue_status}")
             except zmq.error.ZMQError:
                 print(f"\tQueue status: unknown")
 
