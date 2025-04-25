@@ -47,7 +47,7 @@
             GROUP_SIZE = "30720000"    # Group size to achieve 150 MB/s (30720000 * 4 bytes = 150 MB)
             PROXY_RATE = "1.0"     # Proxy processing rate (1.0 means no throttling)
             SEND_ALL_ONES = "0"    # Set to 1 to send all ones, 0 for random values
-            SOCKET_HWM = "10"      # Socket high water mark (testing with low HWM for consistent rate)
+            SOCKET_HWM = "100"      # Socket high water mark (testing with higher HWM for smoother transmission)
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
