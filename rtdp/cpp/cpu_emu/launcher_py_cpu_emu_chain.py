@@ -24,7 +24,7 @@ def launch_component(index, ref_port):
             "-t", str(1)        
         ])
     else:
-        print(f"[launcher_py_cpu_emu] Starting cpu_emu #{index} listening on port {ref_port + index}")
+        print(f"[launcher_py_cpu_emu] Starting cpu_emu #{index} listening on port {ref_port + index}, acting as sink")
         subprocess.Popen([
             "./cpu_emu",
             "-i", str("127.0.0.1"),
