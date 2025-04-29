@@ -19,6 +19,8 @@
 #include <map>
 #include <zmq.hpp>
 #include <netinet/in.h>
+#include <new> // for std::bad_alloc
+#include <cstdlib> // Required for exit()
 #include "buffer_packet.hh"
 
 using namespace std;
@@ -58,7 +60,15 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu]: Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu]: Allocating " << float(memSz/(1024*1024*1024)) << " Gbytes ..." << endl;
-    double* x = new double[memSz];
+
+    double* x;
+    try {
+        x = new double[memSz];
+        std::cout << "Memory allocation for " << memSz << " succeeded.\n";
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
+        exit(1);
+    }    
     //usefull work emulation 
     if(vrbs) cout << "[cpu_emu]: Threading for " << ts << " secs ..." << endl;
     if(vrbs) cout << "[cpu_emu]: Threading for " << tsms << " msecs ..." << endl;
@@ -92,13 +102,13 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
             end_time = std::chrono::high_resolution_clock::now();
             time_span = duration_cast<duration<double>>(end_time - start_time);
         }
-        delete x;
         auto tsc = time_span.count();
         if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc << " secs Done" << endl;
         if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e3 << " msecs Done" << endl;
         if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e6 << " usecs Done" << endl;
         if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e9 << " nsecs Done" << endl;
     }
+    delete x;
 }
 
 map<string,string> mymap;
