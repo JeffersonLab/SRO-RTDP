@@ -47,8 +47,12 @@ def main():
                         help="Average MB/s to send (default = 500)")
     parser.add_argument("--hwm", type=int, default=1000,
                         help="Socket high water mark (default = 1000)")
-    
+    parser.add_argument("-v", "--verbose", action="count", default=1,
+                        help="Increase verbosity level (e.g., -v, -vv, -vvv)")
+   
     args = parser.parse_args()
+    
+    VERBOSE = args.verbose
     
     context = zmq.Context()
     socket = context.socket(zmq.PUSH)
@@ -85,7 +89,7 @@ def main():
                     queue_status = "ready"
                 else:
                     queue_status = "backpressure"
-                print(f"\tQueue status: {queue_status}")
+                if VERBOSE>1 : print(f"\tQueue status: {queue_status}")
             except zmq.error.ZMQError:
                 print(f"\tQueue status: unknown")
 
