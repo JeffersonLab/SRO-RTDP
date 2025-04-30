@@ -1,5 +1,5 @@
 
-source /opt/detector/setup.sh
+source /opt/detector/epic-main/setup.sh
 source ./EICrecon/bin/eicrecon-this.sh
 source ${JANA_ROOT}/bin/jana-this.sh
 export podio_ROOT=${PWD}/podio
