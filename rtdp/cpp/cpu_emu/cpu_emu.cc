@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 #include <new> // for std::bad_alloc
 #include <cstdlib> // Required for exit()
+#include <cmath> // Needed for round()
 #include "buffer_packet.hh"
 
 using namespace std;
@@ -53,10 +54,10 @@ void   Usage()
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
 void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
-    const size_t ts(scs_GB*nmrd*1e-9); //reqd timespan in seconds
-    const size_t tsms(scs_GB*nmrd*1e-6); //reqd timespan in milliseconds
-    const size_t tsus(scs_GB*nmrd*1e-3); //reqd timespan in microseconds
-    const size_t tsns(scs_GB*nmrd);    //reqd timespan in nanoseconds
+    const float ts(scs_GB*nmrd*1e-9); //reqd timespan in seconds
+    const float tsms(scs_GB*nmrd*1e-6); //reqd timespan in milliseconds
+    const float tsus(scs_GB*nmrd*1e-3); //reqd timespan in microseconds
+    const float tsns(scs_GB*nmrd);    //reqd timespan in nanoseconds
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu]: Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu]: Allocating " << float(memSz/(1024*1024*1024)) << " Gbytes ..." << endl;
@@ -70,16 +71,17 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
         exit(1);
     }    
     //usefull work emulation 
-    if(vrbs) cout << "[cpu_emu]: Threading for " << ts << " secs ..." << endl;
-    if(vrbs) cout << "[cpu_emu]: Threading for " << tsms << " msecs ..." << endl;
-    if(vrbs) cout << "[cpu_emu]: Threading for " << tsus << " usecs ..." << endl;
-    if(vrbs) cout << "[cpu_emu]: Threading for " << tsns << " nsecs ..." << endl;
+    if(vrbs) cout << "[cpu_emu]: Threading for " << ts   << " secs ..."  << " size " << nmrd << endl;
+    if(vrbs) cout << "[cpu_emu]: Threading for " << tsms << " msecs ..." << " size " << nmrd << endl;
+    if(vrbs) cout << "[cpu_emu]: Threading for " << tsus << " usecs ..." << " size " << nmrd << endl;
+    if(vrbs) cout << "[cpu_emu]: Threading for " << tsns << " nsecs ..." << " size " << nmrd << endl;
     if(psdS) {
-        auto cms = chrono::nanoseconds(tsns);
-        if(vrbs) cout << "[cpu_emu]: Sleeping for " << ts << " secs ..." << endl;
-        if(vrbs) cout << "[cpu_emu]: Sleeping for " << tsms << " msecs ..." << endl;
-        if(vrbs) cout << "[cpu_emu]: Sleeping for " << tsus << " usecs ..." << endl;
-        if(vrbs) cout << "[cpu_emu]: Sleeping for " << tsns << " nsecs ..." << endl;
+        auto cms = chrono::nanoseconds(size_t(round(tsns)));
+        if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << ts           << " secs ..."  << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << tsms         << " msecs ..." << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << tsus         << " usecs ..." << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << tsns         << " nsecs ..." << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Sleeping for "       << cms.count()  << " nsecs ..." << " size " << nmrd << endl;
         this_thread::sleep_for(cms);
     }else{
         auto ts = (scs_GB*nmrd*1e-9);
@@ -94,19 +96,19 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
         size_t strtMem = 0;
         auto end_time = std::chrono::high_resolution_clock::now();
         duration<double> time_span = duration_cast<duration<double>>(end_time - start_time);
-        if(vrbs) cout << "[cpu_emu]: Checking " << time_span.count() << " against "<< ts  << endl;
         while (time_span.count() < ts) { 
             for (size_t i = strtMem; i<min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
             strtMem += sz1k;
             if(strtMem > memSz - sz1k) strtMem = 0;
             end_time = std::chrono::high_resolution_clock::now();
             time_span = duration_cast<duration<double>>(end_time - start_time);
+            if(vrbs) cout << "[cpu_emu]: Checking " << time_span.count() << " against "<< ts  << endl;
         }
         auto tsc = time_span.count();
-        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc << " secs Done" << endl;
-        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e3 << " msecs Done" << endl;
-        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e6 << " usecs Done" << endl;
-        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e9 << " nsecs Done" << endl;
+        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc     << " secs "  << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e3 << " msecs " << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e6 << " usecs " << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Threaded for " << tsc*1e9 << " nsecs " << " size " << nmrd << endl;
     }
     delete x;
 }
