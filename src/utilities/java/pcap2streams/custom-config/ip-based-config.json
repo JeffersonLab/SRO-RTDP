@@ -1,0 +1,38 @@
+{"connections": [
+  {
+    "port": 9000,
+    "packet_count": 220750,
+    "ip": "129.57.69.15",
+    "buffer_size": 1024,
+    "host": "localhost",
+    "read_timeout": 30000,
+    "connection_timeout": 5000
+  },
+  {
+    "port": 9001,
+    "packet_count": 266971,
+    "ip": "129.57.69.14",
+    "buffer_size": 1024,
+    "host": "localhost",
+    "read_timeout": 30000,
+    "connection_timeout": 5000
+  },
+  {
+    "port": 9002,
+    "packet_count": 583391,
+    "ip": "129.57.177.7",
+    "buffer_size": 1024,
+    "host": "localhost",
+    "read_timeout": 30000,
+    "connection_timeout": 5000
+  },
+  {
+    "port": 9003,
+    "packet_count": 95670,
+    "ip": "129.57.69.12",
+    "buffer_size": 1024,
+    "host": "localhost",
+    "read_timeout": 30000,
+    "connection_timeout": 5000
+  }
+]}
