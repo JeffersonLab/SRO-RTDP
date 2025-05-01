@@ -47,21 +47,25 @@ Modes:"\n\
     echo "\n\
 Proxy Mode Options:"\n\
     echo "  --in-port <port>     Input port for ZeroMQ (default: 55555)"\n\
-    echo "  --out-ip <ip>        Output IP address for ZeroMQ"\n\
+    echo "  -a, --out-ip <ip>    Output IP address for ZeroMQ"\n\
     echo "  --out-port <port>    Output port for ZeroMQ (default: 55556)"\n\
     echo "  -t, --test          Enable test mode with result verification"\n\
-    echo "  -d, --debug         Enable debug mode"\n\
     echo "  -r, --rate <value>  Control output/input volume ratio (default: 0.5)"\n\
     echo "  -w, --width <size>  Set GPU input matrix column size (default: 2048)"\n\
-    echo "  -s, --sqlfile <file> Specify SQL rate logger file"\n\
+    echo "  -v, --verbose       Enable verbose output with detailed monitoring"\n\
     echo "\n\
 Sender Mode Options:"\n\
-    echo "  -a, --address <ip>   Target IP address for ZeroMQ communication"\n\
-    echo "  -r, --rate <value>   Target send rate in MB/s (default: 25)"\n\
-    echo "  --group-size <size>  Group size for sending (default: 2048)"\n\
+    echo "  -a, --ip-addr <ip>  Target IP address for ZeroMQ communication"\n\
+    echo "  -p, --port <port>   Port number to send data to (default: 55555)"\n\
+    echo "  -r, --rate <value>  Target send rate in MB/s (default: 25)"\n\
+    echo "  --group-size <size> Group size for sending (default: 2048)"\n\
+    echo "  --hwm <value>      Socket high water mark (default: 1000)"\n\
+    echo "  -v, --verbose      Enable verbose output with detailed monitoring"\n\
+    echo "  --all-ones         Send all ones instead of random values"\n\
     echo "\n\
 Receiver Mode Options:"\n\
-    echo "  -v, --verbose       Enable verbose output with detailed monitoring"\n\
+    echo "  -p, --port <port>   Port number to receive data on (default: 55556)"\n\
+    echo "  -v, --verbose      Enable verbose output with detailed monitoring"\n\
     echo "\n\
 Common Options:"\n\
     echo "  -h, --help         Show this help message"\n\
