@@ -289,9 +289,11 @@
             # Send data with rate control and group size
             apptainer run ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
+                -p ${IN_PORT} \
                 -r ${SEND_RATE} \
                 --group-size ${GROUP_SIZE} \
                 --hwm ${SOCKET_HWM} \
+                -v \
                 ${SEND_ALL_ONES:+--all-ones} \
                 2>${LOG_DIR}/sender/apptainer.log
             
