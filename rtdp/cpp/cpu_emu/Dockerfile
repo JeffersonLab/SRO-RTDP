@@ -9,14 +9,23 @@ RUN apt-get update && apt-get install -y \
     libyaml-cpp-dev \
     libyaml-dev \
     time \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip3 install pyzmq
 
 # Set working directory
 WORKDIR /app
 
 # Copy source files
 COPY cpu_emu.cc .
+COPY buffer_packet.hh .
 COPY zmq-event-clnt.cc .
+COPY buffer_packet_zmq_emu.py .
+COPY launcher_py_cpu_emu.py .
+COPY simulate_sender-zmq-emu.py .
 
 # Build cpu_emu
 RUN g++ -o cpu_emu cpu_emu.cc -lzmq -lyaml-cpp -lyaml -pthread
@@ -47,13 +56,17 @@ case "$MODE" in
         fi
         ;;
     sender)
-        exec ./zmq-event-clnt "$@"
+        exec python3 simulate_sender-zmq-emu.py "$@"
+        ;;
+    launcher)
+        exec python3 launcher_py_cpu_emu.py "$@"
         ;;
     *)
-        echo "Usage: $0 {emulator|receiver|sender} [options]"
+        echo "Usage: $0 {emulator|receiver|sender|launcher} [options]"
         echo "  emulator: ./cpu_emu [options]"
         echo "  receiver: ./cpu_emu -z [options] or ./cpu_emu -y <yaml> (with terminal: 1)"
-        echo "  sender:   ./zmq-event-clnt -i <ip> -p <port> [-c <count>] [-s <size>]"
+        echo "  sender:   python3 simulate_sender-zmq-emu.py [options]"
+        echo "  launcher: python3 launcher_py_cpu_emu.py [options]"
         exit 1
         ;;
 esac
@@ -63,7 +76,7 @@ EOF
 RUN chmod +x /app/entrypoint.sh
 
 # Expose default ports
-EXPOSE 8888 5555
+EXPOSE 55555-55600
 
 # Set entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"] 
