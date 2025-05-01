@@ -81,7 +81,7 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
         if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << tsms         << " msecs ..." << " size " << nmrd << endl;
         if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << tsus         << " usecs ..." << " size " << nmrd << endl;
         if(vrbs) cout << "[cpu_emu]: Sleep_Threaded for " << tsns         << " nsecs ..." << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu]: Sleeping for "       << cms.count()  << " nsecs ..." << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu]: Sleeping for "       << float(cms.count())/float(1e6)  << " msecs ..." << " size " << nmrd << endl;
         this_thread::sleep_for(cms);
     }else{
         auto ts = (scs_GB*nmrd*1e-9);
