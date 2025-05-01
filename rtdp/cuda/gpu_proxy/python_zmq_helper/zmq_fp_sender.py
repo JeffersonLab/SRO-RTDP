@@ -20,7 +20,7 @@ Dependencies:
 
 Author: ChatGPT, Cissie
 Check-in: 2025-03-10
-Last update: 2025-03-31
+Last update: 2025-04-24
 """
 
 import zmq
@@ -45,15 +45,22 @@ def main():
     parser.add_argument("-r",
                         "--rate", type=float, default=500.0,
                         help="Average MB/s to send (default = 500)")
-    
+    parser.add_argument("--hwm", type=int, default=1000,
+                        help="Socket high water mark (default = 1000)")
+    parser.add_argument("-v", "--verbose", action="count", default=1,
+                        help="Increase verbosity level (e.g., -v, -vv, -vvv)")
+   
     args = parser.parse_args()
+    
+    VERBOSE = args.verbose
     
     context = zmq.Context()
     socket = context.socket(zmq.PUSH)
-    socket.setsockopt(zmq.SNDHWM, 1000)  # set send high-water mark to 1000 messages
+    socket.setsockopt(zmq.SNDHWM, args.hwm)  # set send high-water mark
     socket.connect(f"tcp://{args.ip_addr}:{args.port}")
     
     print(f"Sending data to {args.ip_addr}:{args.port} {'(all ones)' if args.all_ones else '(random values)'}")
+    print(f"Socket HWM: {args.hwm}")
 
     if args.rate > 0:
         print(f"Target send rate: {args.rate} MB/s\n")
@@ -66,27 +73,45 @@ def main():
         print(f"--rate should be a positive number!!!")
         exit(-1)
 
-    next_send_time = time.perf_counter()
-
     try:
         while True:
-            start = time.time()
+            cycle_start = time.time()
             if args.all_ones:
                 data = np.ones(args.group_size, dtype=np.float32)
             else:
                 data = np.random.rand(args.group_size).astype(np.float32)
 
-            socket.send(data.tobytes())  # blocks until all data is sent
-            duration = time.time() - start  # data is handled to ZMQ queue but not fully sent out
+            # Get queue status before send
+            try:
+                # Check if socket is ready to send
+                events = socket.getsockopt(zmq.EVENTS)
+                if events & zmq.POLLOUT:
+                    queue_status = "ready"
+                else:
+                    queue_status = "backpressure"
+                if VERBOSE>1 : print(f"\tQueue status: {queue_status}")
+            except zmq.error.ZMQError:
+                print(f"\tQueue status: unknown")
 
-            remaining = 1.0 - duration
+            socket.send(data.tobytes())  # blocks until all data is sent
+            send_duration = time.time() - cycle_start  # data is handled to ZMQ queue but not fully sent out
+
+            remaining = interval - send_duration
             if remaining > 0:
-                print(f"\tSent {data.nbytes / 1e6} MB, ",
-                    f"curr_send_rate={max(args.rate, data.nbytes / (duration * 1e6))} MB/s, duration={duration * 1000} ms")
-                print(f"\tSleep for {remaining * 1000} ms...\n")
+                sleep_start = time.time()
                 time.sleep(remaining)
+                sleep_duration = time.time() - sleep_start
+                total_duration = send_duration + sleep_duration
+                avg_rate = data.nbytes / (total_duration * 1e6)
+                print(f"\tSent {data.nbytes / 1e6} MB, "
+                    f"curr_send_rate={avg_rate:.2f} MB/s, "
+                    f"send_duration={send_duration * 1000:.2f} ms, "
+                    f"sleep_duration={sleep_duration * 1000:.2f} ms, "
+                    f"total_duration={total_duration * 1000:.2f} ms")
             else:
-                print(f"\tSent {data.nbytes / 1e6} MB, curr_send_rate={data.nbytes / (duration * 1e6)} MB/s, duration={duration * 1000} ms")
+                print(f"\tSent {data.nbytes / 1e6} MB, "
+                    f"curr_send_rate={data.nbytes / (send_duration * 1e6):.2f} MB/s, "
+                    f"send_duration={send_duration * 1000:.2f} ms")
 
     except KeyboardInterrupt:
         print("\nTerminating sender.")

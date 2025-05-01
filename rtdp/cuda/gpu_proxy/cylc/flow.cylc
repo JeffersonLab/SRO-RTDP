@@ -37,11 +37,17 @@
             # Network configuration
             IN_PORT = "55555"
             OUT_PORT = "55556"
+            # NIC and GPU_NIC are optional - if not provided, use default interface
+            NIC = "${NIC:-$(ip route | grep default | awk '{print $5}')}"        # Default to system's default interface
+            GPU_NIC = "${GPU_NIC:-$(ip route | grep default | awk '{print $5}')}"    # Default to system's default interface
             
             # Matrix configuration
-            MATRIX_WIDTH = "2048"  # Default GPU input matrix column size
-            SEND_RATE = "25"       # Default send rate in MB/s
-            GROUP_SIZE = "2048"    # Default group size for sending
+            MATRIX_WIDTH = "2048"  # GPU input matrix column size
+            SEND_RATE = "150"      # Target send rate in MB/s (testing fixed rate control)
+            GROUP_SIZE = "30720000"    # Group size to achieve 150 MB/s (30720000 * 4 bytes = 150 MB)
+            PROXY_RATE = "1.0"     # Proxy processing rate (1.0 means no throttling)
+            SEND_ALL_ONES = "0"    # Set to 1 to send all ones, 0 for random values
+            SOCKET_HWM = "1"      # Socket high water mark (testing minimal buffering)
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
@@ -58,6 +64,12 @@
             exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
             
             # Check if port is already in use
             if netstat -tuln | grep -q ":${OUT_PORT}"; then
@@ -69,8 +81,8 @@
             # Store hostname for other tasks
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
             HOSTNAME=$(hostname -f)  # Use fully qualified hostname
-            IP=$(hostname -i | awk '{print $1}')  # Use first IP if multiple
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from specified NIC
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
             
@@ -170,6 +182,15 @@
             exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - GPU_NIC: ${GPU_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
+            echo "  - PROXY_RATE: ${PROXY_RATE}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
             
             # Get receiver information
             RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
@@ -177,10 +198,10 @@
             
             # Store hostname for sender
             HOSTNAME=$(hostname)
-            IP=$(hostname -i)
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
+            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from GPU NIC
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
             
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
@@ -193,6 +214,7 @@
                 --out-port ${OUT_PORT} \
                 -t \
                 -w ${MATRIX_WIDTH} \
+                -r ${PROXY_RATE} \
                 2>${LOG_DIR}/proxy/apptainer.log &
             
             PROXY_PID=$!
@@ -246,20 +268,31 @@
             exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - SEND_RATE: ${SEND_RATE} MB/s"
+            echo "  - GROUP_SIZE: ${GROUP_SIZE}"
+            echo "  - SEND_ALL_ONES: ${SEND_ALL_ONES}"
+            echo "  - SOCKET_HWM: ${SOCKET_HWM}"
+            echo "  - INPUT_DIR: ${INPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
             
             # Get proxy information
             PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Proxy IP: ${PROXY_IP}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT} (using NIC ${NIC})"
             
             # Create input directory
             mkdir -p ${INPUT_DIR}
             
             # Send data with rate control and group size
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT}"
             apptainer run ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
                 -r ${SEND_RATE} \
                 --group-size ${GROUP_SIZE} \
+                --hwm ${SOCKET_HWM} \
+                ${SEND_ALL_ONES:+--all-ones} \
                 2>${LOG_DIR}/sender/apptainer.log
             
             SEND_STATUS=$?
