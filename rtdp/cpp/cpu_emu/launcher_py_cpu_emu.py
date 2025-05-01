@@ -1,7 +1,7 @@
 # launcher_py_cpu_emu.py
 # To Run the Full Simulation
 
-#   python launcher_py_cpu_emu.py --components 5 --base-port 6000 --avg-rate 50 --rms 0.3 --duty 0.7 --nic 100
+#   python launcher_py_cpu_emu.py --components 5 --base-port 55555 --avg-rate 50 --rms 0.3 --duty 0.7 --nic 100
 
 import subprocess
 import argparse
@@ -16,7 +16,7 @@ def launch_component(index, base_port, avg_rate, rms, duty, nic):
     subprocess.Popen([
         "./cpu_emu",
         "-i", str("127.0.0.1"),
-        "-r", str(6000),
+        "-r", str(recv_port),
         "-s",
         "-x",
         "-z",
@@ -26,19 +26,19 @@ def launch_component(index, base_port, avg_rate, rms, duty, nic):
     ])
     time.sleep(0.05)  # Slight delay to avoid race conditions
 
-    print(f"[launcher_py_cpu_emu] Starting simulate_sender-zmq-emu.py #{index} on port {6000}...")
+    print(f"[launcher_py_cpu_emu] Starting simulate_sender-zmq-emu.py #{index} on port {recv_port}...")
     subprocess.Popen(["python", "simulate_sender-zmq-emu.py",
-        "--port", str(6000),
-        "--avg-rate-mbps", str(50),
-        "--rms-fraction", str(0.3),
-        "--duty-cycle", str(0.7),
-        "--nic-limit-gbps", str(100)
+        "--port", str(recv_port),
+        "--avg-rate-mbps", str(avg_rate),
+        "--rms-fraction", str(rms),
+        "--duty-cycle", str(duty),
+        "--nic-limit-gbps", str(nic)
     ])
 
 def main():
     parser = argparse.ArgumentParser(description="Launcher for simulation components")
     parser.add_argument("--components", type=int, default=50, help="Number of components to simulate")
-    parser.add_argument("--base-port", type=int, default=5000, help="Base port number")
+    parser.add_argument("--base-port", type=int, default=55555, help="Base port number")
     parser.add_argument("--avg-rate", type=float, default=10, help="Average rate in Mbps per component")
     parser.add_argument("--rms", type=float, default=0.1, help="RMS fraction")
     parser.add_argument("--duty", type=float, default=1.0, help="Duty cycle")
