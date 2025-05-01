@@ -41,12 +41,12 @@ void   Usage()
         -o output size in GB  \n\
         -p destination port (default = 8888)  \n\
         -r receive port (default = 8888)  \n\
-        -s sleep versus burn cpu  \n\
+        -s sleep versus burn cpu = 0/1 (default = false = 0)  \n\
         -t num threads (default = 10)  \n\
-        -x run in sim mode  \n\
+        -v verbose = 0/1 (default = false = 0)  \n\
+        -x run in sim mode = 0/1 (default = false = 0)  \n\
         -y yaml config file  \n\
-        -z act as terminal node  \n\
-        -v verbose (= 0/1 - default = false (0))  \n\n";
+        -z act as terminal node = 0/1 (default = false = 0)  \n\n";
 
     cout << "[cpu_emu]: " << usage_str;
 }
