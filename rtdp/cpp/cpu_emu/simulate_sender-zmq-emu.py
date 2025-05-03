@@ -21,38 +21,51 @@ def simulate_stream(
     print(f"[simulate_stream:] rms_fraction = {rms_fraction}...")
     print(f"[simulate_stream:] duty_cycle = {duty_cycle}...")
     print(f"[simulate_stream:] nic_limit_gbps = {nic_limit_gbps}...")
+
     context = zmq.Context()
-    socket = context.socket(zmq.PUSH)
-    socket.connect(f"tcp://localhost:{port}")
+    zmq_socket = context.socket(zmq.PUSH)
+    zmq_socket.connect(f"tcp://localhost:{port}")
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
     nic_limit_bps = nic_limit_gbps * 1_000_000_000
     chunk_size_mean = avg_rate_bps / 100  # Send in 100 chunks per second
+    std_dev = chunk_size_mean * rms_fraction
+    print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, chunk_size_mean(MB) = {chunk_size_mean/1e6}, std_dev(MB) = {std_dev/1e6}")
     
-    sleep_interval = 1 / 100  # 100 messages/sec as baseline
-    
+    cycle_period = 1.0  # seconds
+    on_time = duty_cycle * cycle_period
+    off_time = cycle_period - on_time
+    print(f"[simulate_stream:] duty_cycle = {duty_cycle}, cycle_period = {cycle_period}, on_time = {on_time}, off_time = {off_time}")
+    num_sent = 0
+    start_time = time.time()
     while True:
-        # Calculate chunk size from normal distribution
-        if rms_fraction > 0:
-            std_dev = chunk_size_mean * rms_fraction
-            chunk_size = max(1, int(np.random.normal(chunk_size_mean, std_dev)))
-        else:
-            chunk_size = int(chunk_size_mean)
-        
-        buffer = serialize_buffer(size=chunk_size, timestamp=0, stream_id=99) #time.time()
-        
-        # Simulate network interface bottleneck
-        send_time = chunk_size * 8 / nic_limit_bps  # seconds to send this chunk at NIC limit
-        
+        # -----------------------
+        # ON phase: Send data
+        # -----------------------
+        print(f"[simulate_stream:] Sending for {on_time:.3f}s (duty cycle on phase)")
+        start_on = time.time()
+        print(f"[simulate_stream:] Times: current {time.time()}, time.time() - start_on {time.time() - start_on}, on_time {on_time}")
+        while time.time() - start_on < on_time:
+            # Calculate chunk size from normal distribution
+            if rms_fraction > 0:
+                chunk_size = max(1, int(np.random.normal(chunk_size_mean, std_dev)))
+            else:
+                chunk_size = int(chunk_size_mean)
+            buffer = serialize_buffer(size=chunk_size, timestamp=time.time(), stream_id=99) #time.time()
+            print(f"[simulate_stream:] Sending buffer; size = {chunk_size}")
+            zmq_socket.send(buffer)
+            # Simulate transmission delay
+            td = chunk_size/nic_limit_bps
+            print(f"[simulate_stream:] Simulate transmission delay of {td}")
+            time.sleep(td)
+            num_sent = num_sent + 1
+
+        print(f"[simulate_stream:] Estimated send rate (Mbps): {(1e-6*num_sent*(4+8+4)*10)/(time.time() - start_time)} num_sent {num_sent}")
         # Apply duty cycle
-        on_time = duty_cycle * sleep_interval
-        off_time = sleep_interval - on_time
-        
-        print(f"[simulate_stream:] Sending buffer; size = {chunk_size}, send_time = {send_time}, on_time = {off_time}, off_time = {off_time}")
-        socket.send(buffer)
-        time.sleep(max(send_time, on_time))  # Sleep to simulate actual NIC delay
         if off_time > 0:
+            print(f"[simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
             time.sleep(off_time)
+        print(f"[simulate_stream:] Back from sleep")
 
 
 if __name__ == "__main__":
