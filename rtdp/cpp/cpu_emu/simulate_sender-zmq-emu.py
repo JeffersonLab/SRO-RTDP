@@ -30,7 +30,7 @@ def simulate_stream(
     nic_limit_bps = nic_limit_gbps * 1_000_000_000
     chunk_size_mean = avg_rate_bps / 100  # Send in 100 chunks per second
     std_dev = chunk_size_mean * rms_fraction
-    print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, chunk_size_mean(MB) = {chunk_size_mean/1e6}, std_dev(MB) = {std_dev/1e6}")
+    print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, chunk_size_mean(Mb) = {chunk_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
     
     cycle_period = 1.0  # seconds
     on_time = duty_cycle * cycle_period
@@ -60,7 +60,7 @@ def simulate_stream(
             time.sleep(td)
             num_sent = num_sent + 1
 
-        print(f"[simulate_stream:] Estimated send rate (Mbps): {(1e-6*num_sent*(4+8+4)*10)/(time.time() - start_time)} num_sent {num_sent}")
+        print(f"[simulate_stream:] Estimated send rate (Gbps): {1e-9*num_sent*chunk_size_mean/(time.time() - start_time)} num_sent {num_sent}")
         # Apply duty cycle
         if off_time > 0:
             print(f"[simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
