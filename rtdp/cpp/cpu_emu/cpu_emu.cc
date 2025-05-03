@@ -65,9 +65,9 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
     double* x;
     try {
         x = new double[memSz];
-        std::cout << "Memory allocation for " << memSz << " succeeded.\n";
+        if(vrbs) std::cout << "Memory allocation for " << memSz << " succeeded.\n";
     } catch (const std::bad_alloc& e) {
-        std::cerr << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
+        if(vrbs) std::cerr << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
         exit(1);
     }    
     //usefull work emulation 
