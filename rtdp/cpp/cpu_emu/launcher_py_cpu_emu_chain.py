@@ -19,7 +19,7 @@ def launch_component(index, ref_port):
             "-p", str(ref_port + index - 1),
             "-s", str(1),
             "-x", str(1),
-            "-v", str(1),
+            "-v", str(0),
             "-m", str(1),        
             "-t", str(1)        
         ])
@@ -32,7 +32,7 @@ def launch_component(index, ref_port):
             "-s", str(1),
             "-x", str(1),
             "-z", str(1),
-            "-v", str(1),
+            "-v", str(0),
             "-m", str(1),        
             "-t", str(1)        
         ])
@@ -49,6 +49,8 @@ def main():
     parser.add_argument("--duty", type=float, default=1.0, help="Duty cycle")
     parser.add_argument("--nic", type=float, default=100.0, help="NIC bandwidth in Gbps")
     args = parser.parse_args()
+
+    print(f"[launcher_py_cpu_emu] Starting simulate_sender-zmq-emu.py with args {args.components}, {args.base_port}, {args.avg_rate}, {args.rms}, {args.duty}, {args.nic}")
 
     for i in range(args.components, 0, -1):
         print(f"[launcher_py_cpu_emu: main:] launch_component #{i} with ref_port = {args.base_port + args.components}")
