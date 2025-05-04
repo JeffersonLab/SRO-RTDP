@@ -256,13 +256,12 @@
             
             # Start sender with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
-            apptainer run --pwd /app ${SIF_FILE} launcher \
-                --components ${COMPONENTS} \
-                --base-port ${BASE_PORT} \
-                --avg-rate ${AVG_RATE} \
-                --rms ${RMS} \
-                --duty ${DUTY} \
-                --nic ${NIC} \
+            apptainer run --pwd /app ${SIF_FILE} sender \
+                --port ${BASE_PORT} \
+                --avg-rate-mbps ${AVG_RATE} \
+                --rms-fraction ${RMS} \
+                --duty-cycle ${DUTY} \
+                --nic-limit-gbps ${NIC} \
                 2>${LOG_DIR}/sender/apptainer.log
             
             # Check if sender process completed successfully

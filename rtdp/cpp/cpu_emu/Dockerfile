@@ -13,8 +13,11 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
+# Create python symlink
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
 # Install Python dependencies
-RUN pip3 install pyzmq
+RUN pip3 install pyzmq numpy
 
 # Set working directory
 WORKDIR /app
