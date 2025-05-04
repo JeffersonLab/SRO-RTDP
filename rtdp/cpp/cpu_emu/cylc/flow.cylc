@@ -191,7 +191,6 @@
                 -r ${BASE_PORT} \
                 -s \
                 -x \
-                -z \
                 -v ${VERBOSE} \
                 -m ${MEM_FOOTPRINT} \
                 -t ${THREADS} \
