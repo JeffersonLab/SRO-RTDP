@@ -187,7 +187,7 @@
             # Start CPU emulator with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
             apptainer run --pwd /app ${SIF_FILE} emulator \
-                -i ${RECV_IP} \
+                -i ${IP} \
                 -r ${BASE_PORT} \
                 -s \
                 -x \
@@ -257,6 +257,7 @@
             # Start sender with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
             apptainer run --pwd /app ${SIF_FILE} sender \
+                --host ${EMU_IP} \
                 --port ${BASE_PORT} \
                 --avg-rate-mbps ${AVG_RATE} \
                 --rms-fraction ${RMS} \

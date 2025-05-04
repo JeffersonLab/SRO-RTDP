@@ -10,12 +10,14 @@ import numpy as np
 from buffer_packet_zmq_emu import serialize_buffer
 
 def simulate_stream(
+    host: str,
     port: int,
     avg_rate_mbps: float,
     rms_fraction: float,
     duty_cycle: float,
     nic_limit_gbps: float
 ):
+    print(f"[simulate_stream:] host = {host}...")
     print(f"[simulate_stream:] port = {port}...")
     print(f"[simulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
     print(f"[simulate_stream:] rms_fraction = {rms_fraction}...")
@@ -23,7 +25,7 @@ def simulate_stream(
     print(f"[simulate_stream:] nic_limit_gbps = {nic_limit_gbps}...")
     context = zmq.Context()
     socket = context.socket(zmq.PUSH)
-    socket.connect(f"tcp://localhost:{port}")
+    socket.connect(f"tcp://{host}:{port}")
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
     nic_limit_bps = nic_limit_gbps * 1_000_000_000
@@ -58,6 +60,7 @@ def simulate_stream(
 if __name__ == "__main__":
     print(f"[simulate_sender-zmq-emu: main:]")
     parser = argparse.ArgumentParser(description="Simulated data sender using ZeroMQ")
+    parser.add_argument("--host", type=str, default="localhost", help="Host to connect to")
     parser.add_argument("--port", type=int, required=True, help="Port to connect to")
     parser.add_argument("--avg-rate-mbps", type=float, required=True, help="Average data rate in Mbps")
     parser.add_argument("--rms-fraction", type=float, default=0.0, help="RMS of chunk sizes as fraction of average")
@@ -67,6 +70,7 @@ if __name__ == "__main__":
 
     print(f"[simulate_sender-zmq-emu: main:] simulate_stream...")
     simulate_stream(
+        args.host,
         args.port,
         args.avg_rate_mbps,
         args.rms_fraction,
