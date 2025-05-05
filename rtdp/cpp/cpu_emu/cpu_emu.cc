@@ -375,7 +375,7 @@ int main (int argc, char *argv[])
             send_result_t sr;
             if(psdX) {
                 BufferPacket pkt;
-                pkt.size = outSz;
+                pkt.size = outSz;   //represents harvested data
                 pkt.timestamp = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
                 pkt.stream_id = stream_id;
 	        // Send "event" spec
@@ -384,7 +384,7 @@ int main (int argc, char *argv[])
                 if(sr.value() != pkt.PACKET_SIZE) cerr << "Destination data incorrect size" << endl;
             } else {
 	        // Send  "event"
-                message_t dst_msg(outSz); //harvested data
+                message_t dst_msg(outSz);  //represents harvested data
                 sr = dst_sckt.send(dst_msg, send_flags::none);
                 if(vrbs) cout << "[cpu_emu]: output Num written " << sr.value()  << endl;
                 if(sr.value() != outSz) cerr << "Destination data incorrect size" << endl;
