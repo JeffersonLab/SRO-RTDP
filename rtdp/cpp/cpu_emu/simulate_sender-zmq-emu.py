@@ -56,7 +56,7 @@ def simulate_stream(
             zmq_socket.send(buffer)
             # Simulate transmission delay
             td = chunk_size/nic_limit_bps
-            print(f"[simulate_stream:] Simulate transmission delay of {td}")
+            print(f"[simulate_stream:] Simulate transmission delay (usecs) of {1e6*td}")
             time.sleep(td)
             num_sent = num_sent + 1
 
