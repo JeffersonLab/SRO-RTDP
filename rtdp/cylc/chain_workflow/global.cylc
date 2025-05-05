@@ -11,4 +11,4 @@
 [install]
     [[symlink dirs]]
         [[[localhost]]]
-            run = /home/tsai/jeng
+            run = /home/tsai/jeng 
