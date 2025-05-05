@@ -29,7 +29,7 @@ check_executable() {
 check_file() {
     if [ ! -f "$1" ]; then
         echo "Error: $1 does not exist"
-        echo "Please ensure the PCAP file is placed in /scratch/vscode/"
+        echo "Please ensure the PCAP file is placed in /scratch/jeng-yuantsai/"
         echo "And the directory is properly mounted in the devcontainer"
         echo "See README.md for mounting instructions"
         exit 1
@@ -38,8 +38,8 @@ check_file() {
 
 # Function to list available PCAP files
 list_pcap_files() {
-    echo "Available PCAP files in /scratch/vscode/:"
-    ls -l /scratch/vscode/*.pcap 2>/dev/null || echo "No PCAP files found"
+    echo "Available PCAP files in /scratch/jeng-yuantsai/:"
+    ls -l /scratch/jeng-yuantsai/*.pcap 2>/dev/null || echo "No PCAP files found"
 }
 
 echo "Checking prerequisites..."
@@ -48,26 +48,26 @@ echo "Checking prerequisites..."
 check_command "jq"
 
 # Check for pcap2streams directory and run script
-PCAP2STREAMS_DIR="/workspaces/ersap-actors/src/utilities/java/pcap2streams"
+PCAP2STREAMS_DIR="/workspaces/SRO-RTDP/src/utilities/java/pcap2streams"
 RUN_SCRIPT="$PCAP2STREAMS_DIR/scripts/run_pcap2streams.sh"
 check_executable "$RUN_SCRIPT"
 
 # Check if PCAP directory is mounted
-if [ ! -d "/scratch/vscode" ]; then
-    echo "Error: /scratch/vscode directory is not mounted"
+if [ ! -d "/scratch/jeng-yuantsai" ]; then
+    echo "Error: /scratch/jeng-yuantsai directory is not mounted"
     echo "Please add the following to your .devcontainer/devcontainer.json:"
     echo '{
         "mounts": [
-            "source=/scratch/vscode,target=/scratch/vscode,type=bind,consistency=cached"
+            "source=/scratch/jeng-yuantsai,target=/scratch/jeng-yuantsai,type=bind,consistency=cached"
         ]
     }'
     exit 1
 fi
 
 # Allow PCAP file selection if multiple files exist
-PCAP_FILES=($(ls /scratch/vscode/*.pcap 2>/dev/null))
+PCAP_FILES=($(ls /scratch/jeng-yuantsai/*.pcap 2>/dev/null))
 if [ ${#PCAP_FILES[@]} -eq 0 ]; then
-    echo "Error: No PCAP files found in /scratch/vscode/"
+    echo "Error: No PCAP files found in /scratch/jeng-yuantsai/"
     echo "Please place your PCAP files in this directory"
     exit 1
 elif [ ${#PCAP_FILES[@]} -eq 1 ]; then
@@ -95,7 +95,7 @@ export LD_LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
 
 # Build and install the PCAP actors
 echo "Building and installing PCAP actors..."
-PCAP_ACTORS_DIR="/workspaces/ersap-actors/src/utilities/java/ersap-pcap/pcap-actors"
+PCAP_ACTORS_DIR="/workspaces/SRO-RTDP/src/utilities/java/ersap-pcap/pcap-actors"
 cd "$PCAP_ACTORS_DIR"
 ./gradlew clean build
 ERSAP_HOME=$ERSAP_HOME ./gradlew install
