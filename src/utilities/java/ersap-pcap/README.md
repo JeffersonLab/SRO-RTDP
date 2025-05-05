@@ -34,7 +34,7 @@ The container will build and set up the environment automatically, including:
 After the container is ready, install the ERSAP Java framework:
 
 ```bash
-cd /workspaces/ersap-actors/src/utilities/java
+cd /workspaces/SRO-RTDP/src/utilities/java
 chmod +x build_ersap-java.sh
 ./build_ersap-java.sh
 ```
@@ -50,25 +50,25 @@ The script will:
 Finally, install the PCAP pipeline:
 
 ```bash
-cd ersap-pcap
+cd /workspaces/SRO-RTDP/src/utilities/java/ersap-pcap
 chmod +x scripts/install_pcap_pipeline.sh
 ./scripts/install_pcap_pipeline.sh
 ```
 
 ### 4. Access PCAP Files
 
-The pipeline expects PCAP files to be accessible in the `/scratch/vscode/` directory. To make your PCAP files accessible:
+The pipeline expects PCAP files to be accessible in the `/scratch/jeng-yuantsai/` directory. To make your PCAP files accessible:
 
 1. Mount your PCAP files directory in the devcontainer by adding the following to your `.devcontainer/devcontainer.json`:
 ```json
 {
     "mounts": [
-        "source=/scratch/vscode,target=/scratch/vscode,type=bind,consistency=cached"
+        "source=/scratch/jeng-yuantsai,target=/scratch/jeng-yuantsai,type=bind,consistency=cached"
     ]
 }
 ```
 
-2. Place your PCAP files in the `/scratch/vscode/` directory on your host machine.
+2. Place your PCAP files in the `/scratch/jeng-yuantsai/` directory on your host machine.
 
 3. The pipeline will automatically look for PCAP files in this location when running `run_pcap_pipeline.sh`.
 
@@ -79,6 +79,7 @@ The pipeline expects PCAP files to be accessible in the `/scratch/vscode/` direc
 Before running the full pipeline, you can test the setup using the test script:
 
 ```bash
+cd /workspaces/SRO-RTDP/src/utilities/java/ersap-pcap
 ./scripts/test_pcap2streams.sh
 ```
 
@@ -92,6 +93,7 @@ This script will:
 To run the full PCAP pipeline:
 
 ```bash
+cd /workspaces/SRO-RTDP/src/utilities/java/ersap-pcap
 ./scripts/run_pcap_pipeline.sh
 ```
 
