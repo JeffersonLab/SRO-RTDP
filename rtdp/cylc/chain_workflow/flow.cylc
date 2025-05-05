@@ -129,7 +129,7 @@
             
             # Start GPU proxy
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
-            apptainer run --pwd /app ${GPU_PROXY_SIF} -a ${RECV_IP} -v 2>${LOG_DIR}/gpu_proxy/apptainer.log &
+            apptainer run --pwd /app ${GPU_PROXY_SIF} proxy -a ${RECV_IP} -v 2>${LOG_DIR}/gpu_proxy/apptainer.log &
             
             GPU_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${GPU_PID}"
@@ -256,13 +256,14 @@
             CPU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/cpu_emu_ip)
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator IP: ${CPU_IP}"
             
-            # Start sender
+            # Start sender using GPU proxy's sender
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender"
-            apptainer run --pwd /app ${CPU_EMU_SIF} sender \
-                -i ${CPU_IP} \
-                -r ${BASE_PORT} \
+            apptainer run --pwd /app ${GPU_PROXY_SIF} sender \
+                -a ${CPU_IP} \
                 -p ${BASE_PORT} \
-                -v ${VERBOSE} \
+                -r 25 \
+                --group-size 2048 \
+                -v \
                 2>${LOG_DIR}/sender/apptainer.log
             
             # Check final status
