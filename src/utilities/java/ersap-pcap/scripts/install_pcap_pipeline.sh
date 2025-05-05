@@ -3,11 +3,15 @@
 # Exit on error
 set -e
 
-# Function to check if a command exists
-check_command() {
-    if ! command -v $1 &> /dev/null; then
-        echo "Error: $1 is not installed"
-        echo "Please install $1 and try again"
+# Function to check if a file exists and is executable
+check_executable() {
+    if [ ! -f "$1" ]; then
+        echo "Error: $1 does not exist"
+        exit 1
+    fi
+    if [ ! -x "$1" ]; then
+        echo "Error: $1 is not executable"
+        echo "Please make it executable with: chmod +x $1"
         exit 1
     fi
 }
@@ -22,9 +26,6 @@ check_directory() {
 
 echo "Checking prerequisites..."
 
-# Check for required commands
-check_command "gradle"
-
 # Set ERSAP_HOME to match build_ersap-java.sh
 export ERSAP_HOME=$HOME/ersap-install
 
@@ -36,6 +37,9 @@ echo "Installing PCAP pipeline..."
 # Set the absolute path to pcap-actors directory
 PCAP_ACTORS_DIR="/workspaces/SRO-RTDP/src/utilities/java/ersap-pcap/pcap-actors"
 check_directory "$PCAP_ACTORS_DIR"
+
+# Check if gradlew exists and is executable
+check_executable "$PCAP_ACTORS_DIR/gradlew"
 
 # Build and install the pcap-actors
 cd "$PCAP_ACTORS_DIR"
