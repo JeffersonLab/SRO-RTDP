@@ -141,7 +141,7 @@ void parse_yaml(const char *filename, bool vrbs=false) {
     lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
     lbls.push_back("terminal"); lbls.push_back("sim_mode");
     
-auto it = lbls.begin(); //a hack to get the type
+    auto it = lbls.begin(); //a hack to get the type
 
     while (yaml_parser_parse(&parser, &event)) {
         switch (event.type) {
@@ -356,13 +356,33 @@ int main (int argc, char *argv[])
         //  Do some 'work'
         //load (or emulate load on) system with ensuing work
 
-        vector<thread> threads;
+        if (psdX) {
+            //sleep to simulate cpu work
+            const float tsns(scs_GB*bufSiz);    //reqd timespan in nanoseconds
+            auto cms = chrono::nanoseconds(size_t(round(tsns)));
 
-        for (int i=1; i<=nmThrds; ++i)  //start the threads
-            threads.push_back(thread(func, bufSiz, scs_GB, memGB, psdS, vrbs));
+            // Record start time
+            auto start = high_resolution_clock::now();
 
-        for (auto& th : threads) th.join();
-        if(vrbs) cout << "[cpu_emu]: synchronized all threads..." << endl;
+            this_thread::sleep_for(cms);
+
+            // Record end time
+            auto end = high_resolution_clock::now();
+
+            // Compute duration in seconds
+            duration<double> elapsed = end - start;
+
+            if(vrbs) std::cout << "[cpu_emu]: Sim Slept for " << elapsed.count() << " seconds." << std::endl;
+
+        } else {//parse recvd message to get simlated data size recvd
+            vector<thread> threads;
+
+            for (int i=1; i<=nmThrds; ++i)  //start the threads
+                threads.push_back(thread(func, bufSiz, scs_GB, memGB, psdS, vrbs));
+
+            for (auto& th : threads) th.join();
+            if(vrbs) cout << "[cpu_emu]: synchronized all threads..." << endl;
+        }
 
         if(!psdZ) {
             if(vrbs) cout << "[cpu_emu]: Forwarding "
@@ -380,6 +400,7 @@ int main (int argc, char *argv[])
                 pkt.stream_id = stream_id;
 	        // Send "event" spec
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
+                //simulate netwrok transmission latency
                 if(vrbs) cout << "[cpu_emu]: output Num written " << sr.value()  << endl;
                 if(sr.value() != pkt.PACKET_SIZE) cerr << "Destination data incorrect size" << endl;
             } else {
