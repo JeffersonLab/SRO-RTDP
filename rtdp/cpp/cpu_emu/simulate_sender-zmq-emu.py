@@ -62,11 +62,12 @@ def simulate_stream(
 
         print(f"[simulate_stream:] Estimated send rate (Gbps): {1e-9*num_sent*chunk_size_mean/(time.time() - start_time)} num_sent {num_sent}")
         # Apply duty cycle
+        # -----------------------
+        # OFF phase: Sleep
+        # -----------------------
         if off_time > 0:
             print(f"[simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
             time.sleep(off_time)
-        print(f"[simulate_stream:] Back from sleep")
-
 
 if __name__ == "__main__":
     print(f"[simulate_sender-zmq-emu: main:]")
