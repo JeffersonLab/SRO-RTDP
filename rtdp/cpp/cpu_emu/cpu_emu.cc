@@ -52,12 +52,12 @@ void   Usage()
 }
 
 // Computational Function to emulate/stimulate processimng load/latency, etc. 
-void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false) 
+void func(size_t nmrd, size_t cmpLt_GB, double memGB, bool psdS, bool vrbs=false) 
 { 
-    const float ts(scs_GB*nmrd*1e-9); //reqd timespan in seconds
-    const float tsms(scs_GB*nmrd*1e-6); //reqd timespan in milliseconds
-    const float tsus(scs_GB*nmrd*1e-3); //reqd timespan in microseconds
-    const float tsns(scs_GB*nmrd);    //reqd timespan in nanoseconds
+    const float ts(cmpLt_GB*nmrd*1e-9); //reqd timespan in seconds
+    const float tsms(cmpLt_GB*nmrd*1e-6); //reqd timespan in milliseconds
+    const float tsus(cmpLt_GB*nmrd*1e-3); //reqd timespan in microseconds
+    const float tsns(cmpLt_GB*nmrd);    //reqd timespan in nanoseconds
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu]: Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu]: Allocating " << float(memSz/(1024*1024*1024)) << " Gbytes ..." << endl;
@@ -84,7 +84,7 @@ void func(size_t nmrd, size_t scs_GB, double memGB, bool psdS, bool vrbs=false)
         if(vrbs) cout << "[cpu_emu]: Sleeping for "       << float(cms.count())/float(1e6)  << " msecs ..." << " size " << nmrd << endl;
         this_thread::sleep_for(cms);
     }else{
-        auto ts = (scs_GB*nmrd*1e-9);
+        auto ts = (cmpLt_GB*nmrd*1e-9);
         //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         auto start_time = std::chrono::high_resolution_clock::now();
         if(vrbs) cout << "[cpu_emu]: Burning ...";
@@ -209,13 +209,13 @@ int main (int argc, char *argv[])
     bool     psdZ=false, psdX=false;
     string   yfn = "cpu_emu.yaml";
     char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
-    uint16_t rcv_prt = 8888; // receive port default
-    uint16_t dst_prt = 8888; // target port default
-    auto     nmThrds = 5;   // default
-    bool     vrbs = false;   // verbose ?
-    double   scs_GB  = 100;    // seconds/(input GB) thread latency
+    uint16_t rcv_prt = 8888;  // receive port default
+    uint16_t dst_prt = 8888;  // target port default
+    auto     nmThrds = 5;     // default
+    bool     vrbs    = false; // verbose ?
+    double   cmpLt_GB  = 100;   // seconds/(input GB) computational latency
     double   memGB   = 10;    // thread memory footprint in GB
-    double   otmemGB = 0.01;    // program putput in GB
+    double   otmemGB = 0.01;  // program putput in GB
 
     while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:xy:z")) != -1)
     {
@@ -225,9 +225,9 @@ int main (int argc, char *argv[])
             Usage();
             exit(1);
         case 'b':
-            scs_GB = (double) atof((const char *) optarg) ;
+            cmpLt_GB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) cout << " -b " << scs_GB;
+            if(DBG) cout << " -b " << cmpLt_GB;
             break;
         case 'i':
             strcpy(dst_ip, (const char *) optarg) ;
@@ -293,7 +293,7 @@ int main (int argc, char *argv[])
     if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), vrbs);
         //cmd line parms overide yaml file settings (which are otherwise in the map)
-        if(!psdB) scs_GB = stof(mymap["latency"]);
+        if(!psdB) cmpLt_GB = stof(mymap["latency"]);
         if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
         if(!psdM) memGB = stof(mymap["mem_footprint"]);
         if(!psdO) otmemGB = stof(mymap["output_size"]);
@@ -306,7 +306,7 @@ int main (int argc, char *argv[])
         if(!psdZ) psdZ = stoi(mymap["terminal"]) == 1;
     }    
     ////////
-    if(vrbs) cout << "[cpu_emu]: Operating with scs_GB = " << scs_GB << "\tdst_ip = "
+    if(vrbs) cout << "[cpu_emu]: Operating with cmpLt_GB = " << cmpLt_GB << "\tdst_ip = "
                 << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = " << memGB << "\totmemGB = "
                 << otmemGB << "\tdst_prt = " << (psdZ?"N/A":to_string(dst_prt)) << "\trcv_prt = "
                 << rcv_prt << "\tsleep = " << psdS << "\tsim_mode = " << psdX  << "\tnmThrds = "
@@ -317,7 +317,9 @@ int main (int argc, char *argv[])
     context_t rcv_cntxt(1);
     context_t dst_cntxt(1);
     socket_t rcv_sckt(rcv_cntxt, socket_type::pull);
+    rcv_sckt.set(zmq::sockopt::rcvhwm, int(1e3)); // queue length
     socket_t dst_sckt(dst_cntxt, socket_type::push);
+    dst_sckt.set(zmq::sockopt::sndhwm, int(1e3)); // queue length
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
     if(vrbs) cout << "[cpu_emu]: Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
     
@@ -327,6 +329,8 @@ int main (int argc, char *argv[])
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
     uint16_t request_nbr = 0;
+    // Record start time
+    auto start0 = high_resolution_clock::now();
     while (true) {
         //if(vrbs) cout << "[cpu_emu]: Setting up request message ..." << endl;
         message_t request;
@@ -358,7 +362,7 @@ int main (int argc, char *argv[])
 
         if (psdX) {
             //sleep to simulate cpu work
-            const float tsns(scs_GB*bufSiz);    //reqd timespan in nanoseconds
+            const float tsns(cmpLt_GB*bufSiz);    //reqd timespan in nanoseconds
             auto cms = chrono::nanoseconds(size_t(round(tsns)));
 
             // Record start time
@@ -378,7 +382,7 @@ int main (int argc, char *argv[])
             vector<thread> threads;
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
-                threads.push_back(thread(func, bufSiz, scs_GB, memGB, psdS, vrbs));
+                threads.push_back(thread(func, bufSiz, cmpLt_GB, memGB, psdS, vrbs));
 
             for (auto& th : threads) th.join();
             if(vrbs) cout << "[cpu_emu]: synchronized all threads..." << endl;
@@ -412,6 +416,14 @@ int main (int argc, char *argv[])
             }
         }
         request_nbr++;
+        // Record end time
+        auto end0 = high_resolution_clock::now();
+
+        // Compute duration in seconds
+        duration<double> elapsed = end0 - start0;
+
+        if(vrbs) std::cout << "[cpu_emu]: Measured event rate " << float(request_nbr)/float(elapsed.count()) << " event Hz." << std::endl;
+        if(vrbs) std::cout << "[cpu_emu]: Measured bit rate " << float(request_nbr*bufSiz)/float(elapsed.count()) << " bit Hz." << std::endl;
     }
     return 0;
 }
