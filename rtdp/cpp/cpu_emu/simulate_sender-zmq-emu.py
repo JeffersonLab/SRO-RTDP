@@ -24,6 +24,7 @@ def simulate_stream(
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUSH)
+    zmq_socket.setsockopt(zmq.SNDHWM, int(1e3))  # Set send high water mark to 1000 messages
     zmq_socket.connect(f"tcp://localhost:{port}")
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
@@ -60,7 +61,6 @@ def simulate_stream(
             time.sleep(td)
             num_sent = num_sent + 1
 
-        print(f"[simulate_stream:] Estimated send rate (Gbps): {1e-9*num_sent*chunk_size_mean/(time.time() - start_time)} num_sent {num_sent}")
         # Apply duty cycle
         # -----------------------
         # OFF phase: Sleep
@@ -68,6 +68,10 @@ def simulate_stream(
         if off_time > 0:
             print(f"[simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
             time.sleep(off_time)
+        t = time.time()
+        print(f"[simulate_stream:] Estimated send rate (Gbps): {1e-9*num_sent*chunk_size_mean/(t - start_time)} num_sent {num_sent}")
+        print(f"[simulate_stream:] Estimated send rate (Hz): {float(num_sent)/float(t - start_time)} num_sent {num_sent}")
+        print(f"[simulate_stream:] Estimated bit rate (Hz): {float(num_sent*chunk_size_mean)/float(t - start_time)} num_sent {num_sent}")
 
 if __name__ == "__main__":
     print(f"[simulate_sender-zmq-emu: main:]")
