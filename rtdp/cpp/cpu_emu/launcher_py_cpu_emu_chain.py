@@ -14,12 +14,12 @@ def launch_component(index, ref_port):
         print(f"[launcher_py_cpu_emu] Starting cpu_emu #{index} listening on port {ref_port + index}, forwarding to port {ref_port + index - 1}")
         subprocess.Popen([
             "./cpu_emu",
+            "-b", str(500),
             "-i", str("127.0.0.1"),
             "-r", str(ref_port + index),
             "-p", str(ref_port + index - 1),
-            "-s", str(1),
             "-x", str(1),
-            "-v", str(0),
+            "-v", str(1),
             "-m", str(1),        
             "-t", str(1)        
         ])
@@ -27,12 +27,12 @@ def launch_component(index, ref_port):
         print(f"[launcher_py_cpu_emu] Starting cpu_emu #{index} listening on port {ref_port + index}, acting as sink")
         subprocess.Popen([
             "./cpu_emu",
+            "-b", str(500),
             "-i", str("127.0.0.1"),
             "-r", str(ref_port + index),
-            "-s", str(1),
             "-x", str(1),
             "-z", str(1),
-            "-v", str(0),
+            "-v", str(1),
             "-m", str(1),        
             "-t", str(1)        
         ])
