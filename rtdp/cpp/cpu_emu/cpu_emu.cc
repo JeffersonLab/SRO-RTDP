@@ -293,17 +293,17 @@ int main (int argc, char *argv[])
     if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), vrbs);
         //cmd line parms overide yaml file settings (which are otherwise in the map)
-        if(!psdB) cmpLt_GB = stof(mymap["latency"]);
         if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
-        if(!psdM) memGB = stof(mymap["mem_footprint"]);
-        if(!psdO) otmemGB = stof(mymap["output_size"]);
-        if(!psdP) dst_prt = stoi(mymap["dst_port"]);
-        if(!psdR) rcv_prt = stoi(mymap["rcv_port"]);
-        if(!psdS) psdS = stoi(mymap["sleep"]) == 1;
-        if(!psdT) nmThrds = stoi(mymap["threads"]);
-        if(!psdV) vrbs = stoi(mymap["verbose"]);
-        if(!psdX) psdX = stoi(mymap["sim_mode"]) == 1;
-        if(!psdZ) psdZ = stoi(mymap["terminal"]) == 1;
+        if(!psdB) cmpLt_GB = stof(mymap["latency"]);
+        if(!psdM) memGB    = stof(mymap["mem_footprint"]);
+        if(!psdO) otmemGB  = stof(mymap["output_size"]);
+        if(!psdP) dst_prt  = stoi(mymap["dst_port"]);
+        if(!psdR) rcv_prt  = stoi(mymap["rcv_port"]);
+        if(!psdS) psdS     = stoi(mymap["sleep"]) == 1;
+        if(!psdT) nmThrds  = stoi(mymap["threads"]);
+        if(!psdV) vrbs     = stoi(mymap["verbose"]);
+        if(!psdX) psdX     = stoi(mymap["sim_mode"]) == 1;
+        if(!psdZ) psdZ     = stoi(mymap["terminal"]) == 1;
     }    
     ////////
     if(vrbs) cout << "[cpu_emu]: Operating with cmpLt_GB = " << cmpLt_GB << "\tdst_ip = "
@@ -354,16 +354,18 @@ int main (int argc, char *argv[])
             bufSiz = rtcd.value();
         }
         if(vrbs) cout << "[cpu_emu]: event size = " 
-                      << (psdX?"(Spec'd) ":"(actual) ") << bufSiz << " B " << bufSiz *1e-9 << " GB "
+                      << (psdX?"(Spec'd) ":"(actual) ") << bufSiz << " B " << bufSiz*1e-9 << " GB "
                       << " from client " << endl;
 
         //  Do some 'work'
-        //load (or emulate load on) system with ensuing work
+        // load (or emulate load on) system with ensuing work
 
         if (psdX) {
             //sleep to simulate cpu work
-            const float tsns(cmpLt_GB*bufSiz);    //reqd timespan in nanoseconds
-            auto cms = chrono::nanoseconds(size_t(round(tsns)));
+            const float tsns(cmpLt_GB*bufSiz*1e-9);    //reqd computational timespan in seconds
+            auto cms = chrono::nanoseconds(size_t(round(tsns*1e9)));
+
+            if(vrbs) std::cout << "[cpu_emu]: Sim Sleep: " << tsns << " sec " << cms.count() << " nsec."  << std::endl;
 
             // Record start time
             auto start = high_resolution_clock::now();
@@ -423,7 +425,7 @@ int main (int argc, char *argv[])
         duration<double> elapsed = end0 - start0;
 
         if(vrbs) std::cout << "[cpu_emu]: Measured event rate " << float(request_nbr)/float(elapsed.count()) << " event Hz." << std::endl;
-        if(vrbs) std::cout << "[cpu_emu]: Measured bit rate " << float(request_nbr*bufSiz)/float(elapsed.count()) << " bit Hz." << std::endl;
+        if(vrbs) std::cout << "[cpu_emu]: Measured bit rate " << float(request_nbr*bufSiz*8)/float(elapsed.count()) << " bit Hz." << std::endl;
     }
     return 0;
 }
