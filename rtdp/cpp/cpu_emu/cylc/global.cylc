@@ -1,4 +1,4 @@
-# place this in ~/.cylc/flows/global.cylc
+# place this in ~/.cylc/flow/global.cylc
 
 [platforms]
     [[jlab_slurm]]
@@ -12,3 +12,5 @@
     [[symlink dirs]]
         [[[localhost]]]
             run = /home/tsai/jeng 
+
+
