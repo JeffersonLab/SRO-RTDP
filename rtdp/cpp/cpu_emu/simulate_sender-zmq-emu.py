@@ -29,17 +29,18 @@ def simulate_stream(
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
     nic_limit_bps = nic_limit_gbps * 1_000_000_000
-    chunk_size_mean = avg_rate_bps / 100     # bits - Send in 100 chunks per second
+    chunk_size_mean = 60e3*10 # CLAS12 # avg_rate_bps / 100     # bits - Send in 100 chunks per second
     std_dev = chunk_size_mean * rms_fraction # bits
     print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, chunk_size_mean(Mb) = {chunk_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
     
     cycle_period = 1.0  # seconds
-    on_time = duty_cycle * cycle_period
+    on_time = 1 # duty_cycle * cycle_period #disable duty cycle for now
     off_time = cycle_period - on_time
     print(f"[simulate_stream:] duty_cycle = {duty_cycle}, cycle_period = {cycle_period}, on_time = {on_time}, off_time = {off_time}")
     num_sent = 0
     start_time = time.time()
     while True:
+        tl0 = time.time()
         # -----------------------
         # ON phase: Send data
         # -----------------------
@@ -53,7 +54,7 @@ def simulate_stream(
             else:
                 chunk_size = int(chunk_size_mean)
             buffer = serialize_buffer(size=int(chunk_size/8), timestamp=time.time(), stream_id=99) #bytes
-            print(f"[simulate_stream:] Sending buffer; size = {chunk_size/8}")
+            print(f"[simulate_stream:] Sending chunk; size = {chunk_size/8}")
             zmq_socket.send(buffer)
             # Simulate transmission delay
             td = chunk_size/nic_limit_bps
@@ -70,9 +71,10 @@ def simulate_stream(
             time.sleep(off_time)
         t = time.time()
         tdl = (t - start_time)
-        print(f"[simulate_stream:] Estimated send rate (Gbps): {1e-9*num_sent*chunk_size_mean/tdl} num_sent {num_sent}")
-        print(f"[simulate_stream:] Estimated send rate (Hz): {float(num_sent)/float(tdl)} num_sent {num_sent}")
-        print(f"[simulate_stream:] Estimated bit rate (Hz): {float(num_sent*chunk_size_mean)/float(tdl)} num_sent {num_sent}")
+        print(f"[simulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*chunk_size_mean/tdl} num_sent {num_sent}")
+        print(f"[simulate_stream:] Estimated chunk rate (Hz): {float(num_sent)/float(tdl)} num_sent {num_sent}")
+        print(f"[simulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*chunk_size_mean)/float(tdl)} num_sent {num_sent}")
+        print(f"[simulate_stream:] Avg loop duration (sec): {float(t-tl0)}")
 
 if __name__ == "__main__":
     print(f"[simulate_sender-zmq-emu: main:]")
