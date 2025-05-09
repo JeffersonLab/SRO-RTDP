@@ -1,7 +1,20 @@
-FROM nvidia/cuda:12.6.0-devel-ubuntu22.04
+#
+# To build the image on ifarm do this:
+#--------------------------------------------------------------------------------
+# podman build -t rtdp-gpu_proxy -f Dockerfile .
+#
+#
+# To push to the JLab container image registry:
+#--------------------------------------------------------------------------------
+# podman tag rtdp-gpu_proxy:latest codecr.jlab.org/epsci/rtdp-gpu_proxy:latest
+# podman login codecr.jlab.org
+# podman push codecr.jlab.org/epsci/rtdp-gpu_proxy:latest
+# 
+
+FROM docker://nvidia/cuda:12.6.0-devel-ubuntu22.04 AS builder
 
 LABEL maintainer="Jeng-Yuan Tsai"
-LABEL version="1.0.0"
+LABEL version="1.0.1"
 
 # Set environment variables
 ENV PATH=/usr/local/cuda/bin:$PATH
@@ -20,19 +33,27 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-RUN pip3 install pyzmq numpy
-
 # Create and set working directory
-WORKDIR /app
+WORKDIR /work
 
 # Copy the application files
-COPY . /app/
+COPY CMakeLists.txt gpuEmu.cu python_zmq_helper /work/
+COPY python_zmq_helper /work/python_zmq_helper/
 
 # Build the application
-RUN mkdir -p build && cd build && \
-    cmake .. && \
-    make -j$(nproc)
+RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/app && \
+    cmake --build build --target install -j$(nproc)
+
+# Runtime stage
+FROM docker://nvidia/cuda:12.6.0-runtime-ubuntu22.04 AS runtime
+
+# Copy the application files
+COPY --from=builder /app/ /app/
+
+# Install Python dependencies
+RUN apt-get update && apt-get install -y python3-pip libzmq5 \
+    && pip3 install pyzmq numpy \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create a simple entrypoint script
 RUN echo '#!/bin/bash\n\
@@ -81,17 +102,17 @@ case $mode in\n\
             echo "Error: No arguments provided for proxy mode. Use -h for help."\n\
             exit 1\n\
         fi\n\
-        exec /app/build/gpu_emu "$@"\n\
+        exec /app/bin/gpu_emu "$@"\n\
         ;;\n\
     sender)\n\
         if [ $# -eq 0 ]; then\n\
             echo "Error: No arguments provided for sender mode. Use -h for help."\n\
             exit 1\n\
         fi\n\
-        exec python3 /app/python_zmq_helper/zmq_fp_sender.py "$@"\n\
+        exec python3 /app/bin/zmq_fp_sender.py "$@"\n\
         ;;\n\
     receiver)\n\
-        exec python3 /app/python_zmq_helper/zmq_fp_receiver.py "$@"\n\
+        exec python3 /app/bin/zmq_fp_receiver.py "$@"\n\
         ;;\n\
     *)\n\
         echo "Error: Unknown mode $mode. Use --help for available modes."\n\
