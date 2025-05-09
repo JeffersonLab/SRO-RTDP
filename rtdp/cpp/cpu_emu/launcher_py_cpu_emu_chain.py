@@ -16,12 +16,13 @@ def launch_component(index, ref_port):
             "./cpu_emu",
             "-b", str(500),
             "-i", str("127.0.0.1"),
-            "-r", str(ref_port + index),
+            "-n", str(100),
+            "-o", str(0.00001),
             "-p", str(ref_port + index - 1),
-            "-x", str(1),
+            "-r", str(ref_port + index),
+            "-t", str(1),
             "-v", str(1),
-            "-m", str(1),        
-            "-t", str(1)        
+            "-x", str(1)
         ])
     else:
         print(f"[launcher_py_cpu_emu] Starting cpu_emu #{index} listening on port {ref_port + index}, acting as sink")
@@ -29,12 +30,12 @@ def launch_component(index, ref_port):
             "./cpu_emu",
             "-b", str(500),
             "-i", str("127.0.0.1"),
+            "-o", str(0.00001),
             "-r", str(ref_port + index),
-            "-x", str(1),
-            "-z", str(1),
+            "-t", str(1),
             "-v", str(1),
-            "-m", str(1),        
-            "-t", str(1)        
+            "-x", str(1),
+            "-z", str(1)
         ])
 
 #    time.sleep(0.05)  # Slight delay to avoid race conditions
