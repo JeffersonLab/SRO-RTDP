@@ -6,9 +6,9 @@
 #
 # To push to the JLab container image registry:
 #--------------------------------------------------------------------------------
-# podman tag rtdp-gpu_proxy:latest codecr.jlab.org/epsci/rtdp-gpu_proxy:latest
-# podman login codecr.jlab.org
-# podman push codecr.jlab.org/epsci/rtdp-gpu_proxy:latest
+# podman tag rtdp-gpu_proxy code.jlab.org/epsci/rtdp-gpu_proxy
+# podman login code.jlab.org
+# podman push code.jlab.org/epsci/rtdp-gpu_proxy
 # 
 
 FROM docker://nvidia/cuda:12.6.0-devel-ubuntu22.04 AS builder
@@ -98,17 +98,9 @@ shift\n\
 \n\
 case $mode in\n\
     proxy)\n\
-        if [ $# -eq 0 ]; then\n\
-            echo "Error: No arguments provided for proxy mode. Use -h for help."\n\
-            exit 1\n\
-        fi\n\
         exec /app/bin/gpu_emu "$@"\n\
         ;;\n\
     sender)\n\
-        if [ $# -eq 0 ]; then\n\
-            echo "Error: No arguments provided for sender mode. Use -h for help."\n\
-            exit 1\n\
-        fi\n\
         exec python3 /app/bin/zmq_fp_sender.py "$@"\n\
         ;;\n\
     receiver)\n\
