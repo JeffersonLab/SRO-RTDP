@@ -69,8 +69,8 @@ echo "Event size"; grep -i "Event size" $t|cut -f 9 -d' '|get_moments
 
 ==================================basic report =================================
 t0=$(mktemp)
-grep "Estimated chunk rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$i Estimated chunk rate Hz'; p '-' w l"
-grep "Estimated bit rate" $t|grep MHz|cut -f6 -d' '|gnuplot -p -e "set title '$i Estimated bit rate Mhz'; p '-' w l"
+grep "Estimated chunk rate" $t|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated chunk rate Hz'; p '-' w l"
+grep "Estimated bit rate" $t|grep MHz|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated bit rate Mhz'; p '-' w l"
 echo -n "chunk size: "; grep -i "Sending chunk" $t|cut -f 6 -d' '|get_moments
 echo -n "Estimated chunk rate: "; grep -i "Estimated chunk rate" $t|cut -f6 -d' '|get_moments
 echo -n "Estimated bit rate: "; grep -i "Estimated bit rate" $t|cut -f6 -d' '|get_moments

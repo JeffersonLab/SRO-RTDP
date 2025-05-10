@@ -28,13 +28,14 @@ def launch_component(index, ref_port):
         print(f"[launcher_py_cpu_emu] Starting cpu_emu #{index} listening on port {ref_port + index}, acting as sink")
         subprocess.Popen([
             "./cpu_emu",
-            "-b", str(500),
-            "-i", str("127.0.0.1"),
-            "-o", str(0.00001),
+#            "-b", str(500),
+#            "-i", str("127.0.0.1"),
+#            "-o", str(0.00001),
             "-r", str(ref_port + index),
             "-t", str(1),
             "-v", str(1),
             "-x", str(1),
+            "-y", str("cpu_emu.yaml"),
             "-z", str(1)
         ])
 
