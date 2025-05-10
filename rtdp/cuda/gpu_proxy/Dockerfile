@@ -1,17 +1,17 @@
 #
 # To build the image on ifarm do this:
 #--------------------------------------------------------------------------------
-# podman build -t rtdp-gpu_proxy -f Dockerfile .
+# docker build -t rtdp-gpu_proxy -f Dockerfile .
 #
 #
 # To push to the JLab container image registry:
 #--------------------------------------------------------------------------------
-# podman tag rtdp-gpu_proxy code.jlab.org/epsci/rtdp-gpu_proxy
-# podman login code.jlab.org
-# podman push code.jlab.org/epsci/rtdp-gpu_proxy
+# docker tag rtdp-gpu_proxy code.jlab.org/epsci/rtdp-gpu_proxy
+# docker login code.jlab.org
+# docker push code.jlab.org/epsci/rtdp-gpu_proxy
 # 
 
-FROM docker://nvidia/cuda:12.6.0-devel-ubuntu22.04 AS builder
+FROM docker.io/nvidia/cuda:12.6.0-devel-ubuntu22.04 AS builder
 
 LABEL maintainer="Jeng-Yuan Tsai"
 LABEL version="1.0.1"
@@ -45,7 +45,7 @@ RUN cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/app && \
     cmake --build build --target install -j$(nproc)
 
 # Runtime stage
-FROM docker://nvidia/cuda:12.6.0-runtime-ubuntu22.04 AS runtime
+FROM docker.io/nvidia/cuda:12.6.0-runtime-ubuntu22.04 AS runtime
 
 # Copy the application files
 COPY --from=builder /app/ /app/
