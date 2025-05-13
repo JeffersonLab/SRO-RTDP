@@ -71,7 +71,11 @@ Any of the <yaml_file> settings may be overidden at the command line via the fol
 
 ## Simulation Mode:
 
-        t=$(mktemp); echo $t; python launcher_py_cpu_emu_chain.py --components 100 --base-port 7000 --avg-rate 50 --rms 0.3 --duty 0.7 --nic 100 > $t
+	t=$(mktemp); tx=$(mktemp); echo $t; python launcher_py_cpu_emu_chain.py --components 3 --base-port 7000 --avg-rate 500 --rms 0.1 --duty 0.9 --nic 100 > $t 2> $tx
+ 
+ then use:
+
+        ./sim_rprt.sh $t
 
 With verbose mode asserted, trace prints for sender and receivers will be in the file $t.
 
