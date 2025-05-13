@@ -24,7 +24,7 @@ def simulate_stream(
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUSH)
-    zmq_socket.setsockopt(zmq.SNDHWM, int(1e3))  # Set send high water mark to 1000 messages
+    zmq_socket.setsockopt(zmq.SNDHWM, int(1e2))  # Set send high water mark to 1000 messages
     zmq_socket.connect(f"tcp://localhost:{port}")
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
@@ -54,12 +54,21 @@ def simulate_stream(
             else:
                 chunk_size = int(chunk_size_mean)
             buffer = serialize_buffer(size=int(chunk_size/8), timestamp=time.time(), stream_id=99) #bytes
-            print(f"[simulate_stream:] Sending chunk; size = {chunk_size/8}")
+            if num_sent % 10 == 0: print(f"[simulate_stream:] Sending chunk; size = {chunk_size/8}")
+            ts0 = time.time()
             zmq_socket.send(buffer)
+            ts1 = time.time()
+            if num_sent % 10 == 0: print(f"[simulate_stream:] zmq delay (usecs) of {1e6*(ts1-ts0)}")
             # Simulate transmission delay
-            td = chunk_size/nic_limit_bps
-            print(f"[simulate_stream:] Simulate transmission delay (usecs) of {1e6*td}")
+            td = chunk_size/nic_limit_bps #seconds
+            if num_sent % 10 == 0: print(f"[simulate_stream:] Simulate transmission delay (usecs) of {1e6*td}")
             time.sleep(td)
+            # Delay to effect sending rate
+            # Derived sleep time between messages
+            rate_sleep = chunk_size_mean / avg_rate_bps  # in seconds
+            time.sleep(rate_sleep)
+            if num_sent % 10 == 0: print(f"[simulate_stream:] Rate slept (s) for {rate_sleep}")
+
             num_sent = num_sent + 1
 
         # Apply duty cycle
