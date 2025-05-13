@@ -328,9 +328,9 @@ int main (int argc, char *argv[])
     context_t rcv_cntxt(1);
     context_t dst_cntxt(1);
     socket_t rcv_sckt(rcv_cntxt, socket_type::pull);
-    rcv_sckt.set(zmq::sockopt::rcvhwm, int(1e3)); // queue length
+    rcv_sckt.set(zmq::sockopt::rcvhwm, int(1e2)); // queue length
     socket_t dst_sckt(dst_cntxt, socket_type::push);
-    dst_sckt.set(zmq::sockopt::sndhwm, int(1e3)); // queue length
+    dst_sckt.set(zmq::sockopt::sndhwm, int(1e2)); // queue length
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
     if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
     
@@ -348,8 +348,20 @@ int main (int argc, char *argv[])
 
         //  Wait for next request from client
         if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " Waiting for source ..." << endl;
-        recv_result_t rtcd = rcv_sckt.recv (request, recv_flags::none);
-        if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " Received request " 
+        
+        recv_result_t rtcd;
+        
+        {//block
+            auto start = high_resolution_clock::now();
+            rtcd = rcv_sckt.recv (request, recv_flags::none);
+            // Record end time
+            auto end = high_resolution_clock::now();
+            // Compute duration in seconds
+            auto elapsed = duration_cast<microseconds>(end - start);
+            if(vrbs && request_nbr % 10 == 0) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " ZMQ read for " << elapsed.count() << " usec." << std::endl;
+        }
+
+        if(DBG) cout << "[cpu_emu " << rcv_prt << " ]: " << " Received request " 
                       << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client " << endl;
                       
@@ -364,7 +376,7 @@ int main (int argc, char *argv[])
         } else {
             bufSiz = rtcd.value();
         }
-        if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " chunk size = " 
+        if(vrbs && request_nbr % 10 == 0) cout << "[cpu_emu " << rcv_prt << " ]: " << " chunk size = " 
                       << (psdX?"(Spec'd) ":"(actual) ") << bufSiz << " B " << bufSiz*1e-9 << " GB "
                       << " from client " << endl;
 
@@ -376,7 +388,7 @@ int main (int argc, char *argv[])
             const float ts(cmpLt_GB*bufSiz*1e-9);    //reqd computational timespan in seconds
             auto cms = chrono::nanoseconds(size_t(round(ts*1e9)));
 
-            if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Sim Sleep Spec: " << ts << " sec " << cms.count() << " nsec."  << std::endl;
+            if(vrbs && request_nbr % 10 == 0) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Sim Sleep Spec: " << ts << " sec " << cms.count() << " nsec."  << std::endl;
 
             // Record start time
             auto start = high_resolution_clock::now();
@@ -389,7 +401,7 @@ int main (int argc, char *argv[])
             // Compute duration in seconds
             duration<double> elapsed = end - start;
 
-            if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Sim Slept for " << elapsed.count() << " seconds." << std::endl;
+            if(vrbs && request_nbr % 10 == 0) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Sim Slept for " << elapsed.count() << " seconds." << std::endl;
 
         } else {//parse recvd message to get simlated data size recvd
             vector<thread> threads;
@@ -398,11 +410,11 @@ int main (int argc, char *argv[])
                 threads.push_back(thread(func, bufSiz, cmpLt_GB, memGB, psdS, rcv_prt, vrbs));
 
             for (auto& th : threads) th.join();
-            if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " synchronized all threads..." << endl;
+            if(DBG) cout << "[cpu_emu " << rcv_prt << " ]: " << " synchronized all threads..." << endl;
         }
 
         if(!psdZ) {
-            if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " Forwarding "
+            if(DBG) cout << "[cpu_emu " << rcv_prt << " ]: " << " Forwarding "
                           << " request " << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                           << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt)<< endl;
             //forward to next hop    
@@ -423,7 +435,7 @@ int main (int argc, char *argv[])
                 const float ts(otmemGB/outNicSpd);    //reqd transmission timespan in seconds
                 auto cms = chrono::nanoseconds(size_t(round(ts*1e9)));
 
-                if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Transmission Sleep Spec: " << ts << " sec " << cms.count() << " nsec."  << std::endl;
+                if(vrbs && request_nbr % 10 == 0) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Transmission Sleep Spec: " << ts << " sec " << cms.count() << " nsec."  << std::endl;
 
                 // Record start time
                 auto start = high_resolution_clock::now();
@@ -436,15 +448,15 @@ int main (int argc, char *argv[])
                 // Compute duration in seconds
                 duration<double> elapsed = end - start;
 
-                if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Sim xmssn delay for " << elapsed.count() << " seconds." << std::endl;
+                if(vrbs && request_nbr % 10 == 0) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Sim xmssn delay for " << elapsed.count() << " seconds." << std::endl;
 
-                if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " output Num written " << sr.value()  << endl;
+                if(DBG) cout << "[cpu_emu " << rcv_prt << " ]: " << " output Num written " << sr.value()  << endl;
                 if(sr.value() != pkt.PACKET_SIZE) cerr << "Destination data incorrect size" << endl;
             } else {
 	        // Send  "chunk"
                 message_t dst_msg(outSz);  //represents harvested data
                 sr = dst_sckt.send(dst_msg, send_flags::none);
-                if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " output Num written " << sr.value()  << endl;
+                if(DBG) cout << "[cpu_emu " << rcv_prt << " ]: " << " output Num written " << sr.value()  << endl;
                 if(sr.value() != outSz) cerr << "Destination data incorrect size" << endl;
             }
         }
