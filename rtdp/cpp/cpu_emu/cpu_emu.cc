@@ -329,17 +329,24 @@ int main (int argc, char *argv[])
     context_t dst_cntxt(1);
     socket_t rcv_sckt(rcv_cntxt, socket_type::pull);
     rcv_sckt.set(zmq::sockopt::rcvhwm, int(1e2)); // queue length
+
+    // Subscribe to all messages (empty topic)
+    //rcv_sckt.set(zmq::sockopt::subscribe, "");
+
     socket_t dst_sckt(dst_cntxt, socket_type::push);
-    dst_sckt.set(zmq::sockopt::sndhwm, int(1e2)); // queue length
+    dst_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
     if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
+
+
+
     
     if(!psdZ) {
         //  Prepare our destination socket
         if(vrbs) cout << "[cpu_emu " << rcv_prt << " ]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
-    uint16_t request_nbr = 0;
+    uint64_t request_nbr = 0;
     // Record start time
     auto start0 = high_resolution_clock::now();
     while (true) {
@@ -468,8 +475,12 @@ int main (int argc, char *argv[])
         duration<double> elapsed = end0 - start0;
 
         if (request_nbr % 10 == 0) {
-            if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Measured chunk rate " << float(request_nbr)/float(elapsed.count()) << " chunk Hz." << std::endl;
+            auto now = std::chrono::system_clock::now();
+            auto epoch_seconds = std::chrono::duration<double>(now.time_since_epoch()).count();  // double
+            std::cout << std::fixed << std::setprecision(7);  // 6 decimal places            
+            if(vrbs) std::cout << epoch_seconds << " [cpu_emu " << rcv_prt << " ]: " << " Measured chunk rate " << float(request_nbr)/float(elapsed.count()) << " chunk Hz." << " for " << request_nbr << " chunks" << std::endl;
             if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " Measured bit rate " << float(request_nbr*bufSiz*8)/float(elapsed.count()) << " bit Hz." << std::endl;
+            if(vrbs) std::cout << "[cpu_emu " << rcv_prt << " ]: " << " recd " << request_nbr << std::endl;
         }
     }
     return 0;
