@@ -2,6 +2,7 @@
 # To Run the Full Simulation
 
 #   python launcher_py_cpu_emu.py --components 5 --base-port 6000 --avg-rate 50 --rms 0.3 --duty 0.7 --nic 100
+# `date +%s.%N`
 
 import subprocess
 import argparse
