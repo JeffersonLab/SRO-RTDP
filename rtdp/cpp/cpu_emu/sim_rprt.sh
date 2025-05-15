@@ -32,4 +32,11 @@ for i in {7001..7003}; do
     gnuplot -p -e "set title '$i ZMQ read duration (us)'; p '-' w l" < $t3 &
   echo
 done
+
+
+grep "\[cpu_emu 7003 \]:  Measured chunk rate" $t|cut -f 1,13 -d' '>/tmp/junk0; grep -i "Estimated chunk rate" $t|cut -f 1,9 -d' '>/tmp/junk1; paste /tmp/junk[01]|tee /tmp/junk3|gnuplot -p -e "set title 'sent/recd'; p '-' u 1:2 w l lc 'red', '/tmp/junk3' u 3:4 w l lc 'green'" &
+
+grep recd $t|tail -1; grep sent $t|tail -1; grep Attempting $t|wc -l; grep dropped $t|wc -l
+
+
 set -m
