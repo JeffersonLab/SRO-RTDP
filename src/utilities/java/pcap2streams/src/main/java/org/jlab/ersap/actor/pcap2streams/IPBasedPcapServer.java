@@ -248,190 +248,170 @@ public class IPBasedPcapServer implements Runnable {
             byte[] packetHeader = new byte[PACKET_HEADER_SIZE];
             byte[] packetData;
 
-            // Process each packet position for this IP
-            for (Long position : packetPositions) {
-                if (!running.get() || clientSocket.isClosed()) {
-                    break;
-                }
-
-                // Seek to the packet position
-                pcapRaf.seek(position);
-
-                // Read packet header
-                int headerBytesRead = pcapRaf.read(packetHeader);
-                if (headerBytesRead < PACKET_HEADER_SIZE) {
-                    LOGGER.warning("Incomplete packet header at position " + position);
-                    continue;
-                }
-
-                // Extract packet length from header (bytes 8-11, little-endian)
-                long packetLengthLong = ((packetHeader[8] & 0xFFL) |
-                        ((packetHeader[9] & 0xFFL) << 8) |
-                        ((packetHeader[10] & 0xFFL) << 16) |
-                        ((packetHeader[11] & 0xFFL) << 24));
-
-                // Validate minimum packet size
-                if (packetLengthLong < MIN_PACKET_SIZE) {
-                    LOGGER.warning("Packet too small: " + packetLengthLong + " bytes at position " + position + 
-                                 ". Minimum size is " + MIN_PACKET_SIZE + " bytes. Skipping packet.");
-                    continue;
-                }
-
-                int actualLength = (int) packetLengthLong;
-                boolean isTruncated = false;
-
-                // Read packet data
-                try {
-                    packetData = new byte[actualLength];
-                } catch (NegativeArraySizeException e) {
-                    LOGGER.warning("Invalid packet length (negative): " + actualLength + " at position " + position
-                            + ". Skipping packet.");
-                    continue;
-                }
-                int dataBytesRead = pcapRaf.read(packetData, 0, actualLength);
-
-                if (dataBytesRead < actualLength) {
-                    LOGGER.warning("Incomplete packet data at position " + position + 
-                                 ". Expected " + actualLength + " bytes, got " + dataBytesRead);
-                    continue;
-                }
-
-                // Extract protocol and header information
-                int protocol = packetData[ETHERNET_HEADER_SIZE + 9] & 0xFF;
-                int transportHeaderSize;
-                if (protocol == 6) { // TCP
-                    int tcpDataOffset = ((packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 12] & 0xF0) >> 4) * 4;
-                    transportHeaderSize = Math.min(tcpDataOffset, TCP_HEADER_SIZE + TCP_OPTIONS_MAX_SIZE);
-                } else if (protocol == 17) { // UDP
-                    transportHeaderSize = UDP_HEADER_SIZE;
-                } else {
-                    transportHeaderSize = TCP_HEADER_SIZE;
-                }
-                
-                int totalHeaderSize = ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + transportHeaderSize;
-                
-                // Extract IP addresses and ports
-                byte[] srcIp = new byte[4];
-                byte[] dstIp = new byte[4];
-                // IP header source address starts at offset 12 in IP header
-                // After Ethernet header (14 bytes) and IP header version/length fields
-                System.arraycopy(packetData, ETHERNET_HEADER_SIZE + 12, srcIp, 0, 4);
-                // IP header destination address starts at offset 16 in IP header
-                System.arraycopy(packetData, ETHERNET_HEADER_SIZE + 16, dstIp, 0, 4);
-
-                String sourceIP = InetAddress.getByAddress(srcIp).getHostAddress();
-                String destIP = InetAddress.getByAddress(dstIp).getHostAddress();
-                
-                // Extract ports from transport header
-                int sourcePort = ((packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE] & 0xFF) << 8) |
-                               (packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 1] & 0xFF);
-                int destPort = ((packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 2] & 0xFF) << 8) |
-                             (packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 3] & 0xFF);
-
-                // Truncate packet if it's too large
-                if (actualLength > MAX_PACKET_SIZE) {
-                    packetData = truncatePacket(packetData);
-                    actualLength = packetData.length;
-                    isTruncated = true;
-                    truncatedCount++;
-                }
-
-                // Log packet information for debugging
-                if (packetCount % 10 == 0) {  // Log more frequently
-                    LOGGER.info("Processing packet #" + packetCount + " for IP " + ipAddress +
-                            ", length=" + actualLength +
-                            ", position=" + position +
-                            (isTruncated ? " (truncated)" : ""));
-
-                    // Log the first few bytes of the packet header
-                    StringBuilder headerHex = new StringBuilder("Header bytes: ");
-                    for (int i = 0; i < PACKET_HEADER_SIZE; i++) {
-                        headerHex.append(String.format("%02X ", packetHeader[i] & 0xFF));
+            // Loop indefinitely, sending packets in packetPositions repeatedly
+            while (running.get() && !clientSocket.isClosed()) {
+                for (Long position : packetPositions) {
+                    if (!running.get() || clientSocket.isClosed()) {
+                        break;
                     }
-                    LOGGER.info(headerHex.toString());
 
-                    // Log the first few bytes of the packet data in tcpdump format
-                    StringBuilder dataHex = new StringBuilder("Data bytes (tcpdump format):\n");
-                    int bytesToLog = Math.min(actualLength, 64);  // Log more bytes
-                    for (int i = 0; i < bytesToLog; i += 16) {
-                        dataHex.append(String.format("0x%04x:  ", i));
-                        for (int j = 0; j < 16 && (i + j) < bytesToLog; j++) {
-                            dataHex.append(String.format("%02x ", packetData[i + j] & 0xFF));
+                    // Seek to the packet position
+                    pcapRaf.seek(position);
+
+                    // Read packet header
+                    int headerBytesRead = pcapRaf.read(packetHeader);
+                    if (headerBytesRead < PACKET_HEADER_SIZE) {
+                        LOGGER.warning("Incomplete packet header at position " + position);
+                        continue;
+                    }
+
+                    // Extract packet length from header (bytes 8-11, little-endian)
+                    long packetLengthLong = ((packetHeader[8] & 0xFFL) |
+                            ((packetHeader[9] & 0xFFL) << 8) |
+                            ((packetHeader[10] & 0xFFL) << 16) |
+                            ((packetHeader[11] & 0xFFL) << 24));
+
+                    // Validate minimum packet size
+                    if (packetLengthLong < MIN_PACKET_SIZE) {
+                        LOGGER.warning("Packet too small: " + packetLengthLong + " bytes at position " + position + 
+                                     ". Minimum size is " + MIN_PACKET_SIZE + " bytes. Skipping packet.");
+                        continue;
+                    }
+
+                    int actualLength = (int) packetLengthLong;
+                    boolean isTruncated = false;
+
+                    // Read packet data
+                    try {
+                        packetData = new byte[actualLength];
+                    } catch (NegativeArraySizeException e) {
+                        LOGGER.warning("Invalid packet length (negative): " + actualLength + " at position " + position
+                                + ". Skipping packet.");
+                        continue;
+                    }
+                    int dataBytesRead = pcapRaf.read(packetData, 0, actualLength);
+
+                    if (dataBytesRead < actualLength) {
+                        LOGGER.warning("Incomplete packet data at position " + position + 
+                                     ". Expected " + actualLength + " bytes, got " + dataBytesRead);
+                        continue;
+                    }
+
+                    // Extract protocol and header information
+                    int protocol = packetData[ETHERNET_HEADER_SIZE + 9] & 0xFF;
+                    int transportHeaderSize;
+                    if (protocol == 6) { // TCP
+                        int tcpDataOffset = ((packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 12] & 0xF0) >> 4) * 4;
+                        transportHeaderSize = Math.min(tcpDataOffset, TCP_HEADER_SIZE + TCP_OPTIONS_MAX_SIZE);
+                    } else if (protocol == 17) { // UDP
+                        transportHeaderSize = UDP_HEADER_SIZE;
+                    } else {
+                        transportHeaderSize = TCP_HEADER_SIZE;
+                    }
+                    
+                    int totalHeaderSize = ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + transportHeaderSize;
+                    
+                    // Extract IP addresses and ports
+                    byte[] srcIp = new byte[4];
+                    byte[] dstIp = new byte[4];
+                    System.arraycopy(packetData, ETHERNET_HEADER_SIZE + 12, srcIp, 0, 4);
+                    System.arraycopy(packetData, ETHERNET_HEADER_SIZE + 16, dstIp, 0, 4);
+
+                    String sourceIP = InetAddress.getByAddress(srcIp).getHostAddress();
+                    String destIP = InetAddress.getByAddress(dstIp).getHostAddress();
+                    
+                    int sourcePort = ((packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE] & 0xFF) << 8) |
+                                   (packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 1] & 0xFF);
+                    int destPort = ((packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 2] & 0xFF) << 8) |
+                                 (packetData[ETHERNET_HEADER_SIZE + IP_HEADER_SIZE + 3] & 0xFF);
+
+                    if (actualLength > MAX_PACKET_SIZE) {
+                        packetData = truncatePacket(packetData);
+                        actualLength = packetData.length;
+                        isTruncated = true;
+                        truncatedCount++;
+                    }
+
+                    if (packetCount % 10 == 0) {
+                        LOGGER.info("Processing packet #" + packetCount + " for IP " + ipAddress +
+                                ", length=" + actualLength +
+                                ", position=" + position +
+                                (isTruncated ? " (truncated)" : ""));
+                        StringBuilder headerHex = new StringBuilder("Header bytes: ");
+                        for (int i = 0; i < PACKET_HEADER_SIZE; i++) {
+                            headerHex.append(String.format("%02X ", packetHeader[i] & 0xFF));
                         }
-                        dataHex.append("\n");
-                    }
-                    LOGGER.info(dataHex.toString());
-
-                    // Log IP addresses in hex format
-                    StringBuilder ipHex = new StringBuilder("IP addresses in hex:\n");
-                    ipHex.append("Source IP bytes: ");
-                    for (int i = 0; i < 4; i++) {
-                        ipHex.append(String.format("%02x ", srcIp[i] & 0xFF));
-                    }
-                    ipHex.append("\nDest IP bytes: ");
-                    for (int i = 0; i < 4; i++) {
-                        ipHex.append(String.format("%02x ", dstIp[i] & 0xFF));
-                    }
-                    LOGGER.info(ipHex.toString());
-
-                    // Log CSV write attempt
-                    LOGGER.info("Attempting to write to CSV: " + String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%s,%s,%d,%d\n",
-                        packetCount, position, protocol, actualLength, totalHeaderSize,
-                        actualLength - totalHeaderSize, isTruncated,
-                        ETHERNET_HEADER_SIZE, IP_HEADER_SIZE, transportHeaderSize,
-                        sourceIP, destIP, sourcePort, destPort));
-                }
-
-                // Log header information to CSV
-                try {
-                    if (csvWriter != null) {
-                        String csvLine = String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%s,%s,%d,%d\n",
+                        LOGGER.info(headerHex.toString());
+                        StringBuilder dataHex = new StringBuilder("Data bytes (tcpdump format):\n");
+                        int bytesToLog = Math.min(actualLength, 64);
+                        for (int i = 0; i < bytesToLog; i += 16) {
+                            dataHex.append(String.format("0x%04x:  ", i));
+                            for (int j = 0; j < 16 && (i + j) < bytesToLog; j++) {
+                                dataHex.append(String.format("%02x ", packetData[i + j] & 0xFF));
+                            }
+                            dataHex.append("\n");
+                        }
+                        LOGGER.info(dataHex.toString());
+                        StringBuilder ipHex = new StringBuilder("IP addresses in hex:\n");
+                        ipHex.append("Source IP bytes: ");
+                        for (int i = 0; i < 4; i++) {
+                            ipHex.append(String.format("%02x ", srcIp[i] & 0xFF));
+                        }
+                        ipHex.append("\nDest IP bytes: ");
+                        for (int i = 0; i < 4; i++) {
+                            ipHex.append(String.format("%02x ", dstIp[i] & 0xFF));
+                        }
+                        LOGGER.info(ipHex.toString());
+                        LOGGER.info("Attempting to write to CSV: " + String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%s,%s,%d,%d\n",
                             packetCount, position, protocol, actualLength, totalHeaderSize,
                             actualLength - totalHeaderSize, isTruncated,
                             ETHERNET_HEADER_SIZE, IP_HEADER_SIZE, transportHeaderSize,
-                            sourceIP, destIP, sourcePort, destPort);
-                        LOGGER.info("Writing to CSV: " + csvLine);
-                        csvWriter.write(csvLine);
-                        csvWriter.flush();
-                        LOGGER.info("Successfully wrote to CSV");
-                    } else {
-                        LOGGER.severe("CSV writer is null! Cannot write to CSV file");
+                            sourceIP, destIP, sourcePort, destPort));
                     }
-                } catch (IOException e) {
-                    LOGGER.severe("Failed to write to CSV file: " + e.getMessage());
-                    e.printStackTrace();
-                }
 
-                try {
-                    // First send the packet length (4 bytes) in little-endian order
-                    clientOut.writeInt(Integer.reverseBytes(actualLength) >>> 32);
-                    clientOut.flush();  // Flush after sending length
+                    try {
+                        if (csvWriter != null) {
+                            String csvLine = String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%s,%s,%d,%d\n",
+                                packetCount, position, protocol, actualLength, totalHeaderSize,
+                                actualLength - totalHeaderSize, isTruncated,
+                                ETHERNET_HEADER_SIZE, IP_HEADER_SIZE, transportHeaderSize,
+                                sourceIP, destIP, sourcePort, destPort);
+                            LOGGER.info("Writing to CSV: " + csvLine);
+                            csvWriter.write(csvLine);
+                            csvWriter.flush();
+                            LOGGER.info("Successfully wrote to CSV");
+                        } else {
+                            LOGGER.severe("CSV writer is null! Cannot write to CSV file");
+                        }
+                    } catch (IOException e) {
+                        LOGGER.severe("Failed to write to CSV file: " + e.getMessage());
+                        e.printStackTrace();
+                    }
 
-                    // Then send the packet data in chunks to avoid overwhelming the client
-                    int offset = 0;
-                    while (offset < actualLength) {
-                        int chunkLength = Math.min(CHUNK_SIZE, actualLength - offset);
-                        clientOut.write(packetData, offset, chunkLength);
+                    try {
+                        clientOut.writeInt(Integer.reverseBytes(actualLength) >>> 32);
                         clientOut.flush();
-                        offset += chunkLength;
+                        int offset = 0;
+                        while (offset < actualLength) {
+                            int chunkLength = Math.min(CHUNK_SIZE, actualLength - offset);
+                            clientOut.write(packetData, offset, chunkLength);
+                            clientOut.flush();
+                            offset += chunkLength;
+                        }
+                        packetCount++;
+                        successCount++;
+                        if (packetCount % 100 == 0) {
+                            LOGGER.info("Sent " + packetCount + " packets for IP " + ipAddress + 
+                                      " (" + truncatedCount + " truncated)");
+                        }
+                        Thread.sleep(PACKET_DELAY_MS);
+                    } catch (SocketException e) {
+                        LOGGER.info("Client disconnected from IP " + ipAddress + " server: " + e.getMessage());
+                        return;
+                    } catch (SocketTimeoutException e) {
+                        LOGGER.info("Socket timeout for IP " + ipAddress + ": " + e.getMessage());
+                        return;
                     }
-                    
-                    packetCount++;
-                    successCount++;
-
-                    if (packetCount % 100 == 0) {
-                        LOGGER.info("Sent " + packetCount + " packets for IP " + ipAddress + 
-                                  " (" + truncatedCount + " truncated)");
-                    }
-
-                    // Small delay between packets to avoid overwhelming the client
-                    Thread.sleep(PACKET_DELAY_MS);
-                } catch (SocketException e) {
-                    LOGGER.info("Client disconnected from IP " + ipAddress + " server: " + e.getMessage());
-                    break;
-                } catch (SocketTimeoutException e) {
-                    LOGGER.info("Socket timeout for IP " + ipAddress + ": " + e.getMessage());
-                    break;
                 }
             }
 
