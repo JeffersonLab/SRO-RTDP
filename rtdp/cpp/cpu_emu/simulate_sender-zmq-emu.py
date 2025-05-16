@@ -75,8 +75,8 @@ def simulate_stream(
                 chunk_size = max(1, int(np.random.normal(chunk_size_mean, std_dev)))
             else:
                 chunk_size = int(chunk_size_mean)
-            buffer = serialize_buffer(size=int(chunk_size/8), timestamp=time.time(), stream_id=99) #bytes
-            if num_sent % 10 == 0: print(f"[simulate_stream:] Sending chunk; size = {chunk_size/8}")
+            buffer = serialize_buffer(size=int(chunk_size), timestamp=time.time(), stream_id=99) #bytes
+            if num_sent % 10 == 0: print(f"[simulate_stream:] Sending chunk; size = {chunk_size}")
             ts0 = time.time()
             
             #zmq_socket.send(buffer)

@@ -5,38 +5,40 @@
 set +m
 grep "Estimated chunk rate" $1|cut -f7 -d' '|gnuplot -p -e "set title 'Sender Estimated chunk rate Hz'; p '-' w l" &
 grep "Estimated bit rate" $1|grep MHz|cut -f6 -d' '|gnuplot -p -e "set title 'Sender Estimated bit rate Mhz'; p '-' w l" &
-echo -n "Sender chunk size: "; grep -i "Sending chunk" $1|cut -f 6 -d' '|get_moments
-echo -n "Sender Estimated chunk rate: "; grep -i "Estimated chunk rate" $1|cut -f7 -d' '|get_moments
-echo -n "Sender Estimated bit rate: "; grep -i "Estimated bit rate" $1|cut -f6 -d' '|get_moments
-echo -n "Sender Avg loop duration: "; grep -i "Avg loop duration" $1|cut -f6 -d' '|get_moments
+echo -n "Sender chunk size bits: "; grep -i "Sending chunk" $1|cut -f 6 -d' '|get_moments
+echo -n "Sender Estimated chunk rate Hz: "; grep -i "Estimated chunk rate" $1|cut -f7 -d' '|get_moments
+echo -n "Sender Estimated bit rate MHz: "; grep -i "Estimated bit rate" $1|cut -f6 -d' '|get_moments
+echo -n "Sender Avg loop duration sec: "; grep -i "Avg loop duration" $1|cut -f6 -d' '|get_moments
 grep "\[simulate_stream:\] zmq delay" $1|cut -f 6 -d' '|gnuplot -p -e "set title 'sender zmq delay usec'; p '-' w l" &
 echo -n "sender zmq delay usec: "; grep "\[simulate_stream:\] zmq delay" $1|cut -f 6 -d' '|get_moments
 grep "Avg loop duration" $1|cut -f 6 -d' '|gnuplot -p -e "set title 'Sender Avg loop duration (s)'; p '-' w l" &
-echo -n "sender Rate slept: "; grep "Rate slept" $1|cut -f 6 -d ' '|get_moments
+echo -n "sender Rate slept sec: "; grep "Rate slept" $1|cut -f 6 -d ' '|get_moments
+echo -n "sender transmission slept usec: "; grep transmission $1|cut -f 7 -d' '|get_moments
 echo
 t0=$(mktemp)
-for i in {7001..7003}; do
+for i in {7003..7001}; do
     grep "cpu_emu ${i}" $1 > $t0
     echo "cpu_emu ${i}:"
+    echo -n "chunk size bits: "; grep -i "Chunk size" $t0|grep -v "simulate_stream"|cut -f 9 -d' '|get_moments
     t1=$(mktemp); grep "Measured chunk" $t0|grep -v "simulate_stream"|cut -f 9 -d' ' > $t1
-    gnuplot -p -e "set title '$i Measured chunk Hz'; p '-' w l" < $t1 &
-    echo -n "Measured chunk: "; get_moments < $t1
+    gnuplot -p -e "set title '$i Measured chunk rate Hz'; p '-' w l" < $t1 &
+    echo -n "Measured chunk rate Hz: "; get_moments < $t1
     t2=$(mktemp); grep "Measured bit" $t0|grep -v "simulate_stream"|cut -f 8 -d' '  > $t2
-    gnuplot -p -e "set title '$i Measured bit Hz'; p '-' w l"  < $t2 &
-    echo -n "Measured bit: "; get_moments  < $t2
-    echo -n "Sim Sleep Spec: "; grep -i "Sim Sleep Spec" $t0|grep -v "simulate_stream"|cut -f 8 -d' '|get_moments
-    echo -n "Transmission Sleep Spec: "; grep -i "Transmission Sleep Spec" $t0|grep -v "simulate_stream"|cut -f 8 -d' '|get_moments
-    echo -n "chunk size: "; grep -i "Chunk size" $t0|grep -v "simulate_stream"|cut -f 9 -d' '|get_moments
+    gnuplot -p -e "set title '$i Measured bit rate MHz'; p '-' w l"  < $t2 &
+    echo -n "Measured bit rate MHz: "; get_moments  < $t2
     t3=$(mktemp); grep ZMQ $t0|grep -v "simulate_stream"|cut -f 8 -d' '|tail -n +2   > $t3
     echo -n "ZMQ read duration (us): "; get_moments < $t3
     gnuplot -p -e "set title '$i ZMQ read duration (us)'; p '-' w l" < $t3 &
+    echo -n "Sim Sleep Spec usec: "; grep -i "Sim Sleep Spec" $t0|grep -v "simulate_stream"|cut -f 8 -d' '|get_moments
+    echo -n "Transmission Sleep Spec usec: "; grep -i "Transmission Sleep Spec" $t0|grep -v "simulate_stream"|cut -f 8 -d' '|get_moments
+    echo -n "Transmission Slept for usec: "; grep xmssn $t0|cut -f 9 -d' '|get_moments
   echo
 done
 
 
 grep "\[cpu_emu 7003 \]:  Measured chunk rate" $1|cut -f 1,13 -d' '>/tmp/junk0; grep -i "Estimated chunk rate" $1|cut -f 1,9 -d' '>/tmp/junk1; paste /tmp/junk[01]|tee /tmp/junk3|gnuplot -p -e "set title 'sent/recd'; p '-' u 1:2 w l lc 'red', '/tmp/junk3' u 3:4 w l lc 'green'" &
 
-grep recd $1|tail -1; grep sent $1|tail -1; grep Attempting $1|wc -l; grep dropped $1|wc -l
+for i in {7003..7001}; do grep $i $1|grep recd|tail -1; done; echo; grep sent $1|tail -1; echo -n "Attempting: "; grep Attempting $1|wc -l; echo -n "dropped: "; grep dropped $1|wc -l
 
 echo "t0 $t0"
 echo "t1 $t1"
