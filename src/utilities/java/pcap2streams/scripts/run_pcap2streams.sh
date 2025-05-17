@@ -60,4 +60,4 @@ pkill -f "java.*Pcap2Streams" 2>/dev/null || true
 
 # Run the Pcap2Streams application
 echo "Starting Pcap2Streams with PCAP file: $PCAP_FILE"
-java -cp "build/classes/java/main:lib/json-20231013.jar:lib/disruptor-3.4.4.jar:lib/snakeyaml-2.0.jar" org.jlab.ersap.actor.pcap2streams.Pcap2Streams "$PCAP_FILE" "$CONFIG_DIR" 
+java -cp "build/classes/java/main:lib/json-20231013.jar:lib/disruptor-3.4.4.jar:lib/snakeyaml-2.0.jar" org.jlab.ersap.actor.pcap2streams.Pcap2Streams "$PCAP_FILE" "$CONFIG_DIR"

@@ -6,6 +6,7 @@
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPTS_DIR="$PROJECT_DIR/scripts"
 CONFIG_DIR="$PROJECT_DIR/custom-config"
+OUTPUT_DIR="$PROJECT_DIR/output"
 
 # Default config file
 CONFIG_FILE="$CONFIG_DIR/ip-based-config.json"
