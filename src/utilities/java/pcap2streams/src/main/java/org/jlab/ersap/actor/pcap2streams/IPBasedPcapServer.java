@@ -49,7 +49,6 @@ public class IPBasedPcapServer implements Runnable {
     private final Set<Long> packetPositions;
     private final AtomicBoolean running;
     private ServerSocket serverSocket;
-    private FileWriter csvWriter;  // Add CSV writer
 
     /**
      * Creates a new IP-based PCAP server.
@@ -66,23 +65,6 @@ public class IPBasedPcapServer implements Runnable {
         this.port = port;
         this.packetPositions = packetPositions;
         this.running = new AtomicBoolean(false);
-        
-        // Initialize CSV writer
-        try {
-            String csvFile = String.format("/workspaces/ersap-actors/src/utilities/java/pcap2streams/output/header_%s.csv", 
-                                         ipAddress.replace('.', '_'));
-            LOGGER.info("Creating CSV file: " + csvFile);
-            csvWriter = new FileWriter(csvFile);
-            // Write CSV header
-            String header = "Packet#,Position,Protocol,TotalLength,HeaderLength,PayloadLength,IsTruncated," +
-                          "EthernetHeader,IPHeader,TransportHeader,SourceIP,DestIP,SourcePort,DestPort\n";
-            csvWriter.write(header);
-            csvWriter.flush();
-            LOGGER.info("Successfully created CSV file and wrote header");
-        } catch (IOException e) {
-            LOGGER.severe("Failed to create CSV file: " + e.getMessage());
-            e.printStackTrace();
-        }
     }
 
     /**
@@ -106,9 +88,6 @@ public class IPBasedPcapServer implements Runnable {
             try {
                 if (serverSocket != null && !serverSocket.isClosed()) {
                     serverSocket.close();
-                }
-                if (csvWriter != null) {
-                    csvWriter.close();
                 }
             } catch (IOException e) {
                 LOGGER.log(Level.WARNING, "Error closing resources for IP " + ipAddress, e);
@@ -238,9 +217,26 @@ public class IPBasedPcapServer implements Runnable {
         int packetCount = 0;
         int successCount = 0;
         int truncatedCount = 0;
-
+        FileWriter localCsvWriter = null;
         try (RandomAccessFile pcapRaf = new RandomAccessFile(pcapFile, "r");
                 DataOutputStream clientOut = new DataOutputStream(clientSocket.getOutputStream())) {
+
+            // CSV file creation moved here
+            String outputDir = "output";
+            java.io.File outputDirectory = new java.io.File(outputDir);
+            if (!outputDirectory.exists()) {
+                outputDirectory.mkdirs();
+            }
+            String csvFile = String.format("%s/header_%s.csv", outputDir, ipAddress.replace('.', '_'));
+            java.io.File csvF = new java.io.File(csvFile);
+            boolean writeHeader = !csvF.exists() || csvF.length() == 0;
+            localCsvWriter = new FileWriter(csvFile, true); // append mode
+            if (writeHeader) {
+                String header = "Packet#,Position,Protocol,TotalLength,HeaderLength,PayloadLength,IsTruncated," +
+                                "EthernetHeader,IPHeader,TransportHeader,HeaderBytes,SourceIP,DestIP,SourcePort,DestPort\n";
+                localCsvWriter.write(header);
+                localCsvWriter.flush();
+            }
 
             LOGGER.info("Waiting before sending data for IP " + ipAddress + "...");
             Thread.sleep(1000); // Wait 1 second before sending data
@@ -362,23 +358,25 @@ public class IPBasedPcapServer implements Runnable {
                             ipHex.append(String.format("%02x ", dstIp[i] & 0xFF));
                         }
                         LOGGER.info(ipHex.toString());
-                        LOGGER.info("Attempting to write to CSV: " + String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%s,%s,%d,%d\n",
+                        LOGGER.info("Attempting to write to CSV: " + String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%d,%s,%s,%d,%d\n",
                             packetCount, position, protocol, actualLength, totalHeaderSize,
                             actualLength - totalHeaderSize, isTruncated,
                             ETHERNET_HEADER_SIZE, IP_HEADER_SIZE, transportHeaderSize,
+                            totalHeaderSize, // HeaderBytes
                             sourceIP, destIP, sourcePort, destPort));
                     }
 
                     try {
-                        if (csvWriter != null) {
-                            String csvLine = String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%s,%s,%d,%d\n",
+                        if (localCsvWriter != null) {
+                            String csvLine = String.format("%d,%d,%d,%d,%d,%d,%b,%d,%d,%d,%d,%s,%s,%d,%d\n",
                                 packetCount, position, protocol, actualLength, totalHeaderSize,
                                 actualLength - totalHeaderSize, isTruncated,
                                 ETHERNET_HEADER_SIZE, IP_HEADER_SIZE, transportHeaderSize,
+                                totalHeaderSize, // HeaderBytes
                                 sourceIP, destIP, sourcePort, destPort);
                             LOGGER.info("Writing to CSV: " + csvLine);
-                            csvWriter.write(csvLine);
-                            csvWriter.flush();
+                            localCsvWriter.write(csvLine);
+                            localCsvWriter.flush();
                             LOGGER.info("Successfully wrote to CSV");
                         } else {
                             LOGGER.severe("CSV writer is null! Cannot write to CSV file");
@@ -427,6 +425,9 @@ public class IPBasedPcapServer implements Runnable {
             Thread.currentThread().interrupt();
         } finally {
             try {
+                if (localCsvWriter != null) {
+                    localCsvWriter.close();
+                }
                 if (!clientSocket.isClosed()) {
                     clientSocket.close();
                 }
