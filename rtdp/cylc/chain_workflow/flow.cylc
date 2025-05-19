@@ -163,9 +163,9 @@
         [[[directives]]]
             --job-name = gpu_proxy
             --partition = gpu
-            --gres = gpu:1
+            --gres = gpu:A100:1
+            --mem = 100G
             --cpus-per-task = 4
-            --mem = 16G
         
         [[[outputs]]]
             ready = "ready"
