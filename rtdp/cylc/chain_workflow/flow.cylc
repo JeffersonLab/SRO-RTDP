@@ -13,10 +13,10 @@
             receiver:ready => gpu_proxy:ready => cpu_emu:ready => sender
             
             # Completion chain
-            sender:succeeded => !cpu_emu
-            cpu_emu:succeeded => !gpu_proxy
-            gpu_proxy:succeeded => !receiver
-            receiver:completed
+            sender:done => !cpu_emu
+            cpu_emu:done => !gpu_proxy
+            gpu_proxy:done => !receiver
+            receiver:transfer_done
         """
 
 [runtime]
@@ -103,7 +103,7 @@
         
         [[[outputs]]]
             ready = "ready"
-            completed = "Transfer completed successfully"
+            transfer_done = "Transfer completed successfully"
 
     [[gpu_proxy]]
         script = """
@@ -169,7 +169,7 @@
         
         [[[outputs]]]
             ready = "ready"
-            succeeded = "GPU proxy completed successfully"
+            done = "GPU proxy completed successfully"
 
     [[cpu_emu]]
         script = """
@@ -239,7 +239,7 @@
         
         [[[outputs]]]
             ready = "ready"
-            succeeded = "CPU emulator completed successfully"
+            done = "CPU emulator completed successfully"
 
     [[sender]]
         script = """
@@ -281,4 +281,4 @@
             --mem = 8G
         
         [[[outputs]]]
-            succeeded = "Sender completed successfully" 
+            done = "Sender completed successfully" 
