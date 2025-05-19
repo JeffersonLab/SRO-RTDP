@@ -28,6 +28,9 @@
         
         [[[directives]]]
             --ntasks = 1
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
         
         [[[environment]]]
             # Path to SIF files
