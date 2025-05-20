@@ -1,0 +1,293 @@
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready => gpu_proxy:ready => cpu_emu:ready => sender
+            
+            # Completion chain
+            sender:done => !cpu_emu
+            cpu_emu:done => !gpu_proxy
+            gpu_proxy:done => !receiver
+            receiver:transfer_done
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = jlab_slurm
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = ifarm
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF files
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            GPU_PROXY_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
+            
+            # Network configuration
+            BASE_PORT=55555
+            VERBOSE=2
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+
+    [[receiver]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/receiver
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start receiver with verbose output
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
+            apptainer run --pwd /app ${CPU_EMU_SIF} receiver -z -i ${IP} -r ${BASE_PORT} -p ${BASE_PORT} -v ${VERBOSE} > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                exit 1
+            fi
+            
+            # Monitor the receiver process
+            while kill -0 $RECV_PID 2>/dev/null; do
+                sleep 5
+            done
+            
+            # Check final status
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ] && [ -s "${OUTPUT_DIR}/received_data.bin" ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+            transfer_done = "Transfer completed successfully"
+
+    [[gpu_proxy]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/gpu_proxy
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/gpu_proxy/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/gpu_proxy/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
+            
+            # Store hostname for CPU emulator
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Start GPU proxy
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
+            apptainer run --nv ${GPU_PROXY_SIF} proxy \
+                --in-port ${BASE_PORT} \
+                --out-ip ${RECV_IP} \
+                --out-port ${BASE_PORT} \
+                -t \
+                -w 2048 \
+                2>${LOG_DIR}/gpu_proxy/apptainer.log &
+            
+            GPU_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${GPU_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $GPU_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                exit 1
+            fi
+            
+            # Monitor the GPU proxy process
+            while kill -0 $GPU_PID 2>/dev/null; do
+                sleep 5
+            done
+            
+            # Check final status
+            if [ $? -eq 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy completed successfully"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy failed" >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = gpu_proxy
+            --partition = gpu
+            --gres = gpu:A100:1
+            --mem = 100G
+            --cpus-per-task = 4
+        
+        [[[outputs]]]
+            ready = "ready"
+            done = "GPU proxy completed successfully"
+
+    [[cpu_emu]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/cpu_emu
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/cpu_emu/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/cpu_emu/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator task"
+            
+            # Get GPU proxy information
+            GPU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy IP: ${GPU_IP}"
+            
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/cpu_emu_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/cpu_emu_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Start CPU emulator
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
+            apptainer run --pwd /app ${CPU_EMU_SIF} emulator \
+                -i ${GPU_IP} \
+                -r ${BASE_PORT} \
+                -p ${BASE_PORT} \
+                -s \
+                -v ${VERBOSE} \
+                2>${LOG_DIR}/cpu_emu/apptainer.log &
+            
+            CPU_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator started with PID ${CPU_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $CPU_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process not running" >&2
+                exit 1
+            fi
+            
+            # Monitor the CPU emulator process
+            while kill -0 $CPU_PID 2>/dev/null; do
+                sleep 5
+            done
+            
+            # Check final status
+            if [ $? -eq 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator completed successfully"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator failed" >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = cpu_emu
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+            done = "CPU emulator completed successfully"
+
+    [[sender]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/sender
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            
+            # Get CPU emulator information
+            CPU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/cpu_emu_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator IP: ${CPU_IP}"
+            
+            # Start sender using GPU proxy's sender
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender"
+            apptainer run --pwd /app ${GPU_PROXY_SIF} sender \
+                -a ${CPU_IP} \
+                -p ${BASE_PORT} \
+                -r 25 \
+                --group-size 2048 \
+                -v \
+                2>${LOG_DIR}/sender/apptainer.log
+            
+            # Check final status
+            if [ $? -eq 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sender completed successfully"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Sender failed" >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            done = "Sender completed successfully" 
