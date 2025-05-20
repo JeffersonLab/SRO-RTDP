@@ -32,7 +32,7 @@ def simulate_stream(
     print(f"[simulate_stream:] nic_limit_gbps = {nic_limit_gbps}...")
 
     context = zmq.Context()
-    zmq_socket = context.socket(zmq.PUSH)
+    zmq_socket = context.socket(zmq.REQ)
     # Send will never block
     # optional: disable high water marksocket.setsockopt(zmq.LINGER, 0)  # don't wait on closesocket.bind("tcp://*:5555")
     zmq_socket.setsockopt(zmq.SNDHWM, 0) #int(1e2))  # Set send high water mark to 0 messages
@@ -61,52 +61,32 @@ def simulate_stream(
     start_time = time.time()
     # Derived sleep time between messages
     rate_sleep = chunk_size_mean / avg_rate_bps  # in seconds
+    smClk = 0xFFFFFFFFFFFFFFFF  #ensure is 64bits
+    smClk = 0 #master simulation clock in nanoseconds
     while True:
-        tl0 = time.time()
+#        tl0 = time.time()
         # -----------------------
         # ON phase: Send data
         # -----------------------
-        print(f"[simulate_stream:] Sending for {on_time:.3f}s (duty cycle on phase)")
         start_on = time.time()
-        print(f"[simulate_stream:] Times: current {time.time()}, time.time() - start_on {time.time() - start_on}, on_time {on_time}")
         while time.time() - start_on < on_time:
             # Calculate chunk size from normal distribution
             if rms_fraction > 0:
                 chunk_size = max(1, int(np.random.normal(chunk_size_mean, std_dev)))
             else:
                 chunk_size = int(chunk_size_mean)
-            buffer = serialize_buffer(size=int(chunk_size), timestamp=time.time(), stream_id=99) #bytes
-            if num_sent % 10 == 0: print(f"[simulate_stream:] Sending chunk; size = {chunk_size}")
-            ts0 = time.time()
-            
-            #zmq_socket.send(buffer)
-            try:
-                print(f"[simulate_stream:] Attempting to send ....")
-                zmq_socket.send(buffer, zmq.NOBLOCK)
-            except zmq.Again:
-                lost_chunks = lost_chunks + 1
-                print(f"[simulate_stream:] Receiver is not ready, {lost_chunks} message dropped.")
-                time.sleep(rate_sleep)
-                print(f"[simulate_stream:] Rate slept (lost) (s) for {rate_sleep}")
-                continue # skip the rest
-            
-            #try:
-            #    print(f"[simulate_stream:] Attempting to send ....")
-            #    socket.send(buffer, zmq.NOBLOCK)
-            #except zmq.Again:
-            #    lost_chunks = lost_chunks + 1
-            #    print(f"[simulate_stream:] Receiver is not ready, {lost_chunks} message dropped.")
-                
-            ts1 = time.time()
-            # Delay to simulate sending latency
-            td = chunk_size/nic_limit_bps #seconds
-            if num_sent % 10 == 0: print(f"[simulate_stream:] zmq delay (usecs) of {1e6*(ts1-ts0)}")
-            if num_sent % 10 == 0: print(f"[simulate_stream:] Simulate transmission delay (usecs) of {1e6*td}")
             # Simulate transmission delay
-            time.sleep(td)
+            td = chunk_size/nic_limit_bps #seconds
+            smClk += int(td*1e9)
+            buffer = serialize_buffer(size=chunk_size, timestamp=int(smClk), stream_id=99)
+            print(f"{smClk} [simulate_stream:] Sending chunk; size = {chunk_size}") #if num_sent % 10 == 0: 
+            
+            zmq_socket.send(buffer)
+            reply = zmq_socket.recv_string() #ACK
+                
             # Delay to throttle sending rate
-            time.sleep(rate_sleep)
-            if num_sent % 10 == 0: print(f"[simulate_stream:] Rate slept (s) for {rate_sleep}")
+            smClk += int(rate_sleep*1e9)
+            
             num_sent = num_sent + 1
 
         # Apply duty cycle
@@ -114,16 +94,12 @@ def simulate_stream(
         # OFF phase: Sleep
         # -----------------------
         if off_time > 0:
-            print(f"[simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
+            print(f"{smClk} [simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
             time.sleep(off_time)
-        t = time.time()
-        tdl = (t - start_time)
-        #sys.stdout.flush()
-        print(f"{time.time()} [simulate_stream:] Estimated chunk rate (Hz): {float(num_sent)/float(tdl)} num_sent {num_sent}")
-        print(f"[simulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*chunk_size_mean/float(tdl)} num_sent {num_sent}")
-        print(f"[simulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*chunk_size_mean)/float(tdl)} num_sent {num_sent}")
-        print(f"[simulate_stream:] Avg loop duration (sec): {float(t-tl0)}")
-        print(f"[simulate_stream:] Lost Chunks: {lost_chunks}", flush=True)
+        print(f"{smClk} [simulate_stream:] Estimated chunk rate (Hz): {float(num_sent)/float(smClk*1e-9)} num_sent {num_sent}")
+        print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*chunk_size_mean/float(smClk*1e-9)} num_sent {num_sent}")
+        print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*chunk_size_mean)/float(smClk*1e-9)} num_sent {num_sent}")
+        print(f"{smClk} [simulate_stream:] Lost Chunks: {lost_chunks}", flush=True)
 
 if __name__ == "__main__":
     print(f"[simulate_sender-zmq-emu: main:]")
