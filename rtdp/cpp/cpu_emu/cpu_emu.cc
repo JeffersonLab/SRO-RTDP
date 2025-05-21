@@ -363,11 +363,10 @@ int main (int argc, char *argv[])
         recv_result_t rtcd;
         
         {//block
-            auto start = high_resolution_clock::now();
             rtcd = rcv_sckt.recv (request, recv_flags::none);
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
-            if(vrbs>10) cout << "[cpu_emu " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl;
+            if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl; //vrbs>10
             rcv_sckt.send (reply, send_flags::none);
         }
 
@@ -443,8 +442,8 @@ int main (int argc, char *argv[])
                 message_t dst_msg(outSz/8);  //represents harvested data
                 sr = dst_sckt.send(dst_msg, send_flags::none);
                 zmq::message_t reply;
-                dst_sckt.recv(reply, zmq::recv_flags::none);
-                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  << sr.value()  << endl;
+                recv_result_t rtcd = dst_sckt.recv(reply, zmq::recv_flags::none);
+                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  << sr.value()  << " With rtcd = " << rtcd.value() << endl;
                 if(sr.value() != outSz/8) cout << "Destination data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
