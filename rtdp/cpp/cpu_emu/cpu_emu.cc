@@ -360,7 +360,7 @@ int main (int argc, char *argv[])
         if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
-    uint64_t request_nbr = 0;
+    uint64_t request_nbr = 1;
     double mnBfSz = 0; //mean receive Size (bits)
     while (true) {
         //if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Setting up request message ..." << endl;
@@ -390,7 +390,11 @@ int main (int argc, char *argv[])
 
             bufSiz = pkt.size;
             stream_id = pkt.stream_id;
-            tsr = pkt.timestamp;
+            //reqd transmission timespan in nanoseconds
+            tsn = uint64_t(1e9*float(bufSiz/outNicSpd))*sd_30_gamma_dist(gen);
+            if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << endl;
+            //advance the sim clock for netwok latency
+            tsr = pkt.timestamp + tsn;
         } else {
             bufSiz = 8*rtcd.value();
         }
@@ -400,7 +404,7 @@ int main (int argc, char *argv[])
                       
         if(vrbs) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " chunk size = " 
                       << (psdX?"(Spec'd) ":"(actual) ") << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
-                      << " from client " << "ts = " << (psdX?tsr:0) << endl;  // && request_nbr % 10 == 0
+                      << " from client " << "ts = " << (psdX?tsr:0) << " (" << request_nbr << ')' << endl;  // && request_nbr % 10 == 0
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
         if (psdX) {
@@ -419,7 +423,7 @@ int main (int argc, char *argv[])
         if(!psdZ) {
             if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " Forwarding "
                           << " request " << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
-                          << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt)<< endl;
+                          << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << " (" << request_nbr << ')' << endl;
             //forward to next hop    
             // Send a message to the destination
             size_t outSz = 8*otmemGB*1.024*1.024*1.024*1e9; //output size in bits
@@ -429,10 +433,7 @@ int main (int argc, char *argv[])
                 BufferPacket pkt;
                 //represents harvested data
                 pkt.size = outSz;
-                //reqd transmission timespan in nanoseconds
-                tsn = uint64_t(1e9*float(1e9*8*otmemGB/outNicSpd))*sd_30_gamma_dist(gen);
-                //advance the sim clock for comp + network latencies
-                pkt.timestamp = tsr + tsn + tsc;
+                pkt.timestamp = tsr + tsc;
                 pkt.stream_id = stream_id;
 	            // Send "chunk" spec
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
@@ -452,20 +453,20 @@ int main (int argc, char *argv[])
                 sr = dst_sckt.send(dst_msg, send_flags::none);
                 zmq::message_t reply;
                 recv_result_t rtcd = dst_sckt.recv(reply, zmq::recv_flags::none);
-                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  << sr.value()  << " With rtcd = " << rtcd.value() << endl;
+                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  << sr.value()  << " With rtcd = " << rtcd.value() << " (" << request_nbr << ')' << endl;
                 if(sr.value() != outSz/8) cout << "Destination data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
-        request_nbr++;
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
-        const uint64_t tsl = tsn + tsc;
+        //const uint64_t tsl = tsn + tsc;
         // Record end time
-        if (request_nbr % 10 == 0) {
-            if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << std::endl;
-            if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " Measured chunk rate " << float(1)/(1e-9*float(tsl)) << " chunk Hz." << " for " << request_nbr << " chunks" << std::endl;
-            if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-9*float(tsl)) << " MHz mnBfSz " << mnBfSz << std::endl;
-            if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
+        if (true) { //request_nbr % 10 == 0) {
+            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << request_nbr << ')' << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured chunk rate " << float(1)/(1e-9*float(tsc)) << " chunk Hz." << " for " << request_nbr << " chunks" << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-9*float(tsc)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
         }
+        request_nbr++;
     }
     return 0;
 }

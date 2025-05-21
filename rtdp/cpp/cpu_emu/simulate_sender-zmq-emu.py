@@ -76,10 +76,11 @@ def simulate_stream(
             else:
                 chunk_size = int(chunk_size_mean)
             # Simulate transmission delay
-            td = chunk_size/nic_limit_bps #seconds
-            smClk += int(td*1e9)
+            #td = chunk_size/nic_limit_bps #seconds
+            #smClk += int(td*1e9)
             buffer = serialize_buffer(size=chunk_size, timestamp=int(smClk), stream_id=99)
-            print(f"{smClk} [simulate_stream:] Sending chunk; size = {chunk_size}") #if num_sent % 10 == 0: 
+            num_sent = num_sent + 1
+            print(f"{smClk} [simulate_stream:] Sending chunk; size = {chunk_size} chunk_num = {num_sent}")
             
             zmq_socket.send(buffer)
             reply = zmq_socket.recv_string() #ACK
@@ -87,8 +88,6 @@ def simulate_stream(
             # Delay to throttle sending rate
             smClk += int(rate_sleep*1e9)
             
-            num_sent = num_sent + 1
-
         # Apply duty cycle
         # -----------------------
         # OFF phase: Sleep
