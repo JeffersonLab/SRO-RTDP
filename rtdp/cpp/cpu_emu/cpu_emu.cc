@@ -23,6 +23,7 @@
 #include <cstdlib> // Required for exit()
 #include <cmath> // Needed for round()
 #include "buffer_packet.hh"
+#include <random>
 
 #ifdef __linux__
     #define HTONLL(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))
@@ -331,6 +332,14 @@ int main (int argc, char *argv[])
                 << "\tnmThrds = "  << nmThrds                     << "\tverbose = "   << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
                 << "\tterminal = " << psdZ                        << '\n';
 
+    // Random number generator for compute latency generation
+    constexpr double shape = 25.0;  //100
+    constexpr double scale = 4e-11; //1e-11 - halves the std dev with same mean
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::gamma_distribution<double> tsc_gamma_dist(shape, scale);
+
     //  Prepare our receiving rcv_cntxt and socket
     context_t rcv_cntxt(1);
     context_t dst_cntxt(1);
@@ -395,8 +404,8 @@ int main (int argc, char *argv[])
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
         if (psdX) {
-            //reqd computational timespan in nanoseconds
-            tsc = uint64_t(cmpLt_GB*float(bufSiz)/8);            
+            //reqd computational timespan in nanoseconds with 20% std dev
+            tsc = uint64_t(1e9*cmpLt_GB*(float(bufSiz)/8)*tsc_gamma_dist(gen));
         } else {//parse recvd message to get simlated data size recvd
             vector<thread> threads;
 
