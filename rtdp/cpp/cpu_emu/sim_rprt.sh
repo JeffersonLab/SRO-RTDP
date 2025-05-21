@@ -21,6 +21,8 @@ for i in {7003..7001}; do
     t2=$(mktemp); grep "Measured bit" $t0|grep -v "simulate_stream"|cut -f 1,8 -d' '  > $t2
     gnuplot -p -e "set title '$i Measured bit rate MHz'; p '-' u 1:2 w l"  < $t2 &
     echo -n "Measured bit rate MHz: "; cut -f 2 -d ' ' $t2 | get_moments
+    grep Compute $t0|cut -f9 -d' '|gnuplot -p -e "set title '$i compute latency nsec'; p '-' w l"
+    grep Compute $t0|cut -f12 -d' '|gnuplot -p -e "set title '$i network latency nsec'; p '-' w l"
   echo
 done
 

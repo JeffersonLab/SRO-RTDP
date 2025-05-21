@@ -338,7 +338,7 @@ int main (int argc, char *argv[])
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::gamma_distribution<double> tsc_gamma_dist(shape, scale);
+    std::gamma_distribution<double> sd_30_gamma_dist(shape, scale);
 
     //  Prepare our receiving rcv_cntxt and socket
     context_t rcv_cntxt(1);
@@ -404,8 +404,8 @@ int main (int argc, char *argv[])
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
         if (psdX) {
-            //reqd computational timespan in nanoseconds with 20% std dev
-            tsc = uint64_t(1e9*cmpLt_GB*(float(bufSiz)/8)*tsc_gamma_dist(gen));
+            //reqd computational timespan in nanoseconds with 30% std dev
+            tsc = uint64_t(1e9*cmpLt_GB*(float(bufSiz)/8)*sd_30_gamma_dist(gen));
         } else {//parse recvd message to get simlated data size recvd
             vector<thread> threads;
 
@@ -430,7 +430,7 @@ int main (int argc, char *argv[])
                 //represents harvested data
                 pkt.size = outSz;
                 //reqd transmission timespan in nanoseconds
-                tsn = uint64_t(float(1e9*8*otmemGB/outNicSpd));
+                tsn = uint64_t(1e9*float(1e9*8*otmemGB/outNicSpd))*sd_30_gamma_dist(gen);
                 //advance the sim clock for comp + network latencies
                 pkt.timestamp = tsr + tsn + tsc;
                 pkt.stream_id = stream_id;
