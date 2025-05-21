@@ -25,13 +25,28 @@ for i in {7003..7001}; do
 done
 
 
-grep "\[cpu_emu 7003\]:  Measured chunk rate" $t|cut -f 1,12 -d' '>/tmp/junk0; grep -i "Estimated chunk rate" $t|cut -f 1,9 -d' '>/tmp/junk1; paste /tmp/junk[01]|tee /tmp/junk3|gnuplot -p -e "set title 'sent/recd'; p '-' u 1:2 w l lc 'red', '/tmp/junk3' u 3:4 w l lc 'green'" &
+t3=$(mktemp)
+t4=$(mktemp)
+t5=$(mktemp)
+
+grep "\[cpu_emu 7003\]:  Measured chunk rate" $t|cut -f 1,12 -d' '>$t3; grep -i "Estimated chunk rate" $t|cut -f 1,9 -d' '>$t4; paste $t3 $t4|tee $t5|gnuplot -p -e "set title 'sent/recd'; p '-' u 1:2 w l lc 'red', '$t5' u 3:4 w l lc 'green'" &
 
 for i in {7003..7001}; do grep $i $t|grep recd|tail -1; done; echo; grep sent $t|tail -1; echo -n "Attempting: "; grep Attempting $t|wc -l; echo -n "dropped: "; grep dropped $t|wc -l
 
+t6=$(mktemp)
+t7=$(mktemp)
+grep "\[simulate_stream:] Sending chunk" $t > $t6
+grep "\[cpu_emu 700[123]\]:  chunk size" $t >> $t6
+sort -k 1 -n $t6 > $t7
+
+echo "t $t"
 echo "t0 $t0"
 echo "t1 $t1"
 echo "t2 $t2"
 echo "t3 $t3"
+echo "t4 $t4"
+echo "t5 $t5"
+echo "t6 $t6"
+echo "t7 $t7"
 
 set -m
