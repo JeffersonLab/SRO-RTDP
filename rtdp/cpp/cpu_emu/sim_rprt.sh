@@ -24,7 +24,7 @@ for i in {7003..7001}; do
     grep Compute $t0|cut -f9 -d' '|gnuplot -p -e "set title '$i compute latency nsec'; p '-' w l"
     grep Compute $t0|cut -f12 -d' '|gnuplot -p -e "set title '$i network latency nsec'; p '-' w l"
     #grep tsn $t0|cut -f 9,12 -d' '|gnuplot -p -e "set title '$i network latency nsec vs size bits'; p '-' u 1:2"
-    tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency nsec vs size bits'; p '$tg' u 1:2, f(x) color='red'"
+    tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency nsec vs size bits'; p '$tg' u 1:2, f(x) lc 'red'"
   echo
 done
 
