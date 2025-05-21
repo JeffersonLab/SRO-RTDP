@@ -396,7 +396,7 @@ int main (int argc, char *argv[])
         // load (or emulate load on) system with ensuing work
         if (psdX) {
             //reqd computational timespan in nanoseconds
-            tsc = uint64_t(cmpLt_GB*1e-9*float(bufSiz)/8);            
+            tsc = uint64_t(cmpLt_GB*float(bufSiz)/8);            
         } else {//parse recvd message to get simlated data size recvd
             vector<thread> threads;
 
@@ -452,6 +452,7 @@ int main (int argc, char *argv[])
         const uint64_t tsl = tsn + tsc;
         // Record end time
         if (request_nbr % 10 == 0) {
+            if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << std::endl;
             if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " Measured chunk rate " << float(1)/(1e-9*float(tsl)) << " chunk Hz." << " for " << request_nbr << " chunks" << std::endl;
             if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-9*float(tsl)) << " MHz mnBfSz " << mnBfSz << std::endl;
             if(vrbs) std::cout << tsr+tsl << " [cpu_emu " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
