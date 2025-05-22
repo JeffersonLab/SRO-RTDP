@@ -391,8 +391,10 @@ int main (int argc, char *argv[])
             bufSiz = pkt.size;
             stream_id = pkt.stream_id;
             //reqd transmission timespan in nanoseconds
-            tsn = uint64_t(1e9*float(bufSiz/outNicSpd))*sd_30_gamma_dist(gen);
-            if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << endl;
+            double xmsFctr = max(1e-9,sd_30_gamma_dist(gen));
+            tsn = uint64_t(1e9*float(bufSiz/outNicSpd)*xmsFctr);
+            if(vrbs && request_nbr % 10 == 0) cout << "[cpu_emu " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz 
+                          << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << " using xmsFctr " << xmsFctr << endl;
             //advance the sim clock for netwok latency
             tsr = pkt.timestamp + tsn;
         } else {
@@ -460,7 +462,7 @@ int main (int argc, char *argv[])
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
         //const uint64_t tsl = tsn + tsc;
         // Record end time
-        if (true) { //request_nbr % 10 == 0) {
+        if (request_nbr % 10 == 0) {
             if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << request_nbr << ')' << std::endl;
             if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured chunk rate " << float(1)/(1e-9*float(tsc)) << " chunk Hz." << " for " << request_nbr << " chunks" << std::endl;
             if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-9*float(tsc)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
