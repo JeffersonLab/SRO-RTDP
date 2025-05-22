@@ -41,7 +41,33 @@ t6=$(mktemp)
 t7=$(mktemp)
 grep "\[simulate_stream:] Sending chunk" $t > $t6
 grep "\[cpu_emu 700[123]\]:  chunk size" $t >> $t6
+grep done $t >> $t6
+#grep "Sending chunk" $t >> $t6
+grep dropped $t >> $t6
 sort -k 1 -n $t6 > $t7
+
+t8=$(mktemp)
+grep "simulate_stream:] Sending chunk" $t7 > $t8
+grep "cpu_emu 7003" $t7|grep done >> $t8
+t9=$(mktemp)
+sort -k 1 -n $t8 > $t9
+
+t10=$(mktemp)
+grep "cpu_emu 7003]:  Sending" $t7 > $t10
+grep "cpu_emu 7002" $t7|grep done >> $t10
+t11=$(mktemp)
+sort -k 1 -n $t10 > $t11
+
+t12=$(mktemp)
+grep "cpu_emu 7002]:  Sending" $t7 > $t12
+grep "cpu_emu 7001" $t7|grep done >> $t12
+t13=$(mktemp)
+sort -k 1 -n $t12 > $t13
+
+echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7003"|wc -l; echo "chunks dropped"
+echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7002"|wc -l; echo "chunks dropped"
+echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7001"|wc -l; echo "chunks dropped"
+tail -1 $t
 
 echo "t $t"
 echo "t0 $t0"
@@ -52,5 +78,11 @@ echo "t4 $t4"
 echo "t5 $t5"
 echo "t6 $t6"
 echo "t7 $t7"
+echo "t8 $t8"
+echo "t9 $t9"
+echo "t10 $t10"
+echo "t11 $t11"
+echo "t12 $t12"
+echo "t13 $t13"
 
 set -m

@@ -75,13 +75,9 @@ def simulate_stream(
                 chunk_size = max(1, int(np.random.normal(chunk_size_mean, std_dev)))
             else:
                 chunk_size = int(chunk_size_mean)
-            # Simulate transmission delay
-            #td = chunk_size/nic_limit_bps #seconds
-            #smClk += int(td*1e9)
             buffer = serialize_buffer(size=chunk_size, timestamp=int(smClk), stream_id=99)
             num_sent = num_sent + 1
-            print(f"{smClk} [simulate_stream:] Sending chunk; size = {chunk_size} chunk_num = {num_sent}")
-            
+            print(f"{smClk} [simulate_stream:] Sending chunk; size = {chunk_size} chunk_num = ({num_sent})")            
             zmq_socket.send(buffer)
             reply = zmq_socket.recv_string() #ACK
                 

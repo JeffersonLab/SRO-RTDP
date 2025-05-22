@@ -362,6 +362,11 @@ int main (int argc, char *argv[])
     }
     uint64_t request_nbr = 1;
     double mnBfSz = 0; //mean receive Size (bits)
+    uint64_t bufSiz = 0; //bits
+    uint32_t stream_id = 0;
+    uint64_t tsr = 0; // sim clock from sender
+    uint64_t tsc = 0; // computational latency
+    uint64_t tsn = 0; // outbound network latency
     while (true) {
         //if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Setting up request message ..." << endl;
         message_t request;
@@ -379,11 +384,6 @@ int main (int argc, char *argv[])
             rcv_sckt.send (reply, send_flags::none);
         }
 
-        uint64_t bufSiz = 0; //bits
-        uint32_t stream_id = 0;
-        uint64_t tsr = 0; // sim clock from sender
-        uint64_t tsc = 0; // computational latency
-        uint64_t tsn = 0; // outbound network latency
         if (psdX) { //parse recvd message to get simlated data size recvd
         
             BufferPacket pkt = BufferPacket::from_message(request);
@@ -393,25 +393,33 @@ int main (int argc, char *argv[])
             //reqd transmission timespan in nanoseconds
             double xmsFctr = max(1e-9,sd_30_gamma_dist(gen));
             tsn = uint64_t(1e9*float(bufSiz/outNicSpd)*xmsFctr);
-            if(vrbs && request_nbr % 10 == 0) cout << "[cpu_emu " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz 
-                          << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << " using xmsFctr " << xmsFctr << endl;
             //advance the sim clock for netwok latency
-            tsr = pkt.timestamp + tsn;
+            auto tsr1 = pkt.timestamp + tsn;
+            if(vrbs && request_nbr % 10 == 0) cout << "[cpu_emu " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz
+                          << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << " using xmsFctr " << xmsFctr << endl;
+            if(tsr>tsr1) {
+                if(vrbs) cout << tsr1 << " [cpu_emu " << rcv_prt << "]:  dropped (" << request_nbr++ << ')' << endl;
+                continue;
+            } else {
+                tsr = tsr1;// (request_nbr==1?pkt.timestamp:tsr) + tsn;
+            }
         } else {
             bufSiz = 8*rtcd.value();
         }
-        if(DBG) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " Received request " 
+        if(DBG) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " Received request "
                       << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
-        if(vrbs) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " chunk size = " 
+        if(vrbs) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " chunk size = "
                       << (psdX?"(Spec'd) ":"(actual) ") << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
-                      << " from client " << "ts = " << (psdX?tsr:0) << " (" << request_nbr << ')' << endl;  // && request_nbr % 10 == 0
+                      << " from client " << "ts = " << (psdX?tsr:0) << " (" << request_nbr << ')' << endl;
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
         if (psdX) {
             //reqd computational timespan in nanoseconds with 30% std dev
             tsc = uint64_t(1e9*cmpLt_GB*(float(bufSiz)/8)*sd_30_gamma_dist(gen));
+            if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' << endl;
+            tsr += tsc;
         } else {//parse recvd message to get simlated data size recvd
             vector<thread> threads;
 
@@ -426,7 +434,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " Forwarding "
                           << " request " << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                           << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << " (" << request_nbr << ')' << endl;
-            //forward to next hop    
+            //forward to next hop
             // Send a message to the destination
             size_t outSz = 8*otmemGB*1.024*1.024*1.024*1e9; //output size in bits
 
@@ -435,9 +443,11 @@ int main (int argc, char *argv[])
                 BufferPacket pkt;
                 //represents harvested data
                 pkt.size = outSz;
-                pkt.timestamp = tsr + tsc;
+                pkt.timestamp = tsr;
                 pkt.stream_id = stream_id;
 	            // Send "chunk" spec
+                if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  Sending chunk size = " << outSz << " (" 
+                              << request_nbr << ')' << " to " << rcv_prt-1 << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
 
                 // Receive the reply from the destination
@@ -445,7 +455,8 @@ int main (int argc, char *argv[])
                 message_t reply;
                 if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: Waiting for destination ACK (" << request_nbr << ')' << endl;
                 recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
-                if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: Destination Actual reply (" << request_nbr << ") " << reply << " With rtcd = " << rtcd.value() << endl;
+                if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: Destination Actual reply (" << request_nbr << ") " 
+                              << reply << " With rtcd = " << rtcd.value() << endl;
 
                 if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written  (" << request_nbr << ") " << sr.value()  << endl;
                 if(sr.value() != pkt.PACKET_SIZE) cout << "Destination data incorrect size (" << request_nbr << ") " << endl;
@@ -455,7 +466,8 @@ int main (int argc, char *argv[])
                 sr = dst_sckt.send(dst_msg, send_flags::none);
                 zmq::message_t reply;
                 recv_result_t rtcd = dst_sckt.recv(reply, zmq::recv_flags::none);
-                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  << sr.value()  << " With rtcd = " << rtcd.value() << " (" << request_nbr << ')' << endl;
+                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  
+                             << sr.value()  << " With rtcd = " << rtcd.value() << " (" << request_nbr << ')' << endl;
                 if(sr.value() != outSz/8) cout << "Destination data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
@@ -468,6 +480,7 @@ int main (int argc, char *argv[])
             if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-9*float(tsc)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
             if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
         }
+        if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  done (" << request_nbr << ')' << endl;
         request_nbr++;
     }
     return 0;
