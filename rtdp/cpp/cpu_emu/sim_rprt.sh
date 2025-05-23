@@ -4,11 +4,31 @@
 #==================================basic report =================================
 t=$1
 set +m
-grep "Estimated chunk rate" $t|cut -f1,7 -d' '|gnuplot -p -e "set title 'Sender Estimated chunk rate Hz'; p '-' u 1:2 w l" &
-grep "Estimated bit rate" $t|grep MHz|cut -f1,7 -d' '|gnuplot -p -e "set title 'Sender Estimated bit rate Mhz'; p '-' u 1:2 w l" &
-echo -n "Sender chunk size bits: "; grep -i "Sending chunk" $t|cut -f 7 -d' '|get_moments
-echo -n "Sender Estimated chunk rate Hz: "; grep -i "Estimated chunk rate" $t|cut -f7 -d' '|get_moments
-echo -n "Sender Estimated bit rate MHz: "; grep -i "Estimated bit rate" $t|grep MHz|cut -f7 -d' '|get_moments
+t0a=$(mktemp)
+grep "Estimated chunk rate" $t|cut -f1,7 -d' ' > $t0a
+cat $t0a|gnuplot -p -e "set title 'Sender Estimated chunk rate Hz'; p '-' u 1:2 w l" &
+echo -n 'Sender Estimated chunk rate Hz: '
+cut -f2 -d' ' $t0a|get_moments
+t0b=$(mktemp)
+grep "Estimated bit rate" $t|grep MHz|cut -f1,7 -d' ' > $t0b
+cat $t0b|gnuplot -p -e "set title 'Sender Estimated bit rate Mhz'; p '-' u 1:2 w l" &
+echo -n 'Sender Estimated bit rate Mhz: '
+cut -f2 -d' ' $t0b|get_moments
+t0c=$(mktemp)
+grep -i "\[simulate_stream:] Sending chunk" $t|cut -f 1,7 -d' ' > $t0c
+cat $t0c|gnuplot -p -e "set title 'Sender chunk size bits'; p '-' u 1:2 w l" &
+echo -n "Sender chunk size bits: "
+cut -f2 -d' ' $t0c|get_moments
+t0d=$(mktemp)
+grep -i "Estimated chunk rate" $t|cut -f1,7 -d' ' > $t0d
+cat $t0d|gnuplot -p -e "set title 'Sender Estimated chunk rate Hz'; p '-' u 1:2 w l" &
+echo -n "Sender Estimated chunk rate Hz: "
+cut -f2 -d' ' $t0d|get_moments
+t0e=$(mktemp)
+grep -i "Estimated bit rate" $t|grep MHz|cut -f1,7 -d' ' > $t0e
+cat $t0e|gnuplot -p -e "set title 'Sender Estimated bit rate MHz'; p '-' u 1:2 w l" &
+echo -n "Sender Estimated bit rate MHz: "
+cut -f2 -d' ' $t0e|get_moments
 echo
 t0=$(mktemp)
 for i in {7003..7001}; do
@@ -33,7 +53,7 @@ t3=$(mktemp)
 t4=$(mktemp)
 t5=$(mktemp)
 
-grep "\[cpu_emu 7003\]:  Measured chunk rate" $t|cut -f 1,12 -d' '>$t3; grep -i "Estimated chunk rate" $t|cut -f 1,9 -d' '>$t4; paste $t3 $t4|tee $t5|gnuplot -p -e "set title 'sent/recd'; p '-' u 1:2 w l lc 'red', '$t5' u 3:4 w l lc 'green'" &
+#grep "\[cpu_emu 7003\]:  Measured chunk rate" $t|cut -f 1,12 -d' '>$t3; grep -i "Estimated chunk rate" $t|cut -f 1,9 -d' '>$t4; paste $t3 $t4|tee $t5|gnuplot -p -e "set title 'sent/recd'; p '-' u 1:2 w l lc 'red', '$t5' u 3:4 w l lc 'green'" &
 
 for i in {7003..7001}; do grep $i $t|grep recd|tail -1; done; echo; grep sent $t|tail -1; echo -n "Attempting: "; grep Attempting $t|wc -l; echo -n "dropped: "; grep dropped $t|wc -l
 
@@ -65,8 +85,8 @@ t13=$(mktemp)
 sort -k 1 -n $t12 > $t13
 
 echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7003"|wc -l; echo "chunks dropped"
-echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7002"|wc -l; echo "chunks dropped"
-echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7001"|wc -l; echo "chunks dropped"
+echo -n "cpu_emu 7002: "; grep dropped $t|grep "cpu_emu 7002"|wc -l; echo "chunks dropped"
+echo -n "cpu_emu 7001: "; grep dropped $t|grep "cpu_emu 7001"|wc -l; echo "chunks dropped"
 tail -1 $t
 
 echo "t $t"
