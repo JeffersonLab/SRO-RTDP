@@ -84,10 +84,19 @@ grep "cpu_emu 7001" $t7|grep done >> $t12
 t13=$(mktemp)
 sort -k 1 -n $t12 > $t13
 
-echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7003"|wc -l; echo "chunks dropped"
+#echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7003"|wc -l; echo "chunks dropped"
+#a=$(echo -n "cpu_emu 7003: "; grep dropped $t|grep "cpu_emu 7003"|wc -l)
+echo -n $a; echo " chunks dropped"
 echo -n "cpu_emu 7002: "; grep dropped $t|grep "cpu_emu 7002"|wc -l; echo "chunks dropped"
 echo -n "cpu_emu 7001: "; grep dropped $t|grep "cpu_emu 7001"|wc -l; echo "chunks dropped"
-tail -1 $t
+b=$(grep "simulate_stream:] Sending chunk" $t | tail -1)
+#echo -n $b
+n=$(grep dropped $t|grep "cpu_emu 7003"|wc -l)
+d=$(echo -n $b|cut -f 10 -d ' '|sed 's/(//'|sed 's/)//')
+#echo $n $d
+ratio=$(echo "scale=6; $n / $d" | bc)
+echo "Ratio: $ratio"
+
 
 echo "t $t"
 echo "t0 $t0"
