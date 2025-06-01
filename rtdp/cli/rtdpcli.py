@@ -178,9 +178,54 @@ def cleanup():
     click.echo("[cleanup] Not implemented yet.")
 
 @cli.command('example-config')
-def example_config():
-    """Show example workflow config."""
-    click.echo("[example-config] Not implemented yet.")
+@click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
+def example_config(template):
+    """Show example YAML config for a workflow template (required vars, with placeholders)."""
+    import yaml
+    from jinja2 import Environment, meta, nodes
+    # Read template
+    with open(template, 'r') as f:
+        template_str = f.read()
+    env = Environment()
+    ast = env.parse(template_str)
+    required_vars = meta.find_undeclared_variables(ast)
+
+    # Find variables with a default filter (optional)
+    def find_defaulted_vars(node):
+        defaulted = set()
+        if isinstance(node, nodes.Filter) and node.name == 'default':
+            if isinstance(node.node, nodes.Name):
+                defaulted.add(node.node.name)
+            elif isinstance(node.node, nodes.Getattr):
+                parts = []
+                n = node.node
+                while isinstance(n, nodes.Getattr):
+                    parts.append(n.attr)
+                    n = n.node
+                if isinstance(n, nodes.Name):
+                    parts.append(n.name)
+                    defaulted.add('.'.join(reversed(parts)))
+        for child in node.iter_child_nodes():
+            defaulted |= find_defaulted_vars(child)
+        return defaulted
+    defaulted_vars = find_defaulted_vars(ast)
+
+    truly_required = set(var for var in required_vars if var not in defaulted_vars)
+    # Build example config dict, handling nested keys (e.g., containers.image_path)
+    example = {}
+    for var in truly_required:
+        if '.' in var:
+            # Nested key, e.g., containers.image_path
+            parts = var.split('.')
+            d = example
+            for p in parts[:-1]:
+                if p not in d:
+                    d[p] = {}
+                d = d[p]
+            d[parts[-1]] = f'<{var}>'
+        else:
+            example[var] = f'<{var}>'
+    yaml.dump(example, stream=click.get_text_stream('stdout'), default_flow_style=False)
 
 @cli.command('list-plugins')
 def list_plugins():

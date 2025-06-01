@@ -287,3 +287,28 @@ def test_template_vars_lists_required_vars(tmp_path):
     assert 'NIC' not in output
     # Should include containers (since it's required)
     assert 'containers' in output 
+
+def test_example_config_outputs_valid_yaml(tmp_path):
+    """Test that example-config outputs valid YAML with all required variables for a template."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+    import yaml
+
+    template_path = os.path.abspath('rtdp/cpp/cpu_emu/cylc/flow.cylc.j2')
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'example-config',
+        '--template', template_path
+    ])
+    output = result.output
+    # Should be valid YAML
+    config = yaml.safe_load(output)
+    # Should contain all required variables (not those with defaults)
+    for var in [
+        'BASE_PORT', 'COMPONENTS', 'THREADS', 'LATENCY', 'MEM_FOOTPRINT',
+        'OUTPUT_SIZE', 'SLEEP', 'VERBOSE', 'containers']:
+        assert var in config or (var == 'containers' and 'containers' in config)
+    # Should not require variables with defaults
+    for var in ['AVG_RATE', 'RMS', 'DUTY', 'NIC']:
+        assert var not in config 
