@@ -1,6 +1,7 @@
 import click
 import yaml
 import os
+from jinja2 import Template
 
 @click.group()
 def cli():
@@ -10,17 +11,34 @@ def cli():
 @cli.command()
 @click.option('--config', required=True, type=click.Path(exists=True, dir_okay=False), help='YAML config file')
 @click.option('--output', required=True, type=click.Path(file_okay=False), help='Output directory for workflow files')
-def generate(config, output):
-    """Generate a workflow from config."""
+@click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
+def generate(config, output, template):
+    """Generate a workflow from config and template."""
     # Read YAML config
     with open(config, 'r') as f:
         cfg = yaml.safe_load(f)
+    # Flatten config for template context (top-level keys only)
+    context = dict(cfg)
+    # Also add nested keys at top-level for convenience
+    for k, v in cfg.items():
+        if isinstance(v, dict):
+            context.update(v)
+    # Read template
+    with open(template, 'r') as f:
+        template_str = f.read()
+    j2_template = Template(template_str)
+    # Render template
+    try:
+        rendered = j2_template.render(**context)
+    except Exception as e:
+        click.echo(f"Error rendering template: {e}", err=True)
+        raise click.ClickException("Template rendering failed")
     # Ensure output directory exists
     os.makedirs(output, exist_ok=True)
-    # Write a dummy flow.cylc file
+    # Write rendered flow.cylc
     flow_path = os.path.join(output, 'flow.cylc')
     with open(flow_path, 'w') as f:
-        f.write(f"# Dummy flow.cylc generated for workflow: {cfg.get('workflow', {}).get('name', 'unknown')}\n")
+        f.write(rendered)
     click.echo(f"Generated flow.cylc at {flow_path}")
 
 @cli.command()
