@@ -154,3 +154,48 @@ def test_generate_gpu_proxy_workflow(tmp_path):
     assert '--partition = gpu' in content
     assert '--gres = gpu:A100:1' in content
     assert 'MATRIX_WIDTH = "2048"' in content 
+
+def test_generate_chain_workflow(tmp_path):
+    """Test generating a real chain_workflow from config and template."""
+    import yaml
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+
+    # Prepare a config with all required variables for the chain_workflow template
+    config = {
+        'workflow': {'name': 'chain-workflow', 'description': 'Chain workflow test'},
+        'platform': {'name': 'jlab_slurm'},
+        'BASE_PORT': 55555,
+        'VERBOSE': 2,
+        'containers': {
+            'CPU_EMU_SIF': 'cpu-emu.sif',
+            'GPU_PROXY_SIF': 'gpu-proxy.sif'
+        }
+    }
+    config_path = tmp_path / 'config.yml'
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+
+    output_dir = tmp_path / 'output'
+    os.makedirs(output_dir)
+
+    # Path to the Jinja2 template (to be created)
+    template_path = os.path.abspath('rtdp/cylc/chain_workflow/flow.cylc.j2')
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'generate',
+        '--config', str(config_path),
+        '--output', str(output_dir),
+        '--template', template_path
+    ])
+
+    assert result.exit_code == 0
+    flow_path = output_dir / 'flow.cylc'
+    assert flow_path.exists()
+    content = flow_path.read_text()
+    assert 'BASE_PORT=55555' in content
+    assert 'CPU_EMU_SIF' in content
+    assert 'GPU_PROXY_SIF' in content
+    assert '--job-name = receiver' in content 

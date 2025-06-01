@@ -1,0 +1,125 @@
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready => gpu_proxy:ready => cpu_emu:ready => sender
+            
+            # Completion chain
+            sender:done => !cpu_emu
+            cpu_emu:done => !gpu_proxy
+            gpu_proxy:done => !receiver
+            receiver:transfer_done
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = {{ platform.name | default('jlab_slurm') }}
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = {{ partition | default('ifarm') }}
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF files
+            CPU_EMU_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.CPU_EMU_SIF | default('cpu-emu.sif') }}"
+            GPU_PROXY_SIF = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.GPU_PROXY_SIF | default('gpu-proxy.sif') }}"
+            
+            # Network configuration
+            BASE_PORT={{ BASE_PORT | default(55555) }}
+            VERBOSE={{ VERBOSE | default(2) }}
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+
+    [[receiver]]
+        script = """
+            # ... existing code ...
+            apptainer run --pwd /app ${CPU_EMU_SIF} receiver -z -i ${IP} -r ${BASE_PORT} -p ${BASE_PORT} -v ${VERBOSE} > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+            transfer_done = "Transfer completed successfully"
+
+    [[gpu_proxy]]
+        script = """
+            # ... existing code ...
+            apptainer run --nv ${GPU_PROXY_SIF} proxy \
+                --in-port ${BASE_PORT} \
+                --out-ip ${RECV_IP} \
+                --out-port ${BASE_PORT} \
+                -t \
+                -w 2048 \
+                2>${LOG_DIR}/gpu_proxy/apptainer.log &
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = gpu_proxy
+            --partition = {{ proxy_partition | default('gpu') }}
+            --gres = {{ proxy_gres | default('gpu:A100:1') }}
+            --mem = {{ proxy_mem | default('100G') }}
+            --cpus-per-task = {{ proxy_cpus | default('4') }}
+        
+        [[[outputs]]]
+            ready = "ready"
+            done = "GPU proxy completed successfully"
+
+    [[cpu_emu]]
+        script = """
+            # ... existing code ...
+            apptainer run --pwd /app ${CPU_EMU_SIF} emulator \
+                -i ${GPU_IP} \
+                -r ${BASE_PORT} \
+                -p ${BASE_PORT} \
+                -s \
+                -v ${VERBOSE} \
+                2>${LOG_DIR}/cpu_emu/apptainer.log &
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = cpu_emu
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+            done = "CPU emulator completed successfully"
+
+    [[sender]]
+        script = """
+            # ... existing code ...
+            apptainer run --pwd /app ${GPU_PROXY_SIF} sender \
+                -a ${CPU_IP} \
+                -p ${BASE_PORT} \
+                -r 25 \
+                --group-size 2048 \
+                -v \
+                2>${LOG_DIR}/sender/apptainer.log
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            done = "Sender completed successfully" 
