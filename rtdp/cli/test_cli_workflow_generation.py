@@ -312,3 +312,36 @@ def test_example_config_outputs_valid_yaml(tmp_path):
     # Should not require variables with defaults
     for var in ['AVG_RATE', 'RMS', 'DUTY', 'NIC']:
         assert var not in config 
+
+def test_run_workflow_invokes_cylc(tmp_path, monkeypatch):
+    """Test that 'run' invokes cylc install and cylc play on the workflow directory."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+    import builtins
+
+    # Create a dummy workflow directory with a flow.cylc
+    wf_dir = tmp_path / 'myflow'
+    os.makedirs(wf_dir)
+    (wf_dir / 'flow.cylc').write_text('[scheduler]\n')
+
+    # Track subprocess calls
+    calls = []
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(cmd)
+        class Result:
+            returncode = 0
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'run',
+        '--workflow', str(wf_dir)
+    ])
+    output = result.output
+    # Should call cylc install and cylc play
+    assert any('cylc' in c[0] and 'install' in c for c in calls)
+    assert any('cylc' in c[0] and 'play' in c for c in calls)
+    # Should report success
+    assert 'Workflow started' in output 

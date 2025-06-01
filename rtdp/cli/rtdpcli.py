@@ -133,9 +133,23 @@ def template_vars(template):
         click.echo(var)
 
 @cli.command()
-def run():
-    """Run a workflow."""
-    click.echo("[run] Not implemented yet.")
+@click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
+def run(workflow):
+    """Run a workflow using cylc install and cylc play."""
+    import subprocess
+    import os
+    flow_path = os.path.join(workflow, 'flow.cylc')
+    if not os.path.exists(flow_path):
+        raise click.ClickException(f"No flow.cylc found in {workflow}")
+    # Install the workflow
+    result1 = subprocess.run(['cylc', 'install', workflow])
+    if result1.returncode != 0:
+        raise click.ClickException("cylc install failed")
+    # Play the workflow
+    result2 = subprocess.run(['cylc', 'play', workflow])
+    if result2.returncode != 0:
+        raise click.ClickException("cylc play failed")
+    click.echo("Workflow started")
 
 @cli.command()
 def status():
