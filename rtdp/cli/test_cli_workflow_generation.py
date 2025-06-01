@@ -65,6 +65,7 @@ def test_validate_config_success(tmp_path):
         '--config', str(config_path),
         '--template', os.path.abspath('rtdp/cpp/cpu_emu/cylc/flow.cylc.j2')
     ])
+    print(result.output)  # DEBUG: print CLI output for diagnosis
     assert result.exit_code == 0
     assert 'Config is valid' in result.output
 
