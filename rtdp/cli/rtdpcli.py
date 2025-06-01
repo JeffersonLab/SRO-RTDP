@@ -152,9 +152,17 @@ def run(workflow):
     click.echo("Workflow started")
 
 @cli.command()
-def status():
-    """Show workflow status."""
-    click.echo("[status] Not implemented yet.")
+@click.option('--workflow', required=True, help='Workflow name or directory')
+def status(workflow):
+    """Show workflow status using cylc status."""
+    import subprocess
+    try:
+        result = subprocess.run(['cylc', 'status', workflow], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise click.ClickException(f"cylc status failed: {result.stderr.strip()}")
+        click.echo(result.stdout.strip())
+    except Exception as e:
+        raise click.ClickException(f"Failed to get workflow status: {e}")
 
 @cli.command()
 def logs():
