@@ -165,9 +165,20 @@ def status(workflow):
         raise click.ClickException(f"Failed to get workflow status: {e}")
 
 @cli.command()
-def logs():
-    """Stream logs for a workflow or task."""
-    click.echo("[logs] Not implemented yet.")
+@click.option('--workflow', required=True, help='Workflow name')
+@click.option('--task', required=True, help='Task name')
+def logs(workflow, task):
+    """Stream logs for a workflow or task using cylc cat-log."""
+    import subprocess
+    try:
+        # For simplicity, show logs for cycle 1
+        log_target = f"{workflow}//1/{task}"
+        result = subprocess.run(['cylc', 'cat-log', log_target], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise click.ClickException(f"cylc cat-log failed: {result.stderr.strip()}")
+        click.echo(result.stdout.strip())
+    except Exception as e:
+        raise click.ClickException(f"Failed to get logs: {e}")
 
 @cli.command()
 def list():

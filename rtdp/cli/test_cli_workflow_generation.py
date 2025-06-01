@@ -368,3 +368,27 @@ def test_status_command_shows_workflow_status(monkeypatch):
     output = result.output
     assert 'myflow' in output
     assert 'running' in output 
+
+def test_logs_command_shows_task_logs(monkeypatch):
+    """Test that 'logs' prints the logs for a workflow/task using cylc cat-log."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+
+    # Simulate cylc cat-log output
+    fake_output = "[2024-06-20T12:00:00Z] Task started\n[2024-06-20T12:01:00Z] Task finished"
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = fake_output
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'logs',
+        '--workflow', 'myflow',
+        '--task', 'emulator'
+    ])
+    output = result.output
+    assert '[2024-06-20T12:00:00Z] Task started' in output
+    assert '[2024-06-20T12:01:00Z] Task finished' in output 
