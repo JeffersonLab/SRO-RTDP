@@ -257,3 +257,33 @@ def test_generate_chain_workflow(tmp_path):
     assert 'CPU_EMU_SIF' in content
     assert 'GPU_PROXY_SIF' in content
     assert '--job-name = receiver' in content 
+
+def test_template_vars_lists_required_vars(tmp_path):
+    """Test that template-vars outputs required variables for a template (excluding those with defaults)."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+
+    template_path = os.path.abspath('rtdp/cpp/cpu_emu/cylc/flow.cylc.j2')
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'template-vars',
+        '--template', template_path
+    ])
+    output = result.output
+    # Should list required variables (not those with defaults)
+    assert 'BASE_PORT' in output
+    assert 'COMPONENTS' in output
+    assert 'THREADS' in output
+    assert 'LATENCY' in output
+    assert 'MEM_FOOTPRINT' in output
+    assert 'OUTPUT_SIZE' in output
+    assert 'SLEEP' in output
+    assert 'VERBOSE' in output
+    # Should NOT list variables with defaults (e.g., AVG_RATE, RMS, DUTY, NIC)
+    assert 'AVG_RATE' not in output
+    assert 'RMS' not in output
+    assert 'DUTY' not in output
+    assert 'NIC' not in output
+    # Should include containers (since it's required)
+    assert 'containers' in output 

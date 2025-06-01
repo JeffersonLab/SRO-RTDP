@@ -97,9 +97,40 @@ def validate(config, template):
     click.echo("Config is valid")
 
 @cli.command('template-vars')
-def template_vars():
-    """Show required variables for a workflow template."""
-    click.echo("[template-vars] Not implemented yet.")
+@click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
+def template_vars(template):
+    """Show required variables for a workflow template (excluding those with defaults)."""
+    from jinja2 import Environment, meta, nodes
+    # Read template
+    with open(template, 'r') as f:
+        template_str = f.read()
+    env = Environment()
+    ast = env.parse(template_str)
+    required_vars = meta.find_undeclared_variables(ast)
+
+    # Find variables with a default filter (optional)
+    def find_defaulted_vars(node):
+        defaulted = set()
+        if isinstance(node, nodes.Filter) and node.name == 'default':
+            if isinstance(node.node, nodes.Name):
+                defaulted.add(node.node.name)
+            elif isinstance(node.node, nodes.Getattr):
+                parts = []
+                n = node.node
+                while isinstance(n, nodes.Getattr):
+                    parts.append(n.attr)
+                    n = n.node
+                if isinstance(n, nodes.Name):
+                    parts.append(n.name)
+                    defaulted.add('.'.join(reversed(parts)))
+        for child in node.iter_child_nodes():
+            defaulted |= find_defaulted_vars(child)
+        return defaulted
+    defaulted_vars = find_defaulted_vars(ast)
+
+    truly_required = set(var for var in required_vars if var not in defaulted_vars)
+    for var in sorted(truly_required):
+        click.echo(var)
 
 @cli.command()
 def run():
