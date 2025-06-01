@@ -345,3 +345,26 @@ def test_run_workflow_invokes_cylc(tmp_path, monkeypatch):
     assert any('cylc' in c[0] and 'play' in c for c in calls)
     # Should report success
     assert 'Workflow started' in output 
+
+def test_status_command_shows_workflow_status(monkeypatch):
+    """Test that 'status' prints the workflow status using cylc status."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+
+    # Simulate cylc status output
+    fake_output = "myflow  : running : 2024-06-20T12:00:00Z"
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = fake_output
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'status',
+        '--workflow', 'myflow'
+    ])
+    output = result.output
+    assert 'myflow' in output
+    assert 'running' in output 
