@@ -1,7 +1,7 @@
 import click
 import yaml
 import os
-from jinja2 import Template
+from jinja2 import Template, Environment, meta
 
 @click.group()
 def cli():
@@ -42,9 +42,34 @@ def generate(config, output, template):
     click.echo(f"Generated flow.cylc at {flow_path}")
 
 @cli.command()
-def validate():
-    """Validate a workflow config."""
-    click.echo("[validate] Not implemented yet.")
+@click.option('--config', required=True, type=click.Path(exists=True, dir_okay=False), help='YAML config file')
+@click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
+def validate(config, template):
+    """Validate a workflow config against a Jinja2 template."""
+    # Read YAML config
+    with open(config, 'r') as f:
+        cfg = yaml.safe_load(f)
+    # Flatten config for template context (top-level keys only)
+    context = dict(cfg)
+    for k, v in cfg.items():
+        if isinstance(v, dict):
+            context.update(v)
+    # Read template
+    with open(template, 'r') as f:
+        template_str = f.read()
+    env = Environment()
+    ast = env.parse(template_str)
+    required_vars = meta.find_undeclared_variables(ast)
+    # Check for missing variables
+    missing = []
+    for var in required_vars:
+        if var not in context:
+            missing.append(var)
+    if missing:
+        for var in missing:
+            click.echo(f"Missing required variable: {var}", err=True)
+        raise click.ClickException("Config validation failed: missing required variables.")
+    click.echo("Config is valid")
 
 @cli.command('template-vars')
 def template_vars():
