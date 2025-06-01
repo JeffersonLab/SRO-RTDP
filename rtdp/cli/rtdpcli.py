@@ -1,4 +1,6 @@
 import click
+import yaml
+import os
 
 @click.group()
 def cli():
@@ -6,9 +8,20 @@ def cli():
     pass
 
 @cli.command()
-def generate():
+@click.option('--config', required=True, type=click.Path(exists=True, dir_okay=False), help='YAML config file')
+@click.option('--output', required=True, type=click.Path(file_okay=False), help='Output directory for workflow files')
+def generate(config, output):
     """Generate a workflow from config."""
-    click.echo("[generate] Not implemented yet.")
+    # Read YAML config
+    with open(config, 'r') as f:
+        cfg = yaml.safe_load(f)
+    # Ensure output directory exists
+    os.makedirs(output, exist_ok=True)
+    # Write a dummy flow.cylc file
+    flow_path = os.path.join(output, 'flow.cylc')
+    with open(flow_path, 'w') as f:
+        f.write(f"# Dummy flow.cylc generated for workflow: {cfg.get('workflow', {}).get('name', 'unknown')}\n")
+    click.echo(f"Generated flow.cylc at {flow_path}")
 
 @cli.command()
 def validate():
