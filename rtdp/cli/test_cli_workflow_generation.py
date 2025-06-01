@@ -46,6 +46,7 @@ def test_validate_config_success(tmp_path):
     config = {
         'workflow': {'name': 'cpu-emu', 'description': 'CPU Emulator test'},
         'platform': {'name': 'jlab_slurm'},
+        'containers': {'image_path': 'cpu-emu.sif'},
         'BASE_PORT': 55555,
         'COMPONENTS': 5,
         'THREADS': 1,
