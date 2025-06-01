@@ -53,4 +53,50 @@ def test_export_template_vars(tmp_path):
 def test_generate_workflow_missing_required_vars(tmp_path):
     """Test error when required variables are missing in config."""
     # TODO: Implement: call CLI generate with incomplete config, expect error
-    pass 
+    pass
+
+def test_generate_cpu_emu_workflow(tmp_path):
+    """Test generating a real CPU Emulator workflow from config and template."""
+    import yaml
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+
+    # Prepare a config with all required variables for the cpu_emu template
+    config = {
+        'workflow': {'name': 'cpu-emu', 'description': 'CPU Emulator test'},
+        'platform': {'name': 'jlab_slurm', 'job_runner': 'slurm'},
+        'BASE_PORT': 55555,
+        'COMPONENTS': 5,
+        'THREADS': 1,
+        'LATENCY': 100,
+        'MEM_FOOTPRINT': 0.01,
+        'OUTPUT_SIZE': 0.001,
+        'SLEEP': 0,
+        'VERBOSE': 2,
+        # Add more as needed for the template
+    }
+    config_path = tmp_path / 'config.yml'
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+
+    output_dir = tmp_path / 'output'
+    os.makedirs(output_dir)
+
+    # Assume the template is in a known location, e.g. rtdp/cpp/cpu_emu/cylc/flow.cylc
+    template_path = os.path.abspath('rtdp/cpp/cpu_emu/cylc/flow.cylc')
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'generate',
+        '--config', str(config_path),
+        '--output', str(output_dir),
+        '--template', template_path
+    ])
+
+    assert result.exit_code == 0
+    flow_path = output_dir / 'flow.cylc'
+    assert flow_path.exists()
+    content = flow_path.read_text()
+    assert 'BASE_PORT=55555' in content
+    assert 'THREADS = "1"' in content 
