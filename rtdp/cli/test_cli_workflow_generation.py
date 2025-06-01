@@ -392,3 +392,26 @@ def test_logs_command_shows_task_logs(monkeypatch):
     output = result.output
     assert '[2024-06-20T12:00:00Z] Task started' in output
     assert '[2024-06-20T12:01:00Z] Task finished' in output 
+
+def test_list_command_shows_workflows(monkeypatch):
+    """Test that 'list' prints the list of workflows using cylc list."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+
+    # Simulate cylc list output
+    fake_output = "myflow\nanotherflow\nthirdflow"
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = fake_output
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'list'
+    ])
+    output = result.output
+    assert 'myflow' in output
+    assert 'anotherflow' in output
+    assert 'thirdflow' in output 
