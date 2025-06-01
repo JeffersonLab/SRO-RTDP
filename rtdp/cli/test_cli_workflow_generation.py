@@ -37,13 +37,69 @@ def test_generate_workflow_from_valid_yaml(tmp_path):
 
 def test_validate_config_success(tmp_path):
     """Test validating a correct config file (should succeed)."""
-    # TODO: Implement: call CLI validate, expect success
-    pass
+    import yaml
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+
+    # Minimal valid config for cpu_emu workflow
+    config = {
+        'workflow': {'name': 'cpu-emu', 'description': 'CPU Emulator test'},
+        'platform': {'name': 'jlab_slurm'},
+        'BASE_PORT': 55555,
+        'COMPONENTS': 5,
+        'THREADS': 1,
+        'LATENCY': 100,
+        'MEM_FOOTPRINT': 0.01,
+        'OUTPUT_SIZE': 0.001,
+        'SLEEP': 0,
+        'VERBOSE': 2
+    }
+    config_path = tmp_path / 'config.yml'
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'validate',
+        '--config', str(config_path),
+        '--template', os.path.abspath('rtdp/cpp/cpu_emu/cylc/flow.cylc.j2')
+    ])
+    assert result.exit_code == 0
+    assert 'Config is valid' in result.output
 
 def test_validate_config_failure(tmp_path):
     """Test validating an incorrect config file (should fail)."""
-    # TODO: Implement: call CLI validate, expect error
-    pass
+    import yaml
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+
+    # Incomplete config (missing required variable 'BASE_PORT')
+    config = {
+        'workflow': {'name': 'cpu-emu', 'description': 'CPU Emulator test'},
+        'platform': {'name': 'jlab_slurm'},
+        # 'BASE_PORT' missing
+        'COMPONENTS': 5,
+        'THREADS': 1,
+        'LATENCY': 100,
+        'MEM_FOOTPRINT': 0.01,
+        'OUTPUT_SIZE': 0.001,
+        'SLEEP': 0,
+        'VERBOSE': 2
+    }
+    config_path = tmp_path / 'config.yml'
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'validate',
+        '--config', str(config_path),
+        '--template', os.path.abspath('rtdp/cpp/cpu_emu/cylc/flow.cylc.j2')
+    ])
+    assert result.exit_code != 0
+    assert 'Missing required variable' in result.output
 
 def test_export_template_vars(tmp_path):
     """Test exporting required variables for a workflow template."""
