@@ -182,8 +182,15 @@ def logs(workflow, task):
 
 @cli.command()
 def list():
-    """List all workflows."""
-    click.echo("[list] Not implemented yet.")
+    """List all workflows using cylc list."""
+    import subprocess
+    try:
+        result = subprocess.run(['cylc', 'list'], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise click.ClickException(f"cylc list failed: {result.stderr.strip()}")
+        click.echo(result.stdout.strip())
+    except Exception as e:
+        raise click.ClickException(f"Failed to list workflows: {e}")
 
 @cli.command()
 def stop():
