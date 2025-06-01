@@ -1,7 +1,7 @@
 import click
 import yaml
 import os
-from jinja2 import Template, Environment, meta
+from jinja2 import Template, Environment, meta, nodes
 
 @click.group()
 def cli():
@@ -60,9 +60,34 @@ def validate(config, template):
     env = Environment()
     ast = env.parse(template_str)
     required_vars = meta.find_undeclared_variables(ast)
-    # Check for missing variables
+
+    # Find variables with a default filter (optional)
+    def find_defaulted_vars(node):
+        defaulted = set()
+        if isinstance(node, nodes.Filter) and node.name == 'default':
+            # The variable is the first argument to the filter
+            if isinstance(node.node, nodes.Name):
+                defaulted.add(node.node.name)
+            elif isinstance(node.node, nodes.Getattr):
+                # e.g., containers.image_path | default('foo')
+                # We want 'containers' or 'containers.image_path'
+                parts = []
+                n = node.node
+                while isinstance(n, nodes.Getattr):
+                    parts.append(n.attr)
+                    n = n.node
+                if isinstance(n, nodes.Name):
+                    parts.append(n.name)
+                    defaulted.add('.'.join(reversed(parts)))
+        for child in node.iter_child_nodes():
+            defaulted |= find_defaulted_vars(child)
+        return defaulted
+    defaulted_vars = find_defaulted_vars(ast)
+
+    # Only require variables that do NOT have a default filter
+    truly_required = set(var for var in required_vars if var not in defaulted_vars)
     missing = []
-    for var in required_vars:
+    for var in truly_required:
         if var not in context:
             missing.append(var)
     if missing:
