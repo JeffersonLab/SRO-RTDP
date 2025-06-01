@@ -1,0 +1,111 @@
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready => gpu_proxy:ready => sender
+            
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
+            receiver:completed
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = {{ platform.name | default('jlab_slurm') }}
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = {{ partition | default('ifarm') }}
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF file
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('gpu-proxy.sif') }}"
+            
+            # Network configuration
+            IN_PORT = "{{ IN_PORT }}"
+            OUT_PORT = "{{ OUT_PORT }}"
+            NIC = "{{ NIC | default('${NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
+            GPU_NIC = "{{ GPU_NIC | default('${GPU_NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
+            
+            # Matrix configuration
+            MATRIX_WIDTH = "{{ MATRIX_WIDTH | default('2048') }}"
+            SEND_RATE = "{{ SEND_RATE | default('150') }}"
+            GROUP_SIZE = "{{ GROUP_SIZE | default('30720000') }}"
+            PROXY_RATE = "{{ PROXY_RATE | default('1.0') }}"
+            SEND_ALL_ONES = "{{ SEND_ALL_ONES | default('0') }}"
+            SOCKET_HWM = "{{ SOCKET_HWM | default('1') }}"
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+
+    [[receiver]]
+        script = """
+            # ... existing code ...
+            apptainer run ${SIF_FILE} receiver -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Transfer completed successfully"
+
+    [[gpu_proxy]]
+        script = """
+            # ... existing code ...
+            apptainer run --nv ${SIF_FILE} proxy \
+                --in-port ${IN_PORT} \
+                --out-ip ${RECV_IP} \
+                --out-port ${OUT_PORT} \
+                -t \
+                -w ${MATRIX_WIDTH} \
+                -r ${PROXY_RATE} \
+                2>${LOG_DIR}/proxy/apptainer.log &
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = proxy
+            --partition = {{ proxy_partition | default('gpu') }}
+            --gres = {{ proxy_gres | default('gpu:A100:1') }}
+            --mem = {{ proxy_mem | default('100G') }}
+            --cpus-per-task = {{ proxy_cpus | default('4') }}
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[sender]]
+        script = """
+            # ... existing code ...
+            apptainer run ${SIF_FILE} sender \
+                -a ${PROXY_IP} \
+                -p ${IN_PORT} \
+                -r ${SEND_RATE} \
+                --group-size ${GROUP_SIZE} \
+                --hwm ${SOCKET_HWM} \
+                -v \
+                ${SEND_ALL_ONES:+--all-ones} \
+                2>${LOG_DIR}/sender/apptainer.log
+            # ... existing code ...
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G 

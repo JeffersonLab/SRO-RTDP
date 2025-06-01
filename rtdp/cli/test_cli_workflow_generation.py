@@ -100,3 +100,57 @@ def test_generate_cpu_emu_workflow(tmp_path):
     content = flow_path.read_text()
     assert 'BASE_PORT=55555' in content
     assert 'THREADS = "1"' in content 
+
+def test_generate_gpu_proxy_workflow(tmp_path):
+    """Test generating a real GPU Proxy workflow from config and template."""
+    import yaml
+    from click.testing import CliRunner
+    from rtdpcli import cli
+    import os
+
+    # Prepare a config with all required variables for the gpu_proxy template
+    config = {
+        'workflow': {'name': 'gpu-proxy', 'description': 'GPU Proxy test'},
+        'platform': {'name': 'jlab_slurm'},
+        'containers': {'image_path': 'gpu-proxy.sif'},
+        'IN_PORT': 55555,
+        'OUT_PORT': 55556,
+        'NIC': 'eth0',
+        'GPU_NIC': 'eth1',
+        'MATRIX_WIDTH': 2048,
+        'SEND_RATE': 150,
+        'GROUP_SIZE': 30720000,
+        'PROXY_RATE': 1.0,
+        'SEND_ALL_ONES': 0,
+        'SOCKET_HWM': 1,
+        'proxy_partition': 'gpu',
+        'proxy_gres': 'gpu:A100:1',
+        'proxy_mem': '100G',
+        'proxy_cpus': 4
+    }
+    config_path = tmp_path / 'config.yml'
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+
+    output_dir = tmp_path / 'output'
+    os.makedirs(output_dir)
+
+    # Path to the Jinja2 template
+    template_path = os.path.abspath('rtdp/cuda/gpu_proxy/cylc/flow.cylc.j2')
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'generate',
+        '--config', str(config_path),
+        '--output', str(output_dir),
+        '--template', template_path
+    ])
+
+    assert result.exit_code == 0
+    flow_path = output_dir / 'flow.cylc'
+    assert flow_path.exists()
+    content = flow_path.read_text()
+    assert 'IN_PORT = "55555"' in content
+    assert '--partition = gpu' in content
+    assert '--gres = gpu:A100:1' in content
+    assert 'MATRIX_WIDTH = "2048"' in content 
