@@ -55,7 +55,6 @@ def simulate_stream(
     smClk = 0xFFFFFFFFFFFFFFFF  #ensure is 64bits
     smClk = 0 #master simulation clock in nanoseconds
     while True:
-#        tl0 = time.time()
         # -----------------------
         # ON phase: Send data
         # -----------------------
@@ -74,7 +73,7 @@ def simulate_stream(
                 
             # Delay to throttle sending rate
             rate_sleep = frame_size / avg_rate_bps  # in seconds
-            smClk += int(rate_sleep*1e9) #nanoseconds
+            smClk += int(rate_sleep*1e6) #usec
             
         # Apply duty cycle
         # -----------------------
@@ -83,9 +82,9 @@ def simulate_stream(
         #if off_time > 0:
             #print(f"{smClk} [simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
             #time.sleep(off_time)
-        print(f"{smClk} [simulate_stream:] Estimated frame rate (Hz): {float(num_sent)/float(smClk*1e-9)} num_sent {num_sent}")
-        print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*frame_size_mean/float(smClk*1e-9)} num_sent {num_sent}")
-        print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*frame_size_mean)/float(smClk*1e-9)} num_sent {num_sent}")
+        print(f"{smClk} [simulate_stream:] Estimated frame rate (Hz): {float(num_sent)/float(smClk*1e-6)} num_sent {num_sent}")
+        print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*frame_size_mean/float(smClk*1e-6)} num_sent {num_sent}")
+        print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*frame_size_mean)/float(smClk*1e-6)} num_sent {num_sent}")
         print(f"{smClk} [simulate_stream:] Lost Frames: {lost_frames}", flush=True)
 
 if __name__ == "__main__":

@@ -45,18 +45,18 @@ t0=$(mktemp)
 for i in {7003..7001}; do
     grep "cpu_sim ${i}" $t > $t0
     echo "cpu_sim ${i}:"
-    echo -n "frame size bits: "; grep -i "Frame size" $t0|grep -v "simulate_stream"|cut -f 9 -d' '|get_moments
+    echo -n "frame size bits: "; grep -i "Frame size" $t0|grep -v "simulate_stream"|grep -v Sending|cut -f 9 -d' '|get_moments
     t1=$(mktemp); grep "Measured frame" $t0|grep -v "simulate_stream"|cut -f 1,8 -d' ' > $t1
     gnuplot -p -e "set title '$i Measured frame rate Hz';  stats '$t1' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '-' u 1:2 w l" < $t1  &
     echo -n "Measured frame rate Hz: "; cut -f 2 -d ' ' $t1 | get_moments 
     t2=$(mktemp); grep "Measured bit" $t0|grep -v "simulate_stream"|cut -f 1,8 -d' '  > $t2
     gnuplot -p -e "set title '$i Measured bit rate MHz';  stats '$t2' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '-' u 1:2 w l"  < $t2 &
     echo -n "Measured bit rate MHz: "; cut -f 2 -d ' ' $t2 | get_moments
-    grep Compute $t0|cut -f9 -d' '|gnuplot -p -e "set title '$i compute latency nsec'; p '-' w l"
-    grep Compute $t0|cut -f12 -d' '|gnuplot -p -e "set title '$i network latency nsec'; p '-' w l"
-    #grep tsn $t0|cut -f 9,12 -d' '|gnuplot -p -e "set title '$i network latency nsec vs size bits'; p '-' u 1:2"
-    #tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency nsec vs size bits';  stats '$tg' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '$tg' u 1:2, f(x) lc 'red'"
-    tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency nsec vs size bits'; set yrange [0:*]; p '$tg' u 1:2, f(x) lc 'red'" #headroom test
+    grep Compute $t0|cut -f9 -d' '|gnuplot -p -e "set title '$i compute latency usec'; p '-' w l"
+    grep Compute $t0|cut -f12 -d' '|gnuplot -p -e "set title '$i network latency usec'; p '-' w l"
+    #grep tsn $t0|cut -f 9,12 -d' '|gnuplot -p -e "set title '$i network latency usec vs size bits'; p '-' u 1:2"
+    #tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency usec vs size bits';  stats '$tg' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '$tg' u 1:2, f(x) lc 'red'"
+    #tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency usec vs size bits'; set yrange [0:*]; p '$tg' u 1:2, f(x) lc 'red'" #headroom test
   echo
 done
 

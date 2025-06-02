@@ -50,7 +50,6 @@ def emulate_stream(
     num_sent0 = 0
     # Derived sleep time between messages
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
-    clk0 = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
     while True:
         # -----------------------
         # ON phase: Send data
@@ -63,10 +62,13 @@ def emulate_stream(
             else:
                 frame_size = int(frame_size_mean)
             buffer = bytearray(int(frame_size/8))
-            num_sent = num_sent + 1
-            clk = int(time.time()*1e6)  #microseconds *1e9 #nanoseconds
-            print(f"{clk} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({num_sent})")            
             zmq_socket.send(buffer)
+            num_sent += 1
+            if num_sent == 1:
+                clk0 = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
+            clk = int(time.time()*1e6)  #microseconds *1e9 #nanoseconds
+            elpsd_tm = (clk-clk0) #usec
+            print(f"{elpsd_tm} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({num_sent})")            
                 
             # Delay to throttle sending rate
             rate_sleep = frame_size / avg_rate_bps  # in seconds
@@ -81,11 +83,11 @@ def emulate_stream(
             #time.sleep(off_time)
         clk = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
         #frame_rate_hz = frame_count / (elapsed_time_us / 1_000_000)
-        elpsd_tm = float((clk-clk0)) #usec
-        print(f"{clk} [emulate_stream:] Estimated frame rate (Hz): {1e6*float(num_sent)/float(elpsd_tm)} num_sent {num_sent}")
-        print(f"{clk} [emulate_stream:] Estimated bit rate (Gbps): {1e3*num_sent*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}")
-        print(f"{clk} [emulate_stream:] Estimated bit rate (MHz): {float(num_sent)*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}", flush=True)
-        #print(f"{clk} [emulate_stream:] Lost Frames: {lost_frames}", flush=True)
+        elpsd_tm = (clk-clk0) #usec
+        print(f"{elpsd_tm} [emulate_stream:] Estimated frame rate (Hz): {1e6*float(num_sent)/float(elpsd_tm)} num_sent {num_sent}")
+        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (Gbps): {1e3*num_sent*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}")
+        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (MHz): {float(num_sent)*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}", flush=True)
+        #print(f"{elpsd_tm} [emulate_stream:] Lost Frames: {lost_frames}", flush=True)
         num_sent0 = num_sent
 
 if __name__ == "__main__":

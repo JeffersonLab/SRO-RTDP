@@ -310,7 +310,7 @@ int main (int argc, char *argv[])
         stream_id = pkt.stream_id;
         //reqd transmission timespan in nanoseconds
         double xmsFctr = max(1e-9,sd_30_gamma_dist(gen));
-        tsn = uint64_t(1e9*float(bufSiz/outNicSpd)*xmsFctr);
+        tsn = uint64_t(1e6*float(bufSiz/outNicSpd)*xmsFctr); //usec
         //advance the sim clock for netwok latency
         auto tsr1 = pkt.timestamp + tsn;
         if(DBG && request_nbr % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz
@@ -332,7 +332,7 @@ int main (int argc, char *argv[])
         // simulate load on system for ensuing work
         {
             //reqd computational timespan in nanoseconds with 30% std dev
-            tsc = uint64_t(1e9*cmpLt_GB*(float(bufSiz)/8)*sd_30_gamma_dist(gen));
+            tsc = uint64_t(1e6*cmpLt_GB*(float(bufSiz)/8)*sd_30_gamma_dist(gen)); //usec
             if(DBG) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' << endl;
             tsr += tsc;
         }
@@ -373,8 +373,8 @@ int main (int argc, char *argv[])
         // Record end time
         if (request_nbr % 10 == 0) {
             if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << request_nbr << ')' << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-9*float(tsr)) << " frame Hz." << " for " << request_nbr << " frames" << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-9*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) << " frame Hz." << " for " << request_nbr << " frames" << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
             if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
         }
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << request_nbr << ')' << endl;

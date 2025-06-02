@@ -344,6 +344,7 @@ int main (int argc, char *argv[])
     double mnBfSz = 0; //mean receive Size (bits)
     uint64_t bufSiz = 0; //bits
     uint64_t tsr = 0; // system hi-res clock from in microseconds since epoch
+    uint64_t tsr_base = 0; // base system hi-res clock from in microseconds since epoch
     uint64_t tsc = 0; // computational latency
     uint64_t tsn = 0; // outbound network latency
     while (true) {
@@ -362,7 +363,8 @@ int main (int argc, char *argv[])
         {
             auto now = high_resolution_clock::now();
             auto us = duration_cast<microseconds>(now.time_since_epoch());
-            tsr = us.count();
+            if(request_nbr == 1) tsr_base = us.count();
+            tsr = us.count()-tsr_base;
         }
 
         if(DBG) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " Received request "
@@ -408,7 +410,7 @@ int main (int argc, char *argv[])
         {
             auto now = high_resolution_clock::now();
             auto us = duration_cast<microseconds>(now.time_since_epoch());
-            tsr = us.count();
+            tsr = us.count()-tsr_base;
         }
 
         if (request_nbr % 10 == 0) {
