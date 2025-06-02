@@ -295,7 +295,7 @@ int main (int argc, char *argv[])
         
         recv_result_t rtcd;
         
-        {//block
+        {
             rtcd = rcv_sckt.recv (request, recv_flags::none);
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
@@ -313,7 +313,7 @@ int main (int argc, char *argv[])
         tsn = uint64_t(1e9*float(bufSiz/outNicSpd)*xmsFctr);
         //advance the sim clock for netwok latency
         auto tsr1 = pkt.timestamp + tsn;
-        if(vrbs && request_nbr % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz
+        if(DBG && request_nbr % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz
                                                 << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << " using xmsFctr " << xmsFctr << endl;
         if(tsr>tsr1) {
             if(vrbs) cout << tsr1 << " [cpu_sim " << rcv_prt << "]:  dropped (" << request_nbr++ << ')' << endl;
@@ -333,7 +333,7 @@ int main (int argc, char *argv[])
         {
             //reqd computational timespan in nanoseconds with 30% std dev
             tsc = uint64_t(1e9*cmpLt_GB*(float(bufSiz)/8)*sd_30_gamma_dist(gen));
-            if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' << endl;
+            if(DBG) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' << endl;
             tsr += tsc;
         }
         if(!psdZ) {
@@ -361,7 +361,7 @@ int main (int argc, char *argv[])
                 message_t reply;
                 if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << request_nbr << ')' << endl;
                 recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
-                if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: Destination Actual reply (" << request_nbr << ") " 
+                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Destination Actual reply (" << request_nbr << ") " 
                               << reply << " With rtcd = " << rtcd.value() << endl;
 
                 if(DBG) cout << "[cpu_sim " << rcv_prt << "]: " << " output Num written  (" << request_nbr << ") " << sr.value()  << endl;
@@ -373,8 +373,8 @@ int main (int argc, char *argv[])
         // Record end time
         if (request_nbr % 10 == 0) {
             if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << request_nbr << ')' << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(1)/(1e-9*float(tsc)) << " frame Hz." << " for " << request_nbr << " frames" << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-9*float(tsc)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-9*float(tsr)) << " frame Hz." << " for " << request_nbr << " frames" << std::endl;
+            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-9*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
             if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
         }
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << request_nbr << ')' << endl;
