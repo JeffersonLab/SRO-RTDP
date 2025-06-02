@@ -60,6 +60,7 @@
             mkdir -p ${LOG_DIR}
             mkdir -p ${LOG_DIR}/receiver
             # ... existing code ...
+            echo "SIF_FILE: ${SIF_FILE}"
             apptainer run ${SIF_FILE} receiver -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             # ... existing code ...
         """
