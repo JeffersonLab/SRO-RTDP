@@ -193,9 +193,17 @@ def list():
         raise click.ClickException(f"Failed to list workflows: {e}")
 
 @cli.command()
-def stop():
-    """Stop a workflow."""
-    click.echo("[stop] Not implemented yet.")
+@click.option('--workflow', required=True, help='Workflow name')
+def stop(workflow):
+    """Stop a workflow using cylc stop."""
+    import subprocess
+    try:
+        result = subprocess.run(['cylc', 'stop', workflow], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise click.ClickException(f"cylc stop failed: {result.stderr.strip()}")
+        click.echo(result.stdout.strip())
+    except Exception as e:
+        raise click.ClickException(f"Failed to stop workflow: {e}")
 
 @cli.command()
 def restart():
