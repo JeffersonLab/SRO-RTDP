@@ -324,13 +324,13 @@ int main (int argc, char *argv[])
     context_t dst_cntxt(1);
 
     socket_t rcv_sckt(rcv_cntxt, socket_type::sub);
-    //rcv_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length
+    rcv_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length
 
     // Subscribe to all messages (empty topic)
     //rcv_sckt.set(zmq::sockopt::subscribe, "");
 
     socket_t dst_sckt(dst_cntxt, socket_type::pub);
-    //dst_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
+    dst_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
     rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
     rcv_sckt.set(zmq::sockopt::subscribe, "");
     if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
