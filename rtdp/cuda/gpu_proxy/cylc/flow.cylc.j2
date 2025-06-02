@@ -55,8 +55,10 @@
 
     [[receiver]]
         script = """
-            # Create output directory
+            # Create output and log directories
             mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${LOG_DIR}
+            mkdir -p ${LOG_DIR}/receiver
             # ... existing code ...
             apptainer run ${SIF_FILE} receiver -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             # ... existing code ...
@@ -72,8 +74,10 @@
 
     [[gpu_proxy]]
         script = """
-            # Create output directory
+            # Create output and log directories
             mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${LOG_DIR}
+            mkdir -p ${LOG_DIR}/proxy
             # ... existing code ...
             apptainer run --nv ${SIF_FILE} proxy \
                 --in-port ${IN_PORT} \
@@ -97,8 +101,10 @@
 
     [[sender]]
         script = """
-            # Create output directory
+            # Create output and log directories
             mkdir -p ${OUTPUT_DIR}
+            mkdir -p ${LOG_DIR}
+            mkdir -p ${LOG_DIR}/sender
             # ... existing code ...
             apptainer run ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
