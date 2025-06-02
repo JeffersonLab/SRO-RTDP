@@ -135,21 +135,36 @@ def template_vars(template):
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
 def run(workflow):
-    """Run a workflow using cylc install and cylc play."""
+    """Run a workflow: cd to the workflow dir, cylc install --workflow-name=NAME, then cylc play NAME."""
     import subprocess
     import os
+    import yaml
+    orig_dir = os.getcwd()
     flow_path = os.path.join(workflow, 'flow.cylc')
     if not os.path.exists(flow_path):
         raise click.ClickException(f"No flow.cylc found in {workflow}")
-    # Install the workflow
-    result1 = subprocess.run(['cylc', 'install', workflow])
-    if result1.returncode != 0:
-        raise click.ClickException("cylc install failed")
-    # Play the workflow
-    result2 = subprocess.run(['cylc', 'play', workflow])
-    if result2.returncode != 0:
-        raise click.ClickException("cylc play failed")
-    click.echo("Workflow started")
+    # Try to get workflow name from config if available
+    config_path = os.path.join(workflow, 'config.yml')
+    workflow_name = os.path.basename(os.path.abspath(workflow))
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            try:
+                cfg = yaml.safe_load(f)
+                if 'workflow' in cfg and 'name' in cfg['workflow']:
+                    workflow_name = cfg['workflow']['name']
+            except Exception:
+                pass
+    try:
+        os.chdir(workflow)
+        result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}'])
+        if result1.returncode != 0:
+            raise click.ClickException("cylc install failed")
+        result2 = subprocess.run(['cylc', 'play', workflow_name])
+        if result2.returncode != 0:
+            raise click.ClickException("cylc play failed")
+        click.echo(f"Workflow '{workflow_name}' started")
+    finally:
+        os.chdir(orig_dir)
 
 @cli.command()
 @click.option('--workflow', required=True, help='Workflow name or directory')
