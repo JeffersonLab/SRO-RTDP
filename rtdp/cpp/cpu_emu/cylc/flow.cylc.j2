@@ -32,7 +32,6 @@
         
         [[[environment]]]
             # Path to SIF file
-            CYLC_WORKFLOW_RUN_DIR = "/home/tsai/jeng/cylc-generator/cpu-wf"
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('cpu-emu.sif') }}"
             
             # Network configuration
