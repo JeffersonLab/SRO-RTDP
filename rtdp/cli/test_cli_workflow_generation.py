@@ -438,3 +438,26 @@ def test_stop_command_stops_workflow(monkeypatch):
     output = result.output
     assert 'stopped' in output
     assert 'myflow' in output 
+
+def test_restart_command_restarts_workflow(monkeypatch):
+    """Test that 'restart' restarts a workflow using cylc restart."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+
+    # Simulate cylc restart output
+    fake_output = "Workflow myflow restarted."
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = fake_output
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'restart',
+        '--workflow', 'myflow'
+    ])
+    output = result.output
+    assert 'restarted' in output
+    assert 'myflow' in output 

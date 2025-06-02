@@ -206,9 +206,17 @@ def stop(workflow):
         raise click.ClickException(f"Failed to stop workflow: {e}")
 
 @cli.command()
-def restart():
-    """Restart a workflow."""
-    click.echo("[restart] Not implemented yet.")
+@click.option('--workflow', required=True, help='Workflow name')
+def restart(workflow):
+    """Restart a workflow using cylc restart."""
+    import subprocess
+    try:
+        result = subprocess.run(['cylc', 'restart', workflow], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise click.ClickException(f"cylc restart failed: {result.stderr.strip()}")
+        click.echo(result.stdout.strip())
+    except Exception as e:
+        raise click.ClickException(f"Failed to restart workflow: {e}")
 
 @cli.command()
 def remove():
