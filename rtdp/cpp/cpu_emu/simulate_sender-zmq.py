@@ -9,15 +9,6 @@ import random
 import numpy as np
 from buffer_packet_zmq_sim import serialize_buffer
 
-def wait_for_connection(socket):
-    """Attach monitor and wait until the peer is connected."""
-    monitor = socket.get_monitor_socket()
-    while True:
-        evt = zmq.utils.monitor.parse_monitor_message(monitor)
-        if evt['event'] == zmq.EVENT_CONNECTED:
-            print("✅ Connected to receiver!")
-            break
-
 def simulate_stream(
     port: int,
     avg_rate_mbps: float,
@@ -89,9 +80,9 @@ def simulate_stream(
         # -----------------------
         # OFF phase: Sleep
         # -----------------------
-        if off_time > 0:
-            print(f"{smClk} [simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
-            time.sleep(off_time)
+        #if off_time > 0:
+            #print(f"{smClk} [simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
+            #time.sleep(off_time)
         print(f"{smClk} [simulate_stream:] Estimated frame rate (Hz): {float(num_sent)/float(smClk*1e-9)} num_sent {num_sent}")
         print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*frame_size_mean/float(smClk*1e-9)} num_sent {num_sent}")
         print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*frame_size_mean)/float(smClk*1e-9)} num_sent {num_sent}")
