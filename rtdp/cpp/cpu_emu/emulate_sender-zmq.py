@@ -46,7 +46,8 @@ def emulate_stream(
     on_time = 1 # duty_cycle * cycle_period #disable duty cycle for now
     off_time = cycle_period - on_time
     print(f"[emulate_stream:] duty_cycle = {duty_cycle}, cycle_period = {cycle_period}, on_time = {on_time}, off_time = {off_time}")
-    num_sent = 0
+    num_sent  = 0
+    num_sent0 = 0
     # Derived sleep time between messages
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
     while True:
@@ -78,10 +79,11 @@ def emulate_stream(
             print(f"{int(time.time()*1e6)} [emulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)") #microseconds *1e9 #nanoseconds
             time.sleep(off_time)
         clk = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
-        print(f"{clk} [emulate_stream:] Estimated frame rate (Hz): {float(num_sent)/float(clk*1e-9)} num_sent {num_sent}")
-        print(f"{clk} [emulate_stream:] Estimated bit rate (Gbps): {1e-9*num_sent*frame_size_mean/float(clk*1e-9)} num_sent {num_sent}")
-        print(f"{clk} [emulate_stream:] Estimated bit rate (MHz): {1e-6*float(num_sent*frame_size_mean)/float(clk*1e-9)} num_sent {num_sent}")
+        print(f"{clk} [emulate_stream:] Estimated frame rate (Hz): {float(num_sent-num_sent0)/float((clk-int(start_on*1e6))*1e-9)} num_sent {num_sent}")
+        print(f"{clk} [emulate_stream:] Estimated bit rate (Gbps): {1e-9*(num_sent-num_sent0)*frame_size_mean/float(clk*1e-9)} num_sent {num_sent}")
+        print(f"{clk} [emulate_stream:] Estimated bit rate (MHz): {1e-6*float((num_sent-num_sent0)*frame_size_mean)/float(clk*1e-9)} num_sent {num_sent}")
         #print(f"{clk} [emulate_stream:] Lost Frames: {lost_frames}", flush=True)
+        num_sent0 = num_sent
 
 if __name__ == "__main__":
     print(f"[emulate_sender-zmq: main:]")
