@@ -7,7 +7,7 @@
 
 struct BufferPacket {
     uint32_t size;
-    uint64_t   timestamp;
+    uint64_t timestamp;
     uint32_t stream_id;
 
     static constexpr size_t PACKET_SIZE = sizeof(uint32_t) + sizeof(uint64_t) + sizeof(uint32_t);

@@ -8,5 +8,4 @@ mem_footprint: 0.05  # Memory footprint in GB
 output_size: 0.001   # Output size in GB
 verbose: 1
 terminal: 0          # if 1 do not forward result to destination
-sim_mode: 0          # if 1 run in simulation mode (gets event meta meta only)
-out_nic: 10          # Outbound NIC speed in Gbps for sim_mode
+

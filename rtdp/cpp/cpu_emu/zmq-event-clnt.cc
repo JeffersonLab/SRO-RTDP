@@ -99,7 +99,7 @@ int main (int argc, char *argv[])
         if(psdX) {
             socket.send(pkt.to_message(), zmq::send_flags::none);
         } else {
-	        // Send sized "event"
+	        // Send sized frame
             zmq::message_t request (pkt.size);
             socket.send (request, zmq::send_flags::none);
         }

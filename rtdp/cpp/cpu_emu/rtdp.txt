@@ -48,13 +48,13 @@ grep Est $t|cut -f 8 -d' '|awk 'NR==1 { prev=$1; next } { print $1 - prev; prev=
 grep Est $t|cut -f 6 -d' '|tail -n +11|gnuplot -p -e "set title 'Est rate(Mbps)'; set yrange [0:*]; p '-' u 1 w l"
 
 #p=7001; grep "Estimated send rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated send rate Gbps'; p '-' w l"
-p=7001; grep "Estimated chunk rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated chunk rate Hz'; p '-' w l"
+p=7001; grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated frame rate Hz'; p '-' w l"
 p=7001; grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated bit rate Mhz'; p '-' w l"
 #p=7002; grep "Estimated send rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated send rate Gbps'; p '-' w l"
-p=7002; grep "Estimated chunk rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated chunk rate Hz'; p '-' w l"
+p=7002; grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated frame rate Hz'; p '-' w l"
 p=7002; grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated bit rate Mhz'; p '-' w l"
 #p=7003; grep "Estimated send rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated send rate Gbps'; p '-' w l"
-p=7003; grep "Estimated chunk rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated chunk rate Hz'; p '-' w l"
+p=7003; grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated frame rate Hz'; p '-' w l"
 p=7003; grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated bit rate Mhz'; p '-' w l"
         grep Hz $t|grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated bit rate'; p '-' w l"
         grep Hz $t|grep "Measured event" $t|cut -f 8 -d' '|gnuplot -p -e "set title 'Measured event Hz'; p '-' w l"
@@ -64,29 +64,29 @@ echo "Estimated send rate"; grep "Estimated send rate" $t|cut -f6 -d' '|get_mome
 echo "Estimated bit rate"; grep "Estimated bit rate" $t|cut -f6 -d' '|get_moments
 echo "Measured event"; grep "Measured event" $t|cut -f 8 -d' '|get_moments
 echo "Measured bit"; grep "Measured bit" $t|cut -f 8 -d' '|get_moments
-echo "chunk size"; grep -i "chunk" $t|cut -f 6 -d' '|get_moments
+echo "frame size"; grep -i "frame" $t|cut -f 6 -d' '|get_moments
 echo "Event size"; grep -i "Event size" $t|cut -f 9 -d' '|get_moments
 
 ==================================basic report =================================
 t0=$(mktemp)
-grep "Estimated chunk rate" $t|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated chunk rate Hz'; p '-' w l"
+grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated frame rate Hz'; p '-' w l"
 grep "Estimated bit rate" $t|grep MHz|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated bit rate Mhz'; p '-' w l"
-echo -n "chunk size: "; grep -i "Sending chunk" $t|cut -f 6 -d' '|get_moments
-echo -n "Estimated chunk rate: "; grep -i "Estimated chunk rate" $t|cut -f6 -d' '|get_moments
+echo -n "frame size: "; grep -i "Sending frame" $t|cut -f 6 -d' '|get_moments
+echo -n "Estimated frame rate: "; grep -i "Estimated frame rate" $t|cut -f6 -d' '|get_moments
 echo -n "Estimated bit rate: "; grep -i "Estimated bit rate" $t|cut -f6 -d' '|get_moments
 echo -n "Avg loop duration: "; grep -i "Avg loop duration" $t|cut -f6 -d' '|get_moments
 echo
 for i in {7001..7003}; do
     grep "cpu_emu ${i}" $t > $t0
     echo "cpu_emu ${i}:"
-    grep "Measured chunk" $t0|cut -f 8 -d' '|gnuplot -p -e "set title '$i Measured chunk Hz'; p '-' w l"
+    grep "Measured frame" $t0|cut -f 8 -d' '|gnuplot -p -e "set title '$i Measured frame Hz'; p '-' w l"
     grep "Measured bit" $t0|cut -f 8 -d' '|gnuplot -p -e "set title '$i Measured bit Hz'; p '-' w l"
     echo -n "Sim Sleep Spec: "; grep -i "Sim Sleep Spec" $t0|cut -f 8 -d' '|get_moments
     echo -n "Transmission Sleep Spec: "; grep -i "Transmission Sleep Spec" $t0|cut -f 8 -d' '|get_moments
 
-    echo -n "Measured chunk: "; grep -i "Measured chunk" $t0|cut -f 8 -d' '|get_moments
+    echo -n "Measured frame: "; grep -i "Measured frame" $t0|cut -f 8 -d' '|get_moments
     echo -n "Measured bit: "; grep -i "Measured bit" $t0|cut -f 8 -d' '|get_moments
-    echo -n "chunk size: "; grep -i "Chunk size" $t0|cut -f 9 -d' '|get_moments
+    echo -n "frame size: "; grep -i "Frame size" $t0|cut -f 9 -d' '|get_moments
     echo
 done
 
