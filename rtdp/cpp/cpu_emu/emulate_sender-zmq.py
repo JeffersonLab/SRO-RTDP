@@ -25,7 +25,7 @@ def emulate_stream(
     zmq_socket = context.socket(zmq.PUB)
     # Send will never block
     # optional: disable high water marksocket.setsockopt(zmq.LINGER, 0)  # don't wait on closesocket.bind("tcp://*:5555")
-    #zmq_socket.setsockopt(zmq.SNDHWM, 0) #int(1e2))  # Set send high water mark to 0 messages
+    zmq_socket.setsockopt(zmq.SNDHWM, 0) #int(1e2))  # Set send high water mark to 0 messages
 
     zmq_socket.connect(f"tcp://localhost:{port}")
     time.sleep(1)  # Give receiver time to bind
@@ -50,6 +50,7 @@ def emulate_stream(
     num_sent0 = 0
     # Derived sleep time between messages
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
+    clk0 = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
     while True:
         # -----------------------
         # ON phase: Send data
@@ -75,13 +76,15 @@ def emulate_stream(
         # -----------------------
         # OFF phase: Sleep
         # -----------------------
-        if off_time > 0:
-            print(f"{int(time.time()*1e6)} [emulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)") #microseconds *1e9 #nanoseconds
-            time.sleep(off_time)
+        #if off_time > 0:
+            #print(f"{int(time.time()*1e6)} [emulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)") #microseconds *1e9 #nanoseconds
+            #time.sleep(off_time)
         clk = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
-        print(f"{clk} [emulate_stream:] Estimated frame rate (Hz): {float(num_sent-num_sent0)/float((clk-int(start_on*1e6))*1e-9)} num_sent {num_sent}")
-        print(f"{clk} [emulate_stream:] Estimated bit rate (Gbps): {1e-9*(num_sent-num_sent0)*frame_size_mean/float(clk*1e-9)} num_sent {num_sent}")
-        print(f"{clk} [emulate_stream:] Estimated bit rate (MHz): {1e-6*float((num_sent-num_sent0)*frame_size_mean)/float(clk*1e-9)} num_sent {num_sent}")
+        #frame_rate_hz = frame_count / (elapsed_time_us / 1_000_000)
+        elpsd_tm = float((clk-clk0)) #usec
+        print(f"{clk} [emulate_stream:] Estimated frame rate (Hz): {1e6*float(num_sent)/float(elpsd_tm)} num_sent {num_sent}")
+        print(f"{clk} [emulate_stream:] Estimated bit rate (Gbps): {1e3*num_sent*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}")
+        print(f"{clk} [emulate_stream:] Estimated bit rate (MHz): {float(num_sent)*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}", flush=True)
         #print(f"{clk} [emulate_stream:] Lost Frames: {lost_frames}", flush=True)
         num_sent0 = num_sent
 
