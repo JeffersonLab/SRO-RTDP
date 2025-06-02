@@ -1,0 +1,19 @@
+workflow:
+  name: gpu-proxy
+  description: GPU Proxy test
+platform:
+  name: jlab_slurm
+containers:
+  image_path: gpu-proxy.sif
+IN_PORT: 55555
+OUT_PORT: 55556
+MATRIX_WIDTH: 2048
+SEND_RATE: 150
+GROUP_SIZE: 30720000
+PROXY_RATE: 1.0
+SEND_ALL_ONES: 0
+SOCKET_HWM: 1
+proxy_partition: gpu
+proxy_gres: gpu:A100:1
+proxy_mem: 100G
+proxy_cpus: 4
