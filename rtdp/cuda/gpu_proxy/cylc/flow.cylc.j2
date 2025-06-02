@@ -55,14 +55,112 @@
 
     [[receiver]]
         script = """
-            # Create output and log directories
-            mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${LOG_DIR}
+            # Create log directory
             mkdir -p ${LOG_DIR}/receiver
-            # ... existing code ...
-            echo "SIF_FILE: ${SIF_FILE}"
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+            
+            # Check if port is already in use
+            if netstat -tuln | grep -q ":${OUT_PORT}"; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${OUT_PORT} is already in use" >&2
+                netstat -tuln | grep ":${OUT_PORT}" >&2
+                exit 1
+            fi
+            
+            # Store hostname for other tasks
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
+            HOSTNAME=$(hostname -f)  # Use fully qualified hostname
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from specified NIC
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start receiver with verbose output
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
             apptainer run --pwd /tmp ${SIF_FILE} receiver -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
-            # ... existing code ...
+            
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+            
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+            
+            # Create a flag file to track completion
+            COMPLETION_FILE="${CYLC_WORKFLOW_SHARE_DIR}/receiver_complete"
+            rm -f "${COMPLETION_FILE}"
+            
+            # Initialize file size tracking
+            PREV_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                PREV_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            # Monitor the receiver process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "Process details:" >> ${LOG_DIR}/receiver/process.log
+                ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
+                
+                # Check if data has been received by monitoring file size changes
+                CURRENT_SIZE=0
+                if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                    CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                fi
+                
+                if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${COMPLETION_FILE}" ]; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "Transfer completed successfully"
+                    cylc message -- "Transfer completed successfully"
+                    touch "${COMPLETION_FILE}"
+                fi
+                
+                PREV_SIZE=$CURRENT_SIZE
+                sleep 5
+            done
+            
+            # Check final status
+            FINAL_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                FINAL_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            if [ $FINAL_SIZE -gt 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                echo "Last few lines of apptainer log:" >&2
+                tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = receiver
@@ -75,11 +173,40 @@
 
     [[gpu_proxy]]
         script = """
-            # Create output and log directories
-            mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${LOG_DIR}
+            # Create log directory
             mkdir -p ${LOG_DIR}/proxy
-            # ... existing code ...
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/proxy/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - GPU_NIC: ${GPU_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
+            echo "  - PROXY_RATE: ${PROXY_RATE}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+            
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
+            
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
+            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)  # Get IP from GPU NIC
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start GPU proxy with test mode and matrix width configuration
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
             apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
                 --in-port ${IN_PORT} \
                 --out-ip ${RECV_IP} \
@@ -88,7 +215,37 @@
                 -w ${MATRIX_WIDTH} \
                 -r ${PROXY_RATE} \
                 2>${LOG_DIR}/proxy/apptainer.log &
-            # ... existing code ...
+            
+            PROXY_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $PROXY_PID 2>/dev/null; then
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                exit 1
+            fi
+            
+            # Monitor memory usage
+            while kill -0 $PROXY_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/proxy/memory.log
+                free -h >> ${LOG_DIR}/proxy/memory.log
+                ps -o pid,ppid,%cpu,%mem,cmd -p $PROXY_PID >> ${LOG_DIR}/proxy/memory.log
+                sleep 5
+            done
+            
+            # Check if process died unexpectedly
+            if ! wait $PROXY_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = proxy
@@ -102,11 +259,33 @@
 
     [[sender]]
         script = """
-            # Create output and log directories
-            mkdir -p ${OUTPUT_DIR}
-            mkdir -p ${LOG_DIR}
+            # Create log directory
             mkdir -p ${LOG_DIR}/sender
-            # ... existing code ...
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - SEND_RATE: ${SEND_RATE} MB/s"
+            echo "  - GROUP_SIZE: ${GROUP_SIZE}"
+            echo "  - SEND_ALL_ONES: ${SEND_ALL_ONES}"
+            echo "  - SOCKET_HWM: ${SOCKET_HWM}"
+            echo "  - INPUT_DIR: ${INPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+            
+            # Get proxy information
+            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT} (using NIC ${NIC})"
+            
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+            
+            # Send data with rate control and group size
             apptainer run --pwd /tmp ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
                 -p ${IN_PORT} \
@@ -116,7 +295,16 @@
                 -v \
                 ${SEND_ALL_ONES:+--all-ones} \
                 2>${LOG_DIR}/sender/apptainer.log
-            # ... existing code ...
+            
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+            
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:succeeded"
+            fi
+            
+            # Exit with send status
+            exit ${SEND_STATUS}
         """
         [[[directives]]]
             --job-name = sender
