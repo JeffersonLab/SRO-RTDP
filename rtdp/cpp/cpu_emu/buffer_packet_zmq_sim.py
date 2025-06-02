@@ -1,4 +1,4 @@
-# buffer_packet_zmq_emu.py
+# buffer_packet_zmq_sim.py
 
 # We'll define a structure that works in both C++ and Python by using a flat binary format with a 4-byte size header.
 # This creates a binary buffer with the size encoded up front—C++ can use the same format with htonl() and memcpy().
