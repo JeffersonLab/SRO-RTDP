@@ -135,7 +135,7 @@ def template_vars(template):
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
 def run(workflow):
-    """Run a workflow: build SIF if missing, cd to dir, cylc install --workflow-name=NAME, then cylc play NAME."""
+    """Run a workflow: build SIF if missing (only if config is in workflow dir), cd to dir, cylc install --workflow-name=NAME, then cylc play NAME."""
     import subprocess
     import os
     import yaml
@@ -143,10 +143,9 @@ def run(workflow):
     flow_path = os.path.join(workflow, 'flow.cylc')
     if not os.path.exists(flow_path):
         raise click.ClickException(f"No flow.cylc found in {workflow}")
-    # Try to get workflow name and SIF info from config if available
+    # Only use config if present in workflow directory
     config_path = os.path.join(workflow, 'config.yml')
     workflow_name = os.path.basename(os.path.abspath(workflow))
-    sif_builds = []
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:
             try:
@@ -157,12 +156,10 @@ def run(workflow):
                 sif_dir = os.path.join(workflow, 'sifs')
                 os.makedirs(sif_dir, exist_ok=True)
                 sif_tasks = []
-                # Support both containers.image_path and containers.CPU_EMU_SIF/GPU_PROXY_SIF
                 containers = cfg.get('containers', {})
                 if 'image_path' in containers:
                     sif_name = containers['image_path']
                     sif_path = os.path.join(sif_dir, sif_name)
-                    # Guess Docker image from SIF name
                     if 'gpu-proxy' in sif_name:
                         docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
                     elif 'cpu-emu' in sif_name:
@@ -171,7 +168,6 @@ def run(workflow):
                         docker_img = None
                     if docker_img and not os.path.exists(sif_path):
                         sif_tasks.append((sif_path, docker_img))
-                # For chain workflows, check for multiple SIFs
                 for k, v in containers.items():
                     if k.endswith('_SIF') and isinstance(v, str):
                         sif_name = v
@@ -184,7 +180,6 @@ def run(workflow):
                             docker_img = None
                         if docker_img and not os.path.exists(sif_path):
                             sif_tasks.append((sif_path, docker_img))
-                # Build any missing SIFs
                 for sif_path, docker_img in sif_tasks:
                     click.echo(f"SIF not found: {sif_path}. Building from {docker_img}...")
                     result = subprocess.run(['apptainer', 'build', sif_path, f'docker://{docker_img}'])
