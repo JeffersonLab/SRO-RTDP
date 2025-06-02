@@ -49,9 +49,9 @@
             SOCKET_HWM = "{{ SOCKET_HWM | default('1') }}"
             
             # Directory paths
-            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
-            INPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/input"
-            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
 
     [[receiver]]
         script = """
