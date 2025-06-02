@@ -39,6 +39,9 @@ def generate(config, output, template):
     flow_path = os.path.join(output, 'flow.cylc')
     with open(flow_path, 'w') as f:
         f.write(rendered)
+    # Copy the config file into the output directory as config.yml
+    import shutil
+    shutil.copyfile(config, os.path.join(output, 'config.yml'))
     click.echo(f"Generated flow.cylc at {flow_path}")
 
 @cli.command()
