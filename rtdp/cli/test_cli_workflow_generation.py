@@ -461,3 +461,26 @@ def test_restart_command_restarts_workflow(monkeypatch):
     output = result.output
     assert 'restarted' in output
     assert 'myflow' in output 
+
+def test_remove_command_removes_workflow(monkeypatch):
+    """Test that 'remove' removes a workflow using cylc clean."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+
+    # Simulate cylc clean output
+    fake_output = "Workflow myflow removed."
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = fake_output
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'remove',
+        '--workflow', 'myflow'
+    ])
+    output = result.output
+    assert 'removed' in output
+    assert 'myflow' in output 

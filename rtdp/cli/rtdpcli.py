@@ -219,9 +219,17 @@ def restart(workflow):
         raise click.ClickException(f"Failed to restart workflow: {e}")
 
 @cli.command()
-def remove():
-    """Remove a workflow."""
-    click.echo("[remove] Not implemented yet.")
+@click.option('--workflow', required=True, help='Workflow name')
+def remove(workflow):
+    """Remove a workflow using cylc clean."""
+    import subprocess
+    try:
+        result = subprocess.run(['cylc', 'clean', workflow], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise click.ClickException(f"cylc clean failed: {result.stderr.strip()}")
+        click.echo(result.stdout.strip())
+    except Exception as e:
+        raise click.ClickException(f"Failed to remove workflow: {e}")
 
 @cli.command()
 def export():
