@@ -415,3 +415,26 @@ def test_list_command_shows_workflows(monkeypatch):
     assert 'myflow' in output
     assert 'anotherflow' in output
     assert 'thirdflow' in output 
+
+def test_stop_command_stops_workflow(monkeypatch):
+    """Test that 'stop' stops a workflow using cylc stop."""
+    from click.testing import CliRunner
+    from rtdpcli import cli
+
+    # Simulate cylc stop output
+    fake_output = "Workflow myflow stopped."
+    def fake_run(cmd, *args, **kwargs):
+        class Result:
+            returncode = 0
+            stdout = fake_output
+        return Result()
+    monkeypatch.setattr('subprocess.run', fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        'stop',
+        '--workflow', 'myflow'
+    ])
+    output = result.output
+    assert 'stopped' in output
+    assert 'myflow' in output 
