@@ -1,0 +1,15 @@
+workflow:
+  name: chain-workflow
+  description: CPU+GPU chain workflow test
+platform:
+  name: jlab_slurm
+containers:
+  CPU_EMU_SIF: cpu-emu.sif
+  GPU_PROXY_SIF: gpu-proxy.sif
+BASE_PORT: 55555
+VERBOSE: 2
+partition: ifarm
+proxy_partition: gpu
+proxy_gres: gpu:A100:1
+proxy_mem: 100G
+proxy_cpus: 4 
