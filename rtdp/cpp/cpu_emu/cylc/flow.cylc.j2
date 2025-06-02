@@ -51,8 +51,8 @@
             VERBOSE = "{{ VERBOSE }}"
             
             # Directory paths
-            OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
-            LOG_DIR = "$CYLC_WORKFLOW_SHARE_DIR/logs"
+            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
+            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
 
     [[receiver]]
         script = """
