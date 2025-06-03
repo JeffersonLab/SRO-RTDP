@@ -20,6 +20,7 @@ def launch_component(index, ref_port):
             "-o", str(0.00001),
             "-p", str(ref_port + index - 1),
             "-r", str(ref_port + index),
+            "-s",
             "-t", str(1),
             "-v", str(1)
         ])
@@ -31,6 +32,7 @@ def launch_component(index, ref_port):
 #            "-i", str("127.0.0.1"),
 #            "-o", str(0.00001),
             "-r", str(ref_port + index),
+            "-s",
             "-t", str(1),
             "-v", str(1),
             "-y", str("cpu_emu.yaml"),

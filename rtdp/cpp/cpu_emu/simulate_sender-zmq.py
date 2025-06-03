@@ -39,7 +39,7 @@ def simulate_stream(
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
     nic_limit_bps = nic_limit_gbps * 1_000_000_000
-    frame_size_mean = 60e3*10 # CLAS12 # avg_rate_bps / 100     # bits - Send in 100 frames per second
+    frame_size_mean = 60e3*10 # CLAS12 # bits
     std_dev = frame_size_mean * rms_fraction # bits
     print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, frame_size_mean(Mb) = {frame_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
     

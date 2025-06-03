@@ -51,12 +51,12 @@ void   Usage()
 }
 
 // Computational Function to emulate/stimulate processing load/latency, etc. 
-void func(size_t nmrd, size_t cmpLt_GB, double memGB, bool psdS, uint16_t tag, bool vrbs=false) 
+void func(size_t nmrd, size_t cmpLt_sGB, double memGB, bool psdS, uint16_t tag, bool vrbs=false) 
 { 
-    const float ts(cmpLt_GB*nmrd*1e-9); //reqd timespan in seconds
-    const float tsms(cmpLt_GB*nmrd*1e-6); //reqd timespan in milliseconds
-    const float tsus(cmpLt_GB*nmrd*1e-3); //reqd timespan in microseconds
-    const float tsns(cmpLt_GB*nmrd);    //reqd timespan in nanoseconds
+    const float ts(cmpLt_sGB*nmrd*1e-9); //reqd timespan in seconds
+    const float tsms(cmpLt_sGB*nmrd*1e-6); //reqd timespan in milliseconds
+    const float tsus(cmpLt_sGB*nmrd*1e-3); //reqd timespan in microseconds
+    const float tsns(cmpLt_sGB*nmrd);    //reqd timespan in nanoseconds
     size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(1024*1024*1024)) << " Gbytes ..." << endl;
@@ -83,7 +83,7 @@ void func(size_t nmrd, size_t cmpLt_GB, double memGB, bool psdS, uint16_t tag, b
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for "       << float(cms.count())/float(1e6)  << " msecs ..." << " size " << nmrd << endl;
         this_thread::sleep_for(cms);
     }else{
-        auto ts = (cmpLt_GB*nmrd*1e-9);
+        auto ts = (cmpLt_sGB*nmrd*1e-9);
         //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         auto start_time = std::chrono::high_resolution_clock::now();
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning ...";
@@ -212,9 +212,14 @@ int main (int argc, char *argv[])
     uint16_t dst_prt = 8888;  // target port default
     auto     nmThrds = 5;     // default
     bool     vrbs    = false; // verbose ?
-    double   cmpLt_GB  = 100;   // seconds/(input GB) computational latency
-    double   memGB   = 10;    // thread memory footprint in GB
-    double   otmemGB = 0.01;  // program output in GB
+    // 500 seconds/(input GB) computational latency for 60kB CLAS12
+    // 0.5 microseconds/byte
+    // 0.5 seconds per megabyte
+    double   cmpLt_sGB  = 500;   // seconds/(input GB) computational latency
+    double   cmpLt_usB  = 0.5;   // usec/(input B) computational latency
+    double   cmpLt_sMB  = 0.5;   // seconds/(input MB) computational latency
+    double   memGB      = 10;    // thread memory footprint in GB
+    double   otmemGB    = 0.01;  // program output in GB
 
     std::cout << std::fixed << std::setprecision(7);  // 6 decimal places            
 
@@ -226,9 +231,9 @@ int main (int argc, char *argv[])
             Usage();
             exit(1);
         case 'b':
-            cmpLt_GB = (double) atof((const char *) optarg) ;
+            cmpLt_sGB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) cout << " -b " << cmpLt_GB;
+            if(DBG) cout << " -b " << cmpLt_sGB;
             break;
         case 'i':
             strcpy(dst_ip, (const char *) optarg) ;
@@ -290,7 +295,7 @@ int main (int argc, char *argv[])
     if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), rcv_prt, vrbs);
         //cmd line parms overide yaml file settings (which are otherwise in the map)
-        if(!psdB) cmpLt_GB = stof(mymap["latency"]);
+        if(!psdB) cmpLt_sGB = stof(mymap["latency"]);
         if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
         if(!psdM) memGB    = stof(mymap["mem_footprint"]);
         if(!psdO) otmemGB  = stof(mymap["output_size"]);
@@ -304,7 +309,7 @@ int main (int argc, char *argv[])
     ////////
     if(vrbs) cout << "[cpu_emu "   << rcv_prt                     << " ]: "
                 << " Operating with yaml = " << (psdY?yfn:"N/A")
-                << "\tcmpLt_GB = " << cmpLt_GB
+                << "\tcmpLt_sGB = " << cmpLt_sGB
                 << "\tdst_ip = "   << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = "       << memGB
                 << "\totmemGB = "  << otmemGB                     << "\tdst_prt = "     << (psdZ?"N/A":to_string(dst_prt))
                 << "\trcv_prt = "  << rcv_prt                     << "\tsleep = "       << psdS
@@ -312,7 +317,11 @@ int main (int argc, char *argv[])
                 << "\tterminal = " << psdZ                        << '\n';
 
     // Random number generator for compute latency generation
-    constexpr double shape = 25.0;  //100
+    // use a c++ gamma distribution sampler with shape and scale set to generate samples in the range (0,1) 
+    // such that when multiplied by the number of bytes X and a constant scale factor C of microseconds per 
+    // byte will yield samples of the compute time in microseconds with a standard deviation of 30% of the mean
+
+    constexpr double shape = 25.0;
     constexpr double scale = 4e-11; //1e-11 - halves the std dev with same mean
 
     std::random_device rd;
@@ -358,7 +367,7 @@ int main (int argc, char *argv[])
         
         rtcd = rcv_sckt.recv (request, recv_flags::none);
 
-        bufSiz = 8*rtcd.value();
+        bufSiz = 8*rtcd.value(); //bits
         
         {
             auto now = high_resolution_clock::now();
@@ -367,7 +376,7 @@ int main (int argc, char *argv[])
             tsr = us.count()-tsr_base;
         }
 
-        if(DBG) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " Received request "
+        if(DBG) cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Received request "
                       << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
@@ -380,7 +389,7 @@ int main (int argc, char *argv[])
             vector<thread> threads;
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
-                threads.push_back(thread(func, bufSiz/8, cmpLt_GB, memGB, psdS, rcv_prt, vrbs));
+                threads.push_back(thread(func, bufSiz/8, cmpLt_sGB, memGB, psdS, rcv_prt, vrbs));
 
             for (auto& th : threads) th.join();
             if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " synchronized all threads..." << endl;
@@ -398,6 +407,8 @@ int main (int argc, char *argv[])
             {
 	        // Send  "frame"
                 message_t dst_msg(outSz/8);  //represents harvested data
+                if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
+                              << request_nbr << ')' << " to " << rcv_prt-1 << endl;
                 sr = dst_sckt.send(dst_msg, send_flags::none);
                 if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;

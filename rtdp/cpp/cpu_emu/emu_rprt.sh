@@ -126,9 +126,9 @@ echo "t12 $t12"
 echo "t13 $t13"
 
 #search for missed frames
-tf=$(mktemp); grep emulate_stream $t|grep -Ev "^\[emulate_stream" |grep -v emulate_sender-zmq > $tf
+tf=$(mktemp); echo -n "tf = "; echo $tf; grep emulate_stream $t|grep -Ev "^\[emulate_stream" |grep -v emulate_sender-zmq > $tf
 grep 700 $t|grep -Ev "^\[cpu_emu"|grep -v launcher_py_cpu_emu|grep -v emulate_stream >> $tf
-sort -n -k1 $tf|grep -v Estimated|grep -v Measured|grep -v recd|grep -v Memory|less
+tf1=$(mktemp); echo -n "tf1 = "; echo $tf1; sort -n -k1 $tf|grep -v Estimated|grep -v Measured|grep -v recd|grep -v Memory > $tf1
 # then compare 7003 to 7002, etc.
 
 set -m

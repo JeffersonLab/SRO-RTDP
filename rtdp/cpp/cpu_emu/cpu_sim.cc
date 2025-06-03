@@ -155,10 +155,15 @@ int main (int argc, char *argv[])
     uint16_t rcv_prt = 8888;  // receive port default
     uint16_t dst_prt = 8888;  // target port default
     bool     vrbs    = false; // verbose ?
-    double   cmpLt_GB  = 100;   // seconds/(input GB) computational latency
-    double   memGB   = 10;    // thread memory footprint in GB
-    double   otmemGB = 0.01;  // program output in GB
-    double   outNicSpd = 10;  // outgoing NIC speed in Gbps
+    // 500 seconds/(input GB) computational latency for 60kB CLAS12
+    // 0.5 microseconds/byte
+    // 0.5 seconds per megabyte
+    double   cmpLt_sGB  = 500;   // seconds/(input GB) computational latency
+    double   cmpLt_usB  = 0.5;   // usec/(input B) computational latency
+    double   cmpLt_sMB  = 0.5;   // seconds/(input MB) computational latency
+    double   memGB      = 10;    // thread memory footprint in GB
+    double   otmemGB    = 0.01;  // program output in GB
+    double   outNicSpd  = 10;  // outgoing NIC speed in Gbps
 
     std::cout << std::fixed << std::setprecision(7);  // 6 decimal places            
 
@@ -170,9 +175,9 @@ int main (int argc, char *argv[])
             Usage();
             exit(1);
         case 'b':
-            cmpLt_GB = (double) atof((const char *) optarg) ;
+            cmpLt_sGB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) cout << " -b " << cmpLt_GB;
+            if(DBG) cout << " -b " << cmpLt_sGB;
             break;
         case 'i':
             strcpy(dst_ip, (const char *) optarg) ;
@@ -230,7 +235,7 @@ int main (int argc, char *argv[])
     if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), rcv_prt, vrbs);
         //cmd line parms overide yaml file settings (which are otherwise in the map)
-        if(!psdB) cmpLt_GB = stof(mymap["latency"]);
+        if(!psdB) cmpLt_sGB = stof(mymap["latency"]);
         if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
         if(!psdM) memGB    = stof(mymap["mem_footprint"]);
         if(!psdN) outNicSpd= stof(mymap["out_nic"]);
@@ -243,7 +248,7 @@ int main (int argc, char *argv[])
     ////////
     if(vrbs) cout << "[cpu_sim "   << rcv_prt                     << " ]: "
                 << " Operating with yaml = " << (psdY?yfn:"N/A")
-                << "\tcmpLt_GB = " << cmpLt_GB
+                << "\tcmpLt_sGB = " << cmpLt_sGB
                 << "\tdst_ip = "   << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = "       << memGB
                 << "\totmemGB = "  << otmemGB                     << "\tdst_prt = "     << (psdZ?"N/A":to_string(dst_prt))
                 << "\trcv_prt = "  << rcv_prt
@@ -251,13 +256,15 @@ int main (int argc, char *argv[])
                 << "\tverbose = "   << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
                 << "\tterminal = " << psdZ                        << '\n';
 
-    // Random number generator for compute latency generation
-    constexpr double shape = 25.0;  //100
-    constexpr double scale = 4e-11; //1e-11 - halves the std dev with same mean
+    // RNG for latency variance generation using a Gaussian (normal) distribution to generate a scaling factor 
+    // centered around 1.0, with a standard deviation chosen so that ~99.7% of values fall 
+    // in the 70% to 130% range (i.e., ±3σ ≈ 30%):
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::gamma_distribution<double> sd_30_gamma_dist(shape, scale);
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    
+    // Mean = 1.0, Std Dev = 0.1 gives 99.7% of samples in [0.7, 1.3]
+    static std::normal_distribution<> sd_10pcnt(1.0, 0.1);
 
     //  Prepare our receiving rcv_cntxt and socket
     context_t rcv_cntxt(1);
@@ -299,27 +306,32 @@ int main (int argc, char *argv[])
             rtcd = rcv_sckt.recv (request, recv_flags::none);
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
-            if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl; //vrbs>10
+            if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl; //vrbs>10
             rcv_sckt.send (reply, send_flags::none);
         }
-
         
         BufferPacket pkt = BufferPacket::from_message(request);
 
-        bufSiz = pkt.size;
+        bufSiz = pkt.size; //bits
         stream_id = pkt.stream_id;
-        //reqd transmission timespan in nanoseconds
-        double xmsFctr = max(1e-9,sd_30_gamma_dist(gen));
-        tsn = uint64_t(1e6*float(bufSiz/outNicSpd)*xmsFctr); //usec
-        //advance the sim clock for netwok latency
-        auto tsr1 = pkt.timestamp + tsn;
-        if(DBG && request_nbr % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn << " for bufSiz " << bufSiz
-                                                << " outNicSpd " << outNicSpd << " (" << request_nbr << ')' << " using xmsFctr " << xmsFctr << endl;
-        if(tsr>tsr1) {
-            if(vrbs) cout << tsr1 << " [cpu_sim " << rcv_prt << "]:  dropped (" << request_nbr++ << ')' << endl;
-                continue;
-        } else {
+        //reqd transmission timespan in usec
+    
+        {
+            // Clamp to [1.0, 1.3] to enforce bounds
+            auto lb = 1e-3*double(bufSiz)/outNicSpd; //usec
+            auto x = std::clamp(sd_10pcnt(gen), 1.0, 1.3);
+            tsn = uint64_t(round(lb*x)); //usec
+            //advance the sim clock for netwok latency
+            auto tsr1 = pkt.timestamp + tsn;
+            if(1 && request_nbr % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn
+                                                << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd
+                                                << " (" << request_nbr << ')' << " using x " << x << " lb " << lb << endl;
+            if(tsr>tsr1) {
+                if(vrbs) cout << tsr1 << " [cpu_sim " << rcv_prt << "]:  dropped (" << request_nbr++ << ')' << endl;
+                    continue;
+            } else {
                 tsr = tsr1;// (request_nbr==1?pkt.timestamp:tsr) + tsn;
+            }
         }
         if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
                       << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
@@ -331,11 +343,14 @@ int main (int argc, char *argv[])
         //  Do some 'work'
         // simulate load on system for ensuing work
         {
-            //reqd computational timespan in nanoseconds with 30% std dev
-            tsc = uint64_t(1e6*cmpLt_GB*(float(bufSiz)/8)*sd_30_gamma_dist(gen)); //usec
-            if(DBG) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' << endl;
+            //reqd computational timespan in usec with 10% std dev
+            auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);
+            tsc = uint64_t(round(cmpLt_usB*(float(bufSiz)/8)*x)); //usec
+            if(1) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' 
+                        << " for bufSiz " << bufSiz << " cmpLt_usB " << cmpLt_usB << " x " << x << endl;
             tsr += tsc;
         }
+
         if(!psdZ) {
             if(DBG) cout << "[cpu_sim " << rcv_prt << "]: " << " Forwarding "
                           << " request " << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
@@ -359,7 +374,7 @@ int main (int argc, char *argv[])
                 // Receive the reply from the destination
                 //  Get the reply.
                 message_t reply;
-                if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << request_nbr << ')' << endl;
+                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << request_nbr << ')' << endl;
                 recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
                 if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Destination Actual reply (" << request_nbr << ") " 
                               << reply << " With rtcd = " << rtcd.value() << endl;
