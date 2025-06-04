@@ -286,10 +286,11 @@ int main (int argc, char *argv[])
         if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
-    uint64_t request_nbr = 1;
+    uint64_t request_nbr = 0;
     double mnBfSz = 0; //mean receive Size (bits)
     uint64_t bufSiz = 0; //bits
     uint32_t stream_id = 0;
+    uint32_t frame_num = 0;
     uint64_t tsr = 0; // sim clock from sender
     uint64_t tsc = 0; // computational latency
     uint64_t tsn = 0; // outbound network latency
@@ -306,7 +307,7 @@ int main (int argc, char *argv[])
             rtcd = rcv_sckt.recv (request, recv_flags::none);
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
-            if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl; //vrbs>10
+            if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl; //vrbs>10 //request_nbr correct ?????
             rcv_sckt.send (reply, send_flags::none);
         }
         
@@ -314,6 +315,7 @@ int main (int argc, char *argv[])
 
         bufSiz = pkt.size; //bits
         stream_id = pkt.stream_id;
+        frame_num = pkt.frame_num;
         //reqd transmission timespan in usec
     
         {
@@ -323,38 +325,39 @@ int main (int argc, char *argv[])
             tsn = uint64_t(round(lb*x)); //usec
             //advance the sim clock for netwok latency
             auto tsr1 = pkt.timestamp + tsn;
-            if(1 && request_nbr % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn
+            if(vrbs && frame_num % 10 == 0) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn
                                                 << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd
-                                                << " (" << request_nbr << ')' << " using x " << x << " lb " << lb << endl;
+                                                << " (" << frame_num << ')' << " using x " << x << " lb " << lb << endl;
             if(tsr>tsr1) {
-                if(vrbs) cout << tsr1 << " [cpu_sim " << rcv_prt << "]:  dropped (" << request_nbr++ << ')' << endl;
+                if(vrbs) cout << tsr1 << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')' << endl;
                     continue;
             } else {
+                request_nbr++;
                 tsr = tsr1;// (request_nbr==1?pkt.timestamp:tsr) + tsn;
             }
         }
         if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
-                      << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
+                      << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
         if(vrbs) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " frame size = "
                       << "(Spec'd) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
-                      << " from client " << "ts = " << tsr << " (" << request_nbr << ')' << endl;
+                      << " from client " << "ts = " << tsr << " (" << frame_num << ')' << endl;
         //  Do some 'work'
         // simulate load on system for ensuing work
         {
             //reqd computational timespan in usec with 10% std dev
             auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);
             tsc = uint64_t(round(cmpLt_usB*(float(bufSiz)/8)*x)); //usec
-            if(1) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << request_nbr << ')' 
+            if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << frame_num << ')' 
                         << " for bufSiz " << bufSiz << " cmpLt_usB " << cmpLt_usB << " x " << x << endl;
             tsr += tsc;
         }
 
         if(!psdZ) {
             if(DBG) cout << "[cpu_sim " << rcv_prt << "]: " << " Forwarding "
-                          << " request " << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
-                          << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << " (" << request_nbr << ')' << endl;
+                          << " request " << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
+                          << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << " (" << frame_num << ')' << endl;
             //forward to next hop
             // Send a message to the destination
             size_t outSz = 8*otmemGB*1.024*1.024*1.024*1e9; //output size in bits
@@ -368,19 +371,19 @@ int main (int argc, char *argv[])
                 pkt.stream_id = stream_id;
 	            // Send "frame" spec
                 if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
-                              << request_nbr << ')' << " to " << rcv_prt-1 << endl;
+                              << frame_num << ')' << " to " << rcv_prt-1 << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
 
                 // Receive the reply from the destination
                 //  Get the reply.
                 message_t reply;
-                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << request_nbr << ')' << endl;
+                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << frame_num << ')' << endl;
                 recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
-                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Destination Actual reply (" << request_nbr << ") " 
+                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Destination Actual reply (" << frame_num << ") " 
                               << reply << " With rtcd = " << rtcd.value() << endl;
 
-                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: " << " output Num written  (" << request_nbr << ") " << sr.value()  << endl;
-                if(sr.value() != pkt.PACKET_SIZE) cout << "Destination data incorrect size (" << request_nbr << ") " << endl;
+                if(DBG) cout << "[cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
+                if(sr.value() != pkt.PACKET_SIZE) cout << "Destination data incorrect size (" << frame_num << ") " << endl;
             }        
         }
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
@@ -392,8 +395,7 @@ int main (int argc, char *argv[])
             if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
             if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
         }
-        if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << request_nbr << ')' << endl;
-        request_nbr++;
+        if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << frame_num << ')' << endl;
     }
     return 0;
 }
