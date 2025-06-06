@@ -12,25 +12,25 @@ def launch_component(index, ref_port):
 
     # Launch receiver
     if index > 1:
-        print(f"[launcher_py_cpu_sim] Starting cpu_sim #{index} listening on port {ref_port + index}, forwarding to port {ref_port + index - 1}")
+        print(f"[launcher_py_cpu_sim] Starting cpu_sim #{index} listening on port {ref_port + index - 1}, forwarding to port {ref_port + index - 2}")
         subprocess.Popen([
             "./cpu_sim",
             "-b", str(500),
             "-i", str("127.0.0.1"),
             "-n", str(100),
             "-o", str(0.0001),
-            "-p", str(ref_port + index - 1),
-            "-r", str(ref_port + index),
+            "-p", str(ref_port + index - 2),
+            "-r", str(ref_port + index - 1),
             "-v", str(1)
         ])
     else:
-        print(f"[launcher_py_cpu_sim] Starting cpu_sim #{index} listening on port {ref_port + index}, acting as sink")
+        print(f"[launcher_py_cpu_sim] Starting cpu_sim #{index} listening on port {ref_port + index - 1}, acting as sink")
         subprocess.Popen([
             "./cpu_sim",
 #            "-b", str(500),          # test of cpu_sim.yaml
 #            "-i", str("127.0.0.1"),
             "-o", str(0.0001),
-            "-r", str(ref_port + index),
+            "-r", str(ref_port + index - 1),
             "-v", str(1),
             "-y", str("cpu_sim.yaml"),
             "-z", str(1)
@@ -52,12 +52,12 @@ def main():
     print(f"[launcher_py_cpu_sim] Starting simulate_sender-zmq.py with args {args.components}, {args.base_port}, {args.avg_rate}, {args.rms}, {args.duty}, {args.nic}")
 
     for i in range(args.components, 0, -1):
-        print(f"[launcher_py_cpu_sim: main:] launch_component #{i} with ref_port = {args.base_port + args.components}")
+        print(f"[launcher_py_cpu_sim: main:] launch_component #{i} with ref_port = {args.base_port + args.components - 1}")
         launch_component(i, args.base_port)
         
-    print(f"[launcher_py_cpu_sim] Starting simulate_sender-zmq.py on port {args.base_port + args.components}...")
+    print(f"[launcher_py_cpu_sim] Starting simulate_sender-zmq.py on port {args.base_port + args.components - 1}...")
     subprocess.Popen(["python", "simulate_sender-zmq.py",
-        "--port", str(args.base_port + args.components),
+        "--port", str(args.base_port + args.components - 1),
         "--avg-rate-mbps", str(args.avg_rate),
         "--rms-fraction", str(args.rms),
         "--duty-cycle", str(args.duty),
