@@ -60,7 +60,6 @@ for i in {7003..7001}; do
   echo
 done
 
-grep drop $t|grep 7003|cut -f 1,6 -d' '|sed 's/(//'|sed 's/)//'|gnuplot -p -e "unset key; set xlabel 'Clock (hr)'; set ylabel 'msec'; p '-' u ((\$1/1e6)/3.6e3):2 w l"
 
 t3=$(mktemp); echo "t3 $t3"; 
 t4=$(mktemp); echo "t4 $t4"; 
@@ -99,7 +98,8 @@ sort -k 1 -n $t12 > $t13
 
 for i in {7003..7001}; do
     echo -n "Missed frame ratio for $i: "
-    grep ratio $t|grep $i|cut -f 8 -d' '|tail -1
+    grep ratio $t|grep "cpu_sim $i"|cut -f 8 -d' '|tail -1
+    grep ratio $t|grep "cpu_sim $i"|cut -f 1,8 -d' '|gnuplot -p -e "set title 'Missed Frames $i'; unset key; set xlabel 'Clock (hr)'; set ylabel 'Fraction'; p '-' u ((\$1/1e6)/3.6e3):2 w l"
 done
 
 echo "t $t"
