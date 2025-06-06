@@ -17,17 +17,17 @@ t=$1
 set +m
 t0a=$(mktemp); echo "t0a $t0a"
 grep "Estimated frame rate" $t|cut -f1,7 -d' ' > $t0a
-cat $t0a|gnuplot -p -e "unset key; set title 'Sender Estimated frame rate'; stats '$t0a' using 2 nooutput; set xlabel 'Clock (hr)'; set ylabel 'Hz'; set yrange [0:STATS_max * 1.2]; p '-' u ((\$1/1e6)/3.6e3):2 w l" &
+cat $t0a|gnuplot -p -e "unset key; set title 'Sender Estimated frame rate'; stats '$t0a' using 2 nooutput; set xlabel 'Clock (hr)'; set ylabel 'Hz'; p '-' u ((\$1/1e6)/3.6e3):2 w l" &
 echo -n 'Sender Estimated frame rate Hz: '
 cut -f2 -d' ' $t0a|get_moments
 t0b=$(mktemp); echo "t0b $t0b"
 grep "Estimated bit rate" $t|grep MHz|cut -f1,7 -d' ' > $t0b
-cat $t0b|gnuplot -p -e "unset key; set title 'Sender Estimated bit rate';  stats '$t0b' using (\$2/1e6) nooutput; set xlabel 'Clock (hr)'; set ylabel 'Mbps'; set yrange [0:STATS_max * 1.2]; p '-' u ((\$1/1e6)/3.6e3):(\$2/1e6) w l" &
+cat $t0b|gnuplot -p -e "unset key; set title 'Sender Estimated bit rate';  stats '$t0b' using (\$2/1e6) nooutput; set xlabel 'Clock (hr)'; set ylabel 'Mbps'; p '-' u ((\$1/1e6)/3.6e3):(\$2/1e0) w l" &
 echo -n 'Sender Estimated bit rate Mhz: '
 cut -f2 -d' ' $t0b|get_moments
 t0c=$(mktemp); echo "t0c $t0c"
 grep -i "\[simulate_stream:] Sending frame" $t|cut -f 1,7 -d' ' > $t0c
-cat $t0c|gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'Mb'; unset key; set title 'Sender frame size';  stats '$t0c' using (\$2/1e6) nooutput; set yrange [0:STATS_max * 1.2]; p '-' u ((\$1/1e6)/3.6e3):(\$2/1e6) w l" &
+cat $t0c|gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'Mb'; unset key; set title 'Sender frame size';  stats '$t0c' using (\$2/1e6) nooutput; p '-' u ((\$1/1e6)/3.6e3):(\$2/1e6) w l" &
 echo -n "Sender frame size bits: "
 cut -f2 -d' ' $t0c|get_moments
 #t0d=$(mktemp); echo "t0d $t0d"
@@ -47,19 +47,20 @@ for i in {7003..7001}; do
     echo "cpu_sim ${i}:"
     echo -n "frame size bits: "; grep -i "Frame size" $t0|grep -v "simulate_stream"|grep -v Sending|cut -f 9 -d' '|get_moments
     t1=$(mktemp); echo "t1 $t1"; grep "Measured frame" $t0|grep -v "simulate_stream"|cut -f 1,8 -d' ' > $t1
-    gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'Hz'; unset key; set title '$i Measured frame rate';  stats '$t1' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '-' u ((\$1/1e6)/3.6e3):2 w l" < $t1  &
+    gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'Hz'; unset key; set title '$i Measured frame rate';  stats '$t1' using 2 nooutput; p '-' u ((\$1/1e6)/3.6e3):2 w l" < $t1  &
     echo -n "Measured frame rate Hz: "; cut -f 2 -d ' ' $t1 | get_moments 
     t2=$(mktemp); echo "t2 $t2"; grep "Measured bit" $t0|grep -v "simulate_stream"|cut -f 1,8 -d' '  > $t2
-    gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'Mbps'; unset key; set title '$i Measured bit rate';  stats '$t2' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '-' u ((\$1/1e6)/3.6e3):2 w l"  < $t2 &
+    gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'Mbps'; unset key; set title '$i Measured bit rate';  stats '$t2' using 2 nooutput; p '-' u ((\$1/1e6)/3.6e3):2 w l"  < $t2 &
     echo -n "Measured bit rate MHz: "; cut -f 2 -d ' ' $t2 | get_moments
     grep Compute $t0|cut -f1,9 -d' '| gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'msec'; unset key; set title '$i compute latency'; p '-' u ((\$1/1e6)/3.6e3):(\$2/1e3) w l"
     grep Compute $t0|cut -f1,12 -d' '|gnuplot -p -e "set xlabel 'Clock (hr)'; set ylabel 'usec'; unset key; set title '$i network latency'; p '-' u ((\$1/1e6)/3.6e3):2 w l"
     #grep tsn $t0|cut -f 9,12 -d' '|gnuplot -p -e "unset key; set title '$i network latency usec vs size bits'; p '-' u ((\$1/1e6)/3.6e3):2"
-    #tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "unset key; f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency usec vs size bits';  stats '$tg' using 2 nooutput; set yrange [0:STATS_max * 1.2]; p '$tg' u 1:2, f(x) lc 'red'"
+    #tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "unset key; f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency usec vs size bits';  stats '$tg' using 2 nooutput; p '$tg' u 1:2, f(x) lc 'red'"
     #tg=$(mktemp); grep tsn $t0|cut -f 9,12 -d' ' > $tg; gnuplot -p -e "unset key; f(x) = a*x + b; fit f(x) '$tg' using 1:2 via a,b; set title '$i network latency usec vs size bits'; set yrange [0:*]; p '$tg' u 1:2, f(x) lc 'red'" #headroom test
   echo
 done
 
+grep drop $t|grep 7003|cut -f 1,6 -d' '|sed 's/(//'|sed 's/)//'|gnuplot -p -e "unset key; set xlabel 'Clock (hr)'; set ylabel 'msec'; p '-' u ((\$1/1e6)/3.6e3):2 w l"
 
 t3=$(mktemp); echo "t3 $t3"; 
 t4=$(mktemp); echo "t4 $t4"; 
