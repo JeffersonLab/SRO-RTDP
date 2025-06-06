@@ -18,7 +18,7 @@ def launch_component(index, ref_port):
             "-b", str(500),
             "-i", str("127.0.0.1"),
             "-n", str(100),
-            "-o", str(0.00001),
+            "-o", str(0.0001),
             "-p", str(ref_port + index - 1),
             "-r", str(ref_port + index),
             "-v", str(1)
@@ -29,7 +29,7 @@ def launch_component(index, ref_port):
             "./cpu_sim",
 #            "-b", str(500),          # test of cpu_sim.yaml
 #            "-i", str("127.0.0.1"),
-#            "-o", str(0.00001),
+            "-o", str(0.0001),
             "-r", str(ref_port + index),
             "-v", str(1),
             "-y", str("cpu_sim.yaml"),

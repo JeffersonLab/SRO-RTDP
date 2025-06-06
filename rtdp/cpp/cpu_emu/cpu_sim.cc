@@ -286,7 +286,7 @@ int main (int argc, char *argv[])
         if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
-    uint64_t request_nbr = 0;
+    uint32_t request_nbr = 0;
     double mnBfSz = 0; //mean receive Size (bits)
     uint64_t bufSiz = 0; //bits
     uint32_t stream_id = 0;
@@ -307,7 +307,6 @@ int main (int argc, char *argv[])
             rtcd = rcv_sckt.recv (request, recv_flags::none);
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
-            if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Sending ACK  (" << request_nbr << ')' << endl;
             rcv_sckt.send (reply, send_flags::none);
         }
         
@@ -316,6 +315,8 @@ int main (int argc, char *argv[])
         bufSiz = pkt.size; //bits
         stream_id = pkt.stream_id;
         frame_num = pkt.frame_num;
+        
+        if(DBG) cout << "[cpu_sim " << rcv_prt << "]: Sending ACK  (" << frame_num << ')' << endl;
         //reqd transmission timespan in usec
     
         {
@@ -324,7 +325,8 @@ int main (int argc, char *argv[])
             auto x = std::clamp(sd_10pcnt(gen), 1.0, 1.3);
             tsn = lb*x; //usec
             //advance the sim clock for netwok latency
-            auto tsr1 = pkt.timestamp + tsn;
+            float tsr1 = pkt.timestamp + tsn;
+            if(vrbs) std::cout << tsr1 << " [cpu_sim " << rcv_prt << "]: " << " recd " << frame_num << std::endl;
             if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn
                                                 << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd
                                                 << " (" << frame_num << ')' << " using x " << x << " lb " << lb << endl;
@@ -369,9 +371,10 @@ int main (int argc, char *argv[])
                 pkt.size = outSz;
                 pkt.timestamp = tsr;
                 pkt.stream_id = stream_id;
+                pkt.frame_num = frame_num;
 	            // Send "frame" spec
                 if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
-                              << frame_num << ')' << " to " << rcv_prt-1 << endl;
+                              << frame_num << ')' << " to " << rcv_prt-1 << " at " << tsr << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
 
                 // Receive the reply from the destination
@@ -389,11 +392,12 @@ int main (int argc, char *argv[])
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
         //const uint64_t tsl = tsn + tsc;
         // Record end time
-        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << request_nbr << ')' << std::endl;
-        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) << " frame Hz." << " for " << request_nbr << " frames" << std::endl;
-        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
-        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
+        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << frame_num << ')' << std::endl;
+        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) << " frame Hz." << " for " << frame_num << " frames" << std::endl;
+        if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << frame_num << ')' << std::endl;
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << frame_num << ')' << endl;
+        if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
+        if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) << endl;
     }
     return 0;
 }

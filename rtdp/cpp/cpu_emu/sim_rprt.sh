@@ -97,19 +97,10 @@ grep "cpu_sim 7001" $t7|grep done >> $t12
 t13=$(mktemp); echo "t13 $t13";
 sort -k 1 -n $t12 > $t13
 
-#echo -n "cpu_sim 7003: "; grep dropped $t|grep "cpu_sim 7003"|wc -l; echo "frames dropped"
-#a=$(echo -n "cpu_sim 7003: "; grep dropped $t|grep "cpu_sim 7003"|wc -l)
-echo -n $a; echo " frames dropped"
-echo -n "cpu_sim 7002: "; grep dropped $t|grep "cpu_sim 7002"|wc -l; echo "frames dropped"
-echo -n "cpu_sim 7001: "; grep dropped $t|grep "cpu_sim 7001"|wc -l; echo "frames dropped"
-b=$(grep "simulate_stream:] Sending frame" $t | tail -1)
-#echo -n $b
-n=$(grep dropped $t|grep "cpu_sim 7003"|wc -l)
-d=$(echo -n $b|cut -f 10 -d ' '|sed 's/(//'|sed 's/)//')
-#echo $n $d
-ratio=$(echo "scale=6; $n / $d" | bc)
-echo "Ratio: $ratio"
-
+for i in {7003..7001}; do
+    echo -n "Missed frame ratio for $i: "
+    grep ratio $t|grep $i|cut -f 8 -d' '|tail -1
+done
 
 echo "t $t"
 echo "t0 $t0"

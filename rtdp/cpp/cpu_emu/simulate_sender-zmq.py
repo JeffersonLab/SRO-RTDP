@@ -53,7 +53,7 @@ def simulate_stream(
     # Derived sleep time between messages
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
     smClk = 0xFFFFFFFFFFFFFFFF  #ensure is 64bits
-    smClk = 0 #master simulation clock in nanoseconds
+    smClk = 0 #master simulation clock in usec
     while True:
         # -----------------------
         # ON phase: Send data
