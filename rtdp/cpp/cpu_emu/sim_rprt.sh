@@ -56,12 +56,9 @@ for i in $(seq "$base_port" "$hi_port"); do
   echo
 done
 
-
 t3=$(mktemp); echo "t3 $t3"; 
 t4=$(mktemp); echo "t4 $t4"; 
 t5=$(mktemp); echo "t5 $t5"; 
-
-for i in {$hi_port..$base_port}; do grep $i $t|grep recd|tail -1; done; echo; grep sent $t|tail -1; echo -n "Attempting: "; grep Attempting $t|wc -l; echo -n "dropped: "; grep dropped $t|wc -l
 
 t6=$(mktemp); echo "t6 $t6";
 t7=$(mktemp); echo "t7 $t7";
@@ -90,7 +87,7 @@ t13=$(mktemp); echo "t13 $t13";
 sort -k 1 -n $t12 > $t13
 
 for i in $(seq "$base_port" "$hi_port"); do
-    echo -n "Missed frame ratio for $i: "
+    echo -n "Missed frame ratio for Component $(echo "$i - $base_port + 1" | bc): "
     grep ratio $t|grep "cpu_sim $i"|cut -f 8 -d' '|tail -1
     grep ratio $t|grep "cpu_sim $i"|cut -f 1,8 -d' '|gnuplot -p -e "set title 'Missed Frames Component $(echo "$i - $base_port + 1" | bc)'; unset key; set xlabel 'Clock (hr)'; set ylabel 'Fraction'; p '-' u ((\$1/1e6)/3.6e3):2 w l"
 done
