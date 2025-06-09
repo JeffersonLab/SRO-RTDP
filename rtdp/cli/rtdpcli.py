@@ -100,10 +100,11 @@ def validate(config, template):
         raise click.ClickException("Config validation failed: missing required variables.")
     click.echo("Config is valid")
 
-@cli.command('template-vars')
+@cli.command('example-config')
 @click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
-def template_vars(template):
-    """Show required variables for a workflow template (excluding those with defaults)."""
+def example_config(template):
+    """Show example YAML config for a workflow template (required vars, with placeholders)."""
+    import yaml
     from jinja2 import Environment, meta, nodes
     # Read template
     with open(template, 'r') as f:
@@ -133,8 +134,97 @@ def template_vars(template):
     defaulted_vars = find_defaulted_vars(ast)
 
     truly_required = set(var for var in required_vars if var not in defaulted_vars)
-    for var in sorted(truly_required):
-        click.echo(var)
+    
+    # Build example config dict with proper tree structure
+    example = {}
+    for var in truly_required:
+        if '.' in var:
+            # Nested key, e.g., workflow.name
+            parts = var.split('.')
+            d = example
+            for p in parts[:-1]:
+                if p not in d:
+                    d[p] = {}
+                d = d[p]
+            d[parts[-1]] = f'<{var}>'
+        else:
+            # Top-level key
+            example[var] = f'<{var}>'
+    
+    # Add common workflow structure if not present
+    if 'workflow' not in example:
+        example['workflow'] = {
+            'name': '<workflow.name>',
+            'description': '<workflow.description>'
+        }
+    
+    # Add common platform structure if not present
+    if 'platform' not in example:
+        example['platform'] = {
+            'name': '<platform.name>'
+        }
+    
+    # Add common containers structure if not present
+    if 'containers' not in example:
+        example['containers'] = {
+            'image_path': '<containers.image_path>',
+            'CPU_EMU_SIF': '<containers.CPU_EMU_SIF>',
+            'GPU_PROXY_SIF': '<containers.GPU_PROXY_SIF>',
+            'RTDP_COMPONENTS_SIF': '<containers.RTDP_COMPONENTS_SIF>'
+        }
+    
+    # Add common network configuration if not present
+    if 'network' not in example:
+        example['network'] = {
+            'BASE_PORT': '<network.BASE_PORT>',
+            'IN_PORT': '<network.IN_PORT>',
+            'OUT_PORT': '<network.OUT_PORT>',
+            'NIC': '<network.NIC>',
+            'GPU_NIC': '<network.GPU_NIC>'
+        }
+    
+    # Add common emulator configuration if not present
+    if 'emulator' not in example:
+        example['emulator'] = {
+            'COMPONENTS': '<emulator.COMPONENTS>',
+            'AVG_RATE': '<emulator.AVG_RATE>',
+            'RMS': '<emulator.RMS>',
+            'DUTY': '<emulator.DUTY>',
+            'THREADS': '<emulator.THREADS>',
+            'LATENCY': '<emulator.LATENCY>',
+            'MEM_FOOTPRINT': '<emulator.MEM_FOOTPRINT>',
+            'OUTPUT_SIZE': '<emulator.OUTPUT_SIZE>',
+            'SLEEP': '<emulator.SLEEP>',
+            'VERBOSE': '<emulator.VERBOSE>'
+        }
+    
+    # Add common matrix configuration if not present
+    if 'matrix' not in example:
+        example['matrix'] = {
+            'MATRIX_WIDTH': '<matrix.MATRIX_WIDTH>',
+            'SEND_RATE': '<matrix.SEND_RATE>',
+            'GROUP_SIZE': '<matrix.GROUP_SIZE>',
+            'PROXY_RATE': '<matrix.PROXY_RATE>',
+            'SEND_ALL_ONES': '<matrix.SEND_ALL_ONES>',
+            'SOCKET_HWM': '<matrix.SOCKET_HWM>'
+        }
+    
+    # Add common partition if not present
+    if 'partition' not in example:
+        example['partition'] = '<partition>'
+    
+    # Sort keys to maintain consistent order
+    def sort_dict(d):
+        return {k: sort_dict(v) if isinstance(v, dict) else v 
+                for k, v in sorted(d.items())}
+    
+    example = sort_dict(example)
+    
+    # Dump with proper formatting
+    yaml.dump(example, 
+             stream=click.get_text_stream('stdout'),
+             default_flow_style=False,
+             sort_keys=False)  # Don't sort keys in YAML output to maintain our order
 
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
@@ -203,151 +293,6 @@ def run(workflow):
         click.echo(f"Workflow '{workflow_name}' started")
     finally:
         os.chdir(orig_dir)
-
-@cli.command()
-@click.option('--workflow', required=True, help='Workflow name or directory')
-def status(workflow):
-    """Show workflow status using cylc status."""
-    import subprocess
-    try:
-        result = subprocess.run(['cylc', 'status', workflow], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise click.ClickException(f"cylc status failed: {result.stderr.strip()}")
-        click.echo(result.stdout.strip())
-    except Exception as e:
-        raise click.ClickException(f"Failed to get workflow status: {e}")
-
-@cli.command()
-@click.option('--workflow', required=True, help='Workflow name')
-@click.option('--task', required=True, help='Task name')
-def logs(workflow, task):
-    """Stream logs for a workflow or task using cylc cat-log."""
-    import subprocess
-    try:
-        # For simplicity, show logs for cycle 1
-        log_target = f"{workflow}//1/{task}"
-        result = subprocess.run(['cylc', 'cat-log', log_target], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise click.ClickException(f"cylc cat-log failed: {result.stderr.strip()}")
-        click.echo(result.stdout.strip())
-    except Exception as e:
-        raise click.ClickException(f"Failed to get logs: {e}")
-
-@cli.command()
-def list():
-    """List all workflows using cylc list."""
-    import subprocess
-    try:
-        result = subprocess.run(['cylc', 'list'], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise click.ClickException(f"cylc list failed: {result.stderr.strip()}")
-        click.echo(result.stdout.strip())
-    except Exception as e:
-        raise click.ClickException(f"Failed to list workflows: {e}")
-
-@cli.command()
-@click.option('--workflow', required=True, help='Workflow name')
-def stop(workflow):
-    """Stop a workflow using cylc stop."""
-    import subprocess
-    try:
-        result = subprocess.run(['cylc', 'stop', workflow], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise click.ClickException(f"cylc stop failed: {result.stderr.strip()}")
-        click.echo(result.stdout.strip())
-    except Exception as e:
-        raise click.ClickException(f"Failed to stop workflow: {e}")
-
-@cli.command()
-@click.option('--workflow', required=True, help='Workflow name')
-def restart(workflow):
-    """Restart a workflow using cylc restart."""
-    import subprocess
-    try:
-        result = subprocess.run(['cylc', 'restart', workflow], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise click.ClickException(f"cylc restart failed: {result.stderr.strip()}")
-        click.echo(result.stdout.strip())
-    except Exception as e:
-        raise click.ClickException(f"Failed to restart workflow: {e}")
-
-@cli.command()
-@click.option('--workflow', required=True, help='Workflow name')
-def remove(workflow):
-    """Remove a workflow using cylc clean."""
-    import subprocess
-    try:
-        result = subprocess.run(['cylc', 'clean', workflow], capture_output=True, text=True)
-        if result.returncode != 0:
-            raise click.ClickException(f"cylc clean failed: {result.stderr.strip()}")
-        click.echo(result.stdout.strip())
-    except Exception as e:
-        raise click.ClickException(f"Failed to remove workflow: {e}")
-
-@cli.command()
-def export():
-    """Export workflow configuration or graph."""
-    click.echo("[export] Not implemented yet.")
-
-@cli.command()
-def cleanup():
-    """Clean up workflow outputs and logs."""
-    click.echo("[cleanup] Not implemented yet.")
-
-@cli.command('example-config')
-@click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
-def example_config(template):
-    """Show example YAML config for a workflow template (required vars, with placeholders)."""
-    import yaml
-    from jinja2 import Environment, meta, nodes
-    # Read template
-    with open(template, 'r') as f:
-        template_str = f.read()
-    env = Environment()
-    ast = env.parse(template_str)
-    required_vars = meta.find_undeclared_variables(ast)
-
-    # Find variables with a default filter (optional)
-    def find_defaulted_vars(node):
-        defaulted = set()
-        if isinstance(node, nodes.Filter) and node.name == 'default':
-            if isinstance(node.node, nodes.Name):
-                defaulted.add(node.node.name)
-            elif isinstance(node.node, nodes.Getattr):
-                parts = []
-                n = node.node
-                while isinstance(n, nodes.Getattr):
-                    parts.append(n.attr)
-                    n = n.node
-                if isinstance(n, nodes.Name):
-                    parts.append(n.name)
-                    defaulted.add('.'.join(reversed(parts)))
-        for child in node.iter_child_nodes():
-            defaulted |= find_defaulted_vars(child)
-        return defaulted
-    defaulted_vars = find_defaulted_vars(ast)
-
-    truly_required = set(var for var in required_vars if var not in defaulted_vars)
-    # Build example config dict, handling nested keys (e.g., containers.image_path)
-    example = {}
-    for var in truly_required:
-        if '.' in var:
-            # Nested key, e.g., containers.image_path
-            parts = var.split('.')
-            d = example
-            for p in parts[:-1]:
-                if p not in d:
-                    d[p] = {}
-                d = d[p]
-            d[parts[-1]] = f'<{var}>'
-        else:
-            example[var] = f'<{var}>'
-    yaml.dump(example, stream=click.get_text_stream('stdout'), default_flow_style=False)
-
-@cli.command('list-plugins')
-def list_plugins():
-    """List available plugins."""
-    click.echo("[list-plugins] Not implemented yet.")
 
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
