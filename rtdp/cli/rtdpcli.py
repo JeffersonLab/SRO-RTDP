@@ -123,6 +123,7 @@ def example_config(template):
             if p not in d:
                 d[p] = {}
             d = d[p]
+        # For the last part, set the placeholder
         d[parts[-1]] = f'<{var}>'
     
     # Sort keys to maintain consistent order
