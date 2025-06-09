@@ -348,5 +348,29 @@ def list_plugins():
     """List available plugins."""
     click.echo("[list-plugins] Not implemented yet.")
 
+@cli.command()
+@click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
+def monitor(workflow):
+    """Monitor a workflow using Cylc's TUI interface."""
+    # Get workflow name from directory
+    workflow_name = os.path.basename(os.path.abspath(workflow))
+    
+    # Check if workflow is installed
+    try:
+        subprocess.run(['cylc', 'get-workflow-name', workflow], check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        click.echo(f"Error: Workflow {workflow_name} is not installed. Please run 'cylc install {workflow}' first.", err=True)
+        return
+    
+    # Start Cylc TUI
+    try:
+        click.echo(f"Starting Cylc TUI for workflow {workflow_name}...")
+        click.echo("Press 'q' to quit the TUI")
+        subprocess.run(['cylc', 'tui', workflow_name])
+    except subprocess.CalledProcessError as e:
+        click.echo(f"Error starting Cylc TUI: {e}", err=True)
+    except KeyboardInterrupt:
+        click.echo("\nTUI closed by user")
+
 if __name__ == '__main__':
     cli() 
