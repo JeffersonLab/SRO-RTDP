@@ -362,9 +362,9 @@ def monitor(workflow):
     try:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-            workflow_name = config.get('workflow_name')
+            workflow_name = config.get('workflow', {}).get('name')
             if not workflow_name:
-                click.echo("Error: workflow_name not found in config.yml", err=True)
+                click.echo("Error: workflow.name not found in config.yml", err=True)
                 return
     except Exception as e:
         click.echo(f"Error reading config.yml: {e}", err=True)
