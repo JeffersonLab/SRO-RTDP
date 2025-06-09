@@ -105,39 +105,53 @@ def validate(config, template):
 def example_config(template):
     """Show example YAML config for a workflow template (all vars, with placeholders)."""
     import yaml
-    from jinja2 import Environment, meta, nodes
-    # Read template
+    from jinja2 import Environment, nodes
+
     with open(template, 'r') as f:
         template_str = f.read()
     env = Environment()
     ast = env.parse(template_str)
-    template_vars = meta.find_undeclared_variables(ast)
 
-    # Build example config dict with proper tree structure
+    # Recursively collect all variable paths (including nested)
+    def collect_vars(node, prefix=None):
+        vars = set()
+        if isinstance(node, nodes.Name):
+            if prefix:
+                vars.add(f"{prefix}.{node.name}")
+            else:
+                vars.add(node.name)
+        elif isinstance(node, nodes.Getattr):
+            path = []
+            n = node
+            while isinstance(n, nodes.Getattr):
+                path.append(n.attr)
+                n = n.node
+            if isinstance(n, nodes.Name):
+                path.append(n.name)
+                full = ".".join(reversed(path))
+                vars.add(full)
+        for child in node.iter_child_nodes():
+            vars |= collect_vars(child, prefix)
+        return vars
+
+    all_vars = collect_vars(ast)
+
+    # Build nested dict
     example = {}
-    for var in template_vars:
-        # Split into parts and build nested structure
+    for var in all_vars:
         parts = var.split('.')
         d = example
         for p in parts[:-1]:
             if p not in d:
                 d[p] = {}
             d = d[p]
-        # For the last part, set the placeholder
         d[parts[-1]] = f'<{var}>'
-    
-    # Sort keys to maintain consistent order
+
     def sort_dict(d):
-        return {k: sort_dict(v) if isinstance(v, dict) else v 
-                for k, v in sorted(d.items())}
-    
+        return {k: sort_dict(v) if isinstance(v, dict) else v for k, v in sorted(d.items())}
+
     example = sort_dict(example)
-    
-    # Dump with proper formatting
-    yaml.dump(example, 
-             stream=click.get_text_stream('stdout'),
-             default_flow_style=False,
-             sort_keys=False)  # Don't sort keys in YAML output to maintain our order
+    yaml.dump(example, stream=click.get_text_stream('stdout'), default_flow_style=False, sort_keys=False)
 
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
