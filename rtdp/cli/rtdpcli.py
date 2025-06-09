@@ -151,68 +151,6 @@ def example_config(template):
             # Top-level key
             example[var] = f'<{var}>'
     
-    # Add common workflow structure if not present
-    if 'workflow' not in example:
-        example['workflow'] = {
-            'name': '<workflow.name>',
-            'description': '<workflow.description>'
-        }
-    
-    # Add common platform structure if not present
-    if 'platform' not in example:
-        example['platform'] = {
-            'name': '<platform.name>'
-        }
-    
-    # Add common containers structure if not present
-    if 'containers' not in example:
-        example['containers'] = {
-            'image_path': '<containers.image_path>',
-            'CPU_EMU_SIF': '<containers.CPU_EMU_SIF>',
-            'GPU_PROXY_SIF': '<containers.GPU_PROXY_SIF>',
-            'RTDP_COMPONENTS_SIF': '<containers.RTDP_COMPONENTS_SIF>'
-        }
-    
-    # Add common network configuration if not present
-    if 'network' not in example:
-        example['network'] = {
-            'BASE_PORT': '<network.BASE_PORT>',
-            'IN_PORT': '<network.IN_PORT>',
-            'OUT_PORT': '<network.OUT_PORT>',
-            'NIC': '<network.NIC>',
-            'GPU_NIC': '<network.GPU_NIC>'
-        }
-    
-    # Add common emulator configuration if not present
-    if 'emulator' not in example:
-        example['emulator'] = {
-            'COMPONENTS': '<emulator.COMPONENTS>',
-            'AVG_RATE': '<emulator.AVG_RATE>',
-            'RMS': '<emulator.RMS>',
-            'DUTY': '<emulator.DUTY>',
-            'THREADS': '<emulator.THREADS>',
-            'LATENCY': '<emulator.LATENCY>',
-            'MEM_FOOTPRINT': '<emulator.MEM_FOOTPRINT>',
-            'OUTPUT_SIZE': '<emulator.OUTPUT_SIZE>',
-            'SLEEP': '<emulator.SLEEP>',
-            'VERBOSE': '<emulator.VERBOSE>'
-        }
-    
-    # Add common matrix configuration if not present
-    if 'matrix' not in example:
-        example['matrix'] = {
-            'MATRIX_WIDTH': '<matrix.MATRIX_WIDTH>',
-            'SEND_RATE': '<matrix.SEND_RATE>',
-            'GROUP_SIZE': '<matrix.GROUP_SIZE>',
-            'PROXY_RATE': '<matrix.PROXY_RATE>',
-            'SEND_ALL_ONES': '<matrix.SEND_ALL_ONES>',
-            'SOCKET_HWM': '<matrix.SOCKET_HWM>'
-        }
-    
-    # Add common partition if not present
-    if 'partition' not in example:
-        example['partition'] = '<partition>'
-    
     # Sort keys to maintain consistent order
     def sort_dict(d):
         return {k: sort_dict(v) if isinstance(v, dict) else v 
