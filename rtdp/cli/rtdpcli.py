@@ -113,13 +113,10 @@ def example_config(template):
     ast = env.parse(template_str)
 
     # Recursively collect all variable paths (including nested)
-    def collect_vars(node, prefix=None):
+    def collect_vars(node):
         vars = set()
         if isinstance(node, nodes.Name):
-            if prefix:
-                vars.add(f"{prefix}.{node.name}")
-            else:
-                vars.add(node.name)
+            vars.add(node.name)
         elif isinstance(node, nodes.Getattr):
             path = []
             n = node
@@ -131,21 +128,23 @@ def example_config(template):
                 full = ".".join(reversed(path))
                 vars.add(full)
         for child in node.iter_child_nodes():
-            vars |= collect_vars(child, prefix)
+            vars |= collect_vars(child)
         return vars
 
     all_vars = collect_vars(ast)
 
-    # Build nested dict
+    # Build nested dict robustly
     example = {}
     for var in all_vars:
         parts = var.split('.')
         d = example
-        for p in parts[:-1]:
-            if p not in d:
-                d[p] = {}
-            d = d[p]
-        d[parts[-1]] = f'<{var}>'
+        for i, p in enumerate(parts):
+            if i == len(parts) - 1:
+                d[p] = f'<{var}>'
+            else:
+                if p not in d or not isinstance(d[p], dict):
+                    d[p] = {}
+                d = d[p]
 
     def sort_dict(d):
         return {k: sort_dict(v) if isinstance(v, dict) else v for k, v in sorted(d.items())}
