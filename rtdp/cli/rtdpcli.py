@@ -2,6 +2,7 @@ import click
 import yaml
 import os
 from jinja2 import Template, Environment, meta, nodes
+import subprocess
 
 @click.group()
 def cli():
