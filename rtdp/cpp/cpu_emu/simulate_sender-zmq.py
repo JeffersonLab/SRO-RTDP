@@ -7,6 +7,8 @@ import time
 import argparse
 import random
 import numpy as np
+import sys
+
 from buffer_packet_zmq_sim import serialize_buffer
 
 def simulate_stream(
@@ -14,13 +16,15 @@ def simulate_stream(
     avg_rate_mbps: float,
     rms_fraction: float,
     duty_cycle: float,
-    nic_limit_gbps: float
+    nic_limit_gbps: float,
+    frame_cnt: int
 ):
     print(f"[simulate_stream:] port = {port}...")
     print(f"[simulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
     print(f"[simulate_stream:] rms_fraction = {rms_fraction}...")
     print(f"[simulate_stream:] duty_cycle = {duty_cycle}...")
     print(f"[simulate_stream:] nic_limit_gbps = {nic_limit_gbps}...")
+    print(f"[simulate_stream:] frame_cnt = {frame_cnt}")
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.REQ)
@@ -72,6 +76,15 @@ def simulate_stream(
             # Delay to throttle sending rate
             rate_sleep = frame_size / avg_rate_bps  # in seconds
             smClk += int(rate_sleep*1e6) #usec
+            if frame_num == frame_cnt:
+                buffer = serialize_buffer(size=0, timestamp=int(smClk), stream_id=99, frame_num=0) # signal all components to terminate
+                print(f"{smClk} [simulate_stream:] Sending frame; size = {frame_size} frame_num = ({0}) for termination")            
+                zmq_socket.send(buffer)
+                reply = zmq_socket.recv_string() #ACK
+                print(f"{smClk} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk*1e-6)} frame_num {frame_num}")
+                print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}")
+                print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
+                sys.exit(0)
             frame_num += 1
             
         # Apply duty cycle
@@ -85,6 +98,7 @@ def simulate_stream(
         print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}")
         print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
 
+
 if __name__ == "__main__":
     print(f"[simulate_sender-zmq: main:]")
     parser = argparse.ArgumentParser(description="Simulated data sender using ZeroMQ")
@@ -93,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("--rms-fraction", type=float, default=0.0, help="RMS of frame sizes as fraction of average")
     parser.add_argument("--duty-cycle", type=float, default=1.0, help="Duty cycle (0 to 1)")
     parser.add_argument("--nic-limit-gbps", type=float, default=100.0, help="Simulated NIC bandwidth in Gbps")
+    parser.add_argument("--frame_cnt", type=int, default=1, help="Toal count of frames to send")
     args = parser.parse_args()
 
     print(f"[simulate_sender-zmq: main:] simulate_stream...")
@@ -101,6 +116,7 @@ if __name__ == "__main__":
         args.avg_rate_mbps,
         args.rms_fraction,
         args.duty_cycle,
-        args.nic_limit_gbps
+        args.nic_limit_gbps,
+        args.frame_cnt
     )
 

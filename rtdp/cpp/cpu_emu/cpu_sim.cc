@@ -42,6 +42,7 @@ void   Usage()
         "\nUsage: \n\
         -h help  \n\
         -b seconds thread latency per GB input \n\
+        -f total frames sender will send  \n\
         -i destination address (string)  \n\
         -m thread memory footprint in GB  \n\
         -n out going NIC speed in Gbps  \n\
@@ -82,7 +83,7 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
     lbls.push_back("destination"); lbls.push_back("dst_port"); lbls.push_back("rcv_port");
     lbls.push_back("latency");
     lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
-    lbls.push_back("terminal"); lbls.push_back("out_nic");
+    lbls.push_back("terminal"); lbls.push_back("out_nic"); lbls.push_back("frame_cnt");
     
     auto it = lbls.begin(); //a hack to get the type
 
@@ -147,7 +148,7 @@ int main (int argc, char *argv[])
 { 
     int optc;
 
-    bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
+    bool     psdB=false, psdI=false, psdF=false, psdM=false, psdO=false, psdY=false;
     bool     psdP=false, psdR=false, psdV=false;
     bool     psdZ=false, trmnl=false, psdN=false;
     string   yfn = "cpu_sim.yaml";
@@ -163,12 +164,13 @@ int main (int argc, char *argv[])
     double   cmpLt_sMB  = 0.5;   // seconds/(input MB) computational latency
     double   memGB      = 10;    // thread memory footprint in GB
     double   otmemGB    = 0.01;  // program output in GB
-    double   outNicSpd  = 10;  // outgoing NIC speed in Gbps
-    uint16_t  zed        = 0;   //terminal node ? 
+    double   outNicSpd  = 10;    // outgoing NIC speed in Gbps
+    uint16_t zed        = 0;     //terminal node ?
+    uint64_t frame_cnt  = 0;     //total frames sender will send
 
     std::cout << std::fixed << std::setprecision(7);  // 6 decimal places            
 
-    while ((optc = getopt(argc, argv, "hb:i:m:n:o:p:r:v:y:z:")) != -1)
+    while ((optc = getopt(argc, argv, "hb:i:f:m:n:o:p:r:v:y:z:")) != -1)
     {
         switch (optc)
         {
@@ -184,6 +186,11 @@ int main (int argc, char *argv[])
             strcpy(dst_ip, (const char *) optarg) ;
             psdI = true;
             if(DBG) cout << " -i " << dst_ip;
+            break;
+        case 'f':
+            frame_cnt = (uint64_t) atoi((const char *) optarg) ;
+            psdF = true;
+            if(DBG) cout << " -f " << frame_cnt;
             break;
         case 'm':
             memGB = (double) atof((const char *) optarg) ;
@@ -247,10 +254,12 @@ int main (int argc, char *argv[])
         if(!psdR) rcv_prt  = stoi(mymap["rcv_port"]);
         if(!psdV) vrbs     = stoi(mymap["verbose"]);
         if(!trmnl) trmnl     = stoi(mymap["terminal"]) == 1;
+        if(!psdF) frame_cnt     = stoi(mymap["frame_cnt"]) == 1;
     }    
     ////////
     if(vrbs) cout << "[cpu_sim "   << rcv_prt                     << " ]: "
                 << " Operating with yaml = " << (psdY?yfn:"N/A")
+                << "\tframe_cnt = " << frame_cnt
                 << "\tcmpLt_sGB = " << cmpLt_sGB
                 << "\tdst_ip = "   << (trmnl?"N/A":string(dst_ip)) << "\tmemGB = "       << memGB
                 << "\totmemGB = "  << otmemGB                     << "\tdst_prt = "     << (trmnl?"N/A":to_string(dst_prt))
@@ -319,6 +328,37 @@ wait_for_frame:
         bufSiz = pkt.size; //bits
         stream_id = pkt.stream_id;
         frame_num = pkt.frame_num;
+        
+        if(frame_num == 0) { // all done
+            std::cout.flush();
+            std::cerr.flush();
+            if(trmnl) exit(0); // no terminate signal to send forward
+            send_result_t sr;
+            {
+                BufferPacket pkt;
+                pkt.size = 0;
+                pkt.timestamp = tsr;
+                pkt.stream_id = stream_id;
+                pkt.frame_num = 0;
+	            // Send "frame" spec
+                if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << 0 << " (" 
+                              << frame_num << ')' << " to " << rcv_prt-1 << " at " << tsr << " to forward sim termination" << endl;
+                sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
+
+                // Receive the reply from the destination
+                //  Get the reply.
+                message_t reply;
+                if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << frame_num << ')' << endl;
+                recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
+                if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Destination Actual reply (" << frame_num << ") " 
+                              << reply << " With rtcd = " << rtcd.value() << endl;
+
+                if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
+                if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
+            }        
+            exit(0);
+        }
+        
 
         if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
                       << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
@@ -403,7 +443,7 @@ wait_for_frame:
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << frame_num << ')' << endl;
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
-        if (frame_num == 3e4) exit(0);
+        //if (frame_num == 3e4) exit(0);
     }
     return 0;
 }
