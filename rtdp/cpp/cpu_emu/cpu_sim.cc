@@ -253,8 +253,8 @@ int main (int argc, char *argv[])
         if(!psdP) dst_prt  = stoi(mymap["dst_port"]);
         if(!psdR) rcv_prt  = stoi(mymap["rcv_port"]);
         if(!psdV) vrbs     = stoi(mymap["verbose"]);
-        if(!trmnl) trmnl     = stoi(mymap["terminal"]) == 1;
-        if(!psdF) frame_cnt     = stoi(mymap["frame_cnt"]) == 1;
+        if(!trmnl) trmnl   = stoi(mymap["terminal"]) == 1;
+        if(!psdF) frame_cnt= stoi(mymap["frame_cnt"]) == 1;
     }    
     ////////
     if(vrbs) cout << "[cpu_sim "   << rcv_prt                     << " ]: "
@@ -266,7 +266,7 @@ int main (int argc, char *argv[])
                 << "\trcv_prt = "  << rcv_prt
                 << "\toutNicSpd  = "  << outNicSpd
                 << "\tverbose = "   << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
-                << "\tterminal = " << trmnl                        << '\n';
+                << "\tterminal = " << trmnl << '\n';
 
     // RNG for latency variance generation using a Gaussian (normal) distribution to generate a scaling factor 
     // centered around 1.0, with a standard deviation chosen so that ~99.7% of values fall 
@@ -324,12 +324,24 @@ wait_for_frame:
         }
         
         BufferPacket pkt = BufferPacket::from_message(request);
-
-        bufSiz = pkt.size; //bits
+        bufSiz    = pkt.size; //bits
         stream_id = pkt.stream_id;
         frame_num = pkt.frame_num;
+
+        if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
+                      << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
+                      << " rtcd = " << int(rtcd.value()) << " from client" << endl;
+                      
+        if(vrbs) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " frame size = "
+                      << "(Spec'd) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
+                      << " from client " << "ts = " << tsr << " (" << frame_num << ')' << endl;
+        
+        if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Sending ACK  (" << frame_num << ')' << endl;
         
         if(frame_num == 0) { // all done
+            if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_cnt-request_nbr << endl;
+            if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_cnt-request_nbr)/float(frame_cnt) 
+                          << " frame_num " << frame_cnt  << " request_nbr " << request_nbr << endl;
             std::cout.flush();
             std::cerr.flush();
             if(trmnl) exit(0); // no terminate signal to send forward
@@ -342,7 +354,7 @@ wait_for_frame:
                 pkt.frame_num = 0;
 	            // Send "frame" spec
                 if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << 0 << " (" 
-                              << frame_num << ')' << " to " << rcv_prt-1 << " at " << tsr << " to forward sim termination" << endl;
+                              << frame_num << ')' << " to " << dst_prt << " at " << tsr << " to forward sim termination" << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
 
                 // Receive the reply from the destination
@@ -356,21 +368,12 @@ wait_for_frame:
                 if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
                 if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
             }        
+            std::cout.flush();
+            std::cerr.flush();
             exit(0);
         }
         
-
-        if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
-                      << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
-                      << " rtcd = " << int(rtcd.value()) << " from client" << endl;
-                      
-        if(vrbs) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " frame size = "
-                      << "(Spec'd) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
-                      << " from client " << "ts = " << tsr << " (" << frame_num << ')' << endl;
-        
-        if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Sending ACK  (" << frame_num << ')' << endl;
-        //reqd transmission timespan in usec
-    
+        //reqd transmission timespan in usec    
         {
             // Clamp to [1.0, 1.3] to enforce bounds
             auto lb = 1e-3*double(bufSiz)/outNicSpd; //usec
@@ -383,8 +386,8 @@ wait_for_frame:
                                                 << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd
                                                 << " (" << frame_num << ')' << " using x " << x << " lb " << lb << endl;
             if(tsr>tsr1) {
-                if(vrbs) {cout << tsr1 << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')'  << " request_nbr " << request_nbr << endl;}
-                goto wait_for_frame; //continue;
+                if(vrbs) {cout << tsr << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')'  << " request_nbr " << request_nbr << endl;}
+                goto wait_for_frame; //continue; //
             } else {
                 request_nbr++;
                 tsr = tsr1;
@@ -419,7 +422,7 @@ wait_for_frame:
                 pkt.frame_num = frame_num;
 	            // Send "frame" spec
                 if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
-                              << frame_num << ')' << " to " << rcv_prt-1 << " at " << tsr << endl;
+                              << frame_num << ')' << " to " << dst_prt << " at " << tsr << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
 
                 // Receive the reply from the destination
@@ -434,6 +437,7 @@ wait_for_frame:
                 if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
             }        
         }
+
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
         //const uint64_t tsl = tsn + tsc;
         // Record end time

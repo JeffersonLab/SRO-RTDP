@@ -69,34 +69,34 @@ def simulate_stream(
             else:
                 frame_size = int(frame_size_mean)
             buffer = serialize_buffer(size=frame_size, timestamp=int(smClk), stream_id=99, frame_num=frame_num)
-            print(f"{smClk} [simulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})")            
+            print(f"{float(smClk)} [simulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})")            
             zmq_socket.send(buffer)
             reply = zmq_socket.recv_string() #ACK
                 
+            if frame_num == frame_cnt:
+                buffer = serialize_buffer(size=0, timestamp=int(smClk), stream_id=99, frame_num=0) # signal all components to terminate
+                print(f"{float(smClk)} [simulate_stream:] Sending frame; size = {frame_size} frame_num = ({0}) for termination")            
+                zmq_socket.send(buffer)
+                reply = zmq_socket.recv_string() #ACK
+                print(f"{float(smClk)} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk*1e-6)} frame_num {frame_num}")
+                print(f"{float(smClk)} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}")
+                print(f"{float(smClk)} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
+                sys.exit(0)
+            frame_num += 1
             # Delay to throttle sending rate
             rate_sleep = frame_size / avg_rate_bps  # in seconds
             smClk += int(rate_sleep*1e6) #usec
-            if frame_num == frame_cnt:
-                buffer = serialize_buffer(size=0, timestamp=int(smClk), stream_id=99, frame_num=0) # signal all components to terminate
-                print(f"{smClk} [simulate_stream:] Sending frame; size = {frame_size} frame_num = ({0}) for termination")            
-                zmq_socket.send(buffer)
-                reply = zmq_socket.recv_string() #ACK
-                print(f"{smClk} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk*1e-6)} frame_num {frame_num}")
-                print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}")
-                print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
-                sys.exit(0)
-            frame_num += 1
-            
+           
         # Apply duty cycle
         # -----------------------
         # OFF phase: Sleep
         # -----------------------
         #if off_time > 0:
-            #print(f"{smClk} [simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
+            #print(f"{float(smClk)} [simulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)")
             #time.sleep(off_time)
-        print(f"{smClk} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk*1e-6)} frame_num {frame_num}")
-        print(f"{smClk} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}")
-        print(f"{smClk} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
+        print(f"{float(smClk)} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk*1e-6)} frame_num {frame_num}")
+        print(f"{float(smClk)} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}")
+        print(f"{float(smClk)} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
 
 
 if __name__ == "__main__":
