@@ -353,14 +353,21 @@ def list_plugins():
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
 def monitor(workflow):
     """Monitor a workflow using Cylc's TUI interface."""
-    # Get workflow name from directory
-    workflow_name = os.path.basename(os.path.abspath(workflow))
-    
-    # Check if workflow is installed
+    # Get workflow name from config.yml
+    config_path = os.path.join(workflow, 'config.yml')
+    if not os.path.exists(config_path):
+        click.echo(f"Error: config.yml not found in {workflow}", err=True)
+        return
+        
     try:
-        subprocess.run(['cylc', 'get-workflow-name', workflow], check=True, capture_output=True)
-    except subprocess.CalledProcessError:
-        click.echo(f"Error: Workflow {workflow_name} is not installed. Please run 'cylc install {workflow}' first.", err=True)
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            workflow_name = config.get('workflow_name')
+            if not workflow_name:
+                click.echo("Error: workflow_name not found in config.yml", err=True)
+                return
+    except Exception as e:
+        click.echo(f"Error reading config.yml: {e}", err=True)
         return
     
     # Start Cylc TUI
