@@ -56,7 +56,6 @@ void   Usage()
     cout << "[cpu_sim]: " << usage_str;
 }
 
-
 map<string,string> mymap;
 
 void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
@@ -92,52 +91,52 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(DBG) printf("[cpu_sim]: Stream started\n");
+            if(0) printf("[cpu_sim]: Stream started\n");
             break;
         case YAML_STREAM_END_EVENT:
-            if(DBG) printf("[cpu_sim]: Stream ended\n");
+            if(0) printf("[cpu_sim]: Stream ended\n");
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(DBG) printf("[cpu_sim]: Document started\n");
+            if(0) printf("[cpu_sim]: Document started\n");
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(DBG) printf("[cpu_sim]: Document ended\n");
+            if(0) printf("[cpu_sim]: Document ended\n");
             break;
         case YAML_MAPPING_START_EVENT:
-            if(DBG) printf("[cpu_sim]: Mapping started\n");
+            if(0) printf("[cpu_sim]: Mapping started\n");
             break;
         case YAML_MAPPING_END_EVENT:
-            if(DBG) printf("[cpu_sim]: Mapping ended\n");
+            if(0) printf("[cpu_sim]: Mapping ended\n");
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(DBG) printf("[cpu_sim]: Sequence started\n");
+            if(0) printf("[cpu_sim]: Sequence started\n");
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(DBG) printf("[cpu_sim]: Sequence ended\n");
+            if(0) printf("[cpu_sim]: Sequence ended\n");
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(DBG) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s << '\n';
+                if(0) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s << '\n';
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(DBG) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << '\n';
+                if(0) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << '\n';
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
             break;
         default:
-            if(DBG) cout << "[cpu_sim " << tag << " ]: " << " (Default)" << endl;
+            if(0) cout << "[cpu_sim " << tag << " ]: " << " (Default)" << endl;
             break;
         }
 
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(DBG) cout << "[cpu_sim " << tag << " ]: " << " All done parsing, got this:" << endl;
-    if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
+    if(0) cout << "[cpu_sim " << tag << " ]: " << " All done parsing, got this:" << endl;
+    if(0) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << '\n';
     
     yaml_parser_delete(&parser);
@@ -321,30 +320,55 @@ wait_for_frame:
             message_t reply (3+1);
             memcpy (reply.data (), "ACK", 3);
             rcv_sckt.send (reply, send_flags::none);
+            tsr += 1; // advance the clock
         }
         
         BufferPacket pkt = BufferPacket::from_message(request);
         bufSiz    = pkt.size; //bits
         stream_id = pkt.stream_id;
         frame_num = pkt.frame_num;
-
-        if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
+        if(frame_num == 0) goto all_done;
+        request_nbr++;
+        //reqd transmission timespan in usec    
+        {
+            // Clamp to [1.0, 1.3] to enforce bounds
+            auto lb = 1e-3*double(bufSiz)/outNicSpd; //usec
+            auto x = std::clamp(sd_10pcnt(gen), 1.0, 1.3);
+            tsn = lb*x; //usec
+            //advance the sim clock for netwok latency
+            float tsr1 = pkt.timestamp + tsn;
+            if(vrbs) std::cout << tsr1 << " [cpu_sim " << rcv_prt << "]: " << " recd " << frame_num << endl;
+            tsr1 += 1; // advance the clock
+            if(DBG) cout << tsr1  << " [cpu_sim " << rcv_prt << "]: " << " Received request "
                       << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
-        if(vrbs) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " frame size = "
+            if(vrbs) cout << tsr1  << " [cpu_sim " << rcv_prt << "]: " << " frame size = "
                       << "(Spec'd) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
                       << " from client " << "ts = " << tsr << " (" << frame_num << ')' << endl;
         
-        if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Sending ACK  (" << frame_num << ')' << endl;
+            if(DBG) cout << tsr1  << " [cpu_sim " << rcv_prt << "]: Sending ACK  (" << frame_num << ')' << endl;
+            tsr1 += 1; // advance the clock
+            if(vrbs) cout << tsr1  << " [cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn
+                                                << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd
+                                                << " (" << frame_num << ')' << " using x " << x << " lb " << lb << endl;
+            if(tsr>tsr1) {
+                if(vrbs) {cout << tsr << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')'  << " request_nbr " << request_nbr << endl;}
+                if(frame_num != 0) goto wait_for_frame; //continue; //
+            } else {
+                tsr = tsr1; // advance the clock
+            }
+        }
         
         if(frame_num == 0) { // all done
+all_done:
+            tsr += 1; // advance the clock
             if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_cnt-request_nbr << endl;
             if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_cnt-request_nbr)/float(frame_cnt) 
                           << " frame_num " << frame_cnt  << " request_nbr " << request_nbr << endl;
             std::cout.flush();
             std::cerr.flush();
-            if(trmnl) exit(0); // no terminate signal to send forward
+            if(trmnl) {cout  << tsr << " [cpu_sim " << rcv_prt << "]:  Terminal exiting" << endl; exit(0);} // no terminate signal to send forward
             send_result_t sr;
             {
                 BufferPacket pkt;
@@ -368,42 +392,25 @@ wait_for_frame:
                 if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
                 if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
             }        
+            cout  << tsr << " [cpu_sim " << rcv_prt << "]:  Non-Terminal exiting" << endl;
             std::cout.flush();
             std::cerr.flush();
             exit(0);
         }
-        
-        //reqd transmission timespan in usec    
-        {
-            // Clamp to [1.0, 1.3] to enforce bounds
-            auto lb = 1e-3*double(bufSiz)/outNicSpd; //usec
-            auto x = std::clamp(sd_10pcnt(gen), 1.0, 1.3);
-            tsn = lb*x; //usec
-            //advance the sim clock for netwok latency
-            float tsr1 = pkt.timestamp + tsn;
-            if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " recd " << frame_num << endl;
-            if(vrbs) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Calculating tsn as " << tsn
-                                                << " for bufSiz " << bufSiz << " outNicSpd " << outNicSpd
-                                                << " (" << frame_num << ')' << " using x " << x << " lb " << lb << endl;
-            if(tsr>tsr1) {
-                if(vrbs) {cout << tsr << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')'  << " request_nbr " << request_nbr << endl;}
-                goto wait_for_frame; //continue; //
-            } else {
-                request_nbr++;
-                tsr = tsr1;
-            }
-        }
+        tsr += 1; // advance the clock
         //  Do some 'work'
         // simulate load on system for ensuing work
         {
             //reqd computational timespan in usec with 10% std dev
             auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);
             tsc = cmpLt_usB*(float(bufSiz)/8)*x; //usec
+            tsr += tsc; // advance the clock
             if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  adding tsc " << tsc << " (" << frame_num << ')' 
                         << " for bufSiz " << bufSiz << " cmpLt_usB " << cmpLt_usB << " x " << x << endl;
-            tsr += tsc;
         }
 
+        cout  << tsr << " [cpu_sim " << rcv_prt << "]:  Advancing clock ..." << endl;
+        tsr += 1; // advance the clock
         if(!trmnl) {
             if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Forwarding "
                           << " request " << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
@@ -412,8 +419,9 @@ wait_for_frame:
             // Send a message to the destination
             size_t outSz = 8*otmemGB*1.024*1.024*1.024*1e9; //output size in bits
 
-            send_result_t sr;
+            tsr += 1; // advance the clock
             {
+                send_result_t sr;
                 BufferPacket pkt;
                 //represents harvested data
                 pkt.size = outSz;
@@ -424,12 +432,14 @@ wait_for_frame:
                 if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
                               << frame_num << ')' << " to " << dst_prt << " at " << tsr << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
+                tsr += 1; // advance the clock
 
                 // Receive the reply from the destination
                 //  Get the reply.
                 message_t reply;
                 if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << frame_num << ')' << endl;
                 recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
+                tsr += 1; // advance the clock
                 if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: Destination Actual reply (" << frame_num << ") " 
                               << reply << " With rtcd = " << rtcd.value() << endl;
 
@@ -437,17 +447,21 @@ wait_for_frame:
                 if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
             }        
         }
+        cout  << tsr << " [cpu_sim " << rcv_prt << "]:  clock advanced ...(" << frame_num << ')' <<  " request_nbr " << request_nbr  << endl;
 
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
-        //const uint64_t tsl = tsn + tsc;
-        // Record end time
+        cout  << tsr << " [cpu_sim " << rcv_prt << "]:  computing stats ...(" << frame_num << ')' << endl;
+
         if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn << " (" << frame_num << ')' << endl;
         if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) << " frame Hz." << " for " << frame_num << " frames" << endl;
         if(vrbs) std::cout << tsr << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) << " MHz mnBfSz " << mnBfSz << " (" << frame_num << ')' << endl;
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  done (" << frame_num << ')' << endl;
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
         if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
+        tsr +=1; //small advance to disambigute from top of loop
         //if (frame_num == 3e4) exit(0);
+        cout  << tsr << " [cpu_sim " << rcv_prt << "]:  stats computed ..." << endl;
     }
+    cout  << tsr << " [cpu_sim " << rcv_prt << "]:  return exiting" << endl;
     return 0;
 }
