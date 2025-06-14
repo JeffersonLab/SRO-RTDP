@@ -142,14 +142,18 @@ for i in $(seq "$base_port" "$hi_port"); do
 done
 gnuplot -p -e "unset key; p '$t_0' u 1:2 lc 'red', '/tmp/tmp.file_7000.txt' u 1:2 lc 'green', '/tmp/tmp.file_7001.txt' u 1:2 lc 'blue'"
 
+
 #grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//' >/tmp/d7000.txt
-grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7000//' >/tmp/d7000.txt
+#grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7000//' >/tmp/d7000.txt
+grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//' |sed 's/)//' | sed 's/\[cpu_sim [0-9]\+\]://g'>/tmp/d7000.txt
 #grep done $t|grep "cpu_sim 7001"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//' >/tmp/d7001.txt
-grep done $t|grep "cpu_sim 7001"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7001//' >/tmp/d7001.txt
+#grep done $t|grep "cpu_sim 7001"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7001//' >/tmp/d7001.txt
+grep done $t|grep "cpu_sim 7001"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//' |sed 's/)//' | sed 's/\[cpu_sim [0-9]\+\]://g'>/tmp/d7001.txt
 #grep recd $t|grep "cpu_sim 7000"|sed 's/recd//'|cut -f1 -d' ' --complement>/tmp/r7000.txt
-grep recd $t|grep "cpu_sim 7000"|sed 's/recd//'|sed 's/7000//'|cut -f1 -d' ' --complement>/tmp/r7000.txt
+grep recd $t|grep "cpu_sim 7000"|sed 's/recd//'| sed 's/\[cpu_sim [0-9]\+\]://g'|cut -f1 -d' ' --complement>/tmp/r7000.txt
+grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'| sed 's/\[cpu_sim [0-9]\+\]://g'|cut -f1 -d' ' --complement>/tmp/r7001.txt
 #grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
-grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|sed 's/7001//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
+#grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|sed 's/7001//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
 
 # diff b/n recd and done
 diff -y /tmp/r7000.txt /tmp/d7000.txt|less
