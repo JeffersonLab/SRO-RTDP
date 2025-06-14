@@ -142,7 +142,6 @@ for i in $(seq "$base_port" "$hi_port"); do
 done
 gnuplot -p -e "unset key; p '$t_0' u 1:2 lc 'red', '/tmp/tmp.file_7000.txt' u 1:2 lc 'green', '/tmp/tmp.file_7001.txt' u 1:2 lc 'blue'"
 
-
 #grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//' >/tmp/d7000.txt
 #grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7000//' >/tmp/d7000.txt
 grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//' |sed 's/)//' | sed 's/\[cpu_sim [0-9]\+\]://g'>/tmp/d7000.txt
@@ -155,6 +154,7 @@ grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'| sed 's/\[cpu_sim [0-9]\+\]://g'
 #grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
 #grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|sed 's/7001//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
 
+: <<'COMMENT_BLOCK'
 # diff b/n recd and done
 diff -y /tmp/r7000.txt /tmp/d7000.txt|less
 diff -y /tmp/r7001.txt /tmp/d7001.txt|less
@@ -162,8 +162,30 @@ diff -y /tmp/r7001.txt /tmp/d7001.txt|less
 diff -y /tmp/r700?.txt|less
 # diff b/n recd 7000 and done 7001
 diff -y /tmp/r7000.txt /tmp/d7001.txt|less
+COMMENT_BLOCK
+
+for i in $(seq "$base_port" "$hi_port"); do
+    grep done $t|grep "cpu_sim $i"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//' |sed 's/)//' | sed 's/\[cpu_sim [0-9]\+\]://g'>/tmp/d${i}.txt
+    grep recd $t|grep "cpu_sim $i"|sed 's/recd//'| sed 's/\[cpu_sim [0-9]\+\]://g'|cut -f1 -d' ' --complement>/tmp/r${i}.txt
+done
+for i in $(seq "$base_port" "$hi_port"); do
+    diff -y /tmp/r${i}.txt /tmp/d${i}.txt|less
+done
+#bpx=$(echo "$base_port + 1" | bc)
+bpx=$(echo "$base_port" | bc)
+for i in $(seq "$bpx" "$hi_port"); do
+    diff -y /tmp/r${base_port}.txt /tmp/d${i}.txt|less
+done
 
 : <<'COMMENT_BLOCK'
+for i in $(seq "$base_port" "$hi_port"); do
+  for j in $(seq "$base_port" "$hi_port"); do
+    if [ "$i" -ne "$j" ]; then
+      echo "$i $j"
+    fi
+  done
+done
+
 for i in $(seq "$base_port" "$hi_port"); do
     varname="MYVAR_$i"
     eval "$varname=\"file_$i.txt\""
