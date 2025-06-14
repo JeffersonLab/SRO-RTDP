@@ -92,6 +92,21 @@ for i in $(seq "$base_port" "$hi_port"); do
     grep ratio $t|grep "cpu_sim $i"|cut -f 1,8 -d' '|gnuplot -p -e "set title 'Missed Frames Component $(echo "$i - $base_port + 1" | bc)'; unset key; set xlabel 'Clock (hr)'; set ylabel 'Fraction'; p '-' u ((\$1/1e6)/3.6e3):2 w l"
 done
 
+#for i in $(seq "7000" "7002"); do grep "recd" $ts|grep "cpu_sim $i"|cut -f 6 -d' '|sort -k 1 -n > /tmp/recd_$i; done
+#for i in $(seq "7000" "7002"); do grep "dropped" $ts|grep "cpu_sim $i"|cut -f 6 -d' '|sed 's/(//'|sed 's/)//'|sort -k 1 -n > /tmp/drop_$i; done
+#diff /tmp/drop_7000 /tmp/recd_7001|sed 's/^< //'|sed '1d' > /tmp/diff_drop_0_recd_1
+#grep "dropped" $ts|grep "cpu_sim 7000"|cut -f 6 -d' '|wc -l
+#wc -l /tmp/recd* /tmp/drop_700?
+#grep -v -f /tmp/drop_7000</tmp/recd_7000|wc -l
+#cat /tmp/recd_7000|wc -l
+#cat /tmp/recd_7000|grep -v -f /tmp/drop_7000|wc -l
+#grep -v -f /tmp/drop_7000 /tmp/recd_7000|wc -l
+#wc -l /tmp/diff_drop_0_recd_1 /tmp/drop_7000
+#grep -v -f /tmp/drop_7000 /tmp/recd_7000>/tmp/recd-drop_7000
+#wc -l /tmp/recd-drop_7000
+#wc -l /tmp/recd_7001 /tmp/recd-drop_7000
+#wc -l /tmp/drop_7000 /tmp/recd_7000
+
 echo "t $t"
 echo "t0 $t0"
 echo "t1 $t1"
@@ -111,9 +126,55 @@ echo "t13 $t13"
 
 set -m
 
-# gnuplot -e "set xlabel 'X'; set ylabel 'Y'; plot '-' with lines" < data.txt
-# "here document example"
-#gnuplot -e "set xlabel 'X'; set ylabel 'Y'; plot '-' with lines" <<< $'1 2\n2 3\n3 5\n4 7\n5 11\ne'
+#grep simulate  $t|grep "^[0-9]"|grep Sending|cut -f 1,10 -d' '|sed 's/(//'|sed 's/)//'|gnuplot -p -e "p '-' u 1:2"
+t_0=$(mktemp); grep simulate  $t|grep "^[0-9]"|grep Sending|cut -f 1,10 -d' '|sed 's/(//'|sed 's/)//' > $t_0
+echo "t_0=$t_0"
+gnuplot -p -e "set title 'Sent Frames Sender'; unset key; p '$t_0' u 1:2"
+gnuplot -p -e "set title 'Sent Frames Sender'; unset key; p '$t_0' u 1"
+for i in $(seq "$base_port" "$hi_port"); do
+    varname="MYVAR_$i"
+    eval "$varname=\"file_$i.txt\""
+    filename=$(eval "echo \$$varname")
+    grep "cpu_sim $i"  $t|grep "^[0-9]"|grep done|cut -f 1,6 -d' '|sed 's/(//'|sed 's/)//'  > /tmp/tmp.$filename
+    echo $filename
+    gnuplot -p -e "set title 'Done Frames Component $(echo "$i - $base_port + 1" | bc)'; unset key; p '/tmp/tmp.$filename' u 1:2"
+    gnuplot -p -e "set title 'Done Frames Component $(echo "$i - $base_port + 1" | bc)'; unset key; p '/tmp/tmp.$filename' u 1"
+done
+gnuplot -p -e "unset key; p '$t_0' u 1:2 lc 'red', '/tmp/tmp.file_7000.txt' u 1:2 lc 'green', '/tmp/tmp.file_7001.txt' u 1:2 lc 'blue'"
+
+#grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//' >/tmp/d7000.txt
+grep done $t|grep "cpu_sim 7000"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7000//' >/tmp/d7000.txt
+#grep done $t|grep "cpu_sim 7001"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//' >/tmp/d7001.txt
+grep done $t|grep "cpu_sim 7001"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//'|sed 's/)//'|sed 's/7001//' >/tmp/d7001.txt
+#grep recd $t|grep "cpu_sim 7000"|sed 's/recd//'|cut -f1 -d' ' --complement>/tmp/r7000.txt
+grep recd $t|grep "cpu_sim 7000"|sed 's/recd//'|sed 's/7000//'|cut -f1 -d' ' --complement>/tmp/r7000.txt
+#grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
+grep recd $t|grep "cpu_sim 7001"|sed 's/recd//'|sed 's/7001//'|cut -f1 -d' ' --complement>/tmp/r7001.txt
+
+# diff b/n recd and done
+diff -y /tmp/r7000.txt /tmp/d7000.txt|less
+diff -y /tmp/r7001.txt /tmp/d7001.txt|less
+# diff b/n recd 7000 and 7001
+diff -y /tmp/r700?.txt|less
+# diff b/n recd 7000 and done 7001
+diff -y /tmp/r7000.txt /tmp/d7001.txt|less
+
+: <<'COMMENT_BLOCK'
+for i in $(seq "$base_port" "$hi_port"); do
+    varname="MYVAR_$i"
+    eval "$varname=\"file_$i.txt\""
+    filename=$(eval "echo \$$varname")
+    grep "cpu_sim $i"  $t|grep "^[0-9]"|grep recd|cut -f 1,6 -d' ' > /tmp/tmp.$filename
+    echo $filename
+    gnuplot -p -e "set title 'Recd Frames Component $(echo "$i - $base_port + 1" | bc)'; unset key; p '/tmp/tmp.$filename' u 1:2"
+done
+#for i in {1..3}; do
+#    varname="MYVAR_$i"
+#    eval "$varname=\"file_$i.txt\""
+#    filename=$(eval "echo \$$varname")
+#    echo "$filename"
+#done
+
 
 # to rescale data:
 # Example: Plot single-column data with scaling
@@ -122,4 +183,7 @@ set -m
 # \$0 + 1: Uses the line number as the x-axis (starts from 0, so we add 1).
 # \$1 / 10.0: Scales the y-axis by dividing each value by 10.
 # using (expr1):(expr2): Tells Gnuplot to evaluate expressions for x and y values.
+
+ts=$(mktemp); grep -v "^\[" $t|grep -v "^ -b"|sort -k 1 -n > $ts
+COMMENT_BLOCK
 
