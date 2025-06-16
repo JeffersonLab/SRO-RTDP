@@ -12,6 +12,9 @@ multi_gpu_config = {
         'name': 'jlab_slurm'
     },
     'partition': 'gpu',
+    'containers': {
+        'image_path': 'gpu-proxy.sif'
+    },
     'gpu_proxies': [
         {'device': 'A100', 'partition': 'gpu', 'gres': 'gpu:A100:1', 'mem': '100G', 'cpus': 4},
         {'device': 'V100', 'partition': 'gpu', 'gres': 'gpu:V100:1', 'mem': '80G', 'cpus': 4}
@@ -23,6 +26,9 @@ multi_cpu_config = {
         'name': 'jlab_slurm'
     },
     'partition': 'ifarm',
+    'containers': {
+        'image_path': 'cpu-emu.sif'
+    },
     'cpu_emulators': [
         {'id': 'cpu1', 'cpus': 8, 'mem': '16G'},
         {'id': 'cpu2', 'cpus': 8, 'mem': '16G'}
@@ -34,6 +40,9 @@ multi_mixed_config = {
         'name': 'jlab_slurm'
     },
     'partition': 'gpu',
+    'containers': {
+        'image_path': 'mixed-workflow.sif'
+    },
     'gpu_proxies': [
         {'device': 'A100', 'partition': 'gpu', 'gres': 'gpu:A100:1', 'mem': '100G', 'cpus': 4}
     ],
