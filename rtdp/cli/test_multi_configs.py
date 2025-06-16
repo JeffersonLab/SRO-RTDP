@@ -8,6 +8,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Sample configs for multi-component workflows
 multi_gpu_config = {
+    'platform': {
+        'name': 'jlab_slurm'
+    },
+    'partition': 'gpu',
     'gpu_proxies': [
         {'device': 'A100', 'partition': 'gpu', 'gres': 'gpu:A100:1', 'mem': '100G', 'cpus': 4},
         {'device': 'V100', 'partition': 'gpu', 'gres': 'gpu:V100:1', 'mem': '80G', 'cpus': 4}
@@ -15,6 +19,10 @@ multi_gpu_config = {
 }
 
 multi_cpu_config = {
+    'platform': {
+        'name': 'jlab_slurm'
+    },
+    'partition': 'ifarm',
     'cpu_emulators': [
         {'id': 'cpu1', 'cpus': 8, 'mem': '16G'},
         {'id': 'cpu2', 'cpus': 8, 'mem': '16G'}
@@ -22,6 +30,10 @@ multi_cpu_config = {
 }
 
 multi_mixed_config = {
+    'platform': {
+        'name': 'jlab_slurm'
+    },
+    'partition': 'gpu',
     'gpu_proxies': [
         {'device': 'A100', 'partition': 'gpu', 'gres': 'gpu:A100:1', 'mem': '100G', 'cpus': 4}
     ],
