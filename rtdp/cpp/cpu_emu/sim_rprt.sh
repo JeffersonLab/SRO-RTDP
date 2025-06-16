@@ -164,9 +164,15 @@ diff -y /tmp/r700?.txt|less
 diff -y /tmp/r7000.txt /tmp/d7001.txt|less
 COMMENT_BLOCK
 
+echo "All frames from sender:" > /tmp/s.txt
+grep '\[simulate_stream:\] Sending' $t | sed -n 's/.*(\([0-9]\+\)).*/\1/p' >> /tmp/s.txt
 for i in $(seq "$base_port" "$hi_port"); do
-    grep done $t|grep "cpu_sim $i"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//' |sed 's/)//' | sed 's/\[cpu_sim [0-9]\+\]://g'>/tmp/d${i}.txt
-    grep recd $t|grep "cpu_sim $i"|sed 's/recd//'| sed 's/\[cpu_sim [0-9]\+\]://g'|cut -f1 -d' ' --complement>/tmp/r${i}.txt
+    echo "Processed frames for component ${i}:" > /tmp/d${i}.txt
+    #grep done $t|grep "cpu_sim $i"|grep -v all_done|sed 's/done//'|cut -f1 -d' ' --complement|sed 's/(//' |sed 's/)//' | sed 's/\[cpu_sim [0-9]\+\]://g'>>/tmp/d${i}.txt
+    grep done $t|grep "cpu_sim $i"|grep -v all_done|sed -n 's/.*(\([0-9]\+\)).*/\1/p'>>/tmp/d${i}.txt
+    echo "Available frames for component ${i}:" > /tmp/r${i}.txt
+    #grep recd $t|grep "cpu_sim $i"|sed 's/recd//'| sed 's/\[cpu_sim [0-9]\+\]://g'|cut -f1 -d' ' --complement>>/tmp/r${i}.txt
+    grep recd $t|grep "cpu_sim $i"|sed -n 's/.* //p'>>/tmp/r${i}.txt
 done
 for i in $(seq "$base_port" "$hi_port"); do
     diff -y /tmp/r${i}.txt /tmp/d${i}.txt|less
@@ -174,7 +180,8 @@ done
 #bpx=$(echo "$base_port + 1" | bc)
 bpx=$(echo "$base_port" | bc)
 for i in $(seq "$bpx" "$hi_port"); do
-    diff -y /tmp/r${base_port}.txt /tmp/d${i}.txt|less
+    #diff -y /tmp/r${base_port}.txt /tmp/d${i}.txt|less
+    diff -y /tmp/s.txt /tmp/d${i}.txt|less
 done
 
 : <<'COMMENT_BLOCK'
