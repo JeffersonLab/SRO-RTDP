@@ -145,9 +145,9 @@
         script = """
             #!/bin/bash
             set -e
-            mkdir -p ${LOG_DIR}/proxy
-            exec 1> >(tee -a "${LOG_DIR}/proxy/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
+            mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
+            exec 1> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stderr.log")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
@@ -158,7 +158,7 @@
             echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
             echo "  - PROXY_RATE: ${PROXY_RATE}"
             echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
-            echo "  - LOG_DIR: ${LOG_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}/proxy_{{ loop.index0 }}"
 
             # Get receiver information
             RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
@@ -166,9 +166,9 @@
 
             # Store hostname for sender
             HOSTNAME=$(hostname)
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_hostname
             IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
 
             # Create output directory
@@ -183,7 +183,7 @@
                 -t \
                 -w ${MATRIX_WIDTH} \
                 -r ${PROXY_RATE} \
-                2>${LOG_DIR}/proxy/apptainer.log &
+                2>${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log &
             PROXY_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
 
@@ -197,7 +197,7 @@
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
-                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
                 exit 1
             fi
 
@@ -207,14 +207,14 @@
 
             # Monitor the proxy process
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $PROXY_PID 2>/dev/null; do
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy process is running (PID: $PROXY_PID)"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy process is running (PID: $PROXY_PID)" >> ${LOG_DIR}/proxy_{{ loop.index0 }}/process.log
                 sleep 5
             done
 
             # Check if process died unexpectedly
             if ! wait $PROXY_PID; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
-                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
                 exit 1
             fi
         """
