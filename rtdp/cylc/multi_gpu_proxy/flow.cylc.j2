@@ -31,6 +31,16 @@
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('gpu-proxy.sif') }}"
             DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
             LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
+            NIC = "{{ NIC | default('${NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
+            GPU_NIC = "{{ GPU_NIC | default('${GPU_NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
+            MATRIX_WIDTH = "{{ MATRIX_WIDTH | default('2048') }}"
+            SEND_RATE = "{{ SEND_RATE | default('150') }}"
+            GROUP_SIZE = "{{ GROUP_SIZE | default('30720000') }}"
+            PROXY_RATE = "{{ PROXY_RATE | default('1.0') }}"
+            SEND_ALL_ONES = "{{ SEND_ALL_ONES | default('0') }}"
+            SOCKET_HWM = "{{ SOCKET_HWM | default('1') }}"
+            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
 
     [[receiver]]
         script = """
