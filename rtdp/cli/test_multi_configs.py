@@ -15,10 +15,35 @@ multi_gpu_config = {
     'containers': {
         'image_path': 'gpu-proxy.sif'
     },
+    'receiver': {
+        'port': 5000
+    },
     'gpu_proxies': [
-        {'device': 'A100', 'partition': 'gpu', 'gres': 'gpu:A100:1', 'mem': '100G', 'cpus': 4},
-        {'device': 'V100', 'partition': 'gpu', 'gres': 'gpu:V100:1', 'mem': '80G', 'cpus': 4}
-    ]
+        {
+            'device': 'A100',
+            'partition': 'gpu',
+            'gres': 'gpu:A100:1',
+            'mem': '100G',
+            'cpus': 4,
+            'in_port': 5000,
+            'out_port': 5001,
+            'device_id': 0
+        },
+        {
+            'device': 'V100',
+            'partition': 'gpu',
+            'gres': 'gpu:V100:1',
+            'mem': '80G',
+            'cpus': 4,
+            'in_port': 5001,
+            'out_port': 5002,
+            'device_id': 1
+        }
+    ],
+    'sender': {
+        'port': 5002,
+        'host': 'localhost'
+    }
 }
 
 multi_cpu_config = {
@@ -29,10 +54,33 @@ multi_cpu_config = {
     'containers': {
         'image_path': 'cpu-emu.sif'
     },
+    'receiver': {
+        'port': 5000
+    },
     'cpu_emulators': [
-        {'id': 'cpu1', 'cpus': 8, 'mem': '16G'},
-        {'id': 'cpu2', 'cpus': 8, 'mem': '16G'}
-    ]
+        {
+            'id': 'cpu1',
+            'cpus': 8,
+            'mem': '16G',
+            'in_port': 5000,
+            'out_port': 5001,
+            'threads': 4,
+            'latency': 100
+        },
+        {
+            'id': 'cpu2',
+            'cpus': 8,
+            'mem': '16G',
+            'in_port': 5001,
+            'out_port': 5002,
+            'threads': 4,
+            'latency': 100
+        }
+    ],
+    'sender': {
+        'port': 5002,
+        'host': 'localhost'
+    }
 }
 
 multi_mixed_config = {
@@ -43,12 +91,36 @@ multi_mixed_config = {
     'containers': {
         'image_path': 'mixed-workflow.sif'
     },
+    'receiver': {
+        'port': 5000
+    },
     'gpu_proxies': [
-        {'device': 'A100', 'partition': 'gpu', 'gres': 'gpu:A100:1', 'mem': '100G', 'cpus': 4}
+        {
+            'device': 'A100',
+            'partition': 'gpu',
+            'gres': 'gpu:A100:1',
+            'mem': '100G',
+            'cpus': 4,
+            'in_port': 5000,
+            'out_port': 5001,
+            'device_id': 0
+        }
     ],
     'cpu_emulators': [
-        {'id': 'cpu1', 'cpus': 8, 'mem': '16G'}
-    ]
+        {
+            'id': 'cpu1',
+            'cpus': 8,
+            'mem': '16G',
+            'in_port': 5001,
+            'out_port': 5002,
+            'threads': 4,
+            'latency': 100
+        }
+    ],
+    'sender': {
+        'port': 5002,
+        'host': 'localhost'
+    }
 }
 
 # Write sample configs to temporary YAML files
