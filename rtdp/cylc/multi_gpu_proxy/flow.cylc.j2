@@ -10,11 +10,11 @@
 
     [[graph]]
         R1 = """
-            # Start chain
-            receiver:ready
-            {% for proxy in gpu_proxies %}
-                => gpu_proxy_{{ loop.index0 }}
-            {% endfor %}
+            # Start chain: receiver triggers all proxies in parallel
+            receiver:ready => 
+            {% for proxy in gpu_proxies -%}
+                gpu_proxy_{{ loop.index0 }}{% if not loop.last %} & {% endif %}
+            {%- endfor %}
 
             # Wait for all proxies to be ready before starting sender
             {% for proxy in gpu_proxies -%}
