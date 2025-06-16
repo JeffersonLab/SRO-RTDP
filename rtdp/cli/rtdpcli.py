@@ -207,11 +207,14 @@ def run(workflow):
         raise click.ClickException(f"No flow.cylc found in {workflow}")
     # Only use config if present in workflow directory
     config_path = os.path.join(workflow, 'config.yml')
+    click.echo(f"Looking for config file at: {config_path}")
     workflow_name = os.path.basename(os.path.abspath(workflow))
     if os.path.exists(config_path):
+        click.echo("Found config file, reading...")
         with open(config_path, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
+                click.echo(f"Config contents: {cfg}")
                 if 'workflow' in cfg and 'name' in cfg['workflow']:
                     workflow_name = cfg['workflow']['name']
                 # Find SIF(s) from config
@@ -221,9 +224,11 @@ def run(workflow):
                 
                 # Check containers section
                 containers = cfg.get('containers', {})
+                click.echo(f"Containers section: {containers}")
                 if 'image_path' in containers:
                     sif_name = containers['image_path']
                     sif_path = os.path.join(sif_dir, sif_name)
+                    click.echo(f"Found image_path: {sif_name}")
                     if 'gpu-proxy' in sif_name:
                         docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
                     elif 'cpu-emu' in sif_name:
@@ -231,28 +236,34 @@ def run(workflow):
                     else:
                         docker_img = None
                     if docker_img and not os.path.exists(sif_path):
+                        click.echo(f"Adding SIF task for {sif_path} from {docker_img}")
                         sif_tasks.append((sif_path, docker_img))
 
                 # Check gpu_proxies section
                 gpu_proxies = cfg.get('gpu_proxies', [])
+                click.echo(f"GPU proxies section: {gpu_proxies}")
                 for proxy in gpu_proxies:
                     if isinstance(proxy, dict) and 'device' in proxy and proxy['device'] == 'gpu':
                         sif_name = 'gpu-proxy.sif'  # Default name for GPU proxies
                         sif_path = os.path.join(sif_dir, sif_name)
                         docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
                         if not os.path.exists(sif_path):
+                            click.echo(f"Adding SIF task for {sif_path} from {docker_img}")
                             sif_tasks.append((sif_path, docker_img))
 
                 # Check cpu_emulators section
                 cpu_emulators = cfg.get('cpu_emulators', [])
+                click.echo(f"CPU emulators section: {cpu_emulators}")
                 for emu in cpu_emulators:
                     if isinstance(emu, dict) and 'device' in emu and emu['device'] == 'cpu':
                         sif_name = 'cpu-emu.sif'  # Default name for CPU emulators
                         sif_path = os.path.join(sif_dir, sif_name)
                         docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
                         if not os.path.exists(sif_path):
+                            click.echo(f"Adding SIF task for {sif_path} from {docker_img}")
                             sif_tasks.append((sif_path, docker_img))
 
+                click.echo(f"Total SIF tasks to build: {len(sif_tasks)}")
                 # Build all required SIFs
                 for sif_path, docker_img in sif_tasks:
                     click.echo(f"SIF not found: {sif_path}. Building from {docker_img}...")
@@ -262,6 +273,8 @@ def run(workflow):
                     click.echo(f"Successfully built {sif_path}")
             except Exception as e:
                 click.echo(f"[Warning] Could not auto-build SIF: {e}")
+    else:
+        click.echo(f"Config file not found at {config_path}")
     try:
         os.chdir(workflow)
         result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}'])
