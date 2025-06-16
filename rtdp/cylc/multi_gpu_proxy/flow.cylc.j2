@@ -12,9 +12,15 @@
         R1 = """
             # Start chain
             receiver:ready {% for proxy in gpu_proxies %}=> gpu_proxy_{{ loop.index0 }}:ready {% endfor %}=> sender
-            # Completion chain
+            
+            # Completion chain (separate from start chain)
             sender:succeeded => !receiver
             receiver:completed
+            
+            # Ensure all GPU proxies complete
+            {% for proxy in gpu_proxies %}
+            gpu_proxy_{{ loop.index0 }}:completed
+            {% endfor %}
         """
 
 [runtime]
