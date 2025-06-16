@@ -218,6 +218,8 @@ def run(workflow):
                 sif_dir = os.path.join(workflow, 'sifs')
                 os.makedirs(sif_dir, exist_ok=True)
                 sif_tasks = []
+                
+                # Check containers section
                 containers = cfg.get('containers', {})
                 if 'image_path' in containers:
                     sif_name = containers['image_path']
@@ -230,18 +232,28 @@ def run(workflow):
                         docker_img = None
                     if docker_img and not os.path.exists(sif_path):
                         sif_tasks.append((sif_path, docker_img))
-                for k, v in containers.items():
-                    if k.endswith('_SIF') and isinstance(v, str):
-                        sif_name = v
+
+                # Check gpu_proxies section
+                gpu_proxies = cfg.get('gpu_proxies', [])
+                for proxy in gpu_proxies:
+                    if isinstance(proxy, dict) and 'device' in proxy and proxy['device'] == 'gpu':
+                        sif_name = 'gpu-proxy.sif'  # Default name for GPU proxies
                         sif_path = os.path.join(sif_dir, sif_name)
-                        if 'gpu-proxy' in sif_name:
-                            docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
-                        elif 'cpu-emu' in sif_name:
-                            docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
-                        else:
-                            docker_img = None
-                        if docker_img and not os.path.exists(sif_path):
+                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
+                        if not os.path.exists(sif_path):
                             sif_tasks.append((sif_path, docker_img))
+
+                # Check cpu_emulators section
+                cpu_emulators = cfg.get('cpu_emulators', [])
+                for emu in cpu_emulators:
+                    if isinstance(emu, dict) and 'device' in emu and emu['device'] == 'cpu':
+                        sif_name = 'cpu-emu.sif'  # Default name for CPU emulators
+                        sif_path = os.path.join(sif_dir, sif_name)
+                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
+                        if not os.path.exists(sif_path):
+                            sif_tasks.append((sif_path, docker_img))
+
+                # Build all required SIFs
                 for sif_path, docker_img in sif_tasks:
                     click.echo(f"SIF not found: {sif_path}. Building from {docker_img}...")
                     result = subprocess.run(['apptainer', 'build', sif_path, f'docker://{docker_img}'])
