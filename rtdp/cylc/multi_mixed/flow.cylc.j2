@@ -24,31 +24,36 @@
             execution time limit = PT2H
         [[[directives]]]
             --ntasks = 1
-            --partition = {{ partition | default('ifarm') }}
+            --partition = {{ partition | default('gpu') }}
             --output = slurm_%j.log
             --error = slurm_%j.log
         [[[environment]]]
-            # TODO: Add global environment variables as needed
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('mixed-workflow.sif') }}"
+            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
 
     [[receiver]]
-        # TODO: Adapt receiver logic for mixed setup if needed
         script = """
-        # ... receiver script ...
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/receiver/receiver.sh
         """
         [[[directives]]]
             --job-name = receiver
             --cpus-per-task = 4
             --mem = 8G
+        [[[environment]]]
+            RECV_PORT = "{{ receiver.port | default('5000') }}"
         [[[outputs]]]
             ready = "ready"
             transfer_done = "Transfer completed successfully"
 
     {% for proxy in gpu_proxies %}
     [[gpu_proxy_{{ loop.index0 }}]]
-        # Each proxy gets its own config
         script = """
-        # ... proxy script for GPU {{ proxy.device }} ...
-        # TODO: Use proxy-specific variables
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/proxy/gpu_proxy.sh
         """
         [[[directives]]]
             --job-name = proxy_{{ loop.index0 }}
@@ -56,31 +61,44 @@
             --gres = {{ proxy.gres | default('gpu:A100:1') }}
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
+        [[[environment]]]
+            IN_PORT = "{{ proxy.in_port | default('5000') }}"
+            OUT_PORT = "{{ proxy.out_port | default('5001') }}"
+            GPU_ID = "{{ proxy.device_id | default(loop.index0) }}"
         [[[outputs]]]
             ready = "ready"
     {% endfor %}
 
     {% for emu in cpu_emulators %}
     [[emulator_{{ loop.index0 }}]]
-        # Each emulator gets its own config
         script = """
-        # ... emulator script for CPU {{ emu.id }} ...
-        # TODO: Use emulator-specific variables
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/emulator/cpu_emu.sh
         """
         [[[directives]]]
             --job-name = emulator_{{ loop.index0 }}
             --cpus-per-task = {{ emu.cpus | default('8') }}
             --mem = {{ emu.mem | default('16G') }}
+        [[[environment]]]
+            IN_PORT = "{{ emu.in_port | default('5001') }}"
+            OUT_PORT = "{{ emu.out_port | default('5002') }}"
+            NUM_THREADS = "{{ emu.threads | default('4') }}"
+            LATENCY = "{{ emu.latency | default('0') }}"
         [[[outputs]]]
             ready = "ready"
     {% endfor %}
 
     [[sender]]
-        # TODO: Adapt sender logic for mixed setup if needed
         script = """
-        # ... sender script ...
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/sender/sender.sh
         """
         [[[directives]]]
             --job-name = sender
             --cpus-per-task = 4
-            --mem = 8G 
+            --mem = 8G
+        [[[environment]]]
+            SEND_PORT = "{{ sender.port | default('5002') }}"
+            DEST_HOST = "{{ sender.host | default('localhost') }}" 

@@ -29,42 +29,55 @@
             --error = slurm_%j.log
         [[[environment]]]
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('cpu-emu.sif') }}"
-            # TODO: Add more global environment variables as needed
+            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
 
     [[receiver]]
-        # TODO: Adapt receiver logic for multi-emulator setup if needed
         script = """
-        # ... receiver script ...
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/receiver/receiver.sh
         """
         [[[directives]]]
             --job-name = receiver
             --cpus-per-task = 4
             --mem = 8G
+        [[[environment]]]
+            RECV_PORT = "{{ receiver.port | default('5000') }}"
         [[[outputs]]]
             ready = "ready"
             completed = "Transfer completed successfully"
 
     {% for emu in cpu_emulators %}
     [[emulator_{{ loop.index0 }}]]
-        # Each emulator gets its own config
         script = """
-        # ... emulator script for CPU {{ emu.id }} ...
-        # TODO: Use emulator-specific variables (e.g., emu.threads, emu.latency, etc.)
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/emulator/cpu_emu.sh
         """
         [[[directives]]]
             --job-name = emulator_{{ loop.index0 }}
             --cpus-per-task = {{ emu.cpus | default('8') }}
             --mem = {{ emu.mem | default('16G') }}
+        [[[environment]]]
+            IN_PORT = "{{ emu.in_port | default('5000') }}"
+            OUT_PORT = "{{ emu.out_port | default('5001') }}"
+            NUM_THREADS = "{{ emu.threads | default('4') }}"
+            LATENCY = "{{ emu.latency | default('0') }}"
         [[[outputs]]]
             ready = "ready"
     {% endfor %}
 
     [[sender]]
-        # TODO: Adapt sender logic for multi-emulator setup if needed
         script = """
-        # ... sender script ...
+        #!/bin/bash
+        source $SIF_FILE
+        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/sender/sender.sh
         """
         [[[directives]]]
             --job-name = sender
             --cpus-per-task = 4
-            --mem = 8G 
+            --mem = 8G
+        [[[environment]]]
+            SEND_PORT = "{{ sender.port | default('5002') }}"
+            DEST_HOST = "{{ sender.host | default('localhost') }}" 
