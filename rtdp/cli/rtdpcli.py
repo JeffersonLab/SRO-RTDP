@@ -4,46 +4,88 @@ import os
 from jinja2 import Template, Environment, meta, nodes
 import subprocess
 
+# Update workflow_types to include new multi-component templates
+workflow_types = {
+    'gpu_proxy': {
+        'template': 'rtdp/cuda/gpu_proxy/cylc/flow.cylc.j2',
+        'description': 'Single GPU proxy workflow'
+    },
+    'cpu_emu': {
+        'template': 'rtdp/cpp/cpu_emu/cylc/flow.cylc.j2',
+        'description': 'Single CPU emulator workflow'
+    },
+    'chain_workflow': {
+        'template': 'rtdp/cylc/chain_workflow/flow.cylc.j2',
+        'description': 'Simple chain workflow'
+    },
+    'multi_gpu_proxy': {
+        'template': 'rtdp/cylc/multi_gpu_proxy/flow.cylc.j2',
+        'description': 'Multi-GPU proxy workflow'
+    },
+    'multi_cpu_emu': {
+        'template': 'rtdp/cylc/multi_cpu_emu/flow.cylc.j2',
+        'description': 'Multi-CPU emulator workflow'
+    },
+    'multi_mixed': {
+        'template': 'rtdp/cylc/multi_mixed/flow.cylc.j2',
+        'description': 'Mixed multi-component workflow'
+    }
+}
+
 @click.group()
 def cli():
     """RTDP Workflow CLI"""
     pass
 
 @cli.command()
-@click.option('--config', required=True, type=click.Path(exists=True, dir_okay=False), help='YAML config file')
-@click.option('--output', required=True, type=click.Path(file_okay=False), help='Output directory for workflow files')
-@click.option('--template', required=True, type=click.Path(exists=True, dir_okay=False), help='Path to Jinja2 template (flow.cylc)')
-def generate(config, output, template):
-    """Generate a workflow from config and template."""
-    # Read YAML config
+@click.option('--config', required=True, help='Path to the YAML configuration file')
+@click.option('--output', required=True, help='Output directory for the generated workflow')
+@click.option('--workflow-type', required=True, help='Type of workflow to generate (gpu_proxy, cpu_emu, chain_workflow, multi_gpu_proxy, multi_cpu_emu, multi_mixed)')
+def generate(config, output, workflow_type):
+    """Generate a Cylc workflow from a YAML configuration file.
+
+    The workflow type must be one of:
+    - gpu_proxy: Single GPU proxy workflow
+    - cpu_emu: Single CPU emulator workflow
+    - chain_workflow: Simple chain workflow
+    - multi_gpu_proxy: Multi-GPU proxy workflow (requires 'gpu_proxies' list in config)
+    - multi_cpu_emu: Multi-CPU emulator workflow (requires 'cpu_emulators' list in config)
+    - multi_mixed: Mixed multi-component workflow (requires both 'gpu_proxies' and 'cpu_emulators' lists in config)
+    """
+    if workflow_type not in workflow_types:
+        raise click.ClickException(f"Unknown workflow type: {workflow_type}")
+
+    # Load the configuration
     with open(config, 'r') as f:
-        cfg = yaml.safe_load(f)
-    # Flatten config for template context (top-level keys only)
-    context = dict(cfg)
-    # Also add nested keys at top-level for convenience
-    for k, v in cfg.items():
-        if isinstance(v, dict):
-            context.update(v)
-    # Read template
-    with open(template, 'r') as f:
-        template_str = f.read()
-    j2_template = Template(template_str)
-    # Render template
-    try:
-        rendered = j2_template.render(**context)
-    except Exception as e:
-        click.echo(f"Error rendering template: {e}", err=True)
-        raise click.ClickException("Template rendering failed")
-    # Ensure output directory exists
+        config_data = yaml.safe_load(f)
+
+    # Check if this is a multi-component workflow
+    if workflow_type in ['multi_gpu_proxy', 'multi_cpu_emu', 'multi_mixed']:
+        if workflow_type == 'multi_gpu_proxy' and 'gpu_proxies' not in config_data:
+            raise click.ClickException("Multi-GPU proxy workflow requires a 'gpu_proxies' list in the config.")
+        if workflow_type == 'multi_cpu_emu' and 'cpu_emulators' not in config_data:
+            raise click.ClickException("Multi-CPU emulator workflow requires a 'cpu_emulators' list in the config.")
+        if workflow_type == 'multi_mixed' and ('gpu_proxies' not in config_data or 'cpu_emulators' not in config_data):
+            raise click.ClickException("Mixed workflow requires both 'gpu_proxies' and 'cpu_emulators' lists in the config.")
+
+    # Load the template
+    template_path = workflow_types[workflow_type]['template']
+    with open(template_path, 'r') as f:
+        template_content = f.read()
+
+    # Render the template
+    template = Template(template_content)
+    rendered_content = template.render(**config_data)
+
+    # Create the output directory if it doesn't exist
     os.makedirs(output, exist_ok=True)
-    # Write rendered flow.cylc
-    flow_path = os.path.join(output, 'flow.cylc')
-    with open(flow_path, 'w') as f:
-        f.write(rendered)
-    # Copy the config file into the output directory as config.yml
-    import shutil
-    shutil.copyfile(config, os.path.join(output, 'config.yml'))
-    click.echo(f"Generated flow.cylc at {flow_path}")
+
+    # Write the rendered content to the output file
+    output_file = os.path.join(output, 'flow.cylc')
+    with open(output_file, 'w') as f:
+        f.write(rendered_content)
+
+    click.echo(f"Workflow generated successfully in {output_file}")
 
 @cli.command()
 @click.option('--config', required=True, type=click.Path(exists=True, dir_okay=False), help='YAML config file')

@@ -1,0 +1,72 @@
+{# Multi-GPU Proxy Cylc Workflow Template #}
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready {% for proxy in gpu_proxies %}=> gpu_proxy_{{ loop.index0 }}:ready {% endfor %}=> sender
+            # Completion chain
+            sender:succeeded => !receiver
+            receiver:completed
+        """
+
+[runtime]
+    [[root]]
+        platform = {{ platform.name | default('jlab_slurm') }}
+        [[[job]]]
+            execution time limit = PT2H
+        [[[directives]]]
+            --ntasks = 1
+            --partition = {{ partition | default('ifarm') }}
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        [[[environment]]]
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('gpu-proxy.sif') }}"
+            # TODO: Add more global environment variables as needed
+
+    [[receiver]]
+        # TODO: Adapt receiver logic for multi-proxy setup if needed
+        script = """
+        # ... receiver script ...
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = 4
+            --mem = 8G
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Transfer completed successfully"
+
+    {% for proxy in gpu_proxies %}
+    [[gpu_proxy_{{ loop.index0 }}]]
+        # Each proxy gets its own config
+        script = """
+        # ... proxy script for GPU {{ proxy.device }} ...
+        # TODO: Use proxy-specific variables (e.g., proxy.in_port, proxy.out_port, etc.)
+        """
+        [[[directives]]]
+            --job-name = proxy_{{ loop.index0 }}
+            --partition = {{ proxy.partition | default('gpu') }}
+            --gres = {{ proxy.gres | default('gpu:A100:1') }}
+            --mem = {{ proxy.mem | default('100G') }}
+            --cpus-per-task = {{ proxy.cpus | default('4') }}
+        [[[outputs]]]
+            ready = "ready"
+    {% endfor %}
+
+    [[sender]]
+        # TODO: Adapt sender logic for multi-proxy setup if needed
+        script = """
+        # ... sender script ...
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G 
