@@ -18,6 +18,10 @@ echo "hi_port = $hi_port"
 #tz=$(mktemp); ./sim_rprt.sh $t 2>$tz
 #killall gnuplot_qt; rm /tmp/qtgnuplot*
 
+
+#killall cpu_sim python zmq-event-clnt; t=$(mktemp); tx=$(mktemp); echo $t; python launcher_py_cpu_sim_chain.py --components 2 --base-port 7000 --avg-rate 15.0 --rms 0.1 --duty 0.9 --nic 100 --frame_cnt 100 > $t 2> $tx
+#ts=$(mktemp); grep -v "^\[" $t|grep -v "^ -b"|sort -k 1 -n > $ts
+#tz=$(mktemp); ./sim_rprt.sh $t 2 7000 2>$tz
 #==================================basic report =================================
 t=$1
 set +m
