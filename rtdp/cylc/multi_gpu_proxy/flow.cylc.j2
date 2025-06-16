@@ -221,7 +221,9 @@
         [[[directives]]]
             --job-name = proxy_{{ loop.index0 }}
             --partition = {{ proxy.partition | default('gpu') }}
-            --gres = {{ proxy.gres | default('gpu:A100:1') }}
+            {% if proxy.gres is defined %}
+            --gres = {{ proxy.gres }}
+            {% endif %}
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
         [[[environment]]]
