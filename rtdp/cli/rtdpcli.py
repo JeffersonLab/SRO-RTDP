@@ -85,6 +85,12 @@ def generate(config, output, workflow_type):
     with open(output_file, 'w') as f:
         f.write(rendered_content)
 
+    # Copy the config file to the workflow directory
+    import shutil
+    config_output = os.path.join(output, 'config.yml')
+    shutil.copy2(config, config_output)
+    click.echo(f"Copied config file to {config_output}")
+
     click.echo(f"Workflow generated successfully in {output_file}")
 
 @cli.command()
