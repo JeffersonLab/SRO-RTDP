@@ -34,9 +34,51 @@
 
     [[receiver]]
         script = """
-        #!/bin/bash
-        source $SIF_FILE
-        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/receiver/receiver.sh
+            #!/bin/bash
+            set -e
+            mkdir -p ${LOG_DIR}/receiver
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+
+            # Store hostname for other tasks
+            HOSTNAME=$(hostname -f)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+
+            # Start receiver
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
+            apptainer run --pwd /tmp ${SIF_FILE} receiver -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+
+            # Wait for completion
+            wait $RECV_PID
         """
         [[[directives]]]
             --job-name = receiver
@@ -51,9 +93,64 @@
     {% for proxy in gpu_proxies %}
     [[gpu_proxy_{{ loop.index0 }}]]
         script = """
-        #!/bin/bash
-        source $SIF_FILE
-        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/proxy/gpu_proxy.sh
+            #!/bin/bash
+            set -e
+            mkdir -p ${LOG_DIR}/proxy
+            exec 1> >(tee -a "${LOG_DIR}/proxy/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/proxy/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - GPU_NIC: ${GPU_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
+            echo "  - PROXY_RATE: ${PROXY_RATE}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
+
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_hostname
+            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
+
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+
+            # Start GPU proxy
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
+            apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
+                --in-port ${IN_PORT} \
+                --out-ip ${RECV_IP} \
+                --out-port ${OUT_PORT} \
+                -t \
+                -w ${MATRIX_WIDTH} \
+                -r ${PROXY_RATE} \
+                2>${LOG_DIR}/proxy/apptainer.log &
+            PROXY_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $PROXY_PID 2>/dev/null; then
+                cylc message "ready"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                exit 1
+            fi
+
+            # Wait for completion
+            wait $PROXY_PID
         """
         [[[directives]]]
             --job-name = proxy_{{ loop.index0 }}
@@ -71,9 +168,50 @@
 
     [[sender]]
         script = """
-        #!/bin/bash
-        source $SIF_FILE
-        $CYLC_WORKFLOW_RUN_DIR/rtdp/cylc/scripts/sender/sender.sh
+            #!/bin/bash
+            set -e
+            mkdir -p ${LOG_DIR}/sender
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - SEND_RATE: ${SEND_RATE} MB/s"
+            echo "  - GROUP_SIZE: ${GROUP_SIZE}"
+            echo "  - SEND_ALL_ONES: ${SEND_ALL_ONES}"
+            echo "  - SOCKET_HWM: ${SOCKET_HWM}"
+            echo "  - INPUT_DIR: ${INPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+
+            # Get proxy information
+            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT} (using NIC ${NIC})"
+
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+
+            # Send data
+            apptainer run --pwd /tmp ${SIF_FILE} sender \
+                -a ${PROXY_IP} \
+                -p ${IN_PORT} \
+                -r ${SEND_RATE} \
+                --group-size ${GROUP_SIZE} \
+                --hwm ${SOCKET_HWM} \
+                -v \
+                ${SEND_ALL_ONES:+--all-ones} \
+                2>${LOG_DIR}/sender/apptainer.log
+
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:succeeded"
+            fi
+
+            exit ${SEND_STATUS}
         """
         [[[directives]]]
             --job-name = sender
