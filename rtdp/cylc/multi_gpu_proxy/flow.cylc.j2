@@ -99,14 +99,29 @@
             if kill -0 $RECV_PID 2>/dev/null; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
                 cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
 
-            # Wait for completion
-            wait $RECV_PID
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the receiver process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $RECV_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = receiver
@@ -170,15 +185,31 @@
 
             # Signal readiness if process is running
             if kill -0 $PROXY_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
                 cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
                 cat ${LOG_DIR}/proxy/apptainer.log >&2
                 exit 1
             fi
 
-            # Wait for completion
-            wait $PROXY_PID
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the proxy process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $PROXY_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy process is running (PID: $PROXY_PID)"
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $PROXY_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
+                cat ${LOG_DIR}/proxy/apptainer.log >&2
+                exit 1
+            fi
         """
         [[[directives]]]
             --job-name = proxy_{{ loop.index0 }}
