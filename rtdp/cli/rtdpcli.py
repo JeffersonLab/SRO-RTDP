@@ -226,7 +226,9 @@ def run(workflow):
                 # Find SIF(s) from config
                 sif_dir = os.path.join(workflow, 'sifs')
                 os.makedirs(sif_dir, exist_ok=True)
-                sif_tasks = []
+                
+                # Use a set to track unique SIFs
+                unique_sifs = set()
                 
                 # Check containers section
                 containers = cfg.get('containers', {})
@@ -242,8 +244,7 @@ def run(workflow):
                     else:
                         docker_img = None
                     if docker_img and not os.path.exists(sif_path):
-                        click.echo(f"Adding SIF task for {sif_path} from {docker_img}")
-                        sif_tasks.append((sif_path, docker_img))
+                        unique_sifs.add((sif_path, docker_img))
 
                 # Check gpu_proxies section
                 gpu_proxies = cfg.get('gpu_proxies', [])
@@ -254,8 +255,7 @@ def run(workflow):
                         sif_path = os.path.join(sif_dir, sif_name)
                         docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
                         if not os.path.exists(sif_path):
-                            click.echo(f"Adding SIF task for {sif_path} from {docker_img}")
-                            sif_tasks.append((sif_path, docker_img))
+                            unique_sifs.add((sif_path, docker_img))
 
                 # Check cpu_emulators section
                 cpu_emulators = cfg.get('cpu_emulators', [])
@@ -266,12 +266,11 @@ def run(workflow):
                         sif_path = os.path.join(sif_dir, sif_name)
                         docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
                         if not os.path.exists(sif_path):
-                            click.echo(f"Adding SIF task for {sif_path} from {docker_img}")
-                            sif_tasks.append((sif_path, docker_img))
+                            unique_sifs.add((sif_path, docker_img))
 
-                click.echo(f"Total SIF tasks to build: {len(sif_tasks)}")
+                click.echo(f"Total unique SIFs to build: {len(unique_sifs)}")
                 # Build all required SIFs
-                for sif_path, docker_img in sif_tasks:
+                for sif_path, docker_img in unique_sifs:
                     click.echo(f"SIF not found: {sif_path}. Building from {docker_img}...")
                     result = subprocess.run(['apptainer', 'build', sif_path, f'docker://{docker_img}'])
                     if result.returncode != 0:
