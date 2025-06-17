@@ -1,11 +1,10 @@
 destination: "129.57.177.5" #ejfat-5-daq
 dst_port: 5555
 rcv_port: 5555
-sleep: 0
-threads: 1
 latency: 500         # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
 mem_footprint: 0.05  # Memory footprint in GB
 output_size: 0.001   # Output size in GB
 verbose: 1
 terminal: 0          # if 1 do not forward result to destination
-
+out_nic: 100          # Outbound NIC speed in Gbps for sim_mode
+frame_cnt: 10          # Numbers frames sender will send
