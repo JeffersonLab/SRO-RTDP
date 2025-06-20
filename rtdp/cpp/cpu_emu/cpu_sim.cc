@@ -339,7 +339,7 @@ wait_for_frame:
             auto lb = 1e-3*double(bufSiz)/outNicSpd; //usec
             auto x = std::clamp(sd_10pcnt(gen), 1.0, 1.3);
             tsn = lb*x; //usec
-            //advance the sim clock for netwok latency
+            //temporarily advance the sim clock for ready to receive check
             float tsr1 = pkt.timestamp + tsn;
             if(vrbs) std::cout << tsr1 << " [cpu_sim " << rcv_prt << "]: " << " recd " << frame_num << endl;
             if(DBG) cout << tsr1 + 0.1 << " [cpu_sim " << rcv_prt << "]: " << " Received request "
@@ -422,7 +422,8 @@ all_done:
                 send_result_t sr;
                 BufferPacket pkt;
                 //represents harvested data
-                pkt.size = outSz;
+                auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
+                pkt.size = outSz*x;
                 pkt.timestamp = tsr;
                 pkt.stream_id = stream_id;
                 pkt.frame_num = frame_num;
@@ -451,12 +452,13 @@ all_done:
 
         if(vrbs) std::cout << tsr + 3 << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn 
                            << " (" << frame_num << ')' << endl;
-        if(vrbs) std::cout << tsr + 4 << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) 
+        if(vrbs) std::cout << tsr + 4 << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(1)/(1e-6*float(tsc)) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
-        if(vrbs) std::cout << tsr + 5 << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) 
+        if(vrbs) std::cout << tsr + 5 << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(bufSiz)/(1e-6*float(tsc)) 
                            << " MHz mnBfSz " << mnBfSz << " (" << frame_num << ')' << endl;
         if(vrbs) cout << tsr + 6 << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
-        if(vrbs) cout << tsr + 7 << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
+        if(vrbs) cout << tsr + 7 << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) 
+                      << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
         cout  << tsr + 8 << " [cpu_sim " << rcv_prt << "]:  stats computed ..." << endl;
         tsr += 10; // advance the clock
     }
