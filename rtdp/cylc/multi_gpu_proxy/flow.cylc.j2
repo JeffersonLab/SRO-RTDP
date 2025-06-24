@@ -122,7 +122,7 @@
             --cpus-per-task = 4
             --mem = 8G
         [[[environment]]]
-            SEND_PORT = "{{ sender.port | default('5000') }}"
+            SEND_PORT = "{{ sender.port | default('8000') }}"
             DEST_HOST = "{{ sender.host | default('localhost') }}"
         [[[outputs]]]
             ready = "ready"
@@ -227,10 +227,10 @@
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
         [[[environment]]]
-            IN_PORT = "{{ proxy.in_port | default('5000') }}"
-            OUT_PORT = "{{ proxy.out_port | default('5001') }}"
-            NEXT_IN_PORT = "{{ proxy.next_in_port | default('5000') }}"
-            RECV_PORT = "{{ receiver.port | default('5000') }}"
+            IN_PORT = "{{ proxy.in_port | default('800' + loop.index0|string) }}"
+            OUT_PORT = "{{ proxy.out_port | default('800' + (loop.index0 + 1)|string) }}"
+            NEXT_IN_PORT = "{{ proxy.next_in_port | default('800' + (loop.index0 + 1)|string) }}"
+            RECV_PORT = "{{ receiver.port | default('800' + gpu_proxies|length|string) }}"
             GPU_ID = "{{ proxy.device_id | default(loop.index0) }}"
         [[[outputs]]]
             ready = "ready"
@@ -307,7 +307,7 @@
             --cpus-per-task = 4
             --mem = 8G
         [[[environment]]]
-            RECV_PORT = "{{ receiver.port | default('5000') }}"
+            RECV_PORT = "{{ receiver.port | default('800' + gpu_proxies|length|string) }}"
         [[[outputs]]]
             ready = "ready"
             completed = "Transfer completed successfully" 
