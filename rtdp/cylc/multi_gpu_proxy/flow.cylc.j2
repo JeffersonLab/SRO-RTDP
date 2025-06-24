@@ -140,6 +140,7 @@
             IN_PORT="{{ proxy.in_port }}"
             OUT_PORT="{{ proxy.out_port }}"
             GPU_ID="{{ proxy.device_id | default(loop.index0) }}"
+            PROXY_NIC="{{ proxy.nic | default(GPU_NIC) }}"
             
             mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
             exec 1> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log")
@@ -148,7 +149,7 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
             echo "  - SIF_FILE: ${SIF_FILE}"
-            echo "  - GPU_NIC: ${GPU_NIC}"
+            echo "  - PROXY_NIC: ${PROXY_NIC}"
             echo "  - IN_PORT: ${IN_PORT}"
             echo "  - OUT_PORT: ${OUT_PORT}"
             echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
@@ -159,9 +160,9 @@
             # Store this proxy's hostname and IP for previous component
             HOSTNAME=$(hostname)
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_hostname
-            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+            IP=$(ip addr show ${PROXY_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_ip
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${PROXY_NIC}"
 
             # Create output directory
             mkdir -p ${OUTPUT_DIR}
