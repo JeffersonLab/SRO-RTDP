@@ -46,6 +46,10 @@
             NIC = "{{ NIC | default('${NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
             GPU_NIC = "{{ GPU_NIC | default('${GPU_NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
             
+            # Port configuration
+            SEND_PORT = "{{ sender.target_port }}"
+            RECV_PORT = "{{ receiver.listen_port }}"
+            
             # Matrix configuration
             MATRIX_WIDTH = "{{ MATRIX_WIDTH | default('2048') }}"
             SEND_RATE = "{{ SEND_RATE | default('150') }}"
@@ -64,6 +68,7 @@
         script = """
             #!/bin/bash
             set -e
+            
             mkdir -p ${LOG_DIR}/sender
             exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
@@ -121,9 +126,6 @@
             --job-name = sender
             --cpus-per-task = 4
             --mem = 8G
-        [[[environment]]]
-            SEND_PORT = "{{ sender.target_port }}"
-            DEST_HOST = "{{ sender.host | default('localhost') }}"
         [[[outputs]]]
             ready = "ready"
             completed = "Send completed successfully"
@@ -133,6 +135,12 @@
         script = """
             #!/bin/bash
             set -e
+            
+            # Set proxy-specific environment variables from config
+            IN_PORT="{{ proxy.in_port }}"
+            OUT_PORT="{{ proxy.out_port }}"
+            GPU_ID="{{ proxy.device_id | default(loop.index0) }}"
+            
             mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
             exec 1> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stderr.log")
@@ -224,10 +232,6 @@
             {% endif %}
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
-        [[[environment]]]
-            IN_PORT = "{{ proxy.in_port }}"
-            OUT_PORT = "{{ proxy.out_port }}"
-            GPU_ID = "{{ proxy.device_id | default(loop.index0) }}"
         [[[outputs]]]
             ready = "ready"
             completed = "Proxy processing completed"
@@ -237,6 +241,7 @@
         script = """
             #!/bin/bash
             set -e
+            
             mkdir -p ${LOG_DIR}/receiver
             exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
             exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
@@ -261,7 +266,7 @@
 
             # Start receiver
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --pwd /tmp ${SIF_FILE} receiver -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /tmp ${SIF_FILE} receiver -p ${RECV_PORT} -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
 
@@ -302,8 +307,6 @@
             --job-name = receiver
             --cpus-per-task = 4
             --mem = 8G
-        [[[environment]]]
-            RECV_PORT = "{{ receiver.listen_port }}"
         [[[outputs]]]
             ready = "ready"
             completed = "Transfer completed successfully" 
