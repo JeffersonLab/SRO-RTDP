@@ -233,7 +233,6 @@
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
             --nodes = 1
-            --exclusive
             
         [[[outputs]]]
             ready = "ready"
