@@ -160,8 +160,8 @@
             # Store this proxy's hostname and IP for previous component
             HOSTNAME=$(hostname)
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_hostname
-            # Get the first IPv4 address for the NIC, ensuring we get only one IP
-            IP=$(ip addr show ${PROXY_NIC} | grep 'inet ' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${PROXY_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${PROXY_NIC}"
 
@@ -259,8 +259,8 @@
             # Store hostname and IP for last proxy
             HOSTNAME=$(hostname -f)
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
-            # Get the first IPv4 address for the NIC, ensuring we get only one IP
-            IP=$(ip addr show ${NIC} | grep 'inet ' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
 
