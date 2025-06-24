@@ -10,24 +10,19 @@
 
     [[graph]]
         R1 = """
-            # Start chain: receiver triggers all proxies in parallel
-            receiver:ready => 
-            {% for proxy in gpu_proxies -%}
-                gpu_proxy_{{ loop.index0 }}{% if not loop.last %} & {% endif %}
-            {%- endfor %}
-
-            # Wait for all proxies to be ready before starting sender
-            {% for proxy in gpu_proxies -%}
-                gpu_proxy_{{ loop.index0 }}:ready
-                {%- if not loop.last %} & {% endif -%}
-            {%- endfor %} => sender
+            # Dependency chain (reverse of data flow): receiver => proxy_N => proxy_N-1 => ... => proxy_0 => sender
+            receiver:ready => gpu_proxy_{{ gpu_proxies|length - 1 }}:ready
+            {% for i in range(gpu_proxies|length - 1, 0, -1) %}
+            gpu_proxy_{{ i }}:ready => gpu_proxy_{{ i-1 }}:ready
+            {% endfor %}
+            gpu_proxy_0:ready => sender
 
             # Completion chain
-            sender:succeeded => !receiver
-            receiver:completed
-            {% for proxy in gpu_proxies %}
-                gpu_proxy_{{ loop.index0 }}:completed
-            {% endfor %}
+            #sender:completed => !receiver
+            #receiver:completed
+            #{% for proxy in gpu_proxies %}
+            #    gpu_proxy_{{ loop.index0 }}:completed
+            #{% endfor %}
         """
 
 [runtime]
@@ -48,8 +43,6 @@
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('gpu-proxy.sif') }}"
             
             # Network configuration
-            IN_PORT = "{{ IN_PORT | default('55555') }}"
-            OUT_PORT = "{{ OUT_PORT | default('55556') }}"
             NIC = "{{ NIC | default('${NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
             GPU_NIC = "{{ GPU_NIC | default('${GPU_NIC:-$(ip route | grep default | awk \'{print $5}\')}' ) }}"
             
@@ -67,6 +60,181 @@
             LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
             DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
 
+    [[sender]]
+        script = """
+            #!/bin/bash
+            set -e
+            mkdir -p ${LOG_DIR}/sender
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - NIC: ${NIC}"
+            echo "  - SEND_PORT: ${SEND_PORT}"
+            echo "  - SEND_RATE: ${SEND_RATE} MB/s"
+            echo "  - GROUP_SIZE: ${GROUP_SIZE}"
+            echo "  - SEND_ALL_ONES: ${SEND_ALL_ONES}"
+            echo "  - SOCKET_HWM: ${SOCKET_HWM}"
+            echo "  - INPUT_DIR: ${INPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+
+            # Signal ready state immediately (sender doesn't need to wait for proxy IP)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+            cylc message "ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+
+            # Wait for first proxy to be ready and get its IP
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for first proxy to be ready..."
+            while [ ! -f "$CYLC_WORKFLOW_SHARE_DIR/proxy_0_ip" ]; do
+                sleep 1
+            done
+
+            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_0_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${SEND_PORT} (using NIC ${NIC})"
+
+            # Send data
+            apptainer run --pwd /tmp ${SIF_FILE} sender \
+                -a ${PROXY_IP} \
+                -p ${SEND_PORT} \
+                -r ${SEND_RATE} \
+                --group-size ${GROUP_SIZE} \
+                --hwm ${SOCKET_HWM} \
+                -v \
+                ${SEND_ALL_ONES:+--all-ones} \
+                2>${LOG_DIR}/sender/apptainer.log
+
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:completed"
+            fi
+
+            exit ${SEND_STATUS}
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G
+        [[[environment]]]
+            SEND_PORT = "{{ sender.port | default('5000') }}"
+            DEST_HOST = "{{ sender.host | default('localhost') }}"
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Send completed successfully"
+
+    {% for proxy in gpu_proxies %}
+    [[gpu_proxy_{{ loop.index0 }}]]
+        script = """
+            #!/bin/bash
+            set -e
+            mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
+            exec 1> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - GPU_NIC: ${GPU_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
+            echo "  - PROXY_RATE: ${PROXY_RATE}"
+            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}/proxy_{{ loop.index0 }}"
+
+            # Store this proxy's hostname and IP for previous component
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_hostname
+            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
+
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+
+            # Determine next component's IP and port (in data flow direction)
+            {% if loop.index0 == 0 %}
+            # First proxy connects to receiver
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            NEXT_PORT=${RECV_PORT}
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to receiver at ${NEXT_IP}:${NEXT_PORT}"
+            {% else %}
+            # Connect to previous proxy in data flow (next proxy in dependency chain)
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 - 1 }}_ip)
+            NEXT_PORT=${NEXT_IN_PORT}
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to proxy_{{ loop.index0 - 1 }} at ${NEXT_IP}:${NEXT_PORT}"
+            {% endif %}
+
+            # Start GPU proxy
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
+            apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
+                --in-port ${IN_PORT} \
+                --out-ip ${NEXT_IP} \
+                --out-port ${NEXT_PORT} \
+                -t \
+                -w ${MATRIX_WIDTH} \
+                -r ${PROXY_RATE} \
+                2>${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log &
+            PROXY_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $PROXY_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
+                exit 1
+            fi
+
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the proxy process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $PROXY_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy process is running (PID: $PROXY_PID)" >> ${LOG_DIR}/proxy_{{ loop.index0 }}/process.log
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $PROXY_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
+                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
+                exit 1
+            fi
+
+            cylc message -- "gpu_proxy_{{ loop.index0 }}:completed"
+        """
+        [[[directives]]]
+            --job-name = proxy_{{ loop.index0 }}
+            --partition = {{ proxy.partition | default('gpu') }}
+            {% if proxy.gres is defined %}
+            --gres = {{ proxy.gres }}
+            {% endif %}
+            --mem = {{ proxy.mem | default('100G') }}
+            --cpus-per-task = {{ proxy.cpus | default('4') }}
+        [[[environment]]]
+            IN_PORT = "{{ proxy.in_port | default('5000') }}"
+            OUT_PORT = "{{ proxy.out_port | default('5001') }}"
+            NEXT_IN_PORT = "{{ proxy.next_in_port | default('5000') }}"
+            GPU_ID = "{{ proxy.device_id | default(loop.index0) }}"
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Proxy processing completed"
+    {% endfor %}
+
     [[receiver]]
         script = """
             #!/bin/bash
@@ -79,11 +247,11 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
             echo "  - SIF_FILE: ${SIF_FILE}"
             echo "  - NIC: ${NIC}"
-            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - RECV_PORT: ${RECV_PORT}"
             echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
             echo "  - LOG_DIR: ${LOG_DIR}"
 
-            # Store hostname for other tasks
+            # Store hostname and IP for last proxy
             HOSTNAME=$(hostname -f)
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
             IP=$(ip addr show ${NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
@@ -129,6 +297,8 @@
                 cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
+
+            cylc message -- "receiver:completed"
         """
         [[[directives]]]
             --job-name = receiver
@@ -138,153 +308,4 @@
             RECV_PORT = "{{ receiver.port | default('5000') }}"
         [[[outputs]]]
             ready = "ready"
-            completed = "Transfer completed successfully"
-
-    {% for proxy in gpu_proxies %}
-    [[gpu_proxy_{{ loop.index0 }}]]
-        script = """
-            #!/bin/bash
-            set -e
-            mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
-            exec 1> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stderr.log")
-
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
-            echo "  - SIF_FILE: ${SIF_FILE}"
-            echo "  - GPU_NIC: ${GPU_NIC}"
-            echo "  - IN_PORT: ${IN_PORT}"
-            echo "  - OUT_PORT: ${OUT_PORT}"
-            echo "  - MATRIX_WIDTH: ${MATRIX_WIDTH}"
-            echo "  - PROXY_RATE: ${PROXY_RATE}"
-            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
-            echo "  - LOG_DIR: ${LOG_DIR}/proxy_{{ loop.index0 }}"
-
-            # Get receiver information
-            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
-
-            # Store hostname for sender
-            HOSTNAME=$(hostname)
-            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_hostname
-            IP=$(ip addr show ${GPU_NIC} | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)
-            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_ip
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${GPU_NIC}"
-
-            # Create output directory
-            mkdir -p ${OUTPUT_DIR}
-
-            # Start GPU proxy
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
-            apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
-                --in-port ${IN_PORT} \
-                --out-ip ${RECV_IP} \
-                --out-port ${OUT_PORT} \
-                -t \
-                -w ${MATRIX_WIDTH} \
-                -r ${PROXY_RATE} \
-                2>${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log &
-            PROXY_PID=$!
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
-
-            # Brief pause to let process start
-            sleep 2
-
-            # Signal readiness if process is running
-            if kill -0 $PROXY_PID 2>/dev/null; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
-                cylc message "ready"
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
-            else
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
-                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
-                exit 1
-            fi
-
-            # Create a flag file to indicate we should keep running
-            KEEP_RUNNING=1
-            trap 'KEEP_RUNNING=0' TERM INT
-
-            # Monitor the proxy process
-            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $PROXY_PID 2>/dev/null; do
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy process is running (PID: $PROXY_PID)" >> ${LOG_DIR}/proxy_{{ loop.index0 }}/process.log
-                sleep 5
-            done
-
-            # Check if process died unexpectedly
-            if ! wait $PROXY_PID; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
-                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
-                exit 1
-            fi
-        """
-        [[[directives]]]
-            --job-name = proxy_{{ loop.index0 }}
-            --partition = {{ proxy.partition | default('gpu') }}
-            {% if proxy.gres is defined %}
-            --gres = {{ proxy.gres }}
-            {% endif %}
-            --mem = {{ proxy.mem | default('100G') }}
-            --cpus-per-task = {{ proxy.cpus | default('4') }}
-        [[[environment]]]
-            IN_PORT = "{{ proxy.in_port | default('5000') }}"
-            OUT_PORT = "{{ proxy.out_port | default('5001') }}"
-            GPU_ID = "{{ proxy.device_id | default(loop.index0) }}"
-        [[[outputs]]]
-            ready = "ready"
-    {% endfor %}
-
-    [[sender]]
-        script = """
-            #!/bin/bash
-            set -e
-            mkdir -p ${LOG_DIR}/sender
-            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
-
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
-            echo "  - SIF_FILE: ${SIF_FILE}"
-            echo "  - NIC: ${NIC}"
-            echo "  - IN_PORT: ${IN_PORT}"
-            echo "  - SEND_RATE: ${SEND_RATE} MB/s"
-            echo "  - GROUP_SIZE: ${GROUP_SIZE}"
-            echo "  - SEND_ALL_ONES: ${SEND_ALL_ONES}"
-            echo "  - SOCKET_HWM: ${SOCKET_HWM}"
-            echo "  - INPUT_DIR: ${INPUT_DIR}"
-            echo "  - LOG_DIR: ${LOG_DIR}"
-
-            # Get proxy information
-            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_ip)
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${PROXY_IP}:${IN_PORT} (using NIC ${NIC})"
-
-            # Create input directory
-            mkdir -p ${INPUT_DIR}
-
-            # Send data
-            apptainer run --pwd /tmp ${SIF_FILE} sender \
-                -a ${PROXY_IP} \
-                -p ${IN_PORT} \
-                -r ${SEND_RATE} \
-                --group-size ${GROUP_SIZE} \
-                --hwm ${SOCKET_HWM} \
-                -v \
-                ${SEND_ALL_ONES:+--all-ones} \
-                2>${LOG_DIR}/sender/apptainer.log
-
-            SEND_STATUS=$?
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
-
-            if [ $SEND_STATUS -eq 0 ]; then
-                cylc message -- "sender:succeeded"
-            fi
-
-            exit ${SEND_STATUS}
-        """
-        [[[directives]]]
-            --job-name = sender
-            --cpus-per-task = 4
-            --mem = 8G
-        [[[environment]]]
-            SEND_PORT = "{{ sender.port | default('5002') }}"
-            DEST_HOST = "{{ sender.host | default('localhost') }}" 
+            completed = "Transfer completed successfully" 
