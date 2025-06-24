@@ -234,6 +234,7 @@
             --cpus-per-task = {{ proxy.cpus | default('4') }}
             --nodes = 1
             --exclusive
+            
         [[[outputs]]]
             ready = "ready"
             completed = "Proxy processing completed"
