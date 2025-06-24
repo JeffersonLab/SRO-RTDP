@@ -300,12 +300,15 @@ int main (int argc, char *argv[])
     uint32_t request_nbr = 0;
     double mnBfSz        = 0; //mean receive Size (bits)
     uint64_t bufSiz      = 0; //bits
+    uint64_t mxBufSiz    = 0; //bits -used to estimate frame rate capacity
     uint32_t stream_id   = 0;
     uint32_t frame_num   = 0;
     
-    float tsr = 0; // sim clock from sender
-    float tsc = 0; // computational latency
-    float tsn = 0; // outbound network latency
+    float tsr   = 0; // sim clock from sender
+    float tsc   = 0; // computational latency
+    float mxTsc = 0; // computational latency
+    float mxTsn = 0; // computational latency
+    float tsn   = 0; // outbound network latency
     
     std::string ack = "ACK";
     zmq::message_t ack_msg(ack.begin(), ack.end());  // ensures correct sizing and content
@@ -330,6 +333,7 @@ wait_for_frame:
         
         BufferPacket pkt = BufferPacket::from_message(request);
         bufSiz    = pkt.size; //bits
+        mxBufSiz = max(mxBufSiz,bufSiz);
         stream_id = pkt.stream_id;
         frame_num = pkt.frame_num;
         if(frame_num == 0) {if(vrbs) cout << tsr + 10 << " [cpu_sim " << rcv_prt << "]: " << " going to all_done " << endl; goto all_done;}
@@ -337,8 +341,9 @@ wait_for_frame:
         {
             // Clamp to [1.0, 1.3] to enforce bounds
             auto lb = 1e-3*double(bufSiz)/outNicSpd; //usec
-            auto x = std::clamp(sd_10pcnt(gen), 1.0, 1.3);
+            auto x = 1; //std::clamp(sd_10pcnt(gen), 1.0, 1.3);
             tsn = lb*x; //usec
+            mxTsn = max(mxTsn,tsn);
             //temporarily advance the sim clock for ready to receive check
             float tsr1 = pkt.timestamp + tsn;
             if(vrbs) std::cout << tsr1 << " [cpu_sim " << rcv_prt << "]: " << " recd " << frame_num << endl;
@@ -369,7 +374,7 @@ wait_for_frame:
 all_done:
             std::cout.flush();
             std::cerr.flush();
-            if(trmnl) {cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Terminal exiting" << endl; exit(0);} // no terminate signal to send forward
+            if(trmnl) {cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Terminal exiting: mxTsc = " << mxTsc << endl; exit(0);} // no terminate signal to send forward
 
             {
                 send_result_t sr;
@@ -394,7 +399,7 @@ all_done:
                 if(DBG) cout << tsr + 11  << " [cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
                 if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
             }        
-            cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Non-Terminal exiting" << endl;
+            cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Non-Terminal exiting: mxTsc = " << mxTsc << endl;
             std::cout.flush();
             std::cerr.flush();
             exit(0);
@@ -405,6 +410,7 @@ all_done:
             //reqd computational timespan in usec with 10% std dev
             auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);
             tsc = cmpLt_usB*(float(bufSiz)/8)*x; //usec
+            mxTsc = max(mxTsc,tsc+10); //pad with non-tsc
             tsr += tsc; // advance the clock
             if(vrbs) cout << tsr << " [cpu_sim " << rcv_prt << "]:  added tsc " << tsc << " (" << frame_num << ')' 
                         << " for bufSiz " << bufSiz << " cmpLt_usB " << cmpLt_usB << " x " << x << endl;
@@ -451,17 +457,16 @@ all_done:
         cout  << tsr + 2 << " [cpu_sim " << rcv_prt << "]:  computing stats ...(" << frame_num << ')' << endl;
 
         if(vrbs) std::cout << tsr + 3 << " [cpu_sim " << rcv_prt << "]: " << " Computed latencies: tsc = " << tsc << " tsn = " << tsn 
-                           << " (" << frame_num << ')' << endl;
-        if(vrbs) std::cout << tsr + 4 << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(1)/(1e-6*float(tsc)) 
+                           << " (" << frame_num << ") mxTsc = " << mxTsc << endl;
+        if(vrbs) std::cout << tsr + 4 << " [cpu_sim " << rcv_prt << "]: " << " Measured frame rate " << float(1)/(1e-6*float(mxTsc+mxTsn)) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
-        if(vrbs) std::cout << tsr + 5 << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(bufSiz)/(1e-6*float(tsc)) 
+        if(vrbs) std::cout << tsr + 5 << " [cpu_sim " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(bufSiz)/(1e-6*float(mxTsc+mxTsn)) 
                            << " MHz mnBfSz " << mnBfSz << " (" << frame_num << ')' << endl;
         if(vrbs) cout << tsr + 6 << " [cpu_sim " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
         if(vrbs) cout << tsr + 7 << " [cpu_sim " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) 
                       << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
         cout  << tsr + 8 << " [cpu_sim " << rcv_prt << "]:  stats computed ..." << endl;
-        tsr += 10; // advance the clock
+        tsr += 10; // advance the clock for non-tsc
     }
-    cout  << tsr << " [cpu_sim " << rcv_prt << "]:  return exiting" << endl;
     return 0;
 }
