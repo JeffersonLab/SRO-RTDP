@@ -230,6 +230,7 @@
             IN_PORT = "{{ proxy.in_port | default('5000') }}"
             OUT_PORT = "{{ proxy.out_port | default('5001') }}"
             NEXT_IN_PORT = "{{ proxy.next_in_port | default('5000') }}"
+            RECV_PORT = "{{ receiver.port | default('5000') }}"
             GPU_ID = "{{ proxy.device_id | default(loop.index0) }}"
         [[[outputs]]]
             ready = "ready"
