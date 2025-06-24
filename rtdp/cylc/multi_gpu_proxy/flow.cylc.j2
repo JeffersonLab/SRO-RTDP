@@ -159,16 +159,17 @@
             mkdir -p ${OUTPUT_DIR}
 
             # Determine next component's IP and port (in data flow direction)
-            {% if loop.index0 == 0 %}
-            # First proxy connects to receiver
+            {% if loop.index0 == gpu_proxies|length - 1 %}
+            # Last proxy in dependency chain (proxy_N) connects to receiver
             NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
             NEXT_PORT=${RECV_PORT}
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to receiver at ${NEXT_IP}:${NEXT_PORT}"
             {% else %}
-            # Connect to previous proxy in data flow (next proxy in dependency chain)
-            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 - 1 }}_ip)
+            # Connect to the proxy that starts after this one in dependency chain
+            # For proxy_i, connect to proxy_{i+1} which starts after proxy_i
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 + 1 }}_ip)
             NEXT_PORT=${NEXT_IN_PORT}
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to proxy_{{ loop.index0 - 1 }} at ${NEXT_IP}:${NEXT_PORT}"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to proxy_{{ loop.index0 + 1 }} at ${NEXT_IP}:${NEXT_PORT}"
             {% endif %}
 
             # Start GPU proxy
