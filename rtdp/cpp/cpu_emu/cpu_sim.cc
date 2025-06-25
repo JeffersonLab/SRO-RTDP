@@ -298,23 +298,21 @@ int main (int argc, char *argv[])
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
     uint32_t request_nbr = 0;
-    double mnBfSz        = 0; //mean receive Size (bits)
+    double   mnBfSz      = 0; //mean receive Size (bits)
     uint64_t bufSiz      = 0; //bits
     uint64_t mxBufSiz    = 0; //bits -used to estimate frame rate capacity
     uint32_t stream_id   = 0;
     uint32_t frame_num   = 0;
-    
-    float tsr   = 0; // sim clock from sender
-    float tsc   = 0; // computational latency
-    float mxTsc = 0; // computational latency
-    float mxTsn = 0; // computational latency
-    float tsn   = 0; // outbound network latency
+    float    tsr         = 0; // sim clock from sender
+    float    tsc         = 0; // computational latency
+    float    mxTsc       = 0; // computational latency
+    float    mxTsn       = 0; // computational latency
+    float    tsn         = 0; // outbound network latency
     
     std::string ack = "ACK";
     zmq::message_t ack_msg(ack.begin(), ack.end());  // ensures correct sizing and content
 
-    while (true) {
-wait_for_frame:
+    while (frame_num < frame_cnt) {
         //if(vrbs) cout << "[cpu_sim " << rcv_prt << "]: " << " Setting up request message ..." << endl;
         message_t request;
 
@@ -336,7 +334,6 @@ wait_for_frame:
         mxBufSiz = max(mxBufSiz,bufSiz);
         stream_id = pkt.stream_id;
         frame_num = pkt.frame_num;
-        if(frame_num == 0) {if(vrbs) cout << tsr + 10 << " [cpu_sim " << rcv_prt << "]: " << " going to all_done " << endl; goto all_done;}
         //reqd transmission timespan in usec    
         {
             // Clamp to [1.0, 1.3] to enforce bounds
@@ -362,7 +359,7 @@ wait_for_frame:
             if(tsr>tsr1) {
                 if(vrbs) {cout << tsr1 + 0.3 << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')'  
                                << " request_nbr " << request_nbr << "(tsr,tsr1) (" << tsr << ',' << tsr1 << ')' << endl;}
-                if(frame_num != 0) {if(vrbs) cout << tsr - 0.01 << " [cpu_sim " << rcv_prt << "]: " << " going to wait_for_frame " << endl; goto wait_for_frame;} //continue; //
+                if(frame_num != 0) {if(vrbs) cout << tsr - 0.01 << " [cpu_sim " << rcv_prt << "]: " << " going to wait_for_frame " << endl; continue;}
             } else {
                 tsr = tsr1 + 1; // advance the clock
             }
@@ -370,40 +367,6 @@ wait_for_frame:
         
         request_nbr++;
         
-        if(frame_num == 0) { // all done
-all_done:
-            std::cout.flush();
-            std::cerr.flush();
-            if(trmnl) {cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Terminal exiting: mxTsc = " << mxTsc << endl; exit(0);} // no terminate signal to send forward
-
-            {
-                send_result_t sr;
-                BufferPacket pkt;
-                pkt.size = 0;
-                pkt.timestamp = tsr;
-                pkt.stream_id = stream_id;
-                pkt.frame_num = 0;
-	            // Send "frame" spec
-                if(vrbs) cout << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << 0 << " (" 
-                              << frame_num << ')' << " to " << dst_prt << " at " << tsr << " to forward sim termination" << endl;
-                sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
-
-                // Receive the reply from the destination
-                //  Get the reply.
-                message_t reply;
-                if(DBG) cout << tsr + 11  << " [cpu_sim " << rcv_prt << "]: Waiting for destination ACK (" << frame_num << ')' << endl;
-                recv_result_t rtcd = dst_sckt.recv (reply, recv_flags::none);
-                if(DBG) cout << tsr + 11  << " [cpu_sim " << rcv_prt << "]: Destination Actual reply (" << frame_num << ") " 
-                              << reply << " With rtcd = " << rtcd.value() << endl;
-
-                if(DBG) cout << tsr + 11  << " [cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
-                if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
-            }        
-            cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  Non-Terminal exiting: mxTsc = " << mxTsc << endl;
-            std::cout.flush();
-            std::cerr.flush();
-            exit(0);
-        }
         //  Do some 'work'
         // simulate load on system for ensuing work
         {
@@ -467,6 +430,9 @@ all_done:
                       << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
         cout  << tsr + 8 << " [cpu_sim " << rcv_prt << "]:  stats computed ..." << endl;
         tsr += 10; // advance the clock for non-tsc
-    }
+    } //main loop
+    cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") << " exiting: mxTsc = " << mxTsc << endl;
+    std::cout.flush();
+    std::cerr.flush();
     return 0;
 }
