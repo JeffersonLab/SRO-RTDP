@@ -7,19 +7,23 @@ import time
 import argparse
 import random
 import numpy as np
+import sys
+
+from buffer_packet_zmq_emu import serialize_buffer
 
 def emulate_stream(
     port: int,
     avg_rate_mbps: float,
     rms_fraction: float,
     duty_cycle: float,
-    nic_limit_gbps: float
+    frame_cnt:      int #,
+    #verbosity:      int
 ):
-    print(f"[emulate_stream:] port = {port}...")
-    print(f"[emulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
-    print(f"[emulate_stream:] rms_fraction = {rms_fraction}...")
-    print(f"[emulate_stream:] duty_cycle = {duty_cycle}...")
-    print(f"[emulate_stream:] nic_limit_gbps = {nic_limit_gbps}...")
+    print(f"[simulate_stream:] port = {port}...")
+    print(f"[simulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
+    print(f"[simulate_stream:] rms_fraction = {rms_fraction}...")
+    print(f"[simulate_stream:] duty_cycle = {duty_cycle}...")
+    print(f"[simulate_stream:] frame_cnt = {frame_cnt}")
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)
@@ -37,58 +41,44 @@ def emulate_stream(
     #print("[emulate_stream:] Connected ...")
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
-    nic_limit_bps = nic_limit_gbps * 1_000_000_000
     frame_size_mean = 60e3*10 # CLAS12 # avg_rate_bps / 100     # bits - Send in 100 frames per second
     std_dev = frame_size_mean * rms_fraction # bits
-    print(f"[emulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, frame_size_mean(Mb) = {frame_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
+    print(f"[emulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, rame_size_mean(Mb) = {frame_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
     
     cycle_period = 1.0  # seconds
     on_time = 1 # duty_cycle * cycle_period #disable duty cycle for now
     off_time = cycle_period - on_time
-    print(f"[emulate_stream:] duty_cycle = {duty_cycle}, cycle_period = {cycle_period}, on_time = {on_time}, off_time = {off_time}")
-    num_sent  = 0
-    num_sent0 = 0
+    print(f"[emulate_stream:] duty_cycle = {duty_cycle}, cycle_period = {cycle_period}, on_time = {on_time}, off_time = {off_time}", flush=True)
+    frame_num    = 0
     # Derived sleep time between messages
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
-    while True:
-        # -----------------------
-        # ON phase: Send data
-        # -----------------------
-        start_on = time.time()
-        while time.time() - start_on < on_time:
-            # Calculate frame size from normal distribution
-            if rms_fraction > 0:
-                frame_size = max(1, int(np.random.normal(frame_size_mean, std_dev)))
-            else:
-                frame_size = int(frame_size_mean)
-            buffer = bytearray(int(frame_size/8))
-            zmq_socket.send(buffer)
-            num_sent += 1
-            if num_sent == 1:
-                clk0 = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
-            clk = int(time.time()*1e6)  #microseconds *1e9 #nanoseconds
-            elpsd_tm = (clk-clk0) #usec
-            print(f"{elpsd_tm} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({num_sent})")            
+    while frame_cnt >= frame_num:
+        frame_num += 1
+        # Calculate frame size from normal distribution
+        if rms_fraction > 0:
+            frame_size = max(1, int(np.random.normal(frame_size_mean, std_dev)))
+        else:
+            frame_size = int(frame_size_mean)
+        payload = bytearray(int(frame_size/8))
+        if frame_num == 1:
+            clk0 = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
+        clk = int(time.time()*1e6)  #microseconds *1e9 #nanoseconds
+        elpsd_tm = (clk-clk0) #usec
+        print(f"{elpsd_tm} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})")            
+        buffer = serialize_buffer(size=frame_size, timestamp=int(clk), stream_id=99, frame_num=frame_num, payload=payload)
+        print(f"{float(clk)} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})", flush=True)            
+        zmq_socket.send(buffer)
                 
-            # Delay to throttle sending rate
-            rate_sleep = frame_size / avg_rate_bps  # in seconds
-            time.sleep(rate_sleep)
+        # Delay to throttle sending rate
+        rate_sleep = frame_size / avg_rate_bps  # in seconds
+        time.sleep(rate_sleep)
             
-        # Apply duty cycle
-        # -----------------------
-        # OFF phase: Sleep
-        # -----------------------
-        #if off_time > 0:
-            #print(f"{int(time.time()*1e6)} [emulate_stream:] Sleeping for {off_time:.3f}s (duty cycle off phase)") #microseconds *1e9 #nanoseconds
-            #time.sleep(off_time)
         clk = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
         #frame_rate_hz = frame_count / (elapsed_time_us / 1_000_000)
         elpsd_tm = (clk-clk0) #usec
-        print(f"{elpsd_tm} [emulate_stream:] Estimated frame rate (Hz): {1e6*float(num_sent)/float(elpsd_tm)} num_sent {num_sent}")
-        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (Gbps): {1e3*num_sent*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}")
-        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (MHz): {float(num_sent)*frame_size_mean/float(elpsd_tm)} num_sent {num_sent}", flush=True)
-        #print(f"{elpsd_tm} [emulate_stream:] Lost Frames: {lost_frames}", flush=True)
-        num_sent0 = num_sent
+        print(f"{elpsd_tm} [emulate_stream:] Estimated frame rate (Hz): {1e6*float(frame_num)/float(elpsd_tm)} frame_num {frame_num}")
+        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (Gbps): {1e3*frame_num*frame_size_mean/float(elpsd_tm)} frame_num {frame_num}")
+        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (MHz): {float(frame_num)*frame_size_mean/float(elpsd_tm)} frame_num {frame_num}", flush=True)
 
 if __name__ == "__main__":
     print(f"[emulate_sender-zmq: main:]")
@@ -97,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--avg-rate-mbps", type=float, required=True, help="Average data rate in Mbps")
     parser.add_argument("--rms-fraction", type=float, default=0.0, help="RMS of frame sizes as fraction of average")
     parser.add_argument("--duty-cycle", type=float, default=1.0, help="Duty cycle (0 to 1)")
-    parser.add_argument("--nic-limit-gbps", type=float, default=100.0, help="emulated NIC bandwidth in Gbps")
+    parser.add_argument("--frame_cnt", type=int, default=1, help="Toal count of frames to send")
     args = parser.parse_args()
 
     print(f"[emulate_sender-zmq: main:] emulate_stream...")
@@ -106,6 +96,6 @@ if __name__ == "__main__":
         args.avg_rate_mbps,
         args.rms_fraction,
         args.duty_cycle,
-        args.nic_limit_gbps
+        args.frame_cnt
     )
 
