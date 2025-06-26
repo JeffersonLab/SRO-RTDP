@@ -19,11 +19,11 @@ def emulate_stream(
     frame_cnt:      int #,
     #verbosity:      int
 ):
-    print(f"[simulate_stream:] port = {port}...")
-    print(f"[simulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
-    print(f"[simulate_stream:] rms_fraction = {rms_fraction}...")
-    print(f"[simulate_stream:] duty_cycle = {duty_cycle}...")
-    print(f"[simulate_stream:] frame_cnt = {frame_cnt}")
+    print(f"[emulate_stream:] port = {port}...")
+    print(f"[emulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
+    print(f"[emulate_stream:] rms_fraction = {rms_fraction}...")
+    print(f"[emulate_stream:] duty_cycle = {duty_cycle}...")
+    print(f"[emulate_stream:] frame_cnt = {frame_cnt}")
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)
@@ -52,7 +52,7 @@ def emulate_stream(
     frame_num    = 0
     # Derived sleep time between messages
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
-    while frame_cnt >= frame_num:
+    while frame_cnt > frame_num:
         frame_num += 1
         # Calculate frame size from normal distribution
         if rms_fraction > 0:
@@ -66,7 +66,7 @@ def emulate_stream(
         elpsd_tm = (clk-clk0) #usec
         print(f"{elpsd_tm} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})")            
         buffer = serialize_buffer(size=frame_size, timestamp=int(clk), stream_id=99, frame_num=frame_num, payload=payload)
-        print(f"{float(clk)} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})", flush=True)            
+        #print(f"{float(clk)} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})", flush=True)            
         zmq_socket.send(buffer)
                 
         # Delay to throttle sending rate

@@ -35,7 +35,7 @@ using namespace std;
 using namespace zmq;
 using namespace chrono;
 
-#define DBG 0	//print extra verbosity apart from -v switch
+#define DBG 1	//print extra verbosity apart from -v switch
   
 void   Usage()
 {
@@ -133,7 +133,7 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
     yaml_event_t event;
 
     if (!yaml_parser_initialize(&parser)) {
-        fprintf(stderr, "Failed to initialize parser!\n");
+        cerr << "Failed to initialize parser! " << endl;
         fclose(file);
         return;
     }
@@ -155,38 +155,38 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Stream started\n");
+            if(DBG) cout << "[cpu_emu]: Stream started " << endl;
             break;
         case YAML_STREAM_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Stream ended\n");
+            if(DBG) cout << "[cpu_emu]: Stream ended " << endl;
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Document started\n");
+            if(DBG) cout << "[cpu_emu]: Document started " << endl;
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Document ended\n");
+            if(DBG) cout << "[cpu_emu]: Document ended " << endl;
             break;
         case YAML_MAPPING_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Mapping started\n");
+            if(DBG) cout << "[cpu_emu]: Mapping started " << endl;
             break;
         case YAML_MAPPING_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Mapping ended\n");
+            if(DBG) cout << "[cpu_emu]: Mapping ended " << endl;
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Sequence started\n");
+            if(DBG) cout << "[cpu_emu]: Sequence started " << endl;
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Sequence ended\n");
+            if(DBG) cout << "[cpu_emu]: Sequence ended " << endl;
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Label: " << s << '\n';
+                if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Label: " << s << endl;
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << '\n';
+                if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << endl;
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
@@ -201,7 +201,7 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
     }
     if(DBG) cout << "[cpu_emu " << tag << " ]: " << " All done parsing, got this:" << endl;
     if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
-        cout << it->first << " => " << it->second << '\n';
+        cout << it->first << " => " << it->second << endl;
     
     yaml_parser_delete(&parser);
     fclose(file);
@@ -234,7 +234,7 @@ int main (int argc, char *argv[])
 
     std::cout << std::fixed << std::setprecision(7);  // 6 decimal places            
 
-    while ((optc = getopt(argc, argv, "hb:f:i:m:o:p:r:st:v:y:z")) != -1)
+    while ((optc = getopt(argc, argv, "hb:f:i:m:o:p:r:st:v:y:z:")) != -1)
     {
         switch (optc)
         {
@@ -244,65 +244,65 @@ int main (int argc, char *argv[])
         case 'b':
             cmpLt_sGB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) cout << " -b " << cmpLt_sGB;
+            if(DBG) cout << " -b " << cmpLt_sGB << endl;
             break;
         case 'i':
             strcpy(dst_ip, (const char *) optarg) ;
             psdI = true;
-            if(DBG) cout << " -i " << dst_ip;
+            if(DBG) cout << " -i " << dst_ip << endl;
             break;
         case 'f':
             frame_cnt = (uint64_t) atoi((const char *) optarg) ;
             psdF = true;
-            if(DBG) cout << " -f " << frame_cnt;
+            if(DBG) cout << " -f " << frame_cnt << endl;
             break;
         case 'm':
             memGB = (double) atof((const char *) optarg) ;
             psdM = true;
-            if(DBG) cout << " -m " << memGB;
+            if(DBG) cout << " -m " << memGB << endl;
             break;
         case 'o':
             otmemGB = (double) atof((const char *) optarg) ;
             psdO = true;
-            if(DBG) cout << " -o " << otmemGB;
+            if(DBG) cout << " -o " << otmemGB << endl;
             break;
         case 'p':
             dst_prt = (uint16_t) atoi((const char *) optarg) ;
             psdP = true;
-            if(DBG) cout << " -p " << dst_prt;
+            if(DBG) cout << " -p " << dst_prt << endl;
             break;
         case 'r':
             rcv_prt = (uint16_t) atoi((const char *) optarg) ;
             psdR = true;
-            if(DBG) cout << " -r " << rcv_prt;
+            if(DBG) cout << " -r " << rcv_prt << endl;
             break;
         case 's':
             psdS = true;
-            if(DBG) cout << " -s ";
+            if(DBG) cout << " -s " << endl;
             break;
         case 't':
             nmThrds = (uint16_t) atoi((const char *) optarg) ;
             psdT = true;
-            if(DBG) cout << " -t " << nmThrds;
+            if(DBG) cout << " -t " << nmThrds << endl;
             break;
         case 'v':
             vrbs = (bool) atoi((const char *) optarg) ;
             psdV = true;
-            if(DBG) cout << " -v " << vrbs;
+            if(DBG) cout << " -v " << vrbs << endl;
             break;
         case 'y':
             yfn = (const char *) optarg ;
             psdY = true;
-            if(DBG) cout << " -y " << yfn;
+            if(DBG) cout << " -y " << yfn << endl;
             break;
         case 'z':
             psdZ = true;
             zed = (uint16_t) atoi((const char *) optarg) ;
             trmnl = zed==1?true:false;
-            if(DBG) cout << " -z " << zed;
+            if(DBG) cout << " -z " << zed << endl;
             break;
         case '?':
-            cout << "[cpu_emu " << rcv_prt << "]: " << " Unrecognised option: " << optopt;
+            cout << "[cpu_emu " << rcv_prt << "]: " << " Unrecognised option: " << optopt << endl;
             Usage();
             exit(1);
         }
@@ -366,7 +366,7 @@ int main (int argc, char *argv[])
         if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
-    uint64_t request_nbr = 1;
+    uint32_t request_nbr = 0;
     double mnBfSz = 0; //mean receive Size (bits)
     uint64_t bufSiz = 0; //bits
     uint64_t tsr         = 0; // system hi-res clock in microseconds since epoch
@@ -391,8 +391,10 @@ int main (int argc, char *argv[])
 
         request_nbr++;
 
+        if(DBG) cerr << "deserialize_packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
         auto parsed = deserialize_packet(static_cast<uint8_t*>(request.data()), request.size());
-        assert(bufSiz == parsed.size-sizeof(struct DeserializedPacket)); //bits
+        if(DBG) cerr << "bufSiz = " << bufSiz << " parsed.size = " << parsed.size << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
+        //assert(bufSiz == parsed.size-sizeof(struct DeserializedPacket)); //bits
         stream_id =  parsed.stream_id ;
         frame_num =  parsed.frame_num ;
 
@@ -455,12 +457,12 @@ int main (int argc, char *argv[])
             auto us = duration_cast<microseconds>(now.time_since_epoch());
             tsr = us.count()-tsr_base;
         }
-
+        if(request_nbr < 10) continue; //warmup
         if(vrbs) std::cout << tsr + 3 << " [cpu_emu " << rcv_prt << "]: " << " Measured latencies: tsc = " << tsc << " tsn = " << tsn 
                            << " (" << frame_num << ") mxTsc = " << mxTsc << endl;
-        if(vrbs) std::cout << tsr + 4 << " [cpu_emu " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr-tsr_base)) 
+        if(vrbs) std::cout << tsr + 4 << " [cpu_emu " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
-        if(vrbs) std::cout << tsr + 5 << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(bufSiz)/(1e-6*float(mxTsc+mxTsn)) 
+        if(vrbs) std::cout << tsr + 5 << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(bufSiz)/(1e-6*float(tsr)) 
                            << " MHz mnBfSz " << mnBfSz << " (" << frame_num << ')' << endl;
         if(vrbs) cout << tsr + 6 << " [cpu_emu " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
         if(vrbs) cout << tsr + 7 << " [cpu_emu " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) 
