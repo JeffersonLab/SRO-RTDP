@@ -13,7 +13,7 @@ def launch_component(port, trmnl, frame_cnt):
     print(f"[launch_component] Starting cpu_emu listening on port {port}, term = {trmnl}, forwarding to port {port + 1}, frame_cnt {frame_cnt}")
     subprocess.Popen([
         "./cpu_emu",
-        "-b", str(500),
+        "-b", str(2500),
         "-f", str(frame_cnt),
         "-i", str("127.0.0.1"),
         "-m", str(1),  

@@ -1,3 +1,5 @@
+#define DBG 1	//print extra verbosity apart from -v switch
+  
 //
 //  CPU Emulator for Real Time Development Program (RTDP)
 //
@@ -35,8 +37,6 @@ using namespace std;
 using namespace zmq;
 using namespace chrono;
 
-#define DBG 1	//print extra verbosity apart from -v switch
-  
 void   Usage()
 {
     char usage_str[] =
@@ -367,66 +367,84 @@ int main (int argc, char *argv[])
         dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
     }
     uint32_t request_nbr = 0;
-    double mnBfSz = 0; //mean receive Size (bits)
-    uint64_t bufSiz = 0; //bits
+    double   mnBfSz      = 0; //mean receive Size (bits)
+    uint64_t bufSiz      = 0; //bits
+    uint64_t cmBufSiz    = 0; //bits - cummulative
     uint64_t tsr         = 0; // system hi-res clock in microseconds since epoch
     uint64_t tsr_base    = 0; // base system hi-res clock in microseconds since epoch
     uint32_t stream_id   = 0;
     uint32_t frame_num   = 0;
-    uint64_t tsc = 0; // computational latency
-    uint64_t tsn = 0; // outbound network latency
-    float    mxTsc       = 0; // computational latency
-    float    mxTsn       = 0; // computational latency
+    uint32_t lst_frm_nm  = 0; //last frame number
+    uint64_t tsc         = 0; // computational latency
+    uint64_t tsn         = 0; // outbound network latency
+    uint64_t mxTsc       = 0; // computational latency
+    uint64_t mxTsn       = 0; // computational latency
+    uint64_t msdFrms     = 0; // missed frames count
+    auto now = high_resolution_clock::now();
+    auto us = duration_cast<microseconds>(now.time_since_epoch());
     while (frame_num < frame_cnt) {
         //if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Setting up request message ..." << endl;
         message_t request;
 
         //  Wait for next request from client
-        if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Waiting for source ..." << endl;
+        if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Waiting for source ..." << endl;
         
         recv_result_t rtcd;
         
         rtcd = rcv_sckt.recv (request, recv_flags::none);
+        auto parsed = deserialize_packet(static_cast<uint8_t*>(request.data()), request.size());
         bufSiz = 8*rtcd.value(); //bits
 
         request_nbr++;
 
-        if(DBG) cerr << "deserialize_packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
-        auto parsed = deserialize_packet(static_cast<uint8_t*>(request.data()), request.size());
-        if(DBG) cerr << "bufSiz = " << bufSiz << " parsed.size = " << parsed.size << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
+        now = high_resolution_clock::now();
+        us = duration_cast<microseconds>(now.time_since_epoch());
+        if(request_nbr == 1) {
+            tsr_base = parsed.timestamp; // establish zero offset clock from chain source
+            if (DBG) cout << 0 << " [cpu_emu " << rcv_prt << "]: " << " us.count = " << us.count() << " tsr_base = " << tsr_base << " tsr = " << tsr << endl;
+        }
+        tsr = us.count()-tsr_base;  //zero based clock
+        if (DBG) cout << tsr+4 << " [cpu_emu " << rcv_prt << "]: " << " Recving us.count = " << us.count() << " tsr_base = " << tsr_base << " tsr = " << tsr << endl;
         //assert(bufSiz == parsed.size-sizeof(struct DeserializedPacket)); //bits
         stream_id =  parsed.stream_id ;
         frame_num =  parsed.frame_num ;
+        if(frame_num > lst_frm_nm + 1) msdFrms += frame_num - (lst_frm_nm + 1);
+        lst_frm_nm = frame_num;
 
-        //reqd transmission timespan in usec    
-        {
-            auto now = high_resolution_clock::now();
-            auto us = duration_cast<microseconds>(now.time_since_epoch());
-            if(request_nbr == 1) tsr_base = us.count();
-            tsr = us.count()-tsr_base;  //zero based clock
-        }
+        if(DBG) cout << tsr+2 << " [cpu_emu " << rcv_prt << "]: " << "deserialize_packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
+        if(DBG) cout << tsr+3 << " [cpu_emu " << rcv_prt << "]: " << "bufSiz = " << bufSiz << " parsed.size = " << parsed.size 
+                    << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
 
-        if(DBG) cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Received request "
+        if(vrbs)  cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Received request "
                       << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
-        if(vrbs) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " frame size = "
+        if(vrbs) cout << tsr+1  << " [cpu_emu " << rcv_prt << "]: " << " frame size = "
                       << "(actual) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
                       << " from client " << "ts = " << tsr << " (" << request_nbr << ')' << endl;
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
         {
+
+            tsc = cmpLt_sGB*(parsed.size/8)*1e-3; //reqd timespan in microseconds
+            mxTsc = max(mxTsc,tsc);
+
             vector<thread> threads;
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
                 threads.push_back(thread(func, parsed.size/8, cmpLt_sGB, memGB, psdS, rcv_prt, vrbs));
 
             for (auto& th : threads) th.join();
-            if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " synchronized all threads..." << endl;
+            //reqd computational timespan in usec    
+            now = high_resolution_clock::now();
+            us = duration_cast<microseconds>(now.time_since_epoch());
+            tsr = us.count()-tsr_base;  //zero based clock
+            if (DBG) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << " Syncrhonizing us.count = " << us.count() << " tsr_base = " << tsr_base << " tsr = " << tsr << endl;
+            if(vrbs) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " synchronized all threads..." << endl;
         }
 
         if(!trmnl) {
-            if(DBG) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " Forwarding "
+            if(DBG) cout << tsr+2  << " [cpu_emu " << rcv_prt << "]: " << " Forwarding "
                           << " request " << frame_num << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                           << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << " (" << frame_num << ')' << endl;
             //forward to next hop
@@ -437,37 +455,31 @@ int main (int argc, char *argv[])
             {
 	        // Send  "frame"
                 std::vector<uint8_t> payload(outSz/8);  //represents harvested data
-                auto data = serialize_packet(payload.size(), tsr, parsed.frame_num, parsed.stream_id, payload);
+                auto data = serialize_packet(payload.size(), us.count(), parsed.frame_num, parsed.stream_id, payload);
                 zmq::message_t message(data.size());
                 std::memcpy(message.data(), data.data(), data.size());
                 sr = dst_sckt.send(message, zmq::send_flags::none);
 
-                if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
+                if(vrbs) cout << tsr+3 << " [cpu_emu " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
                               << frame_num << ')' << " to " << dst_prt << " at " << tsr << endl;
-                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  
+                if(DBG) cout << tsr+4 << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
-                if(sr.value() != outSz/8) cout << "Destination data incorrect size(" << request_nbr << ") "  << endl;
+                if(sr.value() != HEADER_SIZE + outSz/8) cout << tsr+3 << "[cpu_emu " << rcv_prt << "Destination data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
         // Record end time
-        uint64_t tsr0 = tsr; // reception system hi-res clock from in microseconds since epoch
-        {
-            auto now = high_resolution_clock::now();
-            auto us = duration_cast<microseconds>(now.time_since_epoch());
-            tsr = us.count()-tsr_base;
-        }
         if(request_nbr < 10) continue; //warmup
-        if(vrbs) std::cout << tsr + 3 << " [cpu_emu " << rcv_prt << "]: " << " Measured latencies: tsc = " << tsc << " tsn = " << tsn 
+        if(vrbs) std::cout << tsr + 5 << " [cpu_emu " << rcv_prt << "]: " << " Measured latencies: tsc = " << tsc << " tsn = " << tsn 
                            << " (" << frame_num << ") mxTsc = " << mxTsc << endl;
-        if(vrbs) std::cout << tsr + 4 << " [cpu_emu " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) 
+        if(vrbs) std::cout << tsr + 6 << " [cpu_emu " << rcv_prt << "]: " << " Measured frame rate " << float(request_nbr)/(1e-6*float(tsr)) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
-        if(vrbs) std::cout << tsr + 5 << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(bufSiz)/(1e-6*float(tsr)) 
+        if(vrbs) std::cout << tsr + 7 << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz)/(1e-6*float(tsr)) 
                            << " MHz mnBfSz " << mnBfSz << " (" << frame_num << ')' << endl;
-        if(vrbs) cout << tsr + 6 << " [cpu_emu " << rcv_prt << "]:  Missed frames: " << frame_num-request_nbr << endl;
-        if(vrbs) cout << tsr + 7 << " [cpu_emu " << rcv_prt << "]:  Missed frame ratio: " << float(frame_num-request_nbr)/float(frame_num) 
+        if(vrbs) cout << tsr + 8 << " [cpu_emu " << rcv_prt << "]:  Missed frames: " << msdFrms << endl;
+        if(vrbs) cout << tsr + 9 << " [cpu_emu " << rcv_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
                       << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
-        cout  << tsr + 8 << " [cpu_emu " << rcv_prt << "]:  stats computed ..." << endl;
+        cout  << tsr + 10 << " [cpu_emu " << rcv_prt << "]:  stats computed ..." << endl;
     } //main loop
     cout  << tsr + 11 << " [cpu_sim " << rcv_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") << " exiting: mxTsc = " << mxTsc << endl;
     std::cout.flush();

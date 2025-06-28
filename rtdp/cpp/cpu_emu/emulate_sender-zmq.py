@@ -60,26 +60,26 @@ def emulate_stream(
         else:
             frame_size = int(frame_size_mean)
         payload = bytearray(int(frame_size/8))
-        if frame_num == 1:
-            clk0 = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
         clk = int(time.time()*1e6)  #microseconds *1e9 #nanoseconds
+        if frame_num == 1:  clk0 = clk #establish zero offset clock
         elpsd_tm = (clk-clk0) #usec
         print(f"{elpsd_tm} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})")            
         buffer = serialize_buffer(size=frame_size, timestamp=int(clk), stream_id=99, frame_num=frame_num, payload=payload)
         #print(f"{float(clk)} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})", flush=True)            
         zmq_socket.send(buffer)
                 
-        # Delay to throttle sending rate
         rate_sleep = frame_size / avg_rate_bps  # in seconds
+
+        if frame_num == 1:
+            print(f"{elpsd_tm+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
+            print(f"{elpsd_tm+2} [emulate_stream:] Estimated bit rate (Gbps): {1e-6*frame_num*frame_size_mean/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
+        else:
+            print(f"{elpsd_tm+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
+            print(f"{elpsd_tm+2} [emulate_stream:] Estimated bit rate (Gbps): {1e-6*frame_num*frame_size_mean/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
+
+        # Delay to throttle sending rate
         time.sleep(rate_sleep)
             
-        clk = int(time.time()*1e6) #microseconds *1e9 #nanoseconds
-        #frame_rate_hz = frame_count / (elapsed_time_us / 1_000_000)
-        elpsd_tm = (clk-clk0) #usec
-        print(f"{elpsd_tm} [emulate_stream:] Estimated frame rate (Hz): {1e6*float(frame_num)/float(elpsd_tm)} frame_num {frame_num}")
-        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (Gbps): {1e3*frame_num*frame_size_mean/float(elpsd_tm)} frame_num {frame_num}")
-        print(f"{elpsd_tm} [emulate_stream:] Estimated bit rate (MHz): {float(frame_num)*frame_size_mean/float(elpsd_tm)} frame_num {frame_num}", flush=True)
-
 if __name__ == "__main__":
     print(f"[emulate_sender-zmq: main:]")
     parser = argparse.ArgumentParser(description="emulated data sender using ZeroMQ")
