@@ -36,9 +36,18 @@
             --output = slurm_%j.log
             --error = slurm_%j.log
         [[[environment]]]
+            # Path to SIF file
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('cpu-emu.sif') }}"
-            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+            
+            # Port configuration
+            SEND_PORT = "{{ sender.target_port }}"
+            RECV_PORT = "{{ receiver.listen_port }}"
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
+            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
 
     [[sender]]
         script = """
