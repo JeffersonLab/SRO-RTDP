@@ -27,11 +27,11 @@ def emulate_stream(
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)
+    zmq_socket.bind(f"tcp://localhost:{port}")
     # Send will never block
     # optional: disable high water marksocket.setsockopt(zmq.LINGER, 0)  # don't wait on closesocket.bind("tcp://*:5555")
     zmq_socket.setsockopt(zmq.SNDHWM, 0) #int(1e2))  # Set send high water mark to 0 messages
 
-    zmq_socket.connect(f"tcp://localhost:{port}")
     time.sleep(1)  # Give receiver time to bind
 
     # Enable socket monitor for connection events
@@ -41,7 +41,7 @@ def emulate_stream(
     #print("[emulate_stream:] Connected ...")
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
-    frame_size_mean = 60e3*10 # CLAS12 # avg_rate_bps / 100     # bits - Send in 100 frames per second
+    frame_size_mean = 60e3*10 # CLAS12 bits
     std_dev = frame_size_mean * rms_fraction # bits
     print(f"[emulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, rame_size_mean(Mb) = {frame_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
     
