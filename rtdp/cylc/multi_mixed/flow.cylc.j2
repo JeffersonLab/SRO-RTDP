@@ -39,13 +39,6 @@
             --error = slurm_%j.log
         
         [[[environment]]]
-            # Path to SIF file
-            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('mixed-workflow.sif') }}"
-            
-            # Port configuration
-            SEND_PORT = "{{ sender.target_port }}"
-            RECV_PORT = "{{ receiver.listen_port }}"
-            
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
             INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
@@ -81,6 +74,16 @@
             {% else %}
             NIC_LIMIT="100"
             {% endif %}
+            
+            # Set sender-specific SIF file
+            {% if sender.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ sender.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            {% endif %}
+            
+            # Set port configuration
+            SEND_PORT="{{ sender.target_port }}"
             
             mkdir -p ${LOG_DIR}/sender
             exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
@@ -157,6 +160,13 @@
             {% else %}
             # Auto-detect the default network interface
             PROXY_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
+            {% endif %}
+            
+            # Set proxy-specific SIF file
+            {% if comp.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
             {% endif %}
             
             # Proxy-specific processing parameters
@@ -291,6 +301,13 @@
             EMULATOR_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
             {% endif %}
             
+            # Set emulator-specific SIF file
+            {% if comp.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            {% endif %}
+            
             # Emulator-specific processing parameters
             {% if comp.threads is defined %}
             NUM_THREADS="{{ comp.threads }}"
@@ -414,6 +431,16 @@
         script = """
             #!/bin/bash
             set -e
+            
+            # Set receiver-specific SIF file
+            {% if receiver.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ receiver.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            {% endif %}
+            
+            # Set port configuration
+            RECV_PORT="{{ receiver.listen_port }}"
             
             mkdir -p ${LOG_DIR}/receiver
             exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
