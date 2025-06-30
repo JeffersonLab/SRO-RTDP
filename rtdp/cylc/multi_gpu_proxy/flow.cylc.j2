@@ -191,7 +191,6 @@
             echo "  - PROXY_MATRIX_WIDTH: ${PROXY_MATRIX_WIDTH}"
             echo "  - PROXY_RATE: ${PROXY_RATE}"
             echo "  - PROXY_SOCKET_HWM: ${PROXY_SOCKET_HWM}"
-            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
             echo "  - LOG_DIR: ${LOG_DIR}/proxy_{{ loop.index0 }}"
 
             # Store this proxy's hostname and IP for previous component
@@ -292,7 +291,6 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
             echo "  - SIF_FILE: ${SIF_FILE}"
             echo "  - RECV_PORT: ${RECV_PORT}"
-            echo "  - OUTPUT_DIR: ${OUTPUT_DIR}"
             echo "  - LOG_DIR: ${LOG_DIR}"
 
             # Store hostname and IP for last proxy
@@ -305,12 +303,9 @@
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${RECEIVER_NIC}"
 
-            # Create output directory
-            mkdir -p ${OUTPUT_DIR}
-
             # Start receiver
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --pwd /tmp ${SIF_FILE} receiver -p ${RECV_PORT} -v > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /tmp ${SIF_FILE} receiver -p ${RECV_PORT} -v 2>${LOG_DIR}/receiver/apptainer.log &
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
 
@@ -332,9 +327,17 @@
             KEEP_RUNNING=1
             trap 'KEEP_RUNNING=0' TERM INT
 
-            # Monitor the receiver process
+            # Monitor the receiver process and log received data information
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                
+                # Log received data statistics if available
+                if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
+                    # Extract and log data transfer information from apptainer output
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver Status:" >> ${LOG_DIR}/receiver/stdout.log
+                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate)" >> ${LOG_DIR}/receiver/stdout.log 2>/dev/null || true
+                fi
+                
                 sleep 5
             done
 
@@ -343,6 +346,15 @@
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
                 cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
+            fi
+
+            # Log final received data summary
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver completed successfully" >> ${LOG_DIR}/receiver/stdout.log
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Final receiver statistics:" >> ${LOG_DIR}/receiver/stdout.log
+            if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
+                echo "=== Receiver Apptainer Log Summary ===" >> ${LOG_DIR}/receiver/stdout.log
+                cat ${LOG_DIR}/receiver/apptainer.log >> ${LOG_DIR}/receiver/stdout.log
+                echo "=== End Receiver Log Summary ===" >> ${LOG_DIR}/receiver/stdout.log
             fi
 
             cylc message -- "receiver:completed"
