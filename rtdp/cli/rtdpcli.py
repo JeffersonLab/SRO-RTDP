@@ -246,6 +246,55 @@ def run(workflow):
                     if docker_img and not os.path.exists(sif_path):
                         unique_sifs.add((sif_path, docker_img))
 
+                # Check sender section
+                sender = cfg.get('sender', {})
+                click.echo(f"Sender section: {sender}")
+                if 'image_path' in sender:
+                    sif_name = sender['image_path']
+                    sif_path = os.path.join(sif_dir, sif_name)
+                    click.echo(f"Found sender image_path: {sif_name}")
+                    if 'gpu-proxy' in sif_name:
+                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
+                    elif 'cpu-emu' in sif_name:
+                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
+                    else:
+                        docker_img = None
+                    if docker_img and not os.path.exists(sif_path):
+                        unique_sifs.add((sif_path, docker_img))
+
+                # Check receiver section
+                receiver = cfg.get('receiver', {})
+                click.echo(f"Receiver section: {receiver}")
+                if 'image_path' in receiver:
+                    sif_name = receiver['image_path']
+                    sif_path = os.path.join(sif_dir, sif_name)
+                    click.echo(f"Found receiver image_path: {sif_name}")
+                    if 'gpu-proxy' in sif_name:
+                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
+                    elif 'cpu-emu' in sif_name:
+                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
+                    else:
+                        docker_img = None
+                    if docker_img and not os.path.exists(sif_path):
+                        unique_sifs.add((sif_path, docker_img))
+
+                # Check components section (for mixed workflow)
+                components = cfg.get('components', [])
+                click.echo(f"Components section: {components}")
+                for comp in components:
+                    if isinstance(comp, dict) and 'image_path' in comp:
+                        sif_name = comp['image_path']
+                        sif_path = os.path.join(sif_dir, sif_name)
+                        click.echo(f"Found component image_path: {sif_name}")
+                        if 'gpu-proxy' in sif_name:
+                            docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
+                        elif 'cpu-emu' in sif_name:
+                            docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
+                        else:
+                            docker_img = None
+                        if docker_img and not os.path.exists(sif_path):
+                            unique_sifs.add((sif_path, docker_img))
+
                 # Check gpu_proxies section
                 gpu_proxies = cfg.get('gpu_proxies', [])
                 click.echo(f"GPU proxies section: {gpu_proxies}")
