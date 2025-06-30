@@ -65,8 +65,8 @@ def generate(config, output, workflow_type):
             raise click.ClickException("Multi-GPU proxy workflow requires a 'gpu_proxies' list in the config.")
         if workflow_type == 'multi_cpu_emu' and 'cpu_emulators' not in config_data:
             raise click.ClickException("Multi-CPU emulator workflow requires a 'cpu_emulators' list in the config.")
-        if workflow_type == 'multi_mixed' and ('gpu_proxies' not in config_data or 'cpu_emulators' not in config_data):
-            raise click.ClickException("Mixed workflow requires both 'gpu_proxies' and 'cpu_emulators' lists in the config.")
+        if workflow_type == 'multi_mixed' and 'components' not in config_data:
+            raise click.ClickException("Mixed workflow requires a 'components' list in the config.")
 
     # Load the template
     template_path = workflow_types[workflow_type]['template']
