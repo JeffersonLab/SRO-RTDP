@@ -10,27 +10,20 @@ The RTDP Workflow CLI is a command-line tool for generating and managing RTDP (R
 
 - Python 3.7 or higher
 - pip (Python package installer)
-- Git (for development installation)
 
-### Install the CLI
+### Setup Development Environment
 
-1. **Install from PyPI (Recommended)**:
-```bash
-pip install rtdp-workflow-cli
-```
-
-2. **Install from Source**:
-```bash
+   ```bash
 # Navigate to the project root directory
 cd /path/to/rtdp
 
 # Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Linux/macOS
-# or
-.\venv\Scripts\activate  # On Windows
+   python -m venv venv
+   source venv/bin/activate  # On Linux/macOS
+   # or
+   .\venv\Scripts\activate  # On Windows
 
-# Install the package
+# Install development dependencies
 pip install -e .
 ```
 
@@ -43,8 +36,8 @@ The CLI provides two main commands:
 
 ### Generate Command
 
-```bash
-rtdp-workflow generate --config <config_file> --output <output_dir> --workflow-type <type>
+   ```bash
+python3 -m rtdp.cli.rtdpcli generate --config <config_file> --output <output_dir> --workflow-type <type>
 ```
 
 #### Workflow Types
@@ -57,19 +50,19 @@ The CLI supports the following workflow types:
    - `chain_workflow`: Simple chain workflow
 
 2. **Multi-Component Workflows**:
-   - `multi_gpu_proxy`: Multi-GPU proxy workflow
+   - `multi_gpu_proxy`: Multi-GPU proxy workflow with exclusive node allocation
    - `multi_cpu_emu`: Multi-CPU emulator workflow
    - `multi_mixed`: Mixed multi-component workflow
 
 ### Validate Command
 
-```bash
-rtdp-workflow validate --config <config_file> --workflow-type <type>
+   ```bash
+python3 -m rtdp.cli.rtdpcli validate --config <config_file> --workflow-type <type>
 ```
 
 ## Example Cases
 
-### 1. Multi-GPU Proxy Workflow
+### 1. Multi-GPU Proxy Workflow (Exclusive Nodes)
 
 Create a configuration file `gpu_config.yml`:
 ```yaml
@@ -80,35 +73,44 @@ containers:
   image_path: "/path/to/gpu_proxy.sif"
 
 receiver:
-  port: 8000
+  listen_port: 8000
+  nic: "eno1"
 
 sender:
-  port: 8003
+  target_port: 8003
   host: "destination.example.com"
 
 gpu_proxies:
   - device: "gpu"
     partition: "gpu_partition"
-    gres: "gpu:1"
-    mem: "16G"
+    gpus: 1
+    mem: "100G"
     cpus: 4
     in_port: 8000
     out_port: 8001
     device_id: 0
+    nic: "eno1"
   - device: "gpu"
     partition: "gpu_partition"
-    gres: "gpu:1"
-    mem: "16G"
+    gpus: 1
+    mem: "100G"
     cpus: 4
     in_port: 8001
     out_port: 8002
     device_id: 1
+    nic: "eno2"
 ```
 
 Generate the workflow:
-```bash
-rtdp-workflow generate --config gpu_config.yml --output gpu_workflow --workflow-type multi_gpu_proxy
+   ```bash
+python3 -m rtdp.cli.rtdpcli generate --config gpu_config.yml --output gpu_workflow --workflow-type multi_gpu_proxy
 ```
+
+**Key Features:**
+- **Exclusive Node Allocation**: Each proxy runs on its own dedicated node (`--exclusive`)
+- **GPU Resource Management**: Automatic GPU allocation and device binding
+- **Network Interface Configuration**: Each component can specify its own NIC
+- **Port Chaining**: Automatic port configuration for data flow: sender → proxy_0 → proxy_1 → ... → receiver
 
 ### 2. Multi-CPU Emulator Workflow
 
@@ -121,10 +123,11 @@ containers:
   image_path: "/path/to/cpu_emu.sif"
 
 receiver:
-  port: 8000
+  listen_port: 8000
+  nic: "eno1"
 
 sender:
-  port: 8002
+  target_port: 8002
   host: "destination.example.com"
 
 cpu_emulators:
@@ -135,6 +138,7 @@ cpu_emulators:
     out_port: 8001
     threads: 4
     latency: 100
+    nic: "eno1"
   - id: "emu2"
     cpus: 4
     mem: "8G"
@@ -142,39 +146,42 @@ cpu_emulators:
     out_port: 8002
     threads: 4
     latency: 100
+    nic: "eno2"
 ```
 
 Generate the workflow:
-```bash
-rtdp-workflow generate --config cpu_config.yml --output cpu_workflow --workflow-type multi_cpu_emu
-```
+   ```bash
+python3 -m rtdp.cli.rtdpcli generate --config cpu_config.yml --output cpu_workflow --workflow-type multi_cpu_emu
+   ```
 
 ### 3. Mixed Workflow (GPU + CPU)
 
 Create a configuration file `mixed_config.yml`:
-```yaml
+   ```yaml
 platform:
   name: "mixed_cluster"
 
-containers:
+   containers:
   image_path: "/path/to/mixed.sif"
 
 receiver:
-  port: 8000
+  listen_port: 8000
+  nic: "eno1"
 
 sender:
-  port: 8004
+  target_port: 8004
   host: "destination.example.com"
 
 gpu_proxies:
   - device: "gpu"
     partition: "gpu_partition"
-    gres: "gpu:1"
-    mem: "16G"
+    gpus: 1
+    mem: "100G"
     cpus: 4
     in_port: 8000
     out_port: 8001
     device_id: 0
+    nic: "eno1"
 
 cpu_emulators:
   - id: "emu1"
@@ -184,6 +191,7 @@ cpu_emulators:
     out_port: 8002
     threads: 4
     latency: 100
+    nic: "eno2"
   - id: "emu2"
     cpus: 4
     mem: "8G"
@@ -191,12 +199,49 @@ cpu_emulators:
     out_port: 8003
     threads: 4
     latency: 100
+    nic: "eno3"
 ```
 
 Generate the workflow:
 ```bash
-rtdp-workflow generate --config mixed_config.yml --output mixed_workflow --workflow-type multi_mixed
+python3 -m rtdp.cli.rtdpcli generate --config mixed_config.yml --output mixed_workflow --workflow-type multi_mixed
+   ```
+
+## Running and Monitoring Workflows
+
+### Running a Workflow
+
+To run a generated workflow, use the `run` command:
+
+   ```bash
+python3 -m rtdp.cli.rtdpcli run --workflow <workflow_directory>
+   ```
+
+**Example:**
+   ```bash
+python3 -m rtdp.cli.rtdpcli run --workflow gpu_workflow
 ```
+
+This command will:
+- Build the SIF container if needed (if the config is in the workflow directory),
+- Change to the workflow directory,
+- Run `cylc install --workflow-name=NAME`,
+- Then run `cylc play NAME`.
+
+### Monitoring a Workflow
+
+To monitor a running workflow, use the `monitor` command:
+
+   ```bash
+python3 -m rtdp.cli.rtdpcli monitor --workflow <workflow_directory>
+   ```
+
+**Example:**
+   ```bash
+python3 -m rtdp.cli.rtdpcli monitor --workflow gpu_workflow
+```
+
+This command will display the current status of the workflow, including task states and progress.
 
 ## Configuration File Format
 
@@ -212,147 +257,136 @@ containers:
   image_path: <path_to_container_image>
 
 receiver:
-  port: <port_number>
+  listen_port: <port_number>  # Port where receiver listens for incoming data
 
 sender:
-  port: <port_number>
-  host: <destination_host>
+  target_port: <port_number>  # Port where sender sends data to
+  host: <destination_host>    # Destination host for sender
+  # Component-specific sender parameters (optional)
+  send_rate: <rate_mbps>      # Send rate in MB/s (default: 150)
+  group_size: <size>          # Group size for data transmission (default: 30720000)
+  send_all_ones: <0_or_1>     # Send all ones (0=random, 1=all ones, default: 0)
+  socket_hwm: <buffer_size>   # Socket high water mark (default: 1)
 ```
+
+**Component-Specific Parameters:**
+- **Sender Parameters**: Each sender can have its own `send_rate`, `group_size`, `send_all_ones`, and `socket_hwm`
+- **Proxy Parameters**: Each proxy can have its own `matrix_width`, `proxy_rate`, and `socket_hwm`
+- **No Global Defaults**: Matrix configuration parameters are component-specific, not global
 
 ### Multi-GPU Proxy Configuration
 
 ```yaml
-# Common configuration as above
 gpu_proxies:
-  - device: <gpu_device>
-    partition: <partition_name>
-    gres: <gpu_resource>
-    mem: <memory_allocation>
-    cpus: <cpu_count>
-    in_port: <input_port>
-    out_port: <output_port>
-    device_id: <gpu_device_id>
-  # Add more GPU proxies as needed
+  - device: "gpu"
+    partition: <slurm_partition>
+    gpus: <number_of_gpus>           # Number of GPUs per proxy
+    mem: <memory_allocation>         # Memory allocation (e.g., "100G")
+    cpus: <cpu_cores>               # CPU cores per proxy
+    in_port: <input_port>           # Port to receive data from previous component
+    out_port: <output_port>         # Port to send data to next component
+    device_id: <gpu_device_id>      # GPU device ID (0, 1, 2, etc.)
+    nic: <network_interface>        # Network interface for this proxy (optional)
+    nodelist: <node_name>           # Explicit SLURM node assignment (optional)
+    # Component-specific processing parameters (optional - local defaults)
+    matrix_width: <matrix_size>     # GPU matrix width for processing (default: 2048)
+    proxy_rate: <processing_rate>   # Proxy processing rate multiplier (default: 1.0)
+    socket_hwm: <buffer_size>       # Socket high water mark buffer size (default: 1)
 ```
+
+**Component-Specific Parameters:**
+- **`matrix_width`**: GPU matrix width for processing (local default: 2048)
+- **`proxy_rate`**: Processing rate multiplier (local default: 1.0)
+- **`socket_hwm`**: Socket buffer size (local default: 1)
+
+**Network Configuration:**
+- **Per-Component NIC**: Each component can specify its own `nic` parameter
+- **Auto-Detection**: If `nic` is not specified, the system auto-detects the default network interface
+- **Validation**: NIC names are validated to ensure they exist on the target system
+
+**SLURM Configuration:**
+- **Node Assignment**: Use `nodelist` parameter to specify exact nodes for each proxy
+- **GPU Allocation**: Uses `--gres=gpu:N` for GPU allocation
+- **Resource Binding**: Automatic GPU device binding and memory allocation
+- **Node Isolation**: Each proxy can be assigned to specific nodes to prevent conflicts
 
 ### Multi-CPU Emulator Configuration
 
 ```yaml
-# Common configuration as above
 cpu_emulators:
-  - id: <emulator_id>
-    cpus: <cpu_count>
+  - id: <unique_emulator_id>
+    cpus: <cpu_cores>
     mem: <memory_allocation>
     in_port: <input_port>
     out_port: <output_port>
-    threads: <thread_count>
-    latency: <latency_ms>
-  # Add more CPU emulators as needed
+    threads: <number_of_threads>
+    latency: <latency_in_ms>
+    nic: <network_interface>
 ```
 
-### Mixed Workflow Configuration
+## Data Flow Architecture
 
-```yaml
-# Common configuration as above
-gpu_proxies:
-  # GPU proxy configurations as above
-cpu_emulators:
-  # CPU emulator configurations as above
+### Multi-GPU Proxy Flow
+```
+Sender → Proxy_0 → Proxy_1 → ... → Proxy_N → Receiver
 ```
 
-## Resource Management
+**Port Configuration:**
+- Sender connects to Proxy_0 on `target_port`
+- Proxy_i connects to Proxy_{i+1} on `out_port`
+- Proxy_N connects to Receiver on `out_port`
+- Receiver listens on `listen_port`
 
-The CLI includes a built-in resource manager that handles:
+**Network Configuration:**
+- Each component can specify its own network interface (`nic`)
+- Automatic IP address extraction (excludes loopback addresses)
+- Hostname and IP information shared between components
 
-1. **GPU Resources**:
-   - Device allocation
-   - Memory management
-   - CPU allocation per GPU
-   - Device ID validation
+### Resource Management
 
-2. **CPU Resources**:
-   - CPU count validation
-   - Memory allocation
-   - Thread count management
-   - Latency configuration
+The CLI includes built-in resource management features:
 
-3. **Network Resources**:
-   - Port allocation and validation
-   - Port chain validation
-   - Host configuration
+1. **Port Validation**: Ensures ports are in valid range (1024-65535)
+2. **Port Chaining**: Validates port connectivity between components
+3. **GPU Resource Allocation**: Manages GPU device IDs and memory
+4. **CPU Resource Allocation**: Manages CPU cores and memory
+5. **Network Interface Validation**: Ensures specified NICs exist
 
-### Resource Validation Rules
+## Validation Features
 
-1. **GPU Proxy Validation**:
-   - Device must be a valid GPU device
-   - Memory allocation must be within system limits
-   - CPU count must be positive
-   - Ports must be between 1024 and 65535
-   - Device ID must be non-negative
+The CLI validates:
 
-2. **CPU Emulator Validation**:
-   - CPU count must be positive
-   - Memory allocation must be within system limits
-   - Thread count must be positive
-   - Latency must be non-negative
-   - Ports must be between 1024 and 65535
-
-3. **Network Validation**:
-   - Ports must be unique across components
-   - Port chain must be continuous
-   - Host must be a valid hostname or IP address
-
-## Error Handling
-
-The CLI provides detailed error messages for:
-
-1. **Configuration Errors**:
-   - Missing required fields
-   - Invalid field types
-   - Out-of-range values
-
-2. **Resource Errors**:
-   - Resource conflicts
-   - Insufficient resources
-   - Invalid resource specifications
-
-3. **Network Errors**:
-   - Port conflicts
-   - Invalid port chains
-   - Invalid host configurations
-
-## Best Practices
-
-1. **Resource Allocation**:
-   - Allocate resources based on actual requirements
-   - Consider system limits when configuring resources
-   - Use appropriate memory and CPU allocations
-
-2. **Network Configuration**:
-   - Use ports in the range 1024-65535
-   - Ensure continuous port chains
-   - Configure appropriate host settings
-
-3. **Workflow Design**:
-   - Start with simple configurations
-   - Test resource allocations
-   - Validate configurations before deployment
+- **Required Fields**: All mandatory configuration parameters
+- **Data Types**: Correct data types for all parameters
+- **Port Ranges**: Valid port numbers (1024-65535)
+- **Resource Conflicts**: No overlapping GPU device IDs or ports
+- **Network Interfaces**: Valid network interface names
+- **Container Paths**: Valid container image paths
 
 ## Troubleshooting
 
-Common issues and solutions:
+### Common Issues
 
-1. **Resource Allocation Failures**:
-   - Check system resource limits
-   - Verify resource specifications
-   - Ensure no resource conflicts
+1. **Port Conflicts**: Ensure unique ports for each component
+2. **GPU Device IDs**: Use sequential device IDs (0, 1, 2, etc.)
+3. **Network Interfaces**: Verify NIC names exist on target systems
+4. **Memory Allocation**: Ensure sufficient memory for GPU workloads
+5. **SLURM Partitions**: Verify partition names exist on cluster
 
-2. **Port Conflicts**:
-   - Verify port availability
-   - Check port chain continuity
-   - Ensure unique port assignments
+### Example Configuration Files
 
-3. **Configuration Errors**:
-   - Validate configuration format
-   - Check required fields
-   - Verify field types and ranges 
+Example configuration files are available for each workflow type:
+
+- **Multi-GPU Proxy**: `rtdp/cylc/multi_gpu_proxy/example_config.yml`
+  - Demonstrates component-specific parameters
+  - Shows explicit node assignment with `nodelist`
+  - Includes different processing parameters for each proxy
+  - Features simplified network interface configuration
+
+### Debug Mode
+
+Enable debug output for detailed validation and generation information:
+
+```bash
+python3 -m rtdp.cli.rtdpcli generate --config config.yml --output workflow --workflow-type multi_gpu_proxy --debug
+```
