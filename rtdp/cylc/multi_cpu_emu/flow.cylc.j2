@@ -236,9 +236,6 @@
                 -v 1 \
                 -m ${MEM_FOOTPRINT} \
                 -t ${NUM_THREADS} \
-                -l ${LATENCY} \
-                -o ${OUTPUT_SIZE} \
-                -w ${SLEEP_TIME} \
                 2>${LOG_DIR}/emulator_{{ loop.index0 }}/apptainer.log &
             EMU_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator started with PID ${EMU_PID}"
