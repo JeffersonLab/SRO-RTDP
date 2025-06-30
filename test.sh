@@ -1,4 +1,4 @@
 #!/bin/bash
 
-python3 -m rtdp.cli.rtdpcli generate --config cpu_config.yml --output cpu_workflow --workflow-type multi_cpu_emu
-python3 -m rtdp.cli.rtdpcli run --workflow cpu_workflow
+python3 -m rtdp.cli.rtdpcli generate --config multi_mixed/example_config.yml --output multi_mixed --workflow-type multi_mixed
+python3 -m rtdp.cli.rtdpcli run --workflow multi_mixed
