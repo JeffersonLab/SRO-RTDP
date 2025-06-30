@@ -138,6 +138,11 @@ def validate(config, workflow_type):
         if 'gpu_proxies' not in config_data:
             raise click.ClickException("Multi-GPU proxy workflow requires a 'gpu_proxies' list in the config.")
         
+        # Validate sender configuration if present
+        if 'sender' in config_data:
+            if not resource_manager.validate_sender_resources(config_data['sender']):
+                raise click.ClickException(f"Invalid sender configuration: {config_data['sender']}")
+        
         # Validate resources for each GPU proxy
         for proxy in config_data['gpu_proxies']:
             if not resource_manager.validate_gpu_resources(proxy):

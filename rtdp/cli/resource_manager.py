@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional
 import logging
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,28 @@ class ResourceManager:
             if 'gres' not in config:
                 logger.error("Missing GPU GRES specification")
                 return False
+            
+            # Validate nodelist if provided
+            if 'nodelist' in config:
+                if not isinstance(config['nodelist'], str) or not config['nodelist'].strip():
+                    logger.error("Invalid nodelist specification - must be a non-empty string")
+                    return False
+            
+            # Validate per-proxy processing parameters if provided
+            if 'matrix_width' in config:
+                if not isinstance(config['matrix_width'], int) or config['matrix_width'] < 1:
+                    logger.error("Invalid matrix_width - must be a positive integer")
+                    return False
+            
+            if 'proxy_rate' in config:
+                if not isinstance(config['proxy_rate'], (int, float)) or config['proxy_rate'] <= 0:
+                    logger.error("Invalid proxy_rate - must be a positive number")
+                    return False
+            
+            if 'socket_hwm' in config:
+                if not isinstance(config['socket_hwm'], int) or config['socket_hwm'] < 1:
+                    logger.error("Invalid socket_hwm - must be a positive integer")
+                    return False
             
             return True
         except Exception as e:
@@ -115,9 +138,62 @@ class ResourceManager:
                 logger.error(f"Output port {config['out_port']} already allocated")
                 return False
             
+            # Validate NIC configuration if specified
+            if 'nic' in config:
+                try:
+                    subprocess.run(['ip', 'link', 'show', config['nic']], 
+                                 check=True, capture_output=True)
+                except subprocess.CalledProcessError:
+                    logger.error(f"Invalid NIC: {config['nic']}")
+                    return False
+            
             return True
         except Exception as e:
             logger.error(f"Error validating network resources: {e}")
+            return False
+    
+    def validate_sender_resources(self, config: Dict) -> bool:
+        """Validate sender resource configuration.
+        
+        Args:
+            config: Sender configuration dictionary
+            
+        Returns:
+            bool: True if resources are valid, False otherwise
+        """
+        try:
+            # Validate target port
+            if 'target_port' not in config:
+                logger.error("Missing sender target port")
+                return False
+            
+            # Validate send rate if provided
+            if 'send_rate' in config:
+                if not isinstance(config['send_rate'], (int, float)) or config['send_rate'] <= 0:
+                    logger.error("Invalid send_rate - must be a positive number")
+                    return False
+            
+            # Validate group size if provided
+            if 'group_size' in config:
+                if not isinstance(config['group_size'], int) or config['group_size'] <= 0:
+                    logger.error("Invalid group_size - must be a positive integer")
+                    return False
+            
+            # Validate send_all_ones if provided
+            if 'send_all_ones' in config:
+                if not isinstance(config['send_all_ones'], int) or config['send_all_ones'] not in [0, 1]:
+                    logger.error("Invalid send_all_ones - must be 0 or 1")
+                    return False
+            
+            # Validate socket_hwm if provided
+            if 'socket_hwm' in config:
+                if not isinstance(config['socket_hwm'], int) or config['socket_hwm'] < 1:
+                    logger.error("Invalid socket_hwm - must be a positive integer")
+                    return False
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error validating sender resources: {e}")
             return False
     
     def allocate_resources(self, component_type: str, config: Dict) -> bool:
