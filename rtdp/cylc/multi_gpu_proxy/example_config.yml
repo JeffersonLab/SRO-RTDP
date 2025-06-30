@@ -19,7 +19,7 @@ sender:
 
 # Receiver configuration  
 receiver:
-  listen_port: 55560
+  listen_port: 55558
 
 # GPU Proxies with explicit node assignment and component-specific parameters
 gpu_proxies:
