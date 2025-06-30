@@ -1,5 +1,0 @@
-include README.md
-include LICENSE
-recursive-include rtdp/cylc *.j2
-recursive-include rtdp/cylc/scripts *.sh
-recursive-include prd *.md 
