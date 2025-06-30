@@ -9,82 +9,84 @@ platform:
   name: jlab_slurm
 partition: ifarm
 
-# Container configuration
-containers:
-  image_path: mixed-workflow.sif
-
 # Receiver configuration
 receiver:
-  listen_port: 5000
+  listen_port: 55559
+  image_path: cpu-emu.sif  # CPU emulator SIF for receiver
 
 # Sender configuration with traffic generation parameters
 sender:
-  target_port: 5001
+  target_port: 55555
   avg_rate: 100          # Average send rate in Mbps
   rms_fraction: 0.2      # RMS variation fraction
   duty_cycle: 0.8        # Duty cycle for traffic bursts
   nic_limit: 50          # NIC bandwidth limit in Gbps
+  image_path: cpu-emu.sif  # CPU emulator SIF for sender
 
 # Components in order (data flows from sender through components to receiver)
-# Each component has: type, index, in_port, out_port, and type-specific parameters
+# Each component has: type, index, in_port, out_port, image_path, and type-specific parameters
 components:
   # First component: GPU Proxy 0 (receives from sender, sends to CPU Emulator 0)
   - type: gpu_proxy
     name: gpu_proxy
     index: 0
-    in_port: 5001
-    out_port: 5002
+    in_port: 55555
+    out_port: 55556
+    image_path: gpu-proxy.sif  # GPU proxy SIF
     cpus: 4
     mem: 100G
     gpus: 1
     partition: gpu
-    matrix_width: 2048
-    proxy_rate: 1.0
-    socket_hwm: 1
-    nic: eth0
+    # matrix_width: 2048
+    # proxy_rate: 1.0
+    # socket_hwm: 1
+    # nic: eth0
     # nodelist: gpu001  # Optional: specify specific node
 
   # Second component: CPU Emulator 0 (receives from GPU Proxy 0, sends to GPU Proxy 1)
   - type: cpu_emulator
     name: emulator
     index: 0
-    in_port: 5002
-    out_port: 5003
+    in_port: 55556
+    out_port: 55557
+    image_path: cpu-emu.sif  # CPU emulator SIF
     cpus: 8
     mem: 16G
-    threads: 4
-    latency: 10          # Processing latency in milliseconds
-    mem_footprint: 0.01  # Memory footprint in GB
-    nic: eth0
+    # threads: 4
+    # latency: 10          # Processing latency in milliseconds
+    # mem_footprint: 0.01  # Memory footprint in GB
+    # nic: eth0
 
   # Third component: GPU Proxy 1 (receives from CPU Emulator 0, sends to CPU Emulator 1)
   - type: gpu_proxy
     name: gpu_proxy
     index: 1
-    in_port: 5003
-    out_port: 5004
+    in_port: 55557
+    out_port: 55558
+    image_path: gpu-proxy.sif  # GPU proxy SIF
     cpus: 6
     mem: 120G
     gpus: 1
     partition: gpu
-    matrix_width: 3072
-    proxy_rate: 1.5
-    socket_hwm: 2
-    nic: eth1
+    # matrix_width: 3072
+    # proxy_rate: 1.5
+    # socket_hwm: 2
+    # nic: eth1
     # nodelist: gpu002
 
   # Fourth component: CPU Emulator 1 (receives from GPU Proxy 1, sends to receiver)
   - type: cpu_emulator
     name: emulator
     index: 1
-    in_port: 5004
-    out_port: 5000
+    in_port: 55558
+    out_port: 55559
+    image_path: cpu-emu.sif  # CPU emulator SIF
     cpus: 12
     mem: 24G
-    threads: 6
-    latency: 15
-    mem_footprint: 0.02
-    nic: eth0
+    # threads: 6
+    # latency: 15
+    # mem_footprint: 0.02
+    # nic: eth0
 
 # Alternative configurations examples:
 
