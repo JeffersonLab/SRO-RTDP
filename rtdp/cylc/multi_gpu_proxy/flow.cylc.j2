@@ -233,7 +233,9 @@
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
             --nodes = 1
-            --exclusive
+            --distribution = block
+            --ntasks-per-node = 1
+            --gres-flags = enforce-binding
 
             
         [[[outputs]]]
