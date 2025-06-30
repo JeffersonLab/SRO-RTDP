@@ -233,8 +233,9 @@
             --mem = {{ proxy.mem | default('100G') }}
             --cpus-per-task = {{ proxy.cpus | default('4') }}
             --nodes = 1
-
-            
+            {% if proxy.nodelist is defined %}
+            --nodelist = {{ proxy.nodelist }}
+            {% endif %}
         [[[outputs]]]
             ready = "ready"
             completed = "Proxy processing completed"
