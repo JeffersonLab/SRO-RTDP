@@ -1,0 +1,148 @@
+# Mixed Multi-Component Workflow Configuration Example
+# This configuration demonstrates a workflow with GPU proxies and CPU emulators in any order
+
+workflow_type: multi_mixed
+workflow_name: mixed_workflow_example
+
+# Platform configuration
+platform:
+  name: jlab_slurm
+partition: ifarm
+
+# Container configuration
+containers:
+  image_path: mixed-workflow.sif
+
+# Receiver configuration
+receiver:
+  listen_port: 5000
+
+# Sender configuration with traffic generation parameters
+sender:
+  target_port: 5001
+  avg_rate: 100          # Average send rate in Mbps
+  rms_fraction: 0.2      # RMS variation fraction
+  duty_cycle: 0.8        # Duty cycle for traffic bursts
+  nic_limit: 50          # NIC bandwidth limit in Gbps
+
+# Components in order (data flows from sender through components to receiver)
+# Each component has: type, index, in_port, out_port, and type-specific parameters
+components:
+  # First component: GPU Proxy 0 (receives from sender, sends to CPU Emulator 0)
+  - type: gpu_proxy
+    name: gpu_proxy
+    index: 0
+    in_port: 5001
+    out_port: 5002
+    cpus: 4
+    mem: 100G
+    gpus: 1
+    partition: gpu
+    matrix_width: 2048
+    proxy_rate: 1.0
+    socket_hwm: 1
+    nic: eth0
+    # nodelist: gpu001  # Optional: specify specific node
+
+  # Second component: CPU Emulator 0 (receives from GPU Proxy 0, sends to GPU Proxy 1)
+  - type: cpu_emulator
+    name: emulator
+    index: 0
+    in_port: 5002
+    out_port: 5003
+    cpus: 8
+    mem: 16G
+    threads: 4
+    latency: 10          # Processing latency in milliseconds
+    mem_footprint: 0.01  # Memory footprint in GB
+    nic: eth0
+
+  # Third component: GPU Proxy 1 (receives from CPU Emulator 0, sends to CPU Emulator 1)
+  - type: gpu_proxy
+    name: gpu_proxy
+    index: 1
+    in_port: 5003
+    out_port: 5004
+    cpus: 6
+    mem: 120G
+    gpus: 1
+    partition: gpu
+    matrix_width: 3072
+    proxy_rate: 1.5
+    socket_hwm: 2
+    nic: eth1
+    # nodelist: gpu002
+
+  # Fourth component: CPU Emulator 1 (receives from GPU Proxy 1, sends to receiver)
+  - type: cpu_emulator
+    name: emulator
+    index: 1
+    in_port: 5004
+    out_port: 5000
+    cpus: 12
+    mem: 24G
+    threads: 6
+    latency: 15
+    mem_footprint: 0.02
+    nic: eth0
+
+# Alternative configurations examples:
+
+# Example 1: GPU-GPU-CPU-CPU chain
+# components:
+#   - type: gpu_proxy
+#     name: gpu_proxy
+#     index: 0
+#     in_port: 5001
+#     out_port: 5002
+#   - type: gpu_proxy
+#     name: gpu_proxy
+#     index: 1
+#     in_port: 5002
+#     out_port: 5003
+#   - type: cpu_emulator
+#     name: emulator
+#     index: 0
+#     in_port: 5003
+#     out_port: 5004
+#   - type: cpu_emulator
+#     name: emulator
+#     index: 1
+#     in_port: 5004
+#     out_port: 5000
+
+# Example 2: CPU-CPU-GPU-GPU chain
+# components:
+#   - type: cpu_emulator
+#     name: emulator
+#     index: 0
+#     in_port: 5001
+#     out_port: 5002
+#   - type: cpu_emulator
+#     name: emulator
+#     index: 1
+#     in_port: 5002
+#     out_port: 5003
+#   - type: gpu_proxy
+#     name: gpu_proxy
+#     index: 0
+#     in_port: 5003
+#     out_port: 5004
+#   - type: gpu_proxy
+#     name: gpu_proxy
+#     index: 1
+#     in_port: 5004
+#     out_port: 5000
+
+# Example 3: Simple GPU-CPU chain
+# components:
+#   - type: gpu_proxy
+#     name: gpu_proxy
+#     index: 0
+#     in_port: 5001
+#     out_port: 5002
+#   - type: cpu_emulator
+#     name: emulator
+#     index: 0
+#     in_port: 5002
+#     out_port: 5000 
