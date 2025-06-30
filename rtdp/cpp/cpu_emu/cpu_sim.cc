@@ -1,3 +1,5 @@
+#define DBG 0	//print extra verbosity apart from -v switch
+  
 //
 //  CPU Simulator for Real Time Development Program (RTDP)
 //
@@ -24,6 +26,7 @@
 #include <cmath> // Needed for round()
 #include "buffer_packet.hh"
 #include <random>
+#include <cassert>
 
 #ifdef __linux__
     #define HTONLL(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))
@@ -33,8 +36,6 @@
 using namespace std;
 using namespace zmq;
 using namespace chrono;
-
-#define DBG 1	//print extra verbosity apart from -v switch
   
 void   Usage()
 {
@@ -69,7 +70,7 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
     yaml_event_t event;
 
     if (!yaml_parser_initialize(&parser)) {
-        fprintf(stderr, "Failed to initialize parser!\n");
+        cerr << "Failed to initialize parser! " << endl;
         fclose(file);
         return;
     }
@@ -91,52 +92,52 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(0) printf("[cpu_sim]: Stream started\n");
+            if(DBG) cout << "[cpu_emu]: Stream started " << endl;
             break;
         case YAML_STREAM_END_EVENT:
-            if(0) printf("[cpu_sim]: Stream ended\n");
+            if(DBG) cout << "[cpu_emu]: Stream ended " << endl;
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(0) printf("[cpu_sim]: Document started\n");
+            if(DBG) cout << "[cpu_emu]: Document started " << endl;
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(0) printf("[cpu_sim]: Document ended\n");
+            if(DBG) cout << "[cpu_emu]: Document ended " << endl;
             break;
         case YAML_MAPPING_START_EVENT:
-            if(0) printf("[cpu_sim]: Mapping started\n");
+            if(DBG) cout << "[cpu_emu]: Mapping started " << endl;
             break;
         case YAML_MAPPING_END_EVENT:
-            if(0) printf("[cpu_sim]: Mapping ended\n");
+            if(DBG) cout << "[cpu_emu]: Mapping ended " << endl;
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(0) printf("[cpu_sim]: Sequence started\n");
+            if(DBG) cout << "[cpu_emu]: Sequence started " << endl;
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(0) printf("[cpu_sim]: Sequence ended\n");
+            if(DBG) cout << "[cpu_emu]: Sequence ended " << endl;
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(0) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s << '\n';
+                if(DBG) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s << '\n';
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(0) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << '\n';
+                if(DBG) cout << "[cpu_sim " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << '\n';
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
             break;
         default:
-            if(0) cout << "[cpu_sim " << tag << " ]: " << " (Default)" << endl;
+            if(DBG) cout << "[cpu_sim " << tag << " ]: " << " (Default)" << endl;
             break;
         }
 
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(0) cout << "[cpu_sim " << tag << " ]: " << " All done parsing, got this:" << endl;
-    if(0) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
+    if(DBG) cout << "[cpu_sim " << tag << " ]: " << " All done parsing, got this:" << endl;
+    if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << '\n';
     
     yaml_parser_delete(&parser);
