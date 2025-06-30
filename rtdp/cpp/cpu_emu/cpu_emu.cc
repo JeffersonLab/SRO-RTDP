@@ -465,7 +465,7 @@ int main (int argc, char *argv[])
                 auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
                 std::vector<uint8_t> payload(outSz*x/8);  //represents harvested data
                 if(vrbs) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
-                auto data = serialize_packet(8*payload.size(), us.count(), parsed.frame_num, parsed.stream_id, payload);
+                auto data = serialize_packet(8*payload.size(), us.count(), parsed.stream_id, parsed.frame_num, payload);
                 if(vrbs) cout << tsr+2 << " [cpu_emu " << rcv_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
                 zmq::message_t message(data.size());
                 std::memcpy(message.data(), data.data(), data.size());
@@ -477,9 +477,11 @@ int main (int argc, char *argv[])
                               << frame_num << ')' << " to " << dst_prt << " at " << tsr << " with code " << endl;
                 if(DBG) cout << tsr+4 << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
-                if(sr.value() != HEADER_SIZE + outSz/8) cout << tsr+3 << "[cpu_emu " << rcv_prt << "Destination data incorrect size(" << request_nbr << ") "  << endl;
+                if(sr.value() != HEADER_SIZE + payload.size()) cout << tsr+3 << "[cpu_emu " << rcv_prt << "]: " << " Destination data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
+        if(vrbs) cout << tsr + 4 << " [cpu_emu " << rcv_prt << "]:  done (" << frame_num << ')' << endl;
+ 
         mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
         // Record end time
         if(request_nbr < 10) continue; //warmup

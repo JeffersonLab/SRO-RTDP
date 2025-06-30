@@ -411,7 +411,7 @@ int main (int argc, char *argv[])
                               << reply << " With rtcd = " << rtcd.value() << endl;
 
                 if(DBG) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " output Num written  (" << frame_num << ") " << sr.value()  << endl;
-                if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " Destination data incorrect size (" << frame_num << ") " << endl;
+                if(sr.value() != pkt.PACKET_SIZE) cout << tsr  << " [cpu_sim " << rcv_prt << "]: " << " Destination data incorrect size (" << frame_num << ") " << endl;
             }        
         }
         if(vrbs) cout << tsr + 1 << " [cpu_sim " << rcv_prt << "]:  done (" << frame_num << ')' << endl;
