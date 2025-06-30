@@ -407,6 +407,7 @@ int main (int argc, char *argv[])
         if(vrbs) cout << tsr+3 << " [cpu_emu " << rcv_prt << "]: " << "bufSiz = " << bufSiz << " parsed.size = " << parsed.size 
                     << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
 
+        if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " recd " << parsed.frame_num << endl;
         if(vrbs)  cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Received request "
                       << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
