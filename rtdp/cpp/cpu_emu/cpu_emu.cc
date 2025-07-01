@@ -1,5 +1,3 @@
-#define DBG 0	//print extra verbosity apart from -v switch
-  
 //
 //  CPU Emulator for Real Time Development Program (RTDP)
 //
@@ -226,7 +224,7 @@ int main (int argc, char *argv[])
     double   cmpLt_sGB  = 500;   // seconds/(input GB) computational latency
     double   cmpLt_usB  = 0.5;   // usec/(input B) computational latency
     double   cmpLt_sMB  = 0.5;   // seconds/(input MB) computational latency
-    double   memGB      = 10;    // thread memory footprint in GB
+    double   memGB      = 0.01;    // thread memory footprint in GB
     double   otmemGB    = 0.01;  // program output in GB
     uint16_t zed        = 0;     //terminal node ?
     uint64_t frame_cnt  = 0;     //total frames sender will send
@@ -325,14 +323,14 @@ int main (int argc, char *argv[])
         if(!psdF) frame_cnt= stoi(mymap["frame_cnt"]) == 1;
     }    
     ////////
-    if(vrbs) cout << "[cpu_emu "   << rcv_prt                     << " ]: "
+    if(vrbs) cout << "[cpu_emu "   << rcv_prt << " ]: "
                 << " Operating with yaml = " << (psdY?yfn:"N/A")
                 << "\tcmpLt_sGB = " << cmpLt_sGB
-                << "\tdst_ip = "   << (trmnl?"N/A":string(dst_ip)) << "\tmemGB = "       << memGB
-                << "\totmemGB = "  << otmemGB                     << "\tdst_prt = "     << (trmnl?"N/A":to_string(dst_prt))
-                << "\trcv_prt = "  << rcv_prt                     << "\tsleep = "       << psdS
-                << "\tnmThrds = "  << nmThrds                     << "\tverbose = "   << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
-                << "\tterminal = " << trmnl << '\n';
+                << "\tdst_ip = "    << (trmnl?"N/A":string(dst_ip)) << "\tmemGB = "     << memGB
+                << "\totmemGB = "   << otmemGB                      << "\tdst_prt = "   << (trmnl?"N/A":to_string(dst_prt))
+                << "\trcv_prt = "   << rcv_prt                      << "\tsleep = "     << psdS
+                << "\tnmThrds = "   << nmThrds                      << "\tverbose = "   << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
+                << "\tterminal = "  << trmnl << '\n';
 
     // RNG for latency variance generation using a Gaussian (normal) distribution to generate a scaling factor 
     // centered around 1.0, with a standard deviation chosen so that ~99.7% of values fall 
@@ -350,26 +348,21 @@ int main (int argc, char *argv[])
 
     socket_t rcv_sckt(rcv_cntxt, socket_type::sub);
     if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Defining SUB protocol rcv socket" << endl;
-    //rcv_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length
+    //rcv_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length /////////////////////////////////////////////////////
 
-    //rcv_sckt.connect(string("tcp://*:") + to_string(rcv_prt));
-    //rcv_sckt.connect("tcp://localhost:5555");
     rcv_sckt.connect(string("tcp://localhost:") + to_string(rcv_prt));
     if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to receiver " + string("tcp://localhost:") + to_string(rcv_prt) << endl;
     // Subscribe to all messages (empty topic)
     rcv_sckt.set(zmq::sockopt::subscribe, "");
     if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " rcv subscibing" << endl;
 
+    //  Prepare our destination socket
+    if(!trmnl && vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
     context_t dst_cntxt(1);
     socket_t dst_sckt(dst_cntxt, socket_type::pub);
     dst_sckt.bind(string("tcp://*:") + to_string(dst_prt));
     dst_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
     
-    if(!trmnl) {
-        //  Prepare our destination socket
-        if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
-        //dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
-    }
     uint32_t request_nbr = 0;
     double   mnBfSz      = 0; //mean receive Size (bits)
     uint64_t bufSiz      = 0; //bits
@@ -397,14 +390,21 @@ int main (int argc, char *argv[])
         
         rtcd = rcv_sckt.recv (request, recv_flags::none);
         request_nbr++;
-        if(vrbs) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
-        auto parsed = deserialize_packet(static_cast<uint8_t*>(request.data()), request.size());
-        if(vrbs) cout << tsr+2 << " [cpu_emu " << rcv_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
+        auto parsed = deserialize_packet(tsr, rcv_prt, static_cast<uint8_t*>(request.data()), request.size());
+        now = high_resolution_clock::now();
+        us = duration_cast<microseconds>(now.time_since_epoch());
+        if(request_nbr == 1) {
+            tsr_base = parsed.timestamp; // establish zero offset clock from chain source
+            if (DBG) cout << 0 << " [cpu_emu " << rcv_prt << "]: " << " us.count = " << us.count() << " tsr_base = " << tsr_base << " tsr = " << tsr << endl;
+        }
+        tsr = us.count()-tsr_base;  //zero based clock usecs
+        if(DBG) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
+        if(DBG) cout << tsr+2 << " [cpu_emu " << rcv_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
         bufSiz = 8*rtcd.value(); //bits
 
 
-        if(vrbs) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "deserializing packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
-        if(vrbs) cout << tsr+3 << " [cpu_emu " << rcv_prt << "]: " << "bufSiz = " << bufSiz << " parsed.size = " << parsed.size 
+        if(DBG) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "deserializing packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
+        if(DBG) cout << tsr+3 << " [cpu_emu " << rcv_prt << "]: " << "bufSiz = " << bufSiz << " parsed.size = " << parsed.size 
                     << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
 
         if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " recd " << parsed.frame_num << endl;
@@ -415,14 +415,6 @@ int main (int argc, char *argv[])
         if(vrbs) cout << tsr+1  << " [cpu_emu " << rcv_prt << "]: " << " frame size = "
                       << "(actual) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
                       << " from client " << "ts = " << tsr << " (" << request_nbr << ')' << endl;
-
-        now = high_resolution_clock::now();
-        us = duration_cast<microseconds>(now.time_since_epoch());
-        if(request_nbr == 1) {
-            tsr_base = parsed.timestamp; // establish zero offset clock from chain source
-            if (DBG) cout << 0 << " [cpu_emu " << rcv_prt << "]: " << " us.count = " << us.count() << " tsr_base = " << tsr_base << " tsr = " << tsr << endl;
-        }
-        tsr = us.count()-tsr_base;  //zero based clock usecs
         if (DBG) cout << tsr+4 << " [cpu_emu " << rcv_prt << "]: " << " Recving us.count = " << us.count() << " tsr_base = " << tsr_base << " tsr = " << tsr << endl;
         //assert(bufSiz == parsed.size-sizeof(struct DeserializedPacket)); //bits
         stream_id =  parsed.stream_id ;
@@ -465,14 +457,14 @@ int main (int argc, char *argv[])
                 //represents harvested data
                 auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
                 std::vector<uint8_t> payload(outSz*x/8);  //represents harvested data
-                if(vrbs) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
-                auto data = serialize_packet(8*payload.size(), us.count(), parsed.stream_id, parsed.frame_num, payload);
-                if(vrbs) cout << tsr+2 << " [cpu_emu " << rcv_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
+                if(DBG) cout << tsr+1 << " [cpu_emu " << rcv_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
+                auto data = serialize_packet(tsr, rcv_prt, 8*payload.size(), parsed.timestamp, parsed.stream_id, parsed.frame_num, payload);
+                if(DBG) cout << tsr+2 << " [cpu_emu " << rcv_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
                 zmq::message_t message(data.size());
                 std::memcpy(message.data(), data.data(), data.size());
                 sr = dst_sckt.send(message, zmq::send_flags::none);
                 if (!sr) std::cerr << tsr << " [cpu_emu " << rcv_prt << "]:  Failed to send" << endl;
-                if (sr.has_value()) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: Bytes sent = " << sr.value() << endl;
+                if (vrbs && sr.has_value()) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: Bytes sent = " << sr.value() << endl;
 
                 if(vrbs) cout << tsr+3 << " [cpu_emu " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
                               << frame_num << ')' << " to " << dst_prt << " at " << tsr << " with code " << endl;

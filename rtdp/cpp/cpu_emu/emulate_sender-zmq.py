@@ -8,8 +8,9 @@ import argparse
 import random
 import numpy as np
 import sys
+import struct
 
-from buffer_packet_zmq_emu import serialize_buffer
+from buffer_packet_zmq_emu import serialize_buffer, HEADER_FORMAT, HEADER_SIZE
 
 def emulate_stream(
     port: int,
@@ -64,7 +65,19 @@ def emulate_stream(
         if frame_num == 1:  clk0 = clk #establish zero offset clock
         elpsd_tm = (clk-clk0) #usec
         print(f"{elpsd_tm} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})")            
-        buffer = serialize_buffer(size=frame_size, timestamp=int(clk), stream_id=99, frame_num=frame_num, payload=payload)
+        print(f"{elpsd_tm} [emulate_stream:] serialize_packet: Serializing frame: size = {frame_size} timestamp = {elpsd_tm} stream_id = {99} frame_num = ({frame_num}) ...")            
+        buffer = serialize_buffer(size=frame_size, timestamp=clk, stream_id=99, frame_num=frame_num, payload=payload)
+        
+        # Extract and unpack the header part
+        header = buffer[:HEADER_SIZE]
+        fields = struct.unpack(HEADER_FORMAT, header)
+
+        print(f" {elpsd_tm} [emulate_stream:] serialized_packet fields:")
+        print(f"  size      : {fields[0]/8}")
+        print(f"  timestamp : {fields[1]}")
+        print(f"  stream_id : {fields[2]}")
+        print(f"  frame_num : {fields[3]}")
+
         #print(f"{float(clk)} [emulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})", flush=True)            
         zmq_socket.send(buffer)
                 
