@@ -9,6 +9,7 @@ import random
 import numpy as np
 import sys
 import struct
+import math
 
 from buffer_packet_zmq_emu import serialize_buffer, HEADER_FORMAT, HEADER_SIZE
 
@@ -28,12 +29,15 @@ def emulate_stream(
 
     context = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)
-    zmq_socket.bind(f"tcp://localhost:{port}")
+    ######zmq_socket.bind("tcp://129.57.177.4:6333")
+    #zmq_socket.bind(f"tcp://localhost:{port}")  #fails
+    #zmq_socket.bind(f"tcp://127.0.0.1:{port}")  #fails
+    zmq_socket.bind(f"tcp://*:{port}")
     # Send will never block
     # optional: disable high water marksocket.setsockopt(zmq.LINGER, 0)  # don't wait on closesocket.bind("tcp://*:5555")
     zmq_socket.setsockopt(zmq.SNDHWM, 0) #int(1e2))  # Set send high water mark to 0 messages
 
-    time.sleep(1)  # Give receiver time to bind
+    #time.sleep(1)  # Give receiver time to bind
 
     # Enable socket monitor for connection events
     #print("[emulate_stream:] Monitoring connection ...")
@@ -43,7 +47,7 @@ def emulate_stream(
     
     avg_rate_bps = avg_rate_mbps * 1_000_000
     frame_size_mean = 60e3*10 # CLAS12 bits
-    std_dev = frame_size_mean * rms_fraction # bits
+    std_dev = 0.1 # 10 percent
     print(f"[emulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, rame_size_mean(Mb) = {frame_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
     
     cycle_period = 1.0  # seconds
@@ -55,11 +59,12 @@ def emulate_stream(
     rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
     while frame_cnt > frame_num:
         frame_num += 1
-        # Calculate frame size from normal distribution
-        if rms_fraction > 0:
-            frame_size = max(1, int(np.random.normal(frame_size_mean, std_dev)))
-        else:
-            frame_size = int(frame_size_mean)
+        # Calculate frame size from clamped normal distribution
+        frame_size_fctr = np.random.normal(1.0, std_dev)
+        frame_size_fctr = max(0.7, frame_size_fctr)
+        frame_size_fctr = min(1.3, frame_size_fctr)
+        #frame_size_fctr = math.clamp(frame_size_fctr, 0.7, 1.3)        
+        frame_size = int(frame_size_mean*frame_size_fctr)
         payload = bytearray(int(frame_size/8))
         clk = int(time.time()*1e6)  #microseconds *1e9 #nanoseconds
         if frame_num == 1:  clk0 = clk #establish zero offset clock
@@ -83,10 +88,7 @@ def emulate_stream(
                 
         rate_sleep = frame_size / avg_rate_bps  # in seconds
 
-        if frame_num == 1:
-            print(f"{elpsd_tm+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
-            print(f"{elpsd_tm+2} [emulate_stream:] Estimated bit rate (Gbps): {1e-6*frame_num*frame_size_mean/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
-        else:
+        if frame_num > 10:
             print(f"{elpsd_tm+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
             print(f"{elpsd_tm+2} [emulate_stream:] Estimated bit rate (Gbps): {1e-6*frame_num*frame_size_mean/float((1e-6*elpsd_tm)+rate_sleep)} frame_num {frame_num} elpsd_tm sec {1e-6*elpsd_tm}")
 
