@@ -113,7 +113,7 @@ def emulate_stream(
         #print(f"{elpsd_tm_us+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm_us)+rate_sleep_S)} frame_num {frame_num} elpsd_tm_us sec {1e-6*elpsd_tm_us}")
         print(f"{elpsd_tm_us+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((elpsd_tm_us*oneToM)+frame_num*rate_sleep_S)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
         #print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {1e-6*frame_num*frame_size_mean_B/float((1e-6*elpsd_tm_us)+rate_sleep_S)} frame_num {frame_num} elpsd_tm_us sec {1e-6*elpsd_tm_us}")
-        print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*Btob*oneToG/float((elpsd_tm_us*oneToM)+frame_num*rate_sleep_S)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
+        #print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*Btob*oneToG/float((elpsd_tm_us*oneToM)+frame_num*rate_sleep_S)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
         print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*Btob*oneToG/float(elpsd_tm_us*oneToM)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
         print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (bps): {frame_size_mean_B*Btob/rate_sleep_S} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
 

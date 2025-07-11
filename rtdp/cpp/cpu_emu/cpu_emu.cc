@@ -77,10 +77,10 @@ void   Usage()
 // Computational Function to emulate/stimulate processing load/latency, etc. 
 void func(size_t nmrd_B, size_t cmpLt_sGB, double memGB, bool psdS, uint16_t tag, bool vrbs=false) 
 { 
-    const float ts(cmpLt_sGB*nmrd_B/(GtoOne)); //reqd timespan in seconds
-    const float tsms(ts/oneToK); //reqd timespan in milliseconds
-    const float tsus(ts/oneToM); //reqd timespan in microseconds
-    const float tsns(ts/oneToG);    //reqd timespan in nanoseconds
+    const float ts_S(cmpLt_sGB*nmrd_B/(GtoOne)); //reqd timespan in seconds
+    const float ts_mS(ts_S/oneToK); //reqd timespan in milliseconds
+    const float ts_uS(ts_S/oneToM); //reqd timespan in microseconds
+    const float ts_nS(ts_S/oneToG);    //reqd timespan in nanoseconds
     size_t memSz = memGB*sz1K*sz1K*sz1K; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(sz1K*sz1K*sz1K)) << " Gbytes ..." << endl;
@@ -94,43 +94,43 @@ void func(size_t nmrd_B, size_t cmpLt_sGB, double memGB, bool psdS, uint16_t tag
         exit(1);
     }    
     //usefull work emulation 
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts   << " secs ..."  << " size " << nmrd_B << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << tsms << " msecs ..." << " size " << nmrd_B << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << tsus << " usecs ..." << " size " << nmrd_B << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << tsns << " nsecs ..." << " size " << nmrd_B << endl;
+    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_S   << " secs ..."  << " size " << nmrd_B << endl;
+    //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_mS << " msecs ..." << " size " << nmrd_B << endl;
+    //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_uS << " usecs ..." << " size " << nmrd_B << endl;
+    //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_nS << " nsecs ..." << " size " << nmrd_B << endl;
     if(psdS) {
-        auto cms_ns = chrono::nanoseconds(size_t(round(tsns)));
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts           << " secs ..."  << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << tsms         << " msecs ..." << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << tsus         << " usecs ..." << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << tsns         << " nsecs ..." << " size " << nmrd_B << endl;
+        auto cms_ns = chrono::nanoseconds(size_t(round(ts_nS)));
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_S  << " secs ..."  << " size " << nmrd_B << endl;
+        //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_mS << " msecs ..." << " size " << nmrd_B << endl;
+        //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_uS << " usecs ..." << " size " << nmrd_B << endl;
+        //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_nS << " nsecs ..." << " size " << nmrd_B << endl;
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for "       << float(cms_ns.count())*oneToG/oneToK  << " msecs ..." << " size " << nmrd_B << endl;
         this_thread::sleep_for(cms_ns);
     }else{
-        auto ts = (cmpLt_sGB*nmrd_B/GtoOne);
+        auto ts_S = (cmpLt_sGB*nmrd_B/GtoOne);
         //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         auto start_time = std::chrono::high_resolution_clock::now();
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning ...";
         
-        double fracsecs, secs;
-        fracsecs = modf (ts , &secs);
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs = " << fracsecs << endl;
+        double fracsecs_S, secs;
+        fracsecs_S = modf (ts_S , &secs);
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs_S = " << fracsecs_S << endl;
         size_t strtMem = 0;
         auto end_time = std::chrono::high_resolution_clock::now();
         duration<double> time_span = duration_cast<duration<double>>(end_time - start_time);
-        while (time_span.count() < ts) { 
+        while (time_span.count() < ts_S) { 
             for (size_t i = strtMem; i<min(strtMem + sz1K, memSz); i++) { x[i] = tanh(i); }
             strtMem += sz1K;
             if(strtMem > memSz - sz1K) strtMem = 0;
             end_time = std::chrono::high_resolution_clock::now();
             time_span = duration_cast<duration<double>>(end_time - start_time);
-            if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span.count() << " against "<< ts  << endl;
+            if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span.count() << " against "<< ts_S  << endl;
         }
-        auto tsc = time_span.count();
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc        << " secs "  << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc*oneToK << " msecs " << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc*oneToM << " usecs " << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc*oneToG << " nsecs " << " size " << nmrd_B << endl;
+        auto tsc_S = time_span.count();
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc_S        << " secs "  << " size " << nmrd_B << endl;
+        //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc_S*oneToK << " msecs " << " size " << nmrd_B << endl;
+        //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc_S*oneToM << " usecs " << " size " << nmrd_B << endl;
+        //if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc_S*oneToG << " nsecs " << " size " << nmrd_B << endl;
     }
     delete x;
 }
@@ -392,9 +392,9 @@ int main (int argc, char *argv[])
     uint32_t stream_id   = 0;
     uint32_t frame_num   = 0;
     uint32_t lst_frm_nm  = 0; //last frame number
-    uint64_t tsc         = 0; // computational latency
+    float    tsc_S       = 0; // computational latency seconds
     uint64_t tsn         = 0; // outbound network latency
-    uint64_t mxTsc       = 0; // computational latency
+    float    mxTsc       = 0; // computational latency
     uint64_t mxTsn       = 0; // computational latency
     uint64_t msdFrms     = 0; // missed frames count
     auto now = high_resolution_clock::now();
@@ -444,15 +444,15 @@ int main (int argc, char *argv[])
 
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
+        tsc_S = (cmpLt_sGB*parsed.size_B/GtoOne);
         {
 
-            tsc = cmpLt_sGB*(parsed.size_B)*oneToK/GtoOne; //reqd timespan in microseconds
-            mxTsc = max(mxTsc,tsc);
+            mxTsc = max(mxTsc,tsc_S);
 
             vector<thread> threads;
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
-                threads.push_back(thread(func, parsed.size_B, cmpLt_sGB, memGB, psdS, pub_prt, vrbs));
+                threads.push_back(thread(func, parsed.size_B, cmpLt_sGB, memGB, psdS, sub_prt, vrbs));
 
             for (auto& th : threads) th.join();
             //reqd computational timespan in usec    
@@ -497,7 +497,7 @@ int main (int argc, char *argv[])
         mnBfSz_B = (request_nbr-1)*mnBfSz_B/request_nbr + bufSiz_B/request_nbr; //incrementally update mean receive size
         // Record end time
         //if(request_nbr < 10) continue; //warmup
-        if(vrbs) std::cout << tsr_us + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: tsc = " << tsc << " tsn = " << tsn 
+        if(vrbs) std::cout << tsr_us + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: tsc_S = " << tsc_S << " tsn = " << tsn 
                            << " (" << frame_num << ") mxTsc = " << mxTsc << endl;
         if(vrbs) std::cout << tsr_us + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " << float(request_nbr)/(float(tsr_us)*oneToM) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
