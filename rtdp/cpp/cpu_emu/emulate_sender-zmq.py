@@ -92,11 +92,11 @@ def emulate_stream(
         header = buffer[:HEADER_SIZE]
         fields = struct.unpack(HEADER_FORMAT, header)
 
-        print(f" {elpsd_tm_us} [emulate_stream:] serialized_packet fields:")
-        print(f"  size      : {fields[0]}")
-        print(f"  timestamp : {fields[1]}")
-        print(f"  stream_id : {fields[2]}")
-        print(f"  frame_num : {fields[3]}")
+        #print(f" {elpsd_tm_us} [emulate_stream:] serialized_packet fields:")
+        #print(f"  size      : {fields[0]}")
+        #print(f"  timestamp : {fields[1]}")
+        #print(f"  stream_id : {fields[2]}")
+        #print(f"  frame_num : {fields[3]}")
 
         #print(f"{float(clk_S)} [emulate_stream:] Sending frame; size = {frame_size_B} frame_num = ({frame_num})", flush=True)            
         zmq_socket.send(buffer)
@@ -106,8 +106,8 @@ def emulate_stream(
         print(f"{elpsd_tm_us+3} [emulate_stream:] Rate Sleeping for: {rate_sleep_S} seconds")
         time.sleep(rate_sleep_S)
         clk_S = time.time()   #seconds since epoch
-        print(f"{elpsd_tm_us+3} [emulate_stream:] Read Raw clock as: {clk_S}")
         elpsd_tm_us = int((clk_S-clk0_S)*MtoOne) #usec
+        print(f"{elpsd_tm_us+3} [emulate_stream:] Read Raw clock as: {clk_S}")
 
         #if frame_num > 10:
         #print(f"{elpsd_tm_us+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm_us)+rate_sleep_S)} frame_num {frame_num} elpsd_tm_us sec {1e-6*elpsd_tm_us}")

@@ -75,9 +75,9 @@ void   Usage()
 }
 
 // Computational Function to emulate/stimulate processing load/latency, etc. 
-void func(size_t nmrd_B, size_t cmpLt_sGB, double memGB, bool psdS, uint16_t tag, bool vrbs=false) 
+void func(size_t nmrd_B, size_t cmpLt_S_GB, double memGB, bool psdS, uint16_t tag, bool vrbs=false) 
 { 
-    const float ts_S(cmpLt_sGB*nmrd_B/(GtoOne)); //reqd timespan in seconds
+    const float ts_S(cmpLt_S_GB*nmrd_B/(GtoOne)); //reqd timespan in seconds
     const float ts_mS(ts_S/oneToK); //reqd timespan in milliseconds
     const float ts_uS(ts_S/oneToM); //reqd timespan in microseconds
     const float ts_nS(ts_S/oneToG);    //reqd timespan in nanoseconds
@@ -107,7 +107,7 @@ void func(size_t nmrd_B, size_t cmpLt_sGB, double memGB, bool psdS, uint16_t tag
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for "       << float(cms_ns.count())*oneToG/oneToK  << " msecs ..." << " size " << nmrd_B << endl;
         this_thread::sleep_for(cms_ns);
     }else{
-        auto ts_S = (cmpLt_sGB*nmrd_B/GtoOne);
+        auto ts_S = (cmpLt_S_GB*nmrd_B/GtoOne);
         //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         auto start_time = std::chrono::high_resolution_clock::now();
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning ...";
@@ -238,7 +238,7 @@ int main (int argc, char *argv[])
     // 500 seconds/(input GB) computational latency for 60kB CLAS12
     // 0.5 microseconds/byte
     // 0.5 seconds per megabyte
-    double   cmpLt_sGB  = 500;   // seconds/(input GB) computational latency
+    double   cmpLt_S_GB  = 500;   // seconds/(input GB) computational latency
     double   cmpLt_usB  = 0.5;   // usec/(input B) computational latency
     double   cmpLt_sMB  = 0.5;   // seconds/(input MB) computational latency
     double   memGB      = 0.01;    // thread memory footprint in GB
@@ -256,9 +256,9 @@ int main (int argc, char *argv[])
             Usage();
             exit(1);
         case 'b':
-            cmpLt_sGB = (double) atof((const char *) optarg) ;
+            cmpLt_S_GB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -b " << cmpLt_sGB << endl;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -b " << cmpLt_S_GB << endl;
             break;
         case 'i':
             strcpy(sub_ip, (const char *) optarg) ;
@@ -329,7 +329,7 @@ int main (int argc, char *argv[])
     if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), pub_prt, vrbs);
         //cmd line parms overide yaml file settings (which are otherwise in the map)
-        if(!psdB) cmpLt_sGB = stof(mymap["latency"]);
+        if(!psdB) cmpLt_S_GB = stof(mymap["latency"]);
         //if(!psdI) strcpy(sub_ip, mymap["sbscrptn_ip"].c_str());
         if(!psdM) memGB    = stof(mymap["mem_footprint"]);
         if(!psdO) otmemGB  = stof(mymap["output_size"]);
@@ -344,7 +344,7 @@ int main (int argc, char *argv[])
     ////////
     if(vrbs) cout << "[cpu_emu "   << sub_prt << " ]: "
                 << " Operating with yaml = " << (psdY?yfn:"N/A")
-                << "\tcmpLt_sGB = " << cmpLt_sGB << "\tsub_ip = "  << sub_ip
+                << "\tcmpLt_sGB = " << cmpLt_S_GB << "\tsub_ip = "  << sub_ip
                 << "\tsub_prt = "   << sub_prt   << "\tpub_prt = " << pub_prt                               
                 << "\tmemGB = "     << memGB     << "\totmemGB = " << otmemGB << "\tsleep = "   << psdS
                 << "\tnmThrds = "   << nmThrds   << "\tverbose = " << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
@@ -366,7 +366,7 @@ int main (int argc, char *argv[])
 
     socket_t sub_sckt(sub_cntxt, socket_type::sub);
     if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Defining SUB protocol rcv socket" << endl;
-    //sub_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length /////////////////////////////////////////////////////
+    sub_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length
 
     sub_sckt.connect(string("tcp://") + sub_ip + ':' + to_string(sub_prt));
     if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Subscribing to " << sub_ip << ':' + to_string(sub_prt) << endl;
@@ -383,15 +383,16 @@ int main (int argc, char *argv[])
     	pub_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
     }
     
-    uint32_t request_nbr = 0;
-    double   mnBfSz_B      = 0; //mean receive Size bytes
-    uint64_t bufSiz_B      = 0; //bytes
-    uint64_t cmBufSiz_B    = 0; //bytes - cummulative
-    uint64_t tsr_us         = 0; // system hi-res clock in microseconds since epoch
-    uint64_t tsr_base_us    = 0; // base system hi-res clock in microseconds since epoch
+    uint32_t request_nbr = 1;
+    double   mnBfSz_B    = 0; //mean receive Size bytes
+    uint64_t bufSiz_B    = 0; //bytes
+    uint64_t cmBufSiz_B  = 0; //bytes - cummulative
+    uint64_t tsr_uS      = 0; // system hi-res clock in microseconds since epoch
+    uint64_t tsr_base_us = 0; // local base system hi-res clock in microseconds since epoch
+    uint64_t ups_base_us = 0; // upstream base system hi-res clock in microseconds since epoch
     uint32_t stream_id   = 0;
     uint32_t frame_num   = 0;
-    uint32_t lst_frm_nm  = 0; //last frame number
+    uint32_t lst_frm_nm  = frame_num; //last frame number
     float    tsc_S       = 0; // computational latency seconds
     uint64_t tsn         = 0; // outbound network latency
     float    mxTsc       = 0; // computational latency
@@ -404,47 +405,65 @@ int main (int argc, char *argv[])
         message_t request;
 
         //  Wait for next request from client
-        if(vrbs) cout << tsr_us << " [cpu_emu " << sub_prt << "]: " << " Waiting for source ..." << endl;
+        if(vrbs) cout << tsr_uS << " [cpu_emu " << sub_prt << "]: " << " Waiting for source ..." << endl;
         
         recv_result_t rtcd;
         
-        rtcd = sub_sckt.recv (request, recv_flags::none);
-        request_nbr++;
-        auto parsed = deserialize_packet(tsr_us, pub_prt, static_cast<uint8_t*>(request.data()), request.size());
-        now = high_resolution_clock::now();
-        us = duration_cast<microseconds>(now.time_since_epoch());
-        if(request_nbr == 1) {
-            tsr_base_us = parsed.timestamp_us; // establish zero offset clock from chain source
-            if (DBG) cout << 0 << " [cpu_emu " << sub_prt << "]: " << " us.count = " << us.count() << " tsr_base_us = " << tsr_base_us << " tsr_us = " << tsr_us << endl;
-        }
-        tsr_us = us.count()-tsr_base_us;  //zero based clock usecs
-        if(DBG) cout << tsr_us+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
-        if(DBG) cout << tsr_us+2 << " [cpu_emu " << sub_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
-        bufSiz_B = 8*rtcd.value(); //bits
-
-
-        if(DBG) cout << tsr_us+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
-        if(DBG) cout << tsr_us+3 << " [cpu_emu " << sub_prt << "]: " << "bufSiz_B = " << bufSiz_B << " parsed.size = " << parsed.size_B 
-                    << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
-
-        if(vrbs) std::cout << tsr_us << " [cpu_emu " << sub_prt << "]: " << " recd " << parsed.frame_num << endl;
-        if(vrbs)  cout << tsr_us << " [cpu_emu " << sub_prt << "]: " << " Received request "
-                      << request_nbr << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
-                      << " rtcd = " << int(rtcd.value()) << " from client" << endl;
-                      
-        if(vrbs) cout << tsr_us+1  << " [cpu_emu " << sub_prt << "]: " << " frame size = "
-                      << "(actual) " << bufSiz_B << " bytes " << bufSiz_B*oneToG << " GB "
-                      << " from client " << "ts = " << tsr_us << " (" << request_nbr << ')' << endl;
-        if (DBG) cout << tsr_us+4 << " [cpu_emu " << sub_prt << "]: " << " Recving us.count = " << us.count() << " tsr_base_us = " << tsr_base_us << " tsr_us = " << tsr_us << endl;
+        rtcd = sub_sckt.recv (request, recv_flags::none);   ///////////  need a timeout here ///////////////////////////
+        auto parsed = deserialize_packet(tsr_uS, pub_prt, static_cast<uint8_t*>(request.data()), request.size());
         //assert(bufSiz_B == parsed.size-sizeof(struct DeserializedPacket)); //bits
         stream_id =  parsed.stream_id ;
         frame_num =  parsed.frame_num ;
-        if(frame_num > lst_frm_nm + 1) msdFrms += frame_num - (lst_frm_nm + 1);
+        if(frame_num > lst_frm_nm + 1) msdFrms += frame_num - (lst_frm_nm + 1); //might have missed more than one
         lst_frm_nm = frame_num;
+        now         = high_resolution_clock::now();
+        us          = duration_cast<microseconds>(now.time_since_epoch());
+        if(frame_num == 1) {
+            ups_base_us = parsed.timestamp_us; // establish upstream zero offset clock from chain source
+            tsr_base_us = us.count();  // establish componenty zero offset clock from local time
+            if (vrbs) cout << 0 << " [cpu_emu " << sub_prt << "]: " << " us.count = " << us.count() << " tsr_base_us = " << tsr_base_us << " tsr_uS = " << tsr_uS << endl;
+        }
+        tsr_uS = us.count()-tsr_base_us;  //zero based current clock usecs
+        cout << tsr_uS  << " [cpu_emu " << sub_prt << "]: updating tsr_uS to " << tsr_uS << endl;
+        
+
+        if(DBG) cout << tsr_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
+        if(DBG) cout << tsr_uS+2 << " [cpu_emu " << sub_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
+        bufSiz_B = 8*rtcd.value(); //bits
+
+
+        if(DBG) cout << tsr_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet ... request.size() " << request.size() << " HEADER_SIZE = " << HEADER_SIZE << endl;
+        if(DBG) cout << tsr_uS+3 << " [cpu_emu " << sub_prt << "]: " << "bufSiz_B = " << bufSiz_B << " parsed.size = " << parsed.size_B 
+                    << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
+
+        if(vrbs) std::cout << tsr_uS << " [cpu_emu " << sub_prt << "]: " << " recd " << parsed.frame_num << endl;
+        if(vrbs)  cout << tsr_uS << " [cpu_emu " << sub_prt << "]: " << " Received request "
+                      << request_nbr << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
+                      << " rtcd = " << int(rtcd.value()) << " from client" << endl;
+                      
+        if(vrbs) cout << tsr_uS+1  << " [cpu_emu " << sub_prt << "]: " << " frame size = "
+                      << "(actual) " << bufSiz_B << " bytes " << bufSiz_B*oneToG << " GB "
+                      << " from client " << "ts = " << tsr_uS << " (" << request_nbr << ')' << endl;
+        if (DBG) cout << tsr_uS+4 << " [cpu_emu " << sub_prt << "]: " << " Recving us.count = " << us.count() << " tsr_base_us = " << tsr_base_us << " tsr_uS = " << tsr_uS << endl;
+
+        uint64_t tsr1_uS = parsed.timestamp_us - ups_base_us + tsn;  ///////////////// drop check here
+        //cout << tsr_uS  << " [cpu_emu " << sub_prt << "]: parsed.timestamp_us " << parsed.timestamp_us << " tsr_base_uS " << tsr_base_us << " tsn " << tsn << endl;
+        cout << tsr_uS  << " [cpu_emu " << sub_prt << "]: comparing tsr_uS " 
+             << tsr_uS << " to tsr1_uS " << tsr1_uS << " frame " << frame_num << endl;
+        if(tsr_uS > tsr1_uS) {
+            if(vrbs) {
+                cout << tsr_uS  << " [cpu_emu " << sub_prt << "]:  dropped (" << frame_num << ')'  
+                    << " request_nbr " << request_nbr << "(tsr_uS,tsr1_uS) (" << tsr_uS << ',' << tsr1_uS << ')' << endl;
+                    }
+            if(frame_num != 0) {
+                if(vrbs) cout << tsr_uS << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
+                continue;
+            }
+        }
 
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
-        tsc_S = (cmpLt_sGB*parsed.size_B/GtoOne);
+        tsc_S = (cmpLt_S_GB*parsed.size_B/GtoOne);
         {
 
             mxTsc = max(mxTsc,tsc_S);
@@ -452,19 +471,19 @@ int main (int argc, char *argv[])
             vector<thread> threads;
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
-                threads.push_back(thread(func, parsed.size_B, cmpLt_sGB, memGB, psdS, sub_prt, vrbs));
+                threads.push_back(thread(func, parsed.size_B, cmpLt_S_GB, memGB, psdS, sub_prt, vrbs));
 
             for (auto& th : threads) th.join();
             //reqd computational timespan in usec    
-            now = high_resolution_clock::now();
-            us = duration_cast<microseconds>(now.time_since_epoch());
-            tsr_us = us.count()-tsr_base_us;  //zero based clock
-            if (DBG) cout << tsr_us+1 << " [cpu_emu " << sub_prt << "]: " << " Syncrhonizing us.count = " << us.count() << " tsr_base_us = " << tsr_base_us << " tsr_us = " << tsr_us << endl;
-            if(vrbs) cout << tsr_us  << " [cpu_emu " << sub_prt << "]: " << " synchronized all threads..." << endl;
+            now    = high_resolution_clock::now();
+            us     = duration_cast<microseconds>(now.time_since_epoch());
+            tsr_uS = us.count()-tsr_base_us;  //zero based clock
+            if (DBG) cout << tsr_uS+1 << " [cpu_emu " << sub_prt << "]: " << " Syncrhonizing us.count = " << us.count() << " tsr_base_us = " << tsr_base_us << " tsr_uS = " << tsr_uS << endl;
+            if(vrbs) cout << tsr_uS  << " [cpu_emu " << sub_prt << "]: " << " synchronized all threads..." << endl;
         }
 
         if(!trmnl) {
-            if(DBG) cout << tsr_us+2  << " [cpu_emu " << sub_prt << "]: " << " Forwarding "
+            if(DBG) cout << tsr_uS+2  << " [cpu_emu " << sub_prt << "]: " << " Forwarding "
                           << " request " << frame_num << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
                           << " to port " + string("tcp://") + sub_ip + ':' +  to_string(sub_prt) << " (" << frame_num << ')' << endl;
             // Publish a message for subscribers
@@ -476,39 +495,40 @@ int main (int argc, char *argv[])
                 //represents harvested data
                 auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
                 std::vector<uint8_t> payload(outSz*x);  //represents harvested data
-                if(DBG) cout << tsr_us+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
-                auto data = serialize_packet(tsr_us, pub_prt, payload.size(), parsed.timestamp_us, parsed.stream_id, parsed.frame_num, payload);
-                if(DBG) cout << tsr_us+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
+                if(DBG) cout << tsr_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
+                auto data = serialize_packet(tsr_uS, pub_prt, payload.size(), parsed.timestamp_us, parsed.stream_id, parsed.frame_num, payload);
+                if(DBG) cout << tsr_uS+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
                 zmq::message_t message(data.size());
                 std::memcpy(message.data(), data.data(), data.size());
                 sr = pub_sckt.send(message, zmq::send_flags::none);
-                if (!sr) std::cerr << tsr_us << " [cpu_emu " << sub_prt << "]:  Failed to send" << endl;
-                if (vrbs && sr.has_value()) std::cout << tsr_us << " [cpu_emu " << sub_prt << "]: Bytes sent = " << sr.value() << endl;
+                if (!sr) std::cerr << tsr_uS << " [cpu_emu " << sub_prt << "]:  Failed to send" << endl;
+                if (vrbs && sr.has_value()) std::cout << tsr_uS << " [cpu_emu " << sub_prt << "]: Bytes sent = " << sr.value() << endl;
 
-                if(vrbs) cout << tsr_us+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << outSz << " (" 
-                              << frame_num << ')' << " to " << pub_prt << " at " << tsr_us << " with code " << endl;
-                if(DBG) cout << tsr_us+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
+                if(vrbs) cout << tsr_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << outSz << " (" 
+                              << frame_num << ')' << " to " << pub_prt << " at " << tsr_uS << " with code " << endl;
+                if(DBG) cout << tsr_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
-                if(sr.value() != HEADER_SIZE + payload.size()) cout << tsr_us+3 << "[cpu_emu " << sub_prt << "]: " << " sbscrptn_ip data incorrect size(" << request_nbr << ") "  << endl;
+                if(sr.value() != HEADER_SIZE + payload.size()) cout << tsr_uS+3 << "[cpu_emu " << sub_prt << "]: " << " sbscrptn_ip data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
-        if(vrbs) cout << tsr_us + 4 << " [cpu_emu " << sub_prt << "]:  done (" << frame_num << ')' << endl;
+        if(vrbs) cout << tsr_uS + 4 << " [cpu_emu " << sub_prt << "]:  done (" << frame_num << ')' << endl;
  
         mnBfSz_B = (request_nbr-1)*mnBfSz_B/request_nbr + bufSiz_B/request_nbr; //incrementally update mean receive size
         // Record end time
         //if(request_nbr < 10) continue; //warmup
-        if(vrbs) std::cout << tsr_us + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: tsc_S = " << tsc_S << " tsn = " << tsn 
+        if(vrbs) std::cout << tsr_uS + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: tsc_S = " << tsc_S << " tsn = " << tsn 
                            << " (" << frame_num << ") mxTsc = " << mxTsc << endl;
-        if(vrbs) std::cout << tsr_us + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " << float(request_nbr)/(float(tsr_us)*oneToM) 
+        if(vrbs) std::cout << tsr_uS + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " << float(request_nbr)/(float(tsr_uS)*oneToM) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
-        if(vrbs) std::cout << tsr_us + 7 << " [cpu_emu " << sub_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz_B)/(float(tsr_us)*oneToM)
+        if(vrbs) std::cout << tsr_uS + 7 << " [cpu_emu " << sub_prt << "]: " << " Measured bit rate " << 1e-6*float(request_nbr*mnBfSz_B)/(float(tsr_uS)*oneToM)
                            << " MHz mnBfSz_B " << mnBfSz_B << " (" << frame_num << ')' << endl;
-        if(vrbs) cout << tsr_us + 8 << " [cpu_emu " << sub_prt << "]:  Missed frames: " << msdFrms << endl;
-        if(vrbs) cout << tsr_us + 9 << " [cpu_emu " << sub_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
+        if(vrbs) cout << tsr_uS + 8 << " [cpu_emu " << sub_prt << "]:  Missed frames: " << msdFrms << endl;
+        if(vrbs) cout << tsr_uS + 9 << " [cpu_emu " << sub_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
                       << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
-        cout  << tsr_us + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
+        cout  << tsr_uS + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
+        request_nbr++;
     } //main loop
-    cout  << tsr_us + 11 << " [cpu_sim " << pub_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") << " exiting: mxTsc = " << mxTsc << endl;
+    cout  << tsr_uS + 11 << " [cpu_emu " << pub_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") << " exiting: mxTsc = " << mxTsc << endl;
     std::cout.flush();
     std::cerr.flush();
     return 0;

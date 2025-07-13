@@ -360,7 +360,10 @@ int main (int argc, char *argv[])
             if(tsr>tsr1) {
                 if(vrbs) {cout << tsr1 + 0.3 << " [cpu_sim " << rcv_prt << "]:  dropped (" << frame_num << ')'  
                                << " request_nbr " << request_nbr << "(tsr,tsr1) (" << tsr << ',' << tsr1 << ')' << endl;}
-                if(frame_num != 0) {if(vrbs) cout << tsr - 0.01 << " [cpu_sim " << rcv_prt << "]: " << " going to wait_for_frame " << endl; continue;}
+                if(frame_num != 0) {
+                    if(vrbs) cout << tsr - 0.01 << " [cpu_sim " << rcv_prt << "]: " << " going to wait_for_frame " << endl; 
+                    continue;
+                }
             } else {
                 tsr = tsr1 + 1; // advance the clock
             }
