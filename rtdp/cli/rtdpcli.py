@@ -301,7 +301,8 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
     workflow_name = os.path.basename(workflow_abs)
     
     if os.path.exists(config_path):
-        click.echo("Found config file, processing...")
+        click.echo(f"📋 Found config file: {os.path.basename(config_path)}")
+        click.echo(f"   Processing workflow configuration...")
         with open(config_path, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
@@ -323,7 +324,13 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
                     unique_sifs = extract_sif_requirements(cfg)
                     
                     if unique_sifs:
-                        click.echo(f"Processing {len(unique_sifs)} SIF containers...")
+                        click.echo(f"🔧 Processing {len(unique_sifs)} SIF containers...")
+                        click.echo(f"   Using {parallel_builds} parallel builds")
+                        if cache:
+                            click.echo(f"   Caching enabled (skips existing containers)")
+                        else:
+                            click.echo(f"   Caching disabled (force rebuild)")
+                        click.echo(f"   ⏳ Building containers in parallel... (this may take several minutes)")
                         
                         # Build SIFs in parallel
                         with ThreadPoolExecutor(max_workers=parallel_builds) as executor:
@@ -333,39 +340,67 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
                                 for sif_path, docker_img in unique_sifs
                             }
                             
+                            click.echo(f"   📊 Building {len(unique_sifs)} containers...")
+                            
                             # Collect results as they complete
                             for future in as_completed(future_to_sif):
                                 sif_path, docker_img = future_to_sif[future]
                                 try:
                                     success, message = future.result()
                                     if success:
-                                        click.echo(f"✓ {message}")
+                                        click.echo(f"   ✅ {message}")
                                     else:
                                         raise click.ClickException(message)
                                 except Exception as e:
                                     raise click.ClickException(f"Failed to build SIF {sif_path}: {e}")
                         
-                        click.echo("All SIF containers processed successfully!")
+                        click.echo(f"🎉 All SIF containers processed successfully!")
                     else:
-                        click.echo("No SIF containers need to be built.")
+                        click.echo(f"✅ No SIF containers need to be built (all up-to-date)")
                         
             except Exception as e:
-                click.echo(f"[Warning] Could not auto-build SIF: {e}")
+                click.echo(f"⚠️  [Warning] Could not auto-build SIF: {e}")
+                click.echo(f"   Proceeding with workflow installation...")
     else:
-        click.echo(f"Config file not found at {config_path}")
+        click.echo(f"⚠️  Config file not found at {config_path}")
+        click.echo(f"   Skipping SIF container building")
+        click.echo(f"   Proceeding with workflow installation...")
     
     try:
         os.chdir(workflow_abs)
-        click.echo(f"Installing workflow '{workflow_name}'...")
+        
+        # Install workflow
+        click.echo(f"📦 Installing workflow '{workflow_name}'...")
+        click.echo(f"   Working directory: {workflow_abs}")
+        click.echo(f"   Flow file: {os.path.basename(flow_path)}")
+        click.echo(f"   ⏳ Installation in progress... (this may take a moment)")
+        
         result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}'])
         if result1.returncode != 0:
             raise click.ClickException("cylc install failed")
+        click.echo(f"✅ Workflow '{workflow_name}' installed successfully!")
         
-        click.echo(f"Starting workflow '{workflow_name}'...")
+        # Start workflow
+        click.echo(f"🚀 Starting workflow '{workflow_name}'...")
+        click.echo(f"   This will launch the workflow in the background")
+        click.echo(f"   Use 'cylc tui {workflow_name}' to monitor progress")
+        click.echo(f"   ⏳ Startup in progress... (this may take a moment)")
+        
         result2 = subprocess.run(['cylc', 'play', workflow_name])
         if result2.returncode != 0:
             raise click.ClickException("cylc play failed")
-        click.echo(f"Workflow '{workflow_name}' started successfully!")
+        
+        click.echo(f"🎉 Workflow '{workflow_name}' started successfully!")
+        click.echo(f"📊 Monitor with: cylc tui {workflow_name}")
+        click.echo(f"📋 Status with: cylc status {workflow_name}")
+        
+        # Summary
+        click.echo(f"\n📈 Summary:")
+        click.echo(f"   • Workflow: {workflow_name}")
+        click.echo(f"   • Status: Running")
+        click.echo(f"   • Directory: {workflow_abs}")
+        click.echo(f"   • Next steps: Use 'cylc tui {workflow_name}' to monitor")
+        
     finally:
         os.chdir(orig_dir)
 
