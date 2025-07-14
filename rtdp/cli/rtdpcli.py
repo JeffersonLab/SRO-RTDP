@@ -392,14 +392,16 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
         
         click.echo(f"🎉 Workflow '{workflow_name}' started successfully!")
         click.echo(f"📊 Monitor with: cylc tui {workflow_name}")
-        click.echo(f"📋 Status with: cylc status {workflow_name}")
+        click.echo(f"📋 List workflows: cylc scan")
+        click.echo(f"📋 Stop workflow: cylc stop {workflow_name}")
         
         # Summary
         click.echo(f"\n📈 Summary:")
         click.echo(f"   • Workflow: {workflow_name}")
         click.echo(f"   • Status: Running")
         click.echo(f"   • Directory: {workflow_abs}")
-        click.echo(f"   • Next steps: Use 'cylc tui {workflow_name}' to monitor")
+        click.echo(f"   • Monitor: cylc tui {workflow_name}")
+        click.echo(f"   • Stop: cylc stop {workflow_name}")
         
     finally:
         os.chdir(orig_dir)
