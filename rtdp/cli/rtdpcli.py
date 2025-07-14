@@ -290,13 +290,15 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
     orig_dir = os.getcwd()
-    flow_path = os.path.join(workflow, 'flow.cylc')
+    # Convert to absolute path to avoid issues with directory changes
+    workflow_abs = os.path.abspath(workflow)
+    flow_path = os.path.join(workflow_abs, 'flow.cylc')
     if not os.path.exists(flow_path):
         raise click.ClickException(f"No flow.cylc found in {workflow}")
     
     # Only use config if present in workflow directory
-    config_path = os.path.join(workflow, 'config.yml')
-    workflow_name = os.path.basename(os.path.abspath(workflow))
+    config_path = os.path.join(workflow_abs, 'config.yml')
+    workflow_name = os.path.basename(workflow_abs)
     
     if os.path.exists(config_path):
         click.echo("Found config file, processing...")
@@ -311,11 +313,11 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
                     cache = None if disable_cache else SIFCache()
                     
                     # Find SIF(s) from config using optimized extraction
-                    sif_dir = os.path.join(workflow, 'sifs')
+                    sif_dir = os.path.join(workflow_abs, 'sifs')
                     os.makedirs(sif_dir, exist_ok=True)
                     
                     # Change to workflow directory for SIF building
-                    os.chdir(workflow)
+                    os.chdir(workflow_abs)
                     
                     # Extract SIF requirements efficiently
                     unique_sifs = extract_sif_requirements(cfg)
@@ -353,7 +355,7 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
         click.echo(f"Config file not found at {config_path}")
     
     try:
-        os.chdir(workflow)
+        os.chdir(workflow_abs)
         click.echo(f"Installing workflow '{workflow_name}'...")
         result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}'])
         if result1.returncode != 0:
