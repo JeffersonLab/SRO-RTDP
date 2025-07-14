@@ -257,7 +257,9 @@
                 -w ${PROXY_MATRIX_WIDTH} \
                 -r ${PROXY_RATE} \
                 --hwm ${PROXY_SOCKET_HWM} \
-                2>${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log &
+                2>${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [PROXY_{{ loop.index0 }}] $line" >> "${CONSOLIDATED_LOG}"
+                done &
             PROXY_PID=$!
             log_message "GPU proxy started with PID ${PROXY_PID}"
 
@@ -348,7 +350,9 @@
 
             # Start receiver
             log_message "Starting receiver process"
-            apptainer run --pwd /tmp ${SIF_FILE} receiver -p ${RECV_PORT} -v 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /tmp ${SIF_FILE} receiver -p ${RECV_PORT} -v 2>${LOG_DIR}/receiver/apptainer.log | tee -a "${LOG_DIR}/receiver/stdout.log" | while IFS= read -r line; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [RECEIVER] $line" >> "${CONSOLIDATED_LOG}"
+            done &
             RECV_PID=$!
             log_message "Receiver started with PID ${RECV_PID}"
 
