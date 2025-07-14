@@ -3,6 +3,11 @@ import yaml
 import os
 from jinja2 import Template, Environment, meta, nodes
 import subprocess
+import concurrent.futures
+import hashlib
+import json
+from pathlib import Path
+from .sif_cache import SIFCache
 
 # Update workflow_types to include new multi-component templates
 workflow_types = {
@@ -31,6 +36,78 @@ workflow_types = {
         'description': 'Mixed multi-component workflow'
     }
 }
+
+# SIF container mapping for faster lookups
+SIF_MAPPING = {
+    'gpu-proxy': 'jlabtsai/rtdp-gpu_proxy:latest',
+    'cpu-emu': 'jlabtsai/rtdp-cpu_emu:latest',
+    'gpu-proxy.sif': 'jlabtsai/rtdp-gpu_proxy:latest',
+    'cpu-emu.sif': 'jlabtsai/rtdp-cpu_emu:latest',
+}
+
+def get_docker_image_for_sif(sif_name):
+    """Get Docker image for SIF name with optimized lookup."""
+    return SIF_MAPPING.get(sif_name)
+
+def build_sif_container(sif_path, docker_img, cache=None):
+    """Build a single SIF container with caching support."""
+    # Check cache first
+    if cache and cache.is_sif_valid(sif_path, docker_img):
+        return True, f"SIF {sif_path} is up-to-date (cached)"
+    
+    try:
+        result = subprocess.run(
+            ['apptainer', 'build', sif_path, f'docker://{docker_img}'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # Update cache after successful build
+        if cache:
+            cache.update_cache(sif_path, docker_img)
+        
+        return True, f"Successfully built {sif_path}"
+    except subprocess.CalledProcessError as e:
+        return False, f"Failed to build SIF {sif_path}: {e.stderr}"
+
+def extract_sif_requirements(config_data):
+    """Extract SIF requirements from config more efficiently."""
+    unique_sifs = set()
+    
+    # Helper function to add SIF if needed
+    def add_sif_if_needed(sif_name, sif_dir):
+        if not sif_name:
+            return
+        sif_path = os.path.join(sif_dir, sif_name)
+        docker_img = get_docker_image_for_sif(sif_name)
+        if docker_img and not os.path.exists(sif_path):
+            unique_sifs.add((sif_path, docker_img))
+    
+    # Check all sections that might contain image_path
+    sections_to_check = [
+        config_data.get('containers', {}),
+        config_data.get('sender', {}),
+        config_data.get('receiver', {}),
+        *config_data.get('components', []),
+        *config_data.get('gpu_proxies', []),
+        *config_data.get('cpu_emulators', [])
+    ]
+    
+    for section in sections_to_check:
+        if isinstance(section, dict) and 'image_path' in section:
+            add_sif_if_needed(section['image_path'], 'sifs')
+    
+    # Handle default SIF names for GPU proxies and CPU emulators
+    for proxy in config_data.get('gpu_proxies', []):
+        if isinstance(proxy, dict) and proxy.get('device') == 'gpu':
+            add_sif_if_needed('gpu-proxy.sif', 'sifs')
+    
+    for emu in config_data.get('cpu_emulators', []):
+        if isinstance(emu, dict) and emu.get('device') == 'cpu':
+            add_sif_if_needed('cpu-emu.sif', 'sifs')
+    
+    return unique_sifs
 
 @click.group()
 def cli():
@@ -202,142 +279,91 @@ def example_config(template):
 
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
-def run(workflow):
+@click.option('--parallel-builds', default=2, help='Number of parallel SIF builds (default: 2)')
+@click.option('--skip-sif-build', is_flag=True, help='Skip SIF container building')
+@click.option('--disable-cache', is_flag=True, help='Disable SIF caching')
+def run(workflow, parallel_builds, skip_sif_build, disable_cache):
     """Run a workflow: build SIF if missing (only if config is in workflow dir), cd to dir, cylc install --workflow-name=NAME, then cylc play NAME."""
     import subprocess
     import os
     import yaml
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
     orig_dir = os.getcwd()
     flow_path = os.path.join(workflow, 'flow.cylc')
     if not os.path.exists(flow_path):
         raise click.ClickException(f"No flow.cylc found in {workflow}")
+    
     # Only use config if present in workflow directory
     config_path = os.path.join(workflow, 'config.yml')
-    click.echo(f"Looking for config file at: {config_path}")
     workflow_name = os.path.basename(os.path.abspath(workflow))
+    
     if os.path.exists(config_path):
-        click.echo("Found config file, reading...")
+        click.echo("Found config file, processing...")
         with open(config_path, 'r') as f:
             try:
                 cfg = yaml.safe_load(f)
-                click.echo(f"Config contents: {cfg}")
                 if 'workflow' in cfg and 'name' in cfg['workflow']:
                     workflow_name = cfg['workflow']['name']
-                # Find SIF(s) from config
-                sif_dir = os.path.join(workflow, 'sifs')
-                os.makedirs(sif_dir, exist_ok=True)
                 
-                # Use a set to track unique SIFs
-                unique_sifs = set()
-                
-                # Check containers section
-                containers = cfg.get('containers', {})
-                click.echo(f"Containers section: {containers}")
-                if 'image_path' in containers:
-                    sif_name = containers['image_path']
-                    sif_path = os.path.join(sif_dir, sif_name)
-                    click.echo(f"Found image_path: {sif_name}")
-                    if 'gpu-proxy' in sif_name:
-                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
-                    elif 'cpu-emu' in sif_name:
-                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
+                if not skip_sif_build:
+                    # Initialize cache if not disabled
+                    cache = None if disable_cache else SIFCache()
+                    
+                    # Find SIF(s) from config using optimized extraction
+                    sif_dir = os.path.join(workflow, 'sifs')
+                    os.makedirs(sif_dir, exist_ok=True)
+                    
+                    # Change to workflow directory for SIF building
+                    os.chdir(workflow)
+                    
+                    # Extract SIF requirements efficiently
+                    unique_sifs = extract_sif_requirements(cfg)
+                    
+                    if unique_sifs:
+                        click.echo(f"Processing {len(unique_sifs)} SIF containers...")
+                        
+                        # Build SIFs in parallel
+                        with ThreadPoolExecutor(max_workers=parallel_builds) as executor:
+                            # Submit all build tasks
+                            future_to_sif = {
+                                executor.submit(build_sif_container, sif_path, docker_img, cache): (sif_path, docker_img)
+                                for sif_path, docker_img in unique_sifs
+                            }
+                            
+                            # Collect results as they complete
+                            for future in as_completed(future_to_sif):
+                                sif_path, docker_img = future_to_sif[future]
+                                try:
+                                    success, message = future.result()
+                                    if success:
+                                        click.echo(f"✓ {message}")
+                                    else:
+                                        raise click.ClickException(message)
+                                except Exception as e:
+                                    raise click.ClickException(f"Failed to build SIF {sif_path}: {e}")
+                        
+                        click.echo("All SIF containers processed successfully!")
                     else:
-                        docker_img = None
-                    if docker_img and not os.path.exists(sif_path):
-                        unique_sifs.add((sif_path, docker_img))
-
-                # Check sender section
-                sender = cfg.get('sender', {})
-                click.echo(f"Sender section: {sender}")
-                if 'image_path' in sender:
-                    sif_name = sender['image_path']
-                    sif_path = os.path.join(sif_dir, sif_name)
-                    click.echo(f"Found sender image_path: {sif_name}")
-                    if 'gpu-proxy' in sif_name:
-                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
-                    elif 'cpu-emu' in sif_name:
-                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
-                    else:
-                        docker_img = None
-                    if docker_img and not os.path.exists(sif_path):
-                        unique_sifs.add((sif_path, docker_img))
-
-                # Check receiver section
-                receiver = cfg.get('receiver', {})
-                click.echo(f"Receiver section: {receiver}")
-                if 'image_path' in receiver:
-                    sif_name = receiver['image_path']
-                    sif_path = os.path.join(sif_dir, sif_name)
-                    click.echo(f"Found receiver image_path: {sif_name}")
-                    if 'gpu-proxy' in sif_name:
-                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
-                    elif 'cpu-emu' in sif_name:
-                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
-                    else:
-                        docker_img = None
-                    if docker_img and not os.path.exists(sif_path):
-                        unique_sifs.add((sif_path, docker_img))
-
-                # Check components section (for mixed workflow)
-                components = cfg.get('components', [])
-                click.echo(f"Components section: {components}")
-                for comp in components:
-                    if isinstance(comp, dict) and 'image_path' in comp:
-                        sif_name = comp['image_path']
-                        sif_path = os.path.join(sif_dir, sif_name)
-                        click.echo(f"Found component image_path: {sif_name}")
-                        if 'gpu-proxy' in sif_name:
-                            docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
-                        elif 'cpu-emu' in sif_name:
-                            docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
-                        else:
-                            docker_img = None
-                        if docker_img and not os.path.exists(sif_path):
-                            unique_sifs.add((sif_path, docker_img))
-
-                # Check gpu_proxies section
-                gpu_proxies = cfg.get('gpu_proxies', [])
-                click.echo(f"GPU proxies section: {gpu_proxies}")
-                for proxy in gpu_proxies:
-                    if isinstance(proxy, dict) and 'device' in proxy and proxy['device'] == 'gpu':
-                        sif_name = 'gpu-proxy.sif'  # Default name for GPU proxies
-                        sif_path = os.path.join(sif_dir, sif_name)
-                        docker_img = 'jlabtsai/rtdp-gpu_proxy:latest'
-                        if not os.path.exists(sif_path):
-                            unique_sifs.add((sif_path, docker_img))
-
-                # Check cpu_emulators section
-                cpu_emulators = cfg.get('cpu_emulators', [])
-                click.echo(f"CPU emulators section: {cpu_emulators}")
-                for emu in cpu_emulators:
-                    if isinstance(emu, dict) and 'device' in emu and emu['device'] == 'cpu':
-                        sif_name = 'cpu-emu.sif'  # Default name for CPU emulators
-                        sif_path = os.path.join(sif_dir, sif_name)
-                        docker_img = 'jlabtsai/rtdp-cpu_emu:latest'
-                        if not os.path.exists(sif_path):
-                            unique_sifs.add((sif_path, docker_img))
-
-                click.echo(f"Total unique SIFs to build: {len(unique_sifs)}")
-                # Build all required SIFs
-                for sif_path, docker_img in unique_sifs:
-                    click.echo(f"SIF not found: {sif_path}. Building from {docker_img}...")
-                    result = subprocess.run(['apptainer', 'build', sif_path, f'docker://{docker_img}'])
-                    if result.returncode != 0:
-                        raise click.ClickException(f"Failed to build SIF: {sif_path}")
-                    click.echo(f"Successfully built {sif_path}")
+                        click.echo("No SIF containers need to be built.")
+                        
             except Exception as e:
                 click.echo(f"[Warning] Could not auto-build SIF: {e}")
     else:
         click.echo(f"Config file not found at {config_path}")
+    
     try:
         os.chdir(workflow)
+        click.echo(f"Installing workflow '{workflow_name}'...")
         result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}'])
         if result1.returncode != 0:
             raise click.ClickException("cylc install failed")
+        
+        click.echo(f"Starting workflow '{workflow_name}'...")
         result2 = subprocess.run(['cylc', 'play', workflow_name])
         if result2.returncode != 0:
             raise click.ClickException("cylc play failed")
-        click.echo(f"Workflow '{workflow_name}' started")
+        click.echo(f"Workflow '{workflow_name}' started successfully!")
     finally:
         os.chdir(orig_dir)
 
@@ -371,6 +397,25 @@ def monitor(workflow):
         click.echo(f"Error starting Cylc TUI: {e}", err=True)
     except KeyboardInterrupt:
         click.echo("\nTUI closed by user")
+
+@cli.command()
+@click.option('--clear', is_flag=True, help='Clear all cached SIF containers')
+@click.option('--stats', is_flag=True, help='Show cache statistics')
+def cache(clear, stats):
+    """Manage SIF container cache."""
+    cache_manager = SIFCache()
+    
+    if clear:
+        cache_manager.clear_cache()
+        click.echo("SIF cache cleared successfully!")
+    elif stats:
+        stats_info = cache_manager.get_cache_stats()
+        click.echo("SIF Cache Statistics:")
+        click.echo(f"  Total cached files: {stats_info['total_files']}")
+        click.echo(f"  Total cache size: {stats_info['total_size_mb']:.2f} MB")
+        click.echo(f"  Cache directory: {stats_info['cache_dir']}")
+    else:
+        click.echo("Use --stats to view cache statistics or --clear to clear cache")
 
 if __name__ == '__main__':
     cli() 
