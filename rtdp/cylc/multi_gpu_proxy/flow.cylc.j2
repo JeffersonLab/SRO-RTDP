@@ -102,13 +102,6 @@
                 echo "Run directory: $CYLC_WORKFLOW_RUN_DIR" >> "${CONSOLIDATED_LOG}"
                 echo "" >> "${CONSOLIDATED_LOG}"
             fi
-            
-            # Add sender section header to consolidated log
-            echo "" >> "${CONSOLIDATED_LOG}"
-            echo "==========================================" >> "${CONSOLIDATED_LOG}"
-            echo "SENDER COMPONENT LOGS" >> "${CONSOLIDATED_LOG}"
-            echo "==========================================" >> "${CONSOLIDATED_LOG}"
-            echo "" >> "${CONSOLIDATED_LOG}"
 
             log_message "Starting sender task"
             log_message "Configuration Parameters:"
@@ -217,13 +210,6 @@
                 local message="$timestamp [PROXY_{{ loop.index0 }}] $1"
                 echo "$message" | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" >> "${CONSOLIDATED_LOG}"
             }
-            
-            # Add section header to consolidated log
-            echo "" >> "${CONSOLIDATED_LOG}"
-            echo "==========================================" >> "${CONSOLIDATED_LOG}"
-            echo "GPU PROXY {{ loop.index0 }} COMPONENT LOGS" >> "${CONSOLIDATED_LOG}"
-            echo "==========================================" >> "${CONSOLIDATED_LOG}"
-            echo "" >> "${CONSOLIDATED_LOG}"
 
             log_message "Starting GPU proxy task"
             log_message "Configuration Parameters:"
@@ -341,13 +327,6 @@
                 local message="$timestamp [RECEIVER] $1"
                 echo "$message" | tee -a "${LOG_DIR}/receiver/stdout.log" >> "${CONSOLIDATED_LOG}"
             }
-            
-            # Add section header to consolidated log
-            echo "" >> "${CONSOLIDATED_LOG}"
-            echo "==========================================" >> "${CONSOLIDATED_LOG}"
-            echo "RECEIVER COMPONENT LOGS" >> "${CONSOLIDATED_LOG}"
-            echo "==========================================" >> "${CONSOLIDATED_LOG}"
-            echo "" >> "${CONSOLIDATED_LOG}"
 
             log_message "Starting receiver task"
             log_message "Configuration Parameters:"
