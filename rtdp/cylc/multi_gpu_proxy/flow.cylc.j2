@@ -131,7 +131,7 @@
             PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_0_ip)
             log_message "Sending data to ${PROXY_IP}:${SEND_PORT}"
 
-            # Send data and capture output to individual log only
+            # Send data and capture output with timestamps for consolidated log
             apptainer run --pwd /tmp ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
                 -p ${SEND_PORT} \
@@ -140,7 +140,9 @@
                 --hwm ${SOCKET_HWM} \
                 -v \
                 ${SEND_ALL_ONES:+--all-ones} \
-                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" >> "${CONSOLIDATED_LOG}"
+                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [SENDER] $line" >> "${CONSOLIDATED_LOG}"
+                done
 
             SEND_STATUS=$?
             log_message "Send completed with status: ${SEND_STATUS}"
