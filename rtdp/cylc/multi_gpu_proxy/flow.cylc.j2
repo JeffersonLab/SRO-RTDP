@@ -140,7 +140,7 @@
                 --hwm ${SOCKET_HWM} \
                 -v \
                 ${SEND_ALL_ONES:+--all-ones} \
-                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log"
+                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" >> "${CONSOLIDATED_LOG}"
 
             SEND_STATUS=$?
             log_message "Send completed with status: ${SEND_STATUS}"
