@@ -257,7 +257,7 @@
                 -w ${PROXY_MATRIX_WIDTH} \
                 -r ${PROXY_RATE} \
                 --hwm ${PROXY_SOCKET_HWM} \
-                2>${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" | while IFS= read -r line; do
+                2>&1 | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" | while IFS= read -r line; do
                     echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [PROXY_{{ loop.index0 }}] $line" >> "${CONSOLIDATED_LOG}"
                 done &
             PROXY_PID=$!
