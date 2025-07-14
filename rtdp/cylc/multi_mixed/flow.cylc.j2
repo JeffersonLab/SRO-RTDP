@@ -44,6 +44,7 @@
             INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
             LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
             DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+            CONSOLIDATED_LOG = "$CYLC_WORKFLOW_RUN_DIR/consolidated.log"
 
     [[sender]]
         script = """
@@ -86,8 +87,8 @@
             SEND_PORT="{{ sender.target_port }}"
             
             mkdir -p ${LOG_DIR}/sender
-            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log" "${CONSOLIDATED_LOG}")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log" "${CONSOLIDATED_LOG}")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
@@ -117,7 +118,7 @@
             COMPONENT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ components[0].name }}_{{ components[0].index }}_ip)
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${COMPONENT_IP}:${SEND_PORT}"
 
-            # Send data
+            # Send data with apptainer output piped to consolidated log with timestamps
             apptainer run --pwd /app ${SIF_FILE} sender \
                 --host ${COMPONENT_IP} \
                 --port ${SEND_PORT} \
@@ -125,9 +126,11 @@
                 --rms-fraction ${RMS_FRACTION} \
                 --duty-cycle ${DUTY_CYCLE} \
                 --nic-limit-gbps ${NIC_LIMIT} \
-                2>${LOG_DIR}/sender/apptainer.log
+                2>&1 | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $line" >> "${CONSOLIDATED_LOG}"
+                done
 
-            SEND_STATUS=$?
+            SEND_STATUS=${PIPESTATUS[0]}
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
 
             if [ $SEND_STATUS -eq 0 ]; then
@@ -189,8 +192,8 @@
             {% endif %}
             
             mkdir -p ${LOG_DIR}/gpu_proxy_{{ comp.index }}
-            exec 1> >(tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/stderr.log")
+            exec 1> >(tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/stdout.log" "${CONSOLIDATED_LOG}")
+            exec 2> >(tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/stderr.log" "${CONSOLIDATED_LOG}")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
@@ -225,7 +228,7 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to {{ components[loop.index0 + 1].name }}_{{ components[loop.index0 + 1].index }} at ${NEXT_IP}:${OUT_PORT}"
             {% endif %}
 
-            # Start GPU proxy
+            # Start GPU proxy with output piped to consolidated log with timestamps
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
             apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
                 --in-port ${IN_PORT} \
@@ -235,7 +238,9 @@
                 -w ${PROXY_MATRIX_WIDTH} \
                 -r ${PROXY_RATE} \
                 --hwm ${PROXY_SOCKET_HWM} \
-                2>${LOG_DIR}/gpu_proxy_{{ comp.index }}/apptainer.log &
+                2>&1 | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $line" >> "${CONSOLIDATED_LOG}"
+                done &
             PROXY_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
 
@@ -249,7 +254,6 @@
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
-                cat ${LOG_DIR}/gpu_proxy_{{ comp.index }}/apptainer.log >&2
                 exit 1
             fi
 
@@ -266,7 +270,6 @@
             # Check if process died unexpectedly
             if ! wait $PROXY_PID; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
-                cat ${LOG_DIR}/gpu_proxy_{{ comp.index }}/apptainer.log >&2
                 exit 1
             fi
 
@@ -328,8 +331,8 @@
             {% endif %}
             
             mkdir -p ${LOG_DIR}/emulator_{{ comp.index }}
-            exec 1> >(tee -a "${LOG_DIR}/emulator_{{ comp.index }}/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/emulator_{{ comp.index }}/stderr.log")
+            exec 1> >(tee -a "${LOG_DIR}/emulator_{{ comp.index }}/stdout.log" "${CONSOLIDATED_LOG}")
+            exec 2> >(tee -a "${LOG_DIR}/emulator_{{ comp.index }}/stderr.log" "${CONSOLIDATED_LOG}")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator task"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
@@ -364,7 +367,7 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to {{ components[loop.index0 + 1].name }}_{{ components[loop.index0 + 1].index }} at ${NEXT_IP}:${OUT_PORT}"
             {% endif %}
 
-            # Start CPU emulator
+            # Start CPU emulator with output piped to consolidated log with timestamps
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
             apptainer run --pwd /app ${SIF_FILE} emulator \
                 -i ${NEXT_IP} \
@@ -376,7 +379,9 @@
                 -m ${MEM_FOOTPRINT} \
                 -t ${NUM_THREADS} \
                 -b ${LATENCY} \
-                2>${LOG_DIR}/emulator_{{ comp.index }}/apptainer.log &
+                2>&1 | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $line" >> "${CONSOLIDATED_LOG}"
+                done &
             EMU_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator started with PID ${EMU_PID}"
 
@@ -390,7 +395,6 @@
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process not running" >&2
-                cat ${LOG_DIR}/emulator_{{ comp.index }}/apptainer.log >&2
                 exit 1
             fi
 
@@ -407,7 +411,6 @@
             # Check if process died unexpectedly
             if ! wait $EMU_PID; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process failed" >&2
-                cat ${LOG_DIR}/emulator_{{ comp.index }}/apptainer.log >&2
                 exit 1
             fi
 
@@ -443,8 +446,8 @@
             RECV_PORT="{{ receiver.listen_port }}"
             
             mkdir -p ${LOG_DIR}/receiver
-            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
-            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log" "${CONSOLIDATED_LOG}")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log" "${CONSOLIDATED_LOG}")
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
@@ -462,9 +465,11 @@
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${RECEIVER_NIC}"
 
-            # Start receiver
+            # Start receiver with output piped to consolidated log with timestamps
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${RECV_PORT} -p ${RECV_PORT} -v 1 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${RECV_PORT} -p ${RECV_PORT} -v 1 2>&1 | while IFS= read -r line; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $line" >> "${CONSOLIDATED_LOG}"
+            done &
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
 
@@ -478,7 +483,6 @@
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
             else
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
-                cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
 
@@ -489,32 +493,18 @@
             # Monitor the receiver process and log received data information
             while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
-                
-                # Log received data statistics if available
-                if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
-                    # Extract and log data transfer information from apptainer output
-                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver Status:" >> ${LOG_DIR}/receiver/stdout.log
-                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate)" >> ${LOG_DIR}/receiver/stdout.log 2>/dev/null || true
-                fi
-                
                 sleep 5
             done
 
             # Check if process died unexpectedly
             if ! wait $RECV_PID; then
                 echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
-                cat ${LOG_DIR}/receiver/apptainer.log >&2
                 exit 1
             fi
 
             # Log final received data summary
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver completed successfully" >> ${LOG_DIR}/receiver/stdout.log
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Final receiver statistics:" >> ${LOG_DIR}/receiver/stdout.log
-            if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
-                echo "=== Receiver Apptainer Log Summary ===" >> ${LOG_DIR}/receiver/stdout.log
-                cat ${LOG_DIR}/receiver/apptainer.log >> ${LOG_DIR}/receiver/stdout.log
-                echo "=== End Receiver Log Summary ===" >> ${LOG_DIR}/receiver/stdout.log
-            fi
 
             cylc message -- "receiver:completed"
         """
