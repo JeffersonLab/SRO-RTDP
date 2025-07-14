@@ -54,13 +54,6 @@
             
             # Consolidated log file path
             CONSOLIDATED_LOG = "$CYLC_WORKFLOW_RUN_DIR/logs/consolidated_workflow.log"
-            
-            # Component-specific log files for consolidated approach
-            SENDER_LOG = "$CYLC_WORKFLOW_RUN_DIR/logs/sender_section.log"
-            RECEIVER_LOG = "$CYLC_WORKFLOW_RUN_DIR/logs/receiver_section.log"
-            {% for proxy in gpu_proxies %}
-            PROXY_{{ loop.index0 }}_LOG = "$CYLC_WORKFLOW_RUN_DIR/logs/proxy_{{ loop.index0 }}_section.log"
-            {% endfor %}
 
     [[sender]]
         script = """
@@ -94,18 +87,28 @@
             
             mkdir -p ${LOG_DIR}/sender
             
-            # Function to log to both individual and sender section logs
+            # Function to log to both individual and consolidated logs
             log_message() {
                 local timestamp="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')]"
                 local message="$timestamp [SENDER] $1"
-                echo "$message" | tee -a "${LOG_DIR}/sender/stdout.log" >> "${SENDER_LOG}"
+                echo "$message" | tee -a "${LOG_DIR}/sender/stdout.log" >> "${CONSOLIDATED_LOG}"
             }
             
-            # Initialize sender section log
-            echo "==========================================" > "${SENDER_LOG}"
-            echo "SENDER COMPONENT LOGS" >> "${SENDER_LOG}"
-            echo "==========================================" >> "${SENDER_LOG}"
-            echo "" >> "${SENDER_LOG}"
+            # Initialize consolidated log if this is the first component
+            if [ ! -f "${CONSOLIDATED_LOG}" ]; then
+                echo "MULTI-GPU PROXY WORKFLOW CONSOLIDATED LOG" > "${CONSOLIDATED_LOG}"
+                echo "Generated at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "${CONSOLIDATED_LOG}"
+                echo "Workflow ID: $CYLC_WORKFLOW_ID" >> "${CONSOLIDATED_LOG}"
+                echo "Run directory: $CYLC_WORKFLOW_RUN_DIR" >> "${CONSOLIDATED_LOG}"
+                echo "" >> "${CONSOLIDATED_LOG}"
+            fi
+            
+            # Add sender section header to consolidated log
+            echo "" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "SENDER COMPONENT LOGS" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "" >> "${CONSOLIDATED_LOG}"
 
             log_message "Starting sender task"
             log_message "Configuration Parameters:"
@@ -144,16 +147,16 @@
                 --hwm ${SOCKET_HWM} \
                 -v \
                 ${SEND_ALL_ONES:+--all-ones} \
-                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" >> "${SENDER_LOG}"
+                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" >> "${CONSOLIDATED_LOG}"
 
             SEND_STATUS=$?
             log_message "Send completed with status: ${SEND_STATUS}"
 
-            # Add apptainer log to sender section
+            # Add apptainer log to consolidated log
             if [ -f "${LOG_DIR}/sender/apptainer.log" ]; then
-                echo "--- SENDER APPTAINER LOG ---" >> "${SENDER_LOG}"
-                cat "${LOG_DIR}/sender/apptainer.log" >> "${SENDER_LOG}"
-                echo "" >> "${SENDER_LOG}"
+                echo "--- SENDER APPTAINER LOG ---" >> "${CONSOLIDATED_LOG}"
+                cat "${LOG_DIR}/sender/apptainer.log" >> "${CONSOLIDATED_LOG}"
+                echo "" >> "${CONSOLIDATED_LOG}"
             fi
 
             if [ $SEND_STATUS -eq 0 ]; then
@@ -208,18 +211,19 @@
             
             mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
             
-            # Function to log to both individual and proxy section logs
+            # Function to log to both individual and consolidated logs
             log_message() {
                 local timestamp="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')]"
                 local message="$timestamp [PROXY_{{ loop.index0 }}] $1"
-                echo "$message" | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" >> "${PROXY_{{ loop.index0 }}_LOG}"
+                echo "$message" | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" >> "${CONSOLIDATED_LOG}"
             }
             
-            # Initialize proxy section log
-            echo "==========================================" > "${PROXY_{{ loop.index0 }}_LOG}"
-            echo "GPU PROXY {{ loop.index0 }} COMPONENT LOGS" >> "${PROXY_{{ loop.index0 }}_LOG}"
-            echo "==========================================" >> "${PROXY_{{ loop.index0 }}_LOG}"
-            echo "" >> "${PROXY_{{ loop.index0 }}_LOG}"
+            # Add section header to consolidated log
+            echo "" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "GPU PROXY {{ loop.index0 }} COMPONENT LOGS" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "" >> "${CONSOLIDATED_LOG}"
 
             log_message "Starting GPU proxy task"
             log_message "Configuration Parameters:"
@@ -300,11 +304,11 @@
                 exit 1
             fi
 
-            # Add apptainer log to proxy section
+            # Add apptainer log to consolidated log
             if [ -f "${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log" ]; then
-                echo "--- PROXY {{ loop.index0 }} APPTAINER LOG ---" >> "${PROXY_{{ loop.index0 }}_LOG}"
-                cat "${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log" >> "${PROXY_{{ loop.index0 }}_LOG}"
-                echo "" >> "${PROXY_{{ loop.index0 }}_LOG}"
+                echo "--- PROXY {{ loop.index0 }} APPTAINER LOG ---" >> "${CONSOLIDATED_LOG}"
+                cat "${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log" >> "${CONSOLIDATED_LOG}"
+                echo "" >> "${CONSOLIDATED_LOG}"
             fi
 
             cylc message -- "gpu_proxy_{{ loop.index0 }}:completed"
@@ -331,18 +335,19 @@
             
             mkdir -p ${LOG_DIR}/receiver
             
-            # Function to log to both individual and receiver section logs
+            # Function to log to both individual and consolidated logs
             log_message() {
                 local timestamp="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')]"
                 local message="$timestamp [RECEIVER] $1"
-                echo "$message" | tee -a "${LOG_DIR}/receiver/stdout.log" >> "${RECEIVER_LOG}"
+                echo "$message" | tee -a "${LOG_DIR}/receiver/stdout.log" >> "${CONSOLIDATED_LOG}"
             }
             
-            # Initialize receiver section log
-            echo "==========================================" > "${RECEIVER_LOG}"
-            echo "RECEIVER COMPONENT LOGS" >> "${RECEIVER_LOG}"
-            echo "==========================================" >> "${RECEIVER_LOG}"
-            echo "" >> "${RECEIVER_LOG}"
+            # Add section header to consolidated log
+            echo "" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "RECEIVER COMPONENT LOGS" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "" >> "${CONSOLIDATED_LOG}"
 
             log_message "Starting receiver task"
             log_message "Configuration Parameters:"
@@ -392,7 +397,7 @@
                 if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
                     # Extract and log data transfer information from apptainer output
                     log_message "Receiver Status:"
-                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate)" >> "${RECEIVER_LOG}" 2>/dev/null || true
+                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate)" >> "${CONSOLIDATED_LOG}" 2>/dev/null || true
                 fi
                 
                 sleep 5
@@ -409,39 +414,13 @@
             log_message "Receiver completed successfully"
             log_message "Final receiver statistics:"
             if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
-                echo "=== RECEIVER APPTAINER LOG SUMMARY ===" >> "${RECEIVER_LOG}"
-                cat ${LOG_DIR}/receiver/apptainer.log >> "${RECEIVER_LOG}"
-                echo "=== END RECEIVER LOG SUMMARY ===" >> "${RECEIVER_LOG}"
+                echo "=== RECEIVER APPTAINER LOG SUMMARY ===" >> "${CONSOLIDATED_LOG}"
+                cat ${LOG_DIR}/receiver/apptainer.log >> "${CONSOLIDATED_LOG}"
+                echo "=== END RECEIVER LOG SUMMARY ===" >> "${CONSOLIDATED_LOG}"
             fi
 
-            # Create the final consolidated log by combining all section logs
-            echo "MULTI-GPU PROXY WORKFLOW CONSOLIDATED LOG" > "${CONSOLIDATED_LOG}"
-            echo "Generated at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "${CONSOLIDATED_LOG}"
-            echo "Workflow ID: $CYLC_WORKFLOW_ID" >> "${CONSOLIDATED_LOG}"
-            echo "Run directory: $CYLC_WORKFLOW_RUN_DIR" >> "${CONSOLIDATED_LOG}"
+            # Add final summary to consolidated log
             echo "" >> "${CONSOLIDATED_LOG}"
-            
-            # Add sender section
-            if [ -f "${SENDER_LOG}" ]; then
-                cat "${SENDER_LOG}" >> "${CONSOLIDATED_LOG}"
-                echo "" >> "${CONSOLIDATED_LOG}"
-            fi
-            
-            # Add proxy sections
-            {% for proxy in gpu_proxies %}
-            if [ -f "${PROXY_{{ loop.index0 }}_LOG}" ]; then
-                cat "${PROXY_{{ loop.index0 }}_LOG}" >> "${CONSOLIDATED_LOG}"
-                echo "" >> "${CONSOLIDATED_LOG}"
-            fi
-            {% endfor %}
-            
-            # Add receiver section
-            if [ -f "${RECEIVER_LOG}" ]; then
-                cat "${RECEIVER_LOG}" >> "${CONSOLIDATED_LOG}"
-                echo "" >> "${CONSOLIDATED_LOG}"
-            fi
-            
-            # Add final summary
             echo "==========================================" >> "${CONSOLIDATED_LOG}"
             echo "WORKFLOW COMPLETION SUMMARY" >> "${CONSOLIDATED_LOG}"
             echo "==========================================" >> "${CONSOLIDATED_LOG}"
