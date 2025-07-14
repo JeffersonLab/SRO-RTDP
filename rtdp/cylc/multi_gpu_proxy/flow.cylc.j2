@@ -138,7 +138,7 @@
             PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_0_ip)
             log_message "Sending data to ${PROXY_IP}:${SEND_PORT}"
 
-            # Send data and capture output
+            # Send data and capture output to individual log only
             apptainer run --pwd /tmp ${SIF_FILE} sender \
                 -a ${PROXY_IP} \
                 -p ${SEND_PORT} \
@@ -147,7 +147,7 @@
                 --hwm ${SOCKET_HWM} \
                 -v \
                 ${SEND_ALL_ONES:+--all-ones} \
-                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" >> "${CONSOLIDATED_LOG}"
+                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log"
 
             SEND_STATUS=$?
             log_message "Send completed with status: ${SEND_STATUS}"
@@ -397,7 +397,8 @@
                 if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
                     # Extract and log data transfer information from apptainer output
                     log_message "Receiver Status:"
-                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate)" >> "${CONSOLIDATED_LOG}" 2>/dev/null || true
+                    # Only capture receiver-specific output, not from other components
+                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate|Queue status|Sent)" >> "${LOG_DIR}/receiver/stdout.log" 2>/dev/null || true
                 fi
                 
                 sleep 5
