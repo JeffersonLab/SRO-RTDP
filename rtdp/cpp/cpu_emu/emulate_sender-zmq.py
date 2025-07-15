@@ -44,9 +44,6 @@ def emulate_stream(
     
     context    = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)
-    ######zmq_socket.bind("tcp://129.57.177.4:6333")
-    #zmq_socket.bind(f"tcp://localhost:{port}")  #fails
-    #zmq_socket.bind(f"tcp://127.0.0.1:{port}")  #fails
     zmq_socket.bind(f"tcp://*:{port}")
     # Send will never block
     # optional: disable high water marksocket.setsockopt(zmq.LINGER, 0)  # don't wait on closesocket.bind("tcp://*:5555")
@@ -54,11 +51,6 @@ def emulate_stream(
 
     time.sleep(1)  # Give receiver time to bind
 
-    # Enable socket monitor for connection events
-    #print("[emulate_stream:] Monitoring connection ...")
-    #zmq_socket.monitor("inproc://monitor.push", zmq.EVENT_CONNECTED)
-    #wait_for_connection(zmq_socket)
-    #print("[emulate_stream:] Connected ...")
     
     avg_rate_bps      = avg_rate_mbps * MtoOne
     frame_size_mean_B = 60*KtoOne # CLAS12 bytes
@@ -68,10 +60,8 @@ def emulate_stream(
     frame_num = 0
     # Derived sleep time between messages
     #rate_sleep_S = frame_size_mean_B*Btob / avg_rate_bps  # in seconds
-    clk_S = time.time()               #seconds since epoch
-    clk0_S = clk_S                         #establish zero offset clock
-    elpsd_tm_us = (clk_S-clk0_S)*MtoOne    #usec
-    print(f"{elpsd_tm_us} [emulate_stream:] Establish logical zero clock as {clk0_S}")
+    clk0_S = clk_S = time.time()                    #seconds since epoch
+    clk_uS = int(clk_S*MtoOne)
     while frame_cnt > frame_num:
         frame_num += 1
         # Calculate frame size from clamped normal distribution
@@ -81,41 +71,28 @@ def emulate_stream(
         #frame_size_fctr = math.clamp(frame_size_fctr, 0.7, 1.3)        
         frame_size_B = int(frame_size_mean_B*frame_size_fctr)
         payload = bytearray(int(frame_size_B))
-        #clk_S = int(time.time()*oneToM)  #microseconds *1e9 #nanoseconds
-        #if frame_num == 1:  clk0_S = clk_S #establish zero offset clock
-        #elpsd_tm_us = (clk_S-clk0_S) #usec
-        print(f"{elpsd_tm_us} [emulate_stream:] Sending frame; size = {frame_size_B} frame_num = ({frame_num})")            
-        print(f"{elpsd_tm_us} [emulate_stream:] serialize_packet: Serializing frame: size = {frame_size_B} timestamp = {elpsd_tm_us} stream_id = {99} frame_num = ({frame_num}) ...")            
+        print(f"{clk_uS} [emulate_stream:] Sending frame; size = {frame_size_B} frame_num = ({frame_num})")            
+        print(f"{clk_uS} [emulate_stream:] serialize_packet: Serializing frame: size = {frame_size_B} timestamp = {int(clk_S*MtoOne)} stream_id = {99} frame_num = ({frame_num}) ...")            
         buffer = serialize_buffer(size=frame_size_B, timestamp=int(clk_S*MtoOne), stream_id=99, frame_num=frame_num, payload=payload)
         
         # Extract and unpack the header part
         header = buffer[:HEADER_SIZE]
         fields = struct.unpack(HEADER_FORMAT, header)
 
-        #print(f" {elpsd_tm_us} [emulate_stream:] serialized_packet fields:")
-        #print(f"  size      : {fields[0]}")
-        #print(f"  timestamp : {fields[1]}")
-        #print(f"  stream_id : {fields[2]}")
-        #print(f"  frame_num : {fields[3]}")
-
-        #print(f"{float(clk_S)} [emulate_stream:] Sending frame; size = {frame_size_B} frame_num = ({frame_num})", flush=True)            
         zmq_socket.send(buffer)
                 
         rate_sleep_S = frame_size_B * Btob / avg_rate_bps  # seconds
         # Delay to throttle sending rate
-        print(f"{elpsd_tm_us+3} [emulate_stream:] Rate Sleeping for: {rate_sleep_S} seconds")
+        print(f"{clk_uS+3} [emulate_stream:] Rate Sleeping for: {rate_sleep_S} seconds")
         time.sleep(rate_sleep_S)
         clk_S = time.time()   #seconds since epoch
+        clk_uS = int(clk_S*MtoOne)
         elpsd_tm_us = int((clk_S-clk0_S)*MtoOne) #usec
-        print(f"{elpsd_tm_us+3} [emulate_stream:] Read Raw clock as: {clk_S}")
+        print(f"{clk_uS+3} [emulate_stream:] Read Raw clock as: {clk_S}")
 
-        #if frame_num > 10:
-        #print(f"{elpsd_tm_us+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((1e-6*elpsd_tm_us)+rate_sleep_S)} frame_num {frame_num} elpsd_tm_us sec {1e-6*elpsd_tm_us}")
-        print(f"{elpsd_tm_us+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float((elpsd_tm_us*oneToM)+frame_num*rate_sleep_S)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
-        #print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {1e-6*frame_num*frame_size_mean_B/float((1e-6*elpsd_tm_us)+rate_sleep_S)} frame_num {frame_num} elpsd_tm_us sec {1e-6*elpsd_tm_us}")
-        #print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*Btob*oneToG/float((elpsd_tm_us*oneToM)+frame_num*rate_sleep_S)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
-        print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*Btob*oneToG/float(elpsd_tm_us*oneToM)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
-        print(f"{elpsd_tm_us+2} [emulate_stream:] Estimated bit rate (bps): {frame_size_mean_B*Btob/rate_sleep_S} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
+        print(f"{clk_uS+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(elpsd_tm_us*oneToM)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
+        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*Btob*oneToG/float(elpsd_tm_us*oneToM)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
+        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (bps): {frame_size_mean_B*Btob/rate_sleep_S} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
 
             
 if __name__ == "__main__":
