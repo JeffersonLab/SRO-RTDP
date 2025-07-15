@@ -2,5 +2,5 @@ sleep: 0
 threads: 1
 latency: 500         # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
 mem_footprint: 0.05  # Memory footprint in GB
-output_size: 0.00000572   # Output size in GB
+output_size: 0.0000572   # Output size in GB
 verbose: 1

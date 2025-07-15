@@ -21,11 +21,6 @@ def emulate_stream(
     frame_cnt:     int #,
     #verbosity:      int
 ):
-    print(f"[emulate_stream:] port          = {port}...")
-    print(f"[emulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
-    print(f"[emulate_stream:] rms_fraction  = {rms_fraction}...")
-    print(f"[emulate_stream:] duty_cycle    = {duty_cycle}...")
-    print(f"[emulate_stream:] frame_cnt     = {frame_cnt}")
 
     oneToU = 1e6
     uToOne = 1/oneToU
@@ -54,8 +49,8 @@ def emulate_stream(
     
     avg_rate_bps      = avg_rate_mbps * MtoOne
     frame_size_mean_B = 60*KtoOne # CLAS12 bytes
-    std_dev           = 0.1 # 10 percent
-    print(f"[emulate_stream:] avg_rate(Gbps) = {avg_rate_mbps*MtoG}, frame_size_mean(MB) = {frame_size_mean_B*oneToM}, std_dev(MB) = {std_dev*frame_size_mean_B*oneToM}")
+    std_dev           = 1e-1 #0.1 # 10 percent
+    #print(f"[emulate_stream:] avg_rate(Gbps) = {avg_rate_mbps*MtoG}, frame_size_mean(MB) = {frame_size_mean_B*oneToM}, std_dev(MB) = {std_dev*frame_size_mean_B*oneToM}")
     
     frame_num = 0
     # Derived sleep time between messages
@@ -106,6 +101,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(f"[emulate_sender-zmq: main:] emulate_stream...")
+    print(f"[emulate_sender-zmq:] port          = {args.port}...")
+    print(f"[emulate_sender-zmq:] avg_rate_mbps = {args.avg_rate_mbps}...")
+    print(f"[emulate_sender-zmq:] rms_fraction  = {args.rms_fraction}...")
+    print(f"[emulate_sender-zmq:] duty_cycle    = {args.duty_cycle}...")
+    print(f"[emulate_sender-zmq:] frame_cnt     = {args.frame_cnt}")
     emulate_stream(
         args.port,
         args.avg_rate_mbps,

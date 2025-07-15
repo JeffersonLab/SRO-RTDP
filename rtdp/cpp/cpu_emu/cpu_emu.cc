@@ -348,7 +348,7 @@ int main (int argc, char *argv[])
     static std::mt19937 gen(rd());
 
     // Mean = 1.0, Std Dev = 0.1 gives 99.7% of samples in [0.7, 1.3]
-    static std::normal_distribution<> sd_10pcnt(1.0, 0.1);
+    static std::normal_distribution<> nd_10pcnt(1.0, 1e-1);
 
     //  Prepare our subscription context and socket
     context_t sub_cntxt(1);
@@ -446,7 +446,7 @@ int main (int argc, char *argv[])
         if(parsed.timestamp_uS < last_rdy_uS) {
             if(vrbs) {
                 cout << now_uS  << " [cpu_emu " << sub_prt << "]:  dropped (" << frame_num << ')'  
-                     << " request_nbr " << request_nbr << "(last_rdy_uS,last_rdy_uS) (" << last_rdy_uS << ',' << last_rdy_uS << ')' << endl;
+                     << " request_nbr " << request_nbr << "(last_rdy_uS,parsed.timestamp_uS) (" << last_rdy_uS << ',' << parsed.timestamp_uS << ')' << endl;
                     }
             if(frame_num != 0) {
                 if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
@@ -484,7 +484,7 @@ int main (int argc, char *argv[])
             {
 	        // Send  "frame"
                 //represents harvested data
-                auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
+                auto x = std::clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
                 std::vector<uint8_t> payload(outSz*x);  //represents harvested data
                 if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
                 auto data = serialize_packet(now_uS, pub_prt, payload.size(), parsed.timestamp_uS, parsed.stream_id, parsed.frame_num, payload);
@@ -495,9 +495,9 @@ int main (int argc, char *argv[])
                 if (!sr) std::cerr << now_uS << " [cpu_emu " << sub_prt << "]:  Failed to send" << endl;
                 if (vrbs && sr.has_value()) std::cout << now_uS << " [cpu_emu " << sub_prt << "]: Bytes sent = " << sr.value() << endl;
 
-                if(vrbs) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << outSz << " (" 
+                if(vrbs) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << outSz*x << " (" 
                               << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
-                if(DBG) cout << now_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
+                if(vrbs) cout << now_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
                 if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << "[cpu_emu " << sub_prt << "]: " 
                                                                     << " sbscrptn_ip data incorrect size(" << request_nbr << ") "  << endl;
