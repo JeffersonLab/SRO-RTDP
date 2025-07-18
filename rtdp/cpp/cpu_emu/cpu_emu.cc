@@ -449,7 +449,7 @@ int main (int argc, char *argv[])
                       
         auto last_rdy_uS = last_timestamp_uS + last_cmp_lat_uS + last_nw_lat;
         last_nw_lat = one_u*request.size()*B_b/(100*G_1);
-        cout << now_uS+4 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
+        if(vrbs) cout << now_uS+4 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
              << last_rdy_uS << " to parsed.timestamp_uS " << parsed.timestamp_uS << " frame " << frame_num << endl;
         if(parsed.timestamp_uS < last_rdy_uS) {
             if(vrbs) {
@@ -527,7 +527,7 @@ int main (int argc, char *argv[])
         if(vrbs) cout << now_uS + 8 << " [cpu_emu " << sub_prt << "]:  Missed frames: " << msdFrms << endl;
         if(vrbs) cout << now_uS + 9 << " [cpu_emu " << sub_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
                       << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
-        cout  << now_uS + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
+        if(vrbs) cout  << now_uS + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
         request_nbr++;
     } //main loop
     cout  << now_uS + 11 << " [cpu_emu " << sub_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") 
