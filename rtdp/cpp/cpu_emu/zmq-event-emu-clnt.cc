@@ -1,7 +1,6 @@
 //
 //  Basic ZeoMQ client in C++
-//  Connects PUB socket to tcp://localhost:5555
-//  Sends "events" to server
+//  Sends frames to subscriber
 //
 #include <unistd.h>
 #include <zmq.hpp>
@@ -17,7 +16,35 @@ using namespace std;
 using namespace zmq;
 using namespace chrono;
 
-#define DBG 0	//print extra verbosity apart from -v switch
+#define DBG 1 /////////////////////
+
+//scaling constants
+const float  B_b   = 1e1;
+const float  b_B   = 1/B_b;
+const float  G_1   = 1e9;
+const float  one_G = 1/G_1;
+const float  G_K   = 1e6;
+const float  K_G   = 1/G_K;
+const float  G_M   = 1e3;
+const float  M_G   = 1/G_M;
+const float  K_1   = 1e3;
+const float  one_K = 1/K_1;
+const float  M_1   = 1e6;
+const float  one_M = 1/M_1;
+const float  m_1   = 1e-3;
+const float  one_m = 1/m_1;
+const float  m_u   = 1e3 ;
+const float  u_m   = 1/m_u;
+const float  u_1   = 1e-6;
+const float  one_u = 1/u_1;
+const float  n_1   = 1e-9;
+const float  one_n = 1/n_1;
+const float  n_m   = 1e-6;
+const float  m_n   = 1/n_m;
+
+const size_t sz1K   = 1024;
+const size_t sz1M   = sz1K*sz1K;
+const size_t sz1G   = sz1M*sz1K;
     
 void   Usage()
 {
@@ -66,11 +93,11 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -c " << evnt_cnt;
             break;
         case 'r':
-            bit_rate_gbps = (uint16_t) atof((const char *) optarg) ;
+            bit_rate_gbps = (float) atof((const char *) optarg) ;
             if(DBG) cout << " -r " << bit_rate_gbps;
             break;
         case 's':
-            evnt_szMB = (uint16_t) atof((const char *) optarg) ;
+            evnt_szMB = (float) atof((const char *) optarg) ;
             if(DBG) cout << " -s " << evnt_szMB;
             break;
         case 'v':
@@ -88,11 +115,11 @@ int main (int argc, char *argv[])
     // centered around 1.0, with a standard deviation chosen so that ~99.7% of values fall 
     // in the 70% to 130% range (i.e., ±3σ ≈ 30%):
 
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
+    static random_device rd;
+    static mt19937 gen(rd());
 
     // Mean = 1.0, Std Dev = 0.1 gives 99.7% of samples in [0.7, 1.3]
-    static std::normal_distribution<> sd_10pcnt(1.0, 0.1);
+    static normal_distribution<> nd_10pcnt(1.0, 0.1);
 
 
     //  Prepare our publication context and socket
@@ -102,44 +129,45 @@ int main (int argc, char *argv[])
     pub_sckt.bind(string("tcp://*:") + to_string(pub_prt));
     pub_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
 
-    std::this_thread::sleep_for(std::chrono::seconds(1)); //  # Give receiver time to bind
+    this_thread::sleep_for(chrono::seconds(1)); //  # Give receiver time to bind
 
-    auto now = high_resolution_clock::now();
-    auto us = duration_cast<microseconds>(now.time_since_epoch());
-    uint64_t tsr_base    = us.count(); // base system hi-res clock in microseconds since epoch
+    auto now_hrc   = high_resolution_clock::now();
 
     //  Do evnt_cnt requests
     for (uint64_t frame_num = 1; frame_num <= evnt_cnt; frame_num++) {
-        std::cout << " [zmq-event-clnt]: Sending  " << frame_num << "..." << std::endl;
-        uint64_t tsr       =   us.count()-tsr_base;  //zero based clock usecs: system hi-res clock in microseconds since tsr_base
+        cout << " [zmq-event-clnt]: Sending  " << frame_num << "..." << endl;
 
         send_result_t sr;
 
         // Send  "frame"
         //represents harvested data
-        auto x = std::clamp(sd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
-        std::vector<uint8_t> payload(size_t(evnt_szMB*x));  //represents harvested data
-        if(DBG) cout << tsr+1 << " [zmq-event-clnt-emu " << pub_prt << "]: " << "serializing packet for frame_num " << frame_num << endl;
-        auto data = serialize_packet(tsr, pub_prt, 8*payload.size(), tsr, stream_id, frame_num, payload);
-        if(DBG) cout << tsr+2 << " [zmq-event-clnt-emu " << pub_prt << "]: " << "serializing success for frame_num " << frame_num << endl;
+        auto x = clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
+        vector<uint8_t> payload(size_t(M_1*evnt_szMB*x));  //represents harvested data
+        auto uSd       = duration_cast<microseconds>(now_hrc.time_since_epoch());
+        uint64_t now_uS          = uSd.count();
+        if(DBG) cout << now_uS+1 << " [zmq-event-clnt-emu " << pub_prt << "]: " << "serializing packet for frame_num " << frame_num << endl;
+        auto data = serialize_packet(now_uS, pub_prt, payload.size(), now_uS, stream_id, frame_num, payload);
+        if(DBG) cout << now_uS+2 << " [zmq-event-clnt-emu " << pub_prt << "]: " << "serializing success for frame_num " << frame_num << endl;
         zmq::message_t message(data.size());
-        std::memcpy(message.data(), data.data(), data.size());
+        memcpy(message.data(), data.data(), data.size());
         sr = pub_sckt.send(message, zmq::send_flags::none);
-        if (!sr) std::cerr << tsr << " [zmq-event-clnt-emu " << pub_prt << "]: Failed to send" << endl;
-        if (vrbs && sr.has_value()) std::cout << tsr << " [zmq-event-clnt-emu " << pub_prt << "]: Bytes sent = " << sr.value() << endl;
+        if (!sr) cerr << now_uS << " [zmq-event-clnt-emu " << pub_prt << "]: Failed to send" << endl;
+        if (vrbs && sr.has_value()) cout << now_uS << " [zmq-event-clnt-emu " << pub_prt << "]: Bytes sent = " << sr.value() << endl;
 
-        if(vrbs) cout << tsr+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  Sending frame size = " << payload.size() << " (" 
-                      << frame_num << ')' << " to " << pub_prt << " at " << tsr << " with code " << endl;
-        if(DBG) cout << tsr+4 << "[zmq-event-clnt-emu " << pub_prt << "]: output Num written (" << frame_num << ") "  
+        if(vrbs) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  Sending frame size = " << payload.size() << " (" 
+                      << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
+        if(DBG) cout << now_uS+4 << "[zmq-event-clnt-emu " << pub_prt << "]: output Num written (" << frame_num << ") "  
                      << sr.value() << " (" << frame_num << ')' << endl;
-        if(sr.value() != HEADER_SIZE + payload.size()) cout << tsr+3 << "[zmq-event-clnt-emu " << pub_prt << "]:  publication data incorrect size(" << frame_num << ") "  << endl;
+        if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << "[zmq-event-clnt-emu " << pub_prt << "]:  data incorrect size(" << frame_num << ") "  << endl;
 
 
-        std::cout << tsr+5 << " [zmq-event-clnt-emu " << pub_prt << "]: sent: size=" 
-                  << HEADER_SIZE + payload.size() << std::endl;
+        cout << now_uS+5 << " [zmq-event-clnt-emu " << pub_prt << "]: sent: size=" 
+                  << HEADER_SIZE + payload.size() << endl;
 
-        float rate_sleep = 1e-9*payload.size() / bit_rate_gbps;  // in seconds
-        auto cms = chrono::microseconds(size_t(round(1e6*rate_sleep))); //reqd timespan in microseconds
+        float rate_sleep_S = one_G*payload.size() / bit_rate_gbps;  // in seconds
+        auto cms = chrono::microseconds(size_t(round(one_u*rate_sleep_S))); //reqd timespan in microseconds
+        if(vrbs) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  Rate sleep for " << rate_sleep_S << " S"  
+                      << " Payload size = " << payload.size() << " bit rate Mbps " << G_M*bit_rate_gbps << endl;
         this_thread::sleep_for(cms);
 
     }

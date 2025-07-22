@@ -68,7 +68,7 @@ def emulate_stream(
     # Derived sleep time between messages
     #rate_sleep_S = frame_size_mean_B*B_b / avg_rate_bps  # in seconds
     clk0_S = clk_S = time.time()                    #seconds since epoch
-    clk_uS = int(clk_S*M_1)
+    clk_uS = int(clk_S*one_u)
     while frame_cnt > frame_num:
         frame_num += 1
         # Calculate frame size from clamped normal distribution
@@ -79,8 +79,8 @@ def emulate_stream(
         frame_size_B = int(frame_size_mean_B*frame_size_fctr)
         payload = bytearray(int(frame_size_B))
         print(f"{clk_uS} [emulate_stream:] Sending frame size = {frame_size_B} frame_num = ({frame_num})")            
-        print(f"{clk_uS} [emulate_stream:] serialize_packet: Serializing frame: size = {frame_size_B} timestamp = {int(clk_S*M_1)} stream_id = {99} frame_num = ({frame_num}) ...")            
-        buffer = serialize_buffer(size=frame_size_B, timestamp=int(clk_S*M_1), stream_id=99, frame_num=frame_num, payload=payload)
+        print(f"{clk_uS} [emulate_stream:] serialize_packet: Serializing frame: size = {frame_size_B} timestamp = {int(clk_S*one_u)} stream_id = {99} frame_num = ({frame_num}) ...")            
+        buffer = serialize_buffer(size=frame_size_B, timestamp=int(clk_S*one_u), stream_id=99, frame_num=frame_num, payload=payload)
         
         # Extract and unpack the header part
         header = buffer[:HEADER_SIZE]
@@ -93,13 +93,13 @@ def emulate_stream(
         print(f"{clk_uS+3} [emulate_stream:] Rate Sleeping for: {rate_sleep_S} seconds")
         time.sleep(rate_sleep_S)
         clk_S = time.time()   #seconds since epoch
-        clk_uS = int(clk_S*M_1)
-        elpsd_tm_us = int((clk_S-clk0_S)*M_1) #usec
+        clk_uS = int(clk_S*one_u)
+        elpsd_tm_uS = int((clk_S-clk0_S)*one_u) #usec
         print(f"{clk_uS+3} [emulate_stream:] Read Raw clock as: {clk_S}")
 
-        print(f"{clk_uS+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(elpsd_tm_us*one_M)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
-        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*B_b*one_G/float(elpsd_tm_us*one_M)} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
-        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (bps): {frame_size_mean_B*B_b/rate_sleep_S} frame_num {frame_num} elpsd_tm_us {elpsd_tm_us}")
+        print(f"{clk_uS+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(elpsd_tm_uS*one_M)} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
+        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*B_b*one_G/float(elpsd_tm_uS*one_M)} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
+        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (bps): {frame_size_mean_B*B_b/rate_sleep_S} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
 
             
 if __name__ == "__main__":

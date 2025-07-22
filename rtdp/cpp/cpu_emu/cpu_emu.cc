@@ -19,7 +19,7 @@
 #include <map>
 #include <zmq.hpp>
 #include <netinet/in.h>
-#include <new> // for std::bad_alloc
+#include <new> // for bad_alloc
 #include <cstdlib> // Required for exit()
 #include <cmath> // Needed for round()
 #include "buffer_packet_emu.hh"
@@ -99,7 +99,7 @@ void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t 
     try {
         x = new double[memSz];
         if(vrbs) cout << "Memory allocation for " << memSz << " succeeded.\n";
-    } catch (const std::bad_alloc& e) {
+    } catch (const bad_alloc& e) {
         if(vrbs) cout << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
         exit(1);
     }    
@@ -112,21 +112,21 @@ void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t 
         this_thread::sleep_for(cms_ns);
     }else{
         auto ts_S = (cmpLt_S_GB*nmrd_B/G_1);
-        //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
-        auto start_time_hrc = std::chrono::high_resolution_clock::now();
+        //high_resolution_clock::time_point start_time = chrono::high_resolution_clock::now();
+        auto start_time_hrc = chrono::high_resolution_clock::now();
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning CPU ...";
         
         double fracsecs_S, secs;
         fracsecs_S = modf (ts_S , &secs);
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs_S = " << fracsecs_S << endl;
         size_t strtMem = 0;
-        auto end_time_hrc = std::chrono::high_resolution_clock::now();
+        auto end_time_hrc = chrono::high_resolution_clock::now();
         duration<double> time_span_Sd = duration_cast<duration<double>>(end_time_hrc - start_time_hrc);
         while (time_span_Sd.count() < ts_S) { 
             for (size_t i = strtMem; i<min(strtMem + sz1K, memSz); i++) { x[i] = tanh(i); } //touch all allocated memory
             strtMem += sz1K;
             if(strtMem > memSz - sz1K) strtMem = 0;
-            end_time_hrc = std::chrono::high_resolution_clock::now();
+            end_time_hrc = chrono::high_resolution_clock::now();
             time_span_Sd = duration_cast<duration<double>>(end_time_hrc - start_time_hrc);
             if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span_Sd.count() << " against "<< ts_S  << endl;
         }
@@ -245,7 +245,7 @@ int main (int argc, char *argv[])
     double   otmem_GB   = 0.01;  // program output in GB
     uint64_t frame_cnt  = 0;     //total frames sender will send
 
-    cout << std::fixed << std::setprecision(7);  // 6 decimal places            
+    cout << fixed << setprecision(7);  // 6 decimal places            
 
     while ((optc = getopt(argc, argv, "hb:f:i:m:o:p:r:s:t:v:y:z:")) != -1)
     {
@@ -353,11 +353,11 @@ int main (int argc, char *argv[])
     // centered around 1.0, with a standard deviation chosen so that ~99.7% of values fall 
     // in the 70% to 130% range (i.e., ±3σ ≈ 30%):
 
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
+    static random_device rd;
+    static mt19937 gen(rd());
 
     // Mean = 1.0, Std Dev = 0.1 gives 99.7% of samples in [0.7, 1.3]
-    static std::normal_distribution<> nd_10pcnt(1.0, 1e-1);
+    static normal_distribution<> nd_10pcnt(1.0, 1e-1);
 
     //  Prepare our subscription context and socket
     context_t sub_cntxt(1);
@@ -391,8 +391,8 @@ int main (int argc, char *argv[])
     uint32_t frame_num   = 0;
     uint32_t lst_frm_nm  = frame_num; //last frame number
     uint64_t msdFrms     = 0; // missed frames count
-    uint64_t last_cmp_lat_uS= 0; //last experienced computational latency
-    uint64_t last_nw_lat = one_u*60e3*B_b/(100*G_1); //last experienced network latency defaulto to 60KB over 100 Gbps
+    uint64_t last_cmp_lat_uS = 0; //last experienced computational latency
+    uint64_t last_nw_lat_uS = one_u*60e3*B_b/(100*G_1); //last experienced network latency defaulto to 60KB over 100 Gbps
     
     auto now_hrc      = high_resolution_clock::now();
     auto clk0_uSd     = duration_cast<microseconds>(now_hrc.time_since_epoch());
@@ -447,17 +447,17 @@ int main (int argc, char *argv[])
                       << "(actual) " << bufSiz_B << " bytes " << bufSiz_B*one_G << " GB "
                       << " from client " << "ts = " << now_uS << " (" << request_nbr << ')' << endl;
                       
-        auto last_rdy_uS = last_timestamp_uS + last_cmp_lat_uS + last_nw_lat;
-        last_nw_lat = one_u*request.size()*B_b/(100*G_1);
-        if(vrbs) cout << now_uS+4 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
-             << last_rdy_uS << " to parsed.timestamp_uS " << parsed.timestamp_uS << " frame " << frame_num << endl;
-        if(parsed.timestamp_uS < last_rdy_uS) {
+        auto last_rdy_uS = last_timestamp_uS + last_cmp_lat_uS + last_nw_lat_uS;
+        last_nw_lat_uS = one_u*request.size()*B_b/(100*G_1);
+        if(vrbs) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
+             << last_rdy_uS << " to recd_uS " << now_uS << " frame " << frame_num << endl;
+        if(now_uS < last_rdy_uS) {
             if(vrbs) {
-                cout << now_uS  << " [cpu_emu " << sub_prt << "]:  dropped (" << frame_num << ')' << " request_nbr " << request_nbr 
-                     << "(last_rdy_uS,parsed.timestamp_uS) (" << last_rdy_uS << ',' << parsed.timestamp_uS << ')' << endl;
+                cout << now_uS+2  << " [cpu_emu " << sub_prt << "]:  dropped (" << frame_num << ')' << " request_nbr " << request_nbr 
+                     << "(last_rdy_uS,recd_uS) (" << last_rdy_uS << ',' << now_uS << ')' << endl;
                     }
             if(frame_num != 0) {
-                if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
+                if(vrbs) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
                 continue;
             }
         }
@@ -486,24 +486,24 @@ int main (int argc, char *argv[])
                          << " request " << frame_num << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
                          << " to port " + string("tcp://") + sub_ip + ':' +  to_string(sub_prt) << " (" << frame_num << ')' << endl;
             // Publish a message for subscribers
-            size_t outSz_B = otmem_GB*1.024*1.024*1.024*1e9; //output size in bytes
+            size_t outSz_B = otmem_GB*sz1G; //output size in bytes
 
             send_result_t sr;
             {
 	        // Send  "frame"
                 //represents harvested data
-                auto x = std::clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
-                std::vector<uint8_t> payload(outSz_B*x);  //represents harvested data
-                if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;
+                auto x = clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
+                vector<uint8_t> payload(outSz_B*x);  //represents harvested data
+                if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;///////////frame_num ???
                 auto data = serialize_packet(now_uS, pub_prt, payload.size(), parsed.timestamp_uS, parsed.stream_id, parsed.frame_num, payload);
                 if(DBG) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
                 zmq::message_t message(data.size());
-                std::memcpy(message.data(), data.data(), data.size());
+                memcpy(message.data(), data.data(), data.size());
                 sr = pub_sckt.send(message, zmq::send_flags::none);
                 if (!sr) cerr << now_uS << " [cpu_emu " << sub_prt << "]:  Failed to send" << endl;
                 if (vrbs && sr.has_value()) cout << now_uS << " [cpu_emu " << sub_prt << "]: Bytes sent = " << sr.value() << endl;
 
-                if(vrbs) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << outSz_B*x << " (" 
+                if(vrbs) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << payload.size() << " (" 
                               << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
                 if(vrbs) cout << now_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
@@ -517,7 +517,7 @@ int main (int argc, char *argv[])
         // Record end time
         //if(request_nbr < 10) continue; //warmup
         if(vrbs) cout << now_uS + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: last_cmp_lat_uS = " << last_cmp_lat_uS 
-                           << " last_nw_lat = " << last_nw_lat  << " (" << frame_num << ")" << endl;
+                           << " last_nw_lat_uS = " << last_nw_lat_uS  << " (" << frame_num << ")" << endl;
         if(vrbs) cout << now_uS + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " 
                            << float(request_nbr)/(float(now_uS-start_uS)*one_M) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
