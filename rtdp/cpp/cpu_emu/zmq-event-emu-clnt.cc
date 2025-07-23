@@ -56,7 +56,7 @@ void   Usage()
         -v verbose = 0/1 (0)  \n\
         -s event size (MB) (1) \n\n";
 
-    cout << " [zmq-event-clnt-emu]: " << usage_str;
+    cout << " [emulate_stream]: " << usage_str;
 }
 
 
@@ -70,6 +70,8 @@ int main (int argc, char *argv[])
     float    evnt_szMB     = 1;    // event size (MB)
     float    bit_rate_gbps = 1; // sending bit rate in Gbps
     bool     vrbs          = false; // verbose ?
+
+    cout << std::fixed << std::setprecision(1);
 
     while ((optc = getopt(argc, argv, "a:hp:c:r:s:v:")) != -1)
     {
@@ -103,7 +105,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -v " << vrbs << endl;
             break;
          case '?':
-            cout << " [zmq-event-clnt-emu]: Unrecognised option: " << optopt;
+            cout << " [emulate_stream]: Unrecognised option: " << optopt;
             Usage();
             exit(1);
         }
@@ -119,9 +121,8 @@ int main (int argc, char *argv[])
     // Mean = 1.0, Std Dev = 0.1 gives 99.7% of samples in [0.7, 1.3]
     static normal_distribution<> nd_10pcnt(1.0, 0.1);
 
-
     //  Prepare our publication context and socket
-    if(vrbs) cout << "[zmq-event-clnt-emu " << pub_prt << "]: " << " Publishing on port " << to_string(pub_prt) << endl;
+    if(vrbs) cout << "[emulate_sender-zmq " << pub_prt << "]: Publishing on port " << to_string(pub_prt) << endl;
     context_t pub_cntxt(1);
     socket_t pub_sckt(pub_cntxt, socket_type::pub);
     pub_sckt.bind(string("tcp://*:") + to_string(pub_prt));
@@ -130,43 +131,68 @@ int main (int argc, char *argv[])
     this_thread::sleep_for(chrono::seconds(1)); //  # Give receiver time to bind
 
     auto now_hrc   = high_resolution_clock::now();
+    auto clk_uSd   = duration_cast<microseconds>(now_hrc.time_since_epoch());
+    uint64_t start_uS  = clk_uSd.count();
+    uint64_t now_uS = start_uS;
+    if(vrbs) cout << "[emulate_sender-zmq " << pub_prt << "]: start_uS " << start_uS << endl;
+
+    double   mnBfSz_B    = 0; //mean receive Size bytes
 
     //  Do evnt_cnt requests
     for (uint64_t frame_num = 1; frame_num <= evnt_cnt; frame_num++) {
-        //cout << " [zmq-event-clnt-emu]: Sending  " << frame_num << "..." << endl;
+        //cout << " [emulate_stream]: Sending  " << frame_num << "..." << endl;
 
         send_result_t sr;
 
         // Send  "frame"
-        //represents harvested data
         auto x = clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
-        vector<uint8_t> payload(size_t(M_1*evnt_szMB*x));  //represents harvested data
-        auto uSd       = duration_cast<microseconds>(now_hrc.time_since_epoch());
-        uint64_t now_uS          = uSd.count();
-        if(DBG) cout << now_uS+1 << " [zmq-event-clnt-emu " << pub_prt << "]: " << "serializing packet for frame_num " << frame_num << endl;
+        vector<uint8_t> payload(size_t(M_1*evnt_szMB*x));
+        
+        if(DBG) cout << now_uS+1 << " [emulate_stream:] serializing packet for frame_num " << frame_num << endl;
         auto data = serialize_packet(now_uS, pub_prt, payload.size(), now_uS, stream_id, frame_num, payload);
-        if(DBG) cout << now_uS+2 << " [zmq-event-clnt-emu " << pub_prt << "]: " << "serializing success for frame_num " << frame_num << endl;
+        if(DBG) cout << now_uS+2 << " [emulate_stream:] serializing success for frame_num " << frame_num << endl;
         zmq::message_t message(data.size());
         memcpy(message.data(), data.data(), data.size());
         sr = pub_sckt.send(message, zmq::send_flags::none);
-        if (!sr) cerr << now_uS << " [zmq-event-clnt-emu " << pub_prt << "]: Failed to send" << endl;
-        if (vrbs && sr.has_value()) cout << now_uS << " [zmq-event-clnt-emu " << pub_prt << "]: Bytes sent = " << sr.value() << endl;
+        if (!sr) {cerr << now_uS << " [emulate_stream:] Failed to send" << endl; exit(1);}
+        
+        float bufSiz_B = sr.value();
+        if (vrbs && sr.has_value()) cout << now_uS << " [emulate_stream:] Sending frame size = " << bufSiz_B << " frame_num = " << frame_num << endl;
 
-        if(vrbs) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  Sending frame size = " << payload.size() << " (" 
+        if(vrbs) cout << now_uS+3 << " [emulate_stream:] Sending frame size = " << payload.size() << " (" 
                       << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
-        if(DBG) cout << now_uS+4 << " [zmq-event-clnt-emu " << pub_prt << "]: output Num written (" << frame_num << ") "  
-                     << sr.value() << " (" << frame_num << ')' << endl;
-        if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  data incorrect size(" << frame_num << ") "  << endl;
+        if(DBG) cout << now_uS+4 << " [emulate_stream:] output Num written (" << frame_num << ") "  
+                     << bufSiz_B << " (" << frame_num << ')' << endl;
+        if(bufSiz_B != HEADER_SIZE + payload.size()) cout << now_uS+3 << " [emulate_stream:] data incorrect size(" << frame_num << ") "  << endl;
 
 
-        cout << now_uS+5 << " [zmq-event-clnt-emu " << pub_prt << "]: sent: size=" 
+        if(vrbs) cout << now_uS+5 << " [emulate_stream:] sent: size=" 
                   << HEADER_SIZE + payload.size() << endl;
 
-        float rate_sleep_S = one_G*payload.size() / bit_rate_gbps;  // in seconds
+        float rate_sleep_S = one_G*payload.size()*B_b / bit_rate_gbps;  // in seconds
         auto cms = chrono::microseconds(size_t(round(one_u*rate_sleep_S))); //reqd timespan in microseconds
-        if(vrbs) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  Rate sleep for " << rate_sleep_S << " S"  
+        if(vrbs) cout << now_uS+3 << " [emulate_stream:] Rate sleep for " << rate_sleep_S << " S"  
                       << " Payload size = " << payload.size() << " bit rate Mbps " << G_M*bit_rate_gbps << endl;
+
         this_thread::sleep_for(cms);
+
+        now_hrc = high_resolution_clock::now();
+        auto clk_uSd        = duration_cast<microseconds>(now_hrc.time_since_epoch());
+        //if(vrbs) cout << now_uS << " [emulate_stream:] Updating clock from " << now_uS << " to ";
+        now_uS = clk_uSd.count();
+        if(vrbs) cout << now_uS << " [emulate_stream:]  " << now_uS << endl;
+        
+        if(vrbs) cout << now_uS + 6 << " [emulate_stream:] Estimated frame rate (Hz): "
+                           << float(frame_num)/(float(now_uS-start_uS)*u_1) 
+                           << " frame_num " << frame_num << " elpsd_tm_uS " << now_uS-start_uS << endl;
+
+        mnBfSz_B = (frame_num-1)*mnBfSz_B/frame_num + bufSiz_B/frame_num; //incrementally update mean receive size
+        if(vrbs) cout << now_uS + 7 << " [emulate_stream:] Estimated bit rate (Gbps): " 
+                           << float(frame_num*mnBfSz_B*B_b*one_G)/(float(now_uS-start_uS)*u_1)
+                           << " frame_num " << frame_num << " elpsd_tm_uS " << now_uS-start_uS << endl;
+        if(vrbs) cout << now_uS + 7 << " [emulate_stream:] Estimated bit rate (bps): " 
+                           << float(frame_num*mnBfSz_B*B_b)/(float(now_uS-start_uS)*u_1)
+                           << " frame_num " << frame_num << " elpsd_tm_uS " << now_uS-start_uS << endl;
 
     }
     return 0;

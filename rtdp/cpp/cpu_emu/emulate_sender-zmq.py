@@ -97,8 +97,8 @@ def emulate_stream(
         elpsd_tm_uS = int((clk_S-clk0_S)*one_u) #usec
         print(f"{clk_uS+3} [emulate_stream:] Read Raw clock as: {clk_S}")
 
-        print(f"{clk_uS+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(elpsd_tm_uS*one_M)} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
-        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*B_b*one_G/float(elpsd_tm_uS*one_M)} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
+        print(f"{clk_uS+1} [emulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(elpsd_tm_uS*u_1)} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
+        print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (Gbps): {frame_num*frame_size_mean_B*B_b*one_G/float(elpsd_tm_uS*u_1)} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
         print(f"{clk_uS+2} [emulate_stream:] Estimated bit rate (bps): {frame_size_mean_B*B_b/rate_sleep_S} frame_num {frame_num} elpsd_tm_uS {elpsd_tm_uS}")
 
             
