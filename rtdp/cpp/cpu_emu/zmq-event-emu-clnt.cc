@@ -16,8 +16,6 @@ using namespace std;
 using namespace zmq;
 using namespace chrono;
 
-#define DBG 1 /////////////////////
-
 //scaling constants
 const float  B_b   = 1e1;
 const float  b_B   = 1/B_b;
@@ -58,7 +56,7 @@ void   Usage()
         -v verbose = 0/1 (0)  \n\
         -s event size (MB) (1) \n\n";
 
-    cout << " [zmq-event-clnt]: " << usage_str;
+    cout << " [zmq-event-clnt-emu]: " << usage_str;
 }
 
 
@@ -105,7 +103,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -v " << vrbs << endl;
             break;
          case '?':
-            cout << " [zmq-event-clnt]: Unrecognised option: " << optopt;
+            cout << " [zmq-event-clnt-emu]: Unrecognised option: " << optopt;
             Usage();
             exit(1);
         }
@@ -135,7 +133,7 @@ int main (int argc, char *argv[])
 
     //  Do evnt_cnt requests
     for (uint64_t frame_num = 1; frame_num <= evnt_cnt; frame_num++) {
-        cout << " [zmq-event-clnt]: Sending  " << frame_num << "..." << endl;
+        //cout << " [zmq-event-clnt-emu]: Sending  " << frame_num << "..." << endl;
 
         send_result_t sr;
 
@@ -156,9 +154,9 @@ int main (int argc, char *argv[])
 
         if(vrbs) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  Sending frame size = " << payload.size() << " (" 
                       << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
-        if(DBG) cout << now_uS+4 << "[zmq-event-clnt-emu " << pub_prt << "]: output Num written (" << frame_num << ") "  
+        if(DBG) cout << now_uS+4 << " [zmq-event-clnt-emu " << pub_prt << "]: output Num written (" << frame_num << ") "  
                      << sr.value() << " (" << frame_num << ')' << endl;
-        if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << "[zmq-event-clnt-emu " << pub_prt << "]:  data incorrect size(" << frame_num << ") "  << endl;
+        if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << " [zmq-event-clnt-emu " << pub_prt << "]:  data incorrect size(" << frame_num << ") "  << endl;
 
 
         cout << now_uS+5 << " [zmq-event-clnt-emu " << pub_prt << "]: sent: size=" 
