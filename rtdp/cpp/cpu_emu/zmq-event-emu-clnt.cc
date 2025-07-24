@@ -157,7 +157,7 @@ int main (int argc, char *argv[])
         if (!sr) {cerr << now_uS << " [emulate_stream:] Failed to send" << endl; exit(1);}
         
         float bufSiz_B = sr.value();
-        if (vrbs && sr.has_value()) cout << now_uS << " [emulate_stream:] Sending frame size = " << bufSiz_B << " frame_num = " << frame_num << endl;
+        //if (vrbs && sr.has_value()) cout << now_uS << " [emulate_stream:] Sending frame size = " << bufSiz_B << " frame_num = " << frame_num << endl;
 
         if(vrbs) cout << now_uS+3 << " [emulate_stream:] Sending frame size = " << payload.size() << " (" 
                       << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;

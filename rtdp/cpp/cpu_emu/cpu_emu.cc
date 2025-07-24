@@ -35,7 +35,7 @@ using namespace std;
 using namespace zmq;
 using namespace chrono;
 
-//scaling constants
+// Power of ten scaling constants
 const float  B_b   = 1e1;
 const float  b_B   = 1/B_b;
 const float  G_1   = 1e9;

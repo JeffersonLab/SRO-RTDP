@@ -13,15 +13,7 @@ import math
 
 from buffer_packet_zmq_emu import serialize_buffer, HEADER_FORMAT, HEADER_SIZE
 
-def emulate_stream(
-    port:          int,
-    avg_rate_mbps: float,
-    rms_fraction:  float,
-    duty_cycle:    float,
-    frame_cnt:     int #,
-    #verbosity:      int
-):
-
+#Power of ten scaling constants
     B_b   = 1e1
     b_B   = 1/B_b
     G_1   = 1e9
@@ -48,6 +40,15 @@ def emulate_stream(
     sz1K  = 1024
     sz1M  = sz1K*sz1K
     sz1G  = sz1M*sz1K
+
+def emulate_stream(
+    port:          int,
+    avg_rate_mbps: float,
+    rms_fraction:  float,
+    duty_cycle:    float,
+    frame_cnt:     int #,
+    #verbosity:      int
+):
     
     context    = zmq.Context()
     zmq_socket = context.socket(zmq.PUB)

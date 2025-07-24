@@ -11,31 +11,59 @@ import sys
 
 from buffer_packet_zmq_sim import serialize_buffer
 
-def flight_time_microseconds(frame_bits, wire_speed_gbps):
+#Power of ten scaling constants
+B_b   = 1e1
+b_B   = 1/B_b
+G_1   = 1e9
+one_G = 1/G_1
+G_K   = 1e6
+K_G   = 1/G_K
+G_M   = 1e3
+M_G   = 1/G_M
+K_1   = 1e3
+one_K = 1/K_1
+M_1   = 1e6
+one_M = 1/M_1
+m_1   = 1e-3
+one_m = 1/m_1
+m_u   = 1e3 
+u_m   = 1/m_u
+u_1   = 1e-6
+one_u = 1/u_1
+n_1   = 1e-9
+one_n = 1/n_1
+n_m   = 1e-6
+m_n   = 1/n_m
+
+sz1K  = 1024
+sz1M  = sz1K*sz1K
+sz1G  = sz1M*sz1K
+
+def flight_time_microseconds(frameSz_b, wire_speed_Gb_S):
     # Convert wire speed to bits per second
-    wire_speed_bps = wire_speed_gbps * 1e9
+    wire_speed_b_S = wire_speed_Gb_S * G_1
     # Time in seconds = bits / bits per second
-    time_seconds = frame_bits / wire_speed_bps
+    time_S = frameSz_b / wire_speed_b_S
     # Convert seconds to microseconds
-    time_microseconds = time_seconds * 1e6
-    #print(f"flight_time_microseconds[flight_time_microseconds:] {frame_bits}, {wire_speed_gbps} -> {time_microseconds}", flush=True)
-    return time_microseconds
+    time_uS = time_S * one_u
+    #print(f"flight_time_microseconds[flight_time_microseconds:] {frameSz_b}, {wire_speed_Gb_S} -> {time_uS}", flush=True)
+    return time_uS
 
 
 def simulate_stream(
     port:           int,
-    avg_rate_mbps:  float,
+    avg_rate_Mb_S:  float,
     rms_fraction:   float,
     duty_cycle:     float,
-    nic_limit_gbps: float,
+    nic_limit_Gb_S: float,
     frame_cnt:      int #,
     #verbosity:      int
 ):
     print(f"[simulate_stream:] port = {port}...")
-    print(f"[simulate_stream:] avg_rate_mbps = {avg_rate_mbps}...")
+    print(f"[simulate_stream:] avg_rate_Mb_S = {avg_rate_Mb_S}...")
     print(f"[simulate_stream:] rms_fraction = {rms_fraction}...")
     print(f"[simulate_stream:] duty_cycle = {duty_cycle}...")
-    print(f"[simulate_stream:] nic_limit_gbps = {nic_limit_gbps}...")
+    print(f"[simulate_stream:] nic_limit_Gb_S = {nic_limit_Gb_S}...")
     print(f"[simulate_stream:] frame_cnt = {frame_cnt}")
 
     context = zmq.Context()
@@ -53,42 +81,41 @@ def simulate_stream(
     #wait_for_connection(zmq_socket)
     #print("[simulate_stream:] Connected ...")
     
-    avg_rate_bps = avg_rate_mbps * 1e6
-    nic_limit_bps = nic_limit_gbps * 1e9
-    frame_size_mean = 60e3*10 # CLAS12 # bits
-    std_dev = frame_size_mean * rms_fraction # bits
-    print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_bps/1e9}, nic_limit(Gbps) = {nic_limit_bps/1e9}, frame_size_mean(Mb) = {frame_size_mean/1e6}, std_dev(Mb) = {std_dev/1e6}")
+    avg_rate_b_S = avg_rate_Mb_S * M_1
+    nic_limit_b_S = nic_limit_Gb_S * G_1
+    frameSzMn_b = 60e3*10 # CLAS12 # bits
+    stdDev_b = frameSzMn_b * rms_fraction # bits
+    print(f"[simulate_stream:] avg_rate(Gbps) = {avg_rate_b_S*one_G}, nic_limit(Gbps) = {nic_limit_b_S*one_G}, frameSzMn_b(Mb) = {frameSzMn_b*one_M}, stdDev_b(Mb) = {stdDev_b*one_M}")
     
-    cycle_period = 1.0  # seconds
-    on_time      = 1 # duty_cycle * cycle_period #disable duty cycle for now
-    off_time     = cycle_period - on_time
-    print(f"[simulate_stream:] duty_cycle = {duty_cycle}, cycle_period = {cycle_period}, on_time = {on_time}, off_time = {off_time}", flush=True)
+    cyclPrd_S = 1.0  # seconds
+    onTm_S      = 1 # duty_cycle * cyclPrd_S #disable duty cycle for now
+    offTm_S     = cyclPrd_S - onTm_S
+    print(f"[simulate_stream:] duty_cycle = {duty_cycle}, cyclPrd_S = {cyclPrd_S}, onTm_S = {onTm_S}, offTm_S = {offTm_S}", flush=True)
     frame_num    = 1
     # Derived sleep time between messages
-    rate_sleep = frame_size_mean / avg_rate_bps  # in seconds
-    smClk = float(0) #master simulation clock in usec
+    rtSlp_S = frameSzMn_b / avg_rate_b_S  # in seconds
+    smClk_uS = float(0) #master simulation clock in usec
     while frame_cnt >= frame_num:
         # Calculate frame size from normal distribution
         if rms_fraction > 0:
-            frame_size = max(1, int(np.random.normal(frame_size_mean, std_dev)))
+            frmSz_b = max(1, int(np.random.normal(frameSzMn_b, stdDev_b)))
         else:
-            frame_size = int(frame_size_mean)
-        buffer = serialize_buffer(size=frame_size, timestamp=int(smClk), stream_id=99, frame_num=frame_num)
-        print(f"{float(smClk)} [simulate_stream:] Sending frame; size = {frame_size} frame_num = ({frame_num})", flush=True)            
+            frmSz_b = int(frameSzMn_b)
+        buffer = serialize_buffer(size=frmSz_b, timestamp=int(smClk_uS), stream_id=99, frame_num=frame_num)
+        print(f"{float(smClk_uS)} [simulate_stream:] Sending frame; size = {frmSz_b} frame_num = ({frame_num})", flush=True)            
         zmq_socket.send(buffer)
         reply = zmq_socket.recv_string() #ACK
-        #1e6*float(frame_size)/nic_limit_bps)
-        ft = flight_time_microseconds(frame_size, nic_limit_gbps)
-        print(f"{float(smClk + 2*ft)} [simulate_stream:] Recvd ACK: frame_num = ({frame_num}), 2*ft = {2*ft}", flush=True)
+        ft_uS = flight_time_microseconds(frmSz_b, nic_limit_Gb_S)
+        print(f"{float(smClk_uS + 2*ft_uS)} [simulate_stream:] Recvd ACK: frame_num = ({frame_num}), 2*ft_uS = {2*ft_uS}", flush=True)
                                 
         # Delay to throttle sending rate
-        rate_sleep = frame_size / avg_rate_bps  # in seconds
-        smClk += int(rate_sleep*1e6) #usec
-        print(f"{float(smClk)} [simulate_stream:] Added rate latency = {int(rate_sleep*1e6)}: frame_num = ({frame_num})", flush=True)
+        rtSlp_S = frmSz_b / avg_rate_b_S  # in seconds
+        smClk_uS += int(rtSlp_S*one_u) #usec
+        print(f"{float(smClk_uS)} [simulate_stream:] Added rate latency uS = {int(rtSlp_S*one_u)}: frame_num = ({frame_num})", flush=True)
         
-        print(f"{float(smClk+ 2 + ft)} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
-        print(f"{float(smClk+ 3 + ft)} [simulate_stream:] Estimated bit rate (Gbps): {1e-9*frame_num*frame_size_mean/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
-        print(f"{float(smClk+ 4 + ft)} [simulate_stream:] Estimated bit rate (MHz): {1e-6*float(frame_num*frame_size_mean)/float(smClk*1e-6)} frame_num {frame_num}", flush=True)
+        print(f"{float(smClk_uS+ 2 + ft_uS)} [simulate_stream:] Estimated frame rate (Hz): {float(frame_num)/float(smClk_uS*u_1)} frame_num {frame_num}", flush=True)
+        print(f"{float(smClk_uS+ 3 + ft_uS)} [simulate_stream:] Estimated bit rate (Gbps): {one_G*frame_num*frameSzMn_b/float(smClk_uS*u_1)} frame_num {frame_num}", flush=True)
+        print(f"{float(smClk_uS+ 4 + ft_uS)} [simulate_stream:] Estimated bit rate (MHz): {one_M*float(frame_num*frameSzMn_b)/float(smClk_uS*u_1)} frame_num {frame_num}", flush=True)
         frame_num += 1
 
 
