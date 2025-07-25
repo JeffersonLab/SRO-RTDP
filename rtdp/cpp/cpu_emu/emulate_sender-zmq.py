@@ -14,32 +14,32 @@ import math
 from buffer_packet_zmq_emu import serialize_buffer, HEADER_FORMAT, HEADER_SIZE
 
 #Power of ten scaling constants
-    B_b   = 1e1
-    b_B   = 1/B_b
-    G_1   = 1e9
-    one_G = 1/G_1
-    G_K   = 1e6
-    K_G   = 1/G_K
-    G_M   = 1e3
-    M_G   = 1/G_M
-    K_1   = 1e3
-    one_K = 1/K_1
-    M_1   = 1e6
-    one_M = 1/M_1
-    m_1   = 1e-3
-    one_m = 1/m_1
-    m_u   = 1e3 
-    u_m   = 1/m_u
-    u_1   = 1e-6
-    one_u = 1/u_1
-    n_1   = 1e-9
-    one_n = 1/n_1
-    n_m   = 1e-6
-    m_n   = 1/n_m
+B_b   = 1e1
+b_B   = 1/B_b
+G_1   = 1e9
+one_G = 1/G_1
+G_K   = 1e6
+K_G   = 1/G_K
+G_M   = 1e3
+M_G   = 1/G_M
+K_1   = 1e3
+one_K = 1/K_1
+M_1   = 1e6
+one_M = 1/M_1
+m_1   = 1e-3
+one_m = 1/m_1
+m_u   = 1e3 
+u_m   = 1/m_u
+u_1   = 1e-6
+one_u = 1/u_1
+n_1   = 1e-9
+one_n = 1/n_1
+n_m   = 1e-6
+m_n   = 1/n_m
 
-    sz1K  = 1024
-    sz1M  = sz1K*sz1K
-    sz1G  = sz1M*sz1K
+sz1K  = 1024
+sz1M  = sz1K*sz1K
+sz1G  = sz1M*sz1K
 
 def emulate_stream(
     port:          int,

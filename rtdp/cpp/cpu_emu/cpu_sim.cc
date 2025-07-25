@@ -429,7 +429,7 @@ int main (int argc, char *argv[])
                 pkt.stream_id = stream_id;
                 pkt.frame_num = frame_num;
 	            // Send "frame" spec
-                if(vrbs) cout << tsr_uS << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << outSz_b << " (" 
+                if(vrbs) cout << tsr_uS << " [cpu_sim " << rcv_prt << "]:  Sending frame size = " << outSz_b*x << " (" 
                               << frame_num << ')' << " to " << dst_prt << " at " << tsr_uS << endl;
                 sr = dst_sckt.send(pkt.to_message(), zmq::send_flags::none);
 

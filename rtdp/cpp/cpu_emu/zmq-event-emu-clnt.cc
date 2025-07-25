@@ -105,7 +105,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -v " << vrbs << endl;
             break;
          case '?':
-            cout << " [emulate_stream]: Unrecognised option: " << optopt;
+            cout << " [zmq-event-emu-clnt]: Unrecognised option: " << optopt;
             Usage();
             exit(1);
         }
@@ -122,6 +122,7 @@ int main (int argc, char *argv[])
     static normal_distribution<> nd_10pcnt(1.0, 0.1);
 
     //  Prepare our publication context and socket
+    if(vrbs) cout << "[zmq-event-emu-clnt " << pub_prt << "]" << endl;
     if(vrbs) cout << "[emulate_sender-zmq " << pub_prt << "]: Publishing on port " << to_string(pub_prt) << endl;
     context_t pub_cntxt(1);
     socket_t pub_sckt(pub_cntxt, socket_type::pub);
