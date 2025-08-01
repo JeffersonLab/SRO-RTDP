@@ -428,19 +428,13 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
         click.echo(f"   Proceeding with workflow installation...")
     
     try:
-        # Install workflow from parent directory to avoid symlink issues
-        workflow_parent = os.path.dirname(workflow_abs)
-        workflow_dirname = os.path.basename(workflow_abs)
-        
-        os.chdir(workflow_parent)
-        
         # Install workflow
         click.echo(f"📦 Installing workflow '{workflow_name}'...")
-        click.echo(f"   Working directory: {workflow_parent}")
-        click.echo(f"   Flow file: {workflow_dirname}/flow.cylc")
+        click.echo(f"   Working directory: {os.getcwd()}")
+        click.echo(f"   Flow file: {workflow_abs}/flow.cylc")
         click.echo(f"   ⏳ Installation in progress... (this may take a moment)")
         
-        result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}', workflow_dirname])
+        result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}', workflow_abs])
         if result1.returncode != 0:
             raise click.ClickException("cylc install failed")
         click.echo(f"✅ Workflow '{workflow_name}' installed successfully!")
