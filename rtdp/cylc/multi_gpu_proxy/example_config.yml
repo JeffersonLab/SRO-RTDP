@@ -7,7 +7,7 @@ platform:
   name: jlab_slurm
 
 containers:
-  image_path: gpu-proxy.sif
+  image_path: jlabtsai/rtdp-gpu_proxy:latest
 
 # Sender configuration with component-specific parameters
 sender:

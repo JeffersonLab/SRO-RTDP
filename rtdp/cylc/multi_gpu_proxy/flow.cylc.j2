@@ -40,7 +40,7 @@
         
         [[[environment]]]
             # Path to SIF file
-            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('gpu-proxy.sif') }}"
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('jlabtsai/rtdp-gpu_proxy:latest') }}"
             
             # Port configuration
             SEND_PORT = "{{ sender.target_port }}"
