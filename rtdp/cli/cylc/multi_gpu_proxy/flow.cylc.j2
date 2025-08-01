@@ -46,14 +46,14 @@
             SEND_PORT = "{{ sender.target_port }}"
             RECV_PORT = "{{ receiver.listen_port }}"
             
-            # Directory paths
-            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
-            INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
-            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
-            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+            # Directory paths - use CLI output directory instead of CYLC_WORKFLOW_RUN_DIR
+            OUTPUT_DIR = "{{ output_dir }}/output"
+            INPUT_DIR = "{{ output_dir }}/input"
+            LOG_DIR = "{{ output_dir }}/logs"
+            DATA_DIR = "{{ output_dir }}/data"
             
             # Consolidated log file path
-            CONSOLIDATED_LOG = "$CYLC_WORKFLOW_RUN_DIR/consolidated.log"
+            CONSOLIDATED_LOG = "{{ output_dir }}/consolidated.log"
 
     [[sender]]
         script = """
@@ -100,6 +100,7 @@
                 echo "Generated at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "${CONSOLIDATED_LOG}"
                 echo "Workflow ID: $CYLC_WORKFLOW_ID" >> "${CONSOLIDATED_LOG}"
                 echo "Run directory: $CYLC_WORKFLOW_RUN_DIR" >> "${CONSOLIDATED_LOG}"
+                echo "Output directory: {{ output_dir }}" >> "${CONSOLIDATED_LOG}"
                 echo "" >> "${CONSOLIDATED_LOG}"
             fi
 
