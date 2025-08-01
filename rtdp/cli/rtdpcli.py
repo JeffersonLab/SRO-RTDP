@@ -9,6 +9,18 @@ import json
 from pathlib import Path
 from .sif_cache import SIFCache
 
+def docker_to_sif_filter(image_path):
+    """Convert Docker image name to SIF filename."""
+    if not image_path:
+        return ""
+    
+    # If image_path is already a Docker image name (contains '/'), convert it
+    if '/' in image_path:
+        return image_path.replace('/', '_').replace(':', '_') + '.sif'
+    else:
+        # Legacy support: if it's a short name, assume it's a Docker image name
+        return image_path + '.sif'
+
 # Update workflow_types to include new multi-component templates
 workflow_types = {
     'gpu_proxy': {
@@ -184,8 +196,12 @@ def generate(config, output, workflow_type, consolidated_logging):
     # Add consolidated_logging flag to config data for template rendering
     config_data['consolidated_logging'] = consolidated_logging
 
+    # Create Jinja2 environment with custom filter
+    env = Environment()
+    env.filters['docker_to_sif'] = docker_to_sif_filter
+    
     # Render the template
-    template = Template(template_content)
+    template = env.from_string(template_content)
     rendered_content = template.render(**config_data)
 
     # Create the output directory if it doesn't exist

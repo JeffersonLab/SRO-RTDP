@@ -40,7 +40,7 @@
         
         [[[environment]]]
             # Path to SIF file
-            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('jlabtsai/rtdp-gpu_proxy:latest') }}"
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ (containers.image_path | default('jlabtsai/rtdp-gpu_proxy:latest')) | docker_to_sif }}"
             
             # Port configuration
             SEND_PORT = "{{ sender.target_port }}"
