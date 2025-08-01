@@ -31,7 +31,7 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "rtdp=rtdpcli:cli",
+            "rtdp=rtdp.cli:cli",
         ],
     },
     scripts=[

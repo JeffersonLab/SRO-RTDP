@@ -29,41 +29,43 @@ pip install --upgrade pip
 # Install CLI package in development mode
 pip install -e .
 
-# The rtdp command should now work:
-rtdp --help
+# Note: The console_scripts entry point (rtdp command) has import issues.
+# Use the wrapper script instead (recommended):
 
-# Alternative methods (if needed):
+# Run CLI with wrapper script
 python run_rtdp.py --help
+
+# Alternative: Run directly with Python
 python rtdpcli.py --help
 
 # Setup RTDP environment (install Cylc and configure directories)
-rtdp setup
+python run_rtdp.py setup
 
 ## Quick Start
 
 1. **Check Environment Status**:
    ```bash
-   rtdp status
+   python run_rtdp.py status
    ```
 
 2. **Setup Environment** (if needed):
    ```bash
-   rtdp setup
+   python run_rtdp.py setup
    ```
 
 3. **Generate a Workflow**:
    ```bash
-   rtdp generate --config config.yml --output workflow_dir --workflow-type cpu_emu
+   python run_rtdp.py generate --config config.yml --output workflow_dir --workflow-type cpu_emu
    ```
 
 4. **Run the Workflow**:
    ```bash
-   rtdp run workflow_dir
+   python run_rtdp.py run workflow_dir
    ```
 
 5. **Monitor the Workflow**:
    ```bash
-   rtdp monitor workflow_dir
+   python run_rtdp.py monitor workflow_dir
    ```
 
 ## Basic Usage
