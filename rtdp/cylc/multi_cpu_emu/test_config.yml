@@ -1,0 +1,36 @@
+# Simplified CPU Emulator Test Configuration
+# Contains only essential parameters for testing
+
+workflow_type: multi_cpu_emu
+workflow_name: cpu_emu_test
+
+# Platform configuration
+platform:
+  name: jlab_slurm
+partition: ifarm
+
+# Container configuration
+containers:
+  image_path: cpu-emu.sif
+
+# Receiver configuration
+receiver:
+  listen_port: 5000
+
+# Sender configuration (minimal)
+sender:
+  target_port: 5001
+
+# CPU emulators with minimal required parameters
+cpu_emulators:
+  # First emulator - receives from sender, sends to emulator_1
+  - in_port: 5001
+    out_port: 5002
+    cpus: 4
+    mem: 8G
+
+  # Second emulator - receives from emulator_0, sends to receiver
+  - in_port: 5002
+    out_port: 5000
+    cpus: 4
+    mem: 8G 
