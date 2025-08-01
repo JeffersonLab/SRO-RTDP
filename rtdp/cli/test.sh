@@ -1,91 +1,60 @@
 #!/bin/bash
 
-echo "=== RTDP CLI Test Script - GPU Consolidated Workflow ==="
-echo "This script tests the GPU consolidated workflow step by step."
-echo ""
-
-# Check if we're in a virtual environment
-if [[ "$VIRTUAL_ENV" == "" ]]; then
-    echo "⚠️  Warning: Not running in a virtual environment."
-    echo "   It's recommended to activate a virtual environment first."
-    echo "   Example: source venv/bin/activate"
-    echo ""
-fi
-
-echo "1. Checking RTDP environment status..."
-# Function to run rtdp command
-run_rtdp() {
-    echo "Running: $*"
-    ./rtdp "$@"
-}
-
-run_rtdp status
+echo "=== Testing Multi-Component Workflows with Logging Options ==="
 
 echo ""
-echo "2. Setting up RTDP environment (if needed)..."
-echo "   This will install Cylc and configure directories."
-echo "   Press Enter to continue or Ctrl+C to skip..."
-read -r
-
-run_rtdp setup
+echo "1. Testing GPU workflow with consolidated logging (default):"
+./rtdp generate --config cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
 
 echo ""
-echo "3. Testing GPU workflow generation with consolidated logging..."
-run_rtdp generate --config cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
+echo "2. Testing GPU workflow with separate logging:"
+./rtdp generate --config cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_separate --workflow-type multi_gpu_proxy --no-consolidated-logging
 
 echo ""
-echo "4. Testing workflow validation..."
-run_rtdp validate --config cylc/multi_gpu_proxy/test_config.yml --template cylc/multi_gpu_proxy/flow.cylc.j2
+echo "3. Testing CPU emulator workflow with consolidated logging (default):"
+./rtdp generate --config cylc/multi_cpu_emu/test_config.yml --output cpu_workflow_consolidated --workflow-type multi_cpu_emu --consolidated-logging
 
 echo ""
-echo "5. Testing workflow execution (optional)..."
-echo "   This will build SIF containers and run the workflow."
-echo "   Press Enter to continue or Ctrl+C to skip..."
-read -r
-
-run_rtdp run --workflow gpu_workflow_consolidated
+echo "4. Testing CPU emulator workflow with separate logging:"
+./rtdp generate --config cylc/multi_cpu_emu/test_config.yml --output cpu_workflow_separate --workflow-type multi_cpu_emu --no-consolidated-logging
 
 echo ""
-echo "6. Testing monitoring (optional)..."
-echo "   This will open Cylc TUI for monitoring the workflow."
-echo "   Press Enter to continue or Ctrl+C to skip..."
-read -r
-
-run_rtdp monitor --workflow gpu_workflow_consolidated
+echo "5. Testing mixed components workflow with consolidated logging (default):"
+./rtdp generate --config cylc/multi_mixed/test_config.yml --output mixed_workflow_consolidated --workflow-type multi_mixed --consolidated-logging
 
 echo ""
-echo "7. Testing cache management..."
-run_rtdp cache --stats
+echo "6. Testing mixed components workflow with separate logging:"
+./rtdp generate --config cylc/multi_mixed/test_config.yml --output mixed_workflow_separate --workflow-type multi_mixed --no-consolidated-logging
 
 echo ""
-echo "=== Test Summary ==="
-echo "✅ Environment setup completed"
-echo "✅ GPU workflow generation tested"
-echo "✅ Workflow validation tested"
-echo "✅ Workflow execution tested"
-echo "✅ Monitoring tested"
-echo "✅ Cache management tested"
+echo "=== CLI Option Summary ==="
+echo "✅ --consolidated-logging: Enable consolidated logging (default)"
+echo "📁 --no-consolidated-logging: Use separate log files for each component"
 echo ""
-echo "Generated workflow:"
+echo "Generated workflows:"
 echo "- gpu_workflow_consolidated (consolidated logging enabled)"
+echo "- gpu_workflow_separate (consolidated logging disabled)"
+echo "- cpu_workflow_consolidated (consolidated logging enabled)"
+echo "- cpu_workflow_separate (consolidated logging disabled)"
+echo "- mixed_workflow_consolidated (consolidated logging enabled)"
+echo "- mixed_workflow_separate (consolidated logging disabled)"
 echo ""
-echo "CLI Commands tested:"
-echo "✅ rtdp status - Check environment status"
-echo "✅ rtdp setup - Setup RTDP environment"
-echo "✅ rtdp generate - Generate workflow"
-echo "✅ rtdp validate - Validate configuration"
-echo "✅ rtdp run - Run workflow"
-echo "✅ rtdp monitor - Monitor workflow"
-echo "✅ rtdp cache - Manage SIF cache"
-echo ""
-echo "To run the workflow manually:"
+echo "To run a workflow, use:"
 echo "./rtdp run --workflow gpu_workflow_consolidated"
+echo "./rtdp run --workflow gpu_workflow_separate"
+echo "./rtdp run --workflow cpu_workflow_consolidated"
+echo "./rtdp run --workflow cpu_workflow_separate"
+echo "./rtdp run --workflow mixed_workflow_consolidated"
+echo "./rtdp run --workflow mixed_workflow_separate"
 echo ""
-echo "To monitor the workflow:"
+echo "To monitor a workflow, use:"
 echo "./rtdp monitor --workflow gpu_workflow_consolidated"
+echo "./rtdp monitor --workflow gpu_workflow_separate"
+echo "./rtdp monitor --workflow cpu_workflow_consolidated"
+echo "./rtdp monitor --workflow cpu_workflow_separate"
+echo "./rtdp monitor --workflow mixed_workflow_consolidated"
+echo "./rtdp monitor --workflow mixed_workflow_separate"
 echo ""
-echo "To check cache:"
-echo "./rtdp cache --stats"
-echo "./rtdp cache --clear"
-echo ""
-echo "🎉 GPU consolidated workflow test completed successfully!" 
+echo "Logging differences:"
+echo "- Consolidated logging: All component logs combined into a single file with timestamps and component markers"
+echo "- Separate logging: Each component has its own log directory with stdout.log, stderr.log, and apptainer.log files" 
