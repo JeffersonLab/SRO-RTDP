@@ -29,43 +29,41 @@ pip install --upgrade pip
 # Install CLI package in development mode
 pip install -e .
 
-# Note: The console_scripts entry point (rtdp command) may have import issues.
-# Use the wrapper script instead:
+# The rtdp command should now work:
+rtdp --help
 
-# Run CLI with wrapper script (recommended)
+# Alternative methods (if needed):
 python run_rtdp.py --help
-
-# Alternative: Run directly with Python
 python rtdpcli.py --help
 
 # Setup RTDP environment (install Cylc and configure directories)
-python run_rtdp.py setup
+rtdp setup
 
 ## Quick Start
 
 1. **Check Environment Status**:
    ```bash
-   python run_rtdp.py status
+   rtdp status
    ```
 
 2. **Setup Environment** (if needed):
    ```bash
-   python run_rtdp.py setup
+   rtdp setup
    ```
 
 3. **Generate a Workflow**:
    ```bash
-   python run_rtdp.py generate --config config.yml --output workflow_dir --workflow-type cpu_emu
+   rtdp generate --config config.yml --output workflow_dir --workflow-type cpu_emu
    ```
 
 4. **Run the Workflow**:
    ```bash
-   python run_rtdp.py run workflow_dir
+   rtdp run workflow_dir
    ```
 
 5. **Monitor the Workflow**:
    ```bash
-   python run_rtdp.py monitor workflow_dir
+   rtdp monitor workflow_dir
    ```
 
 ## Basic Usage
@@ -93,6 +91,13 @@ rtdp setup --non-interactive --platform jlab_slurm
 
 # Skip Cylc installation (if already installed)
 rtdp setup --skip-cylc-install
+```
+
+**Note**: If the `rtdp` command has issues, you can use:
+```bash
+python run_rtdp.py setup
+# or
+python rtdpcli.py setup
 ```
 
 The setup command will:
@@ -508,6 +513,7 @@ The CLI validates:
    - Check that you're in the correct directory (`rtdp/cli`)
    - Ensure all dependencies are installed: `pip install -r requirements.txt`
    - If console_scripts entry point fails, use the wrapper script: `python run_rtdp.py setup`
+   - The `rtdp` command should now work with the fixed entry point after reinstallation
 
 ### Workflow Issues
 

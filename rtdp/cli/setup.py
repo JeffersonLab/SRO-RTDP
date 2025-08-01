@@ -31,9 +31,12 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "rtdp=rtdp_entry:main",
+            "rtdp=rtdpcli:cli",
         ],
     },
+    scripts=[
+        "rtdp",
+    ],
     include_package_data=True,
     package_data={
         "": ["*.md", "*.txt", "*.yml", "*.yaml"],
