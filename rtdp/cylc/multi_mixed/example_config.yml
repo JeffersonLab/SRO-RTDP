@@ -12,16 +12,16 @@ partition: ifarm
 # Receiver configuration
 receiver:
   listen_port: 55559
-  image_path: cpu-emu.sif  # CPU emulator SIF for receiver
+  image_path: cpu-emu.sif  # (optional) CPU emulator SIF for receiver
 
 # Sender configuration with traffic generation parameters
 sender:
   target_port: 55555
-  avg_rate: 100          # Average send rate in Mbps
-  rms_fraction: 0.2      # RMS variation fraction
-  duty_cycle: 0.8        # Duty cycle for traffic bursts
-  nic_limit: 50          # NIC bandwidth limit in Gbps
-  image_path: cpu-emu.sif  # CPU emulator SIF for sender
+  avg_rate: 100          # Average send rate in Mbps (optional)
+  rms_fraction: 0.2      # RMS variation fraction (optional)
+  duty_cycle: 0.8        # Duty cycle for traffic bursts (optional)
+  nic_limit: 50          # NIC bandwidth limit in Gbps (optional)
+  image_path: cpu-emu.sif  # (optional) CPU emulator SIF for sender
 
 # Components in order (data flows from sender through components to receiver)
 # Each component has: type, index, in_port, out_port, image_path, and type-specific parameters
@@ -32,16 +32,16 @@ components:
     index: 0
     in_port: 55555
     out_port: 55556
-    image_path: gpu-proxy.sif  # GPU proxy SIF
+    image_path: gpu-proxy.sif  # (optional) GPU proxy SIF
     cpus: 4
     mem: 100G
     gpus: 1
     partition: gpu
-    # matrix_width: 2048
-    # proxy_rate: 1.0
-    # socket_hwm: 1
-    # nic: eth0
-    # nodelist: gpu001  # Optional: specify specific node
+    # matrix_width: 2048    # (optional)
+    # proxy_rate: 1.0       # (optional)
+    # socket_hwm: 1         # (optional)
+    # nic: eth0             # (optional)
+    # nodelist: gpu001      # (optional) specify specific node
 
   # Second component: CPU Emulator 0 (receives from GPU Proxy 0, sends to GPU Proxy 1)
   - type: cpu_emulator
@@ -49,13 +49,13 @@ components:
     index: 0
     in_port: 55556
     out_port: 55557
-    image_path: cpu-emu.sif  # CPU emulator SIF
+    image_path: cpu-emu.sif  # (optional) CPU emulator SIF
     cpus: 8
     mem: 16G
-    # threads: 4
-    # latency: 10          # Processing latency in milliseconds
-    # mem_footprint: 0.01  # Memory footprint in GB
-    # nic: eth0
+    # threads: 4            # (optional)
+    # latency: 10           # Processing latency in milliseconds (optional)
+    # mem_footprint: 0.01   # Memory footprint in GB (optional)
+    # nic: eth0             # (optional)
 
   # Third component: GPU Proxy 1 (receives from CPU Emulator 0, sends to CPU Emulator 1)
   - type: gpu_proxy
@@ -63,16 +63,16 @@ components:
     index: 1
     in_port: 55557
     out_port: 55558
-    image_path: gpu-proxy.sif  # GPU proxy SIF
+    image_path: gpu-proxy.sif  # (optional) GPU proxy SIF
     cpus: 6
     mem: 120G
     gpus: 1
     partition: gpu
-    # matrix_width: 3072
-    # proxy_rate: 1.5
-    # socket_hwm: 2
-    # nic: eth1
-    # nodelist: gpu002
+    # matrix_width: 3072    # (optional)
+    # proxy_rate: 1.5       # (optional)
+    # socket_hwm: 2         # (optional)
+    # nic: eth1             # (optional)
+    # nodelist: gpu002      # (optional)
 
   # Fourth component: CPU Emulator 1 (receives from GPU Proxy 1, sends to receiver)
   - type: cpu_emulator
@@ -80,71 +80,71 @@ components:
     index: 1
     in_port: 55558
     out_port: 55559
-    image_path: cpu-emu.sif  # CPU emulator SIF
+    image_path: cpu-emu.sif  # (optional) CPU emulator SIF
     cpus: 12
     mem: 24G
-    # threads: 6
-    # latency: 15
-    # mem_footprint: 0.02
-    # nic: eth0
+    # threads: 6            # (optional)
+    # latency: 15           # (optional)
+    # mem_footprint: 0.02   # (optional)
+    # nic: eth0             # (optional)
 
 # Alternative configurations examples:
 
 # Example 1: GPU-GPU-CPU-CPU chain
 # components:
-#   - type: gpu_proxy
-#     name: gpu_proxy
-#     index: 0
-#     in_port: 5001
-#     out_port: 5002
-#   - type: gpu_proxy
-#     name: gpu_proxy
-#     index: 1
-#     in_port: 5002
-#     out_port: 5003
-#   - type: cpu_emulator
-#     name: emulator
-#     index: 0
-#     in_port: 5003
-#     out_port: 5004
-#   - type: cpu_emulator
-#     name: emulator
-#     index: 1
-#     in_port: 5004
-#     out_port: 5000
+#   - type: gpu_proxy       # (required)
+#     name: gpu_proxy       # (required)
+#     index: 0              # (required)
+#     in_port: 5001         # (required)
+#     out_port: 5002        # (required)
+#   - type: gpu_proxy       # (required)
+#     name: gpu_proxy       # (required)
+#     index: 1              # (required)
+#     in_port: 5002         # (required)
+#     out_port: 5003        # (required)
+#   - type: cpu_emulator    # (required)
+#     name: emulator        # (required)
+#     index: 0              # (required)
+#     in_port: 5003         # (required)
+#     out_port: 5004        # (required)
+#   - type: cpu_emulator    # (required)
+#     name: emulator        # (required)
+#     index: 1              # (required)
+#     in_port: 5004         # (required)
+#     out_port: 5000        # (required)
 
 # Example 2: CPU-CPU-GPU-GPU chain
 # components:
-#   - type: cpu_emulator
-#     name: emulator
-#     index: 0
-#     in_port: 5001
-#     out_port: 5002
-#   - type: cpu_emulator
-#     name: emulator
-#     index: 1
-#     in_port: 5002
-#     out_port: 5003
-#   - type: gpu_proxy
-#     name: gpu_proxy
-#     index: 0
-#     in_port: 5003
-#     out_port: 5004
-#   - type: gpu_proxy
-#     name: gpu_proxy
-#     index: 1
-#     in_port: 5004
-#     out_port: 5000
+#   - type: cpu_emulator    # (required)
+#     name: emulator        # (required)
+#     index: 0              # (required)
+#     in_port: 5001         # (required)
+#     out_port: 5002        # (required)
+#   - type: cpu_emulator    # (required)
+#     name: emulator        # (required)
+#     index: 1              # (required)
+#     in_port: 5002         # (required)
+#     out_port: 5003        # (required)
+#   - type: gpu_proxy       # (required)
+#     name: gpu_proxy       # (required)
+#     index: 0              # (required)
+#     in_port: 5003         # (required)
+#     out_port: 5004        # (required)
+#   - type: gpu_proxy       # (required)
+#     name: gpu_proxy       # (required)
+#     index: 1              # (required)
+#     in_port: 5004         # (required)
+#     out_port: 5000        # (required)
 
 # Example 3: Simple GPU-CPU chain
 # components:
-#   - type: gpu_proxy
-#     name: gpu_proxy
-#     index: 0
-#     in_port: 5001
-#     out_port: 5002
-#   - type: cpu_emulator
-#     name: emulator
-#     index: 0
-#     in_port: 5002
-#     out_port: 5000 
+#   - type: gpu_proxy       # (required)
+#     name: gpu_proxy       # (required)
+#     index: 0              # (required)
+#     in_port: 5001         # (required)
+#     out_port: 5002        # (required)
+#   - type: cpu_emulator    # (required)
+#     name: emulator        # (required)
+#     index: 0              # (required)
+#     in_port: 5002         # (required)
+#     out_port: 5000        # (required) 

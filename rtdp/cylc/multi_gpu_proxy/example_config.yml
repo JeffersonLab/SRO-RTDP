@@ -12,10 +12,10 @@ containers:
 # Sender configuration with component-specific parameters
 sender:
   target_port: 55555
-  send_rate: 150
-  group_size: 30720000
-  send_all_ones: 0
-  socket_hwm: 1
+  send_rate: 150         # (optional)
+  group_size: 30720000   # (optional)
+  send_all_ones: 0       # (optional)
+  socket_hwm: 1          # (optional)
 
 # Receiver configuration  
 receiver:
@@ -31,12 +31,12 @@ gpu_proxies:
     in_port: 55555
     out_port: 55556
     device_id: 0
-    nic: eth1  # Optional: specify network interface for this proxy
-    nodelist: "gpu-node-01"  # Explicit node assignment for first proxy
+    nic: eth1  # (optional) specify network interface for this proxy
+    nodelist: "gpu-node-01"  # (optional) explicit node assignment for first proxy
     # Component-specific processing parameters
-    matrix_width: 1024  # Smaller matrix for first proxy
-    proxy_rate: 0.8     # Slower processing rate
-    socket_hwm: 2       # Higher socket buffer
+    matrix_width: 1024  # (optional) smaller matrix for first proxy
+    proxy_rate: 0.8     # (optional) slower processing rate
+    socket_hwm: 2       # (optional) higher socket buffer
     
   - device: "gpu"
     partition: gpu
@@ -46,12 +46,12 @@ gpu_proxies:
     in_port: 55556
     out_port: 55557
     device_id: 1
-    # nic: eth2  # Optional: if not specified, auto-detects default interface
-    nodelist: "gpu-node-02"  # Explicit node assignment for second proxy
+    # nic: eth2  # (optional) if not specified, auto-detects default interface
+    nodelist: "gpu-node-02"  # (optional) explicit node assignment for second proxy
     # Component-specific processing parameters
-    matrix_width: 4096  # Larger matrix for second proxy
-    proxy_rate: 1.2     # Faster processing rate
-    socket_hwm: 1       # Default socket buffer
+    matrix_width: 4096  # (optional) larger matrix for second proxy
+    proxy_rate: 1.2     # (optional) faster processing rate
+    socket_hwm: 1       # (optional) default socket buffer
     
   - device: "gpu"
     partition: gpu
@@ -61,9 +61,9 @@ gpu_proxies:
     in_port: 55557
     out_port: 55558
     device_id: 2
-    nic: eth3  # Optional: specify network interface for this proxy
-    nodelist: "gpu-node-03"  # Explicit node assignment for third proxy
+    nic: eth3  # (optional) specify network interface for this proxy
+    nodelist: "gpu-node-03"  # (optional) explicit node assignment for third proxy
     # Component-specific processing parameters (uses defaults)
-    # matrix_width: not specified - uses default (2048)
-    # proxy_rate: not specified - uses default (1.0)
-    # socket_hwm: not specified - uses default (1) 
+    # matrix_width: not specified - uses default (2048) (optional)
+    # proxy_rate: not specified - uses default (1.0) (optional)
+    # socket_hwm: not specified - uses default (1) (optional) 
