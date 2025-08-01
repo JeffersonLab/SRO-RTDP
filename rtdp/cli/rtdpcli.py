@@ -191,6 +191,9 @@ def generate(config, output, workflow_type, consolidated_logging):
 
     # Add consolidated_logging flag to config data for template rendering
     config_data['consolidated_logging'] = consolidated_logging
+    
+    # Add output directory to config data for template rendering
+    config_data['output_dir'] = output
 
     # Create Jinja2 environment with custom filter
     env = Environment()
