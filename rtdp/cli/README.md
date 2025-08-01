@@ -48,16 +48,41 @@ The setup command will:
 
 ## Quick Start
 
-### 1. Generate a Workflow
+### Option 1: Use Test Script (Recommended)
+
+The easiest way to get started is using the comprehensive test script:
+
+```bash
+# Run the test script to generate and test all workflow types
+./test.sh
+```
+
+This script will:
+- Generate all workflow types (GPU, CPU, Mixed) with different logging options
+- Create multiple workflow variants for comparison
+- Provide clear instructions for running and monitoring workflows
+- Test both consolidated and separate logging configurations
+
+After running the test script, you can run any of the generated workflows:
+```bash
+# Run a generated workflow
+./rtdp run gpu_workflow_consolidated
+./rtdp run cpu_workflow_separate
+./rtdp run mixed_workflow_consolidated
+
+# Monitor workflows
+./rtdp monitor gpu_workflow_consolidated
+cylc tui cpu_workflow_separate
+```
+
+### Option 2: Manual Workflow Generation
+
+If you prefer to create custom workflows:
 
 ```bash
 # Generate a multi-GPU proxy workflow
 ./rtdp generate --config config.yml --output workflow_dir --workflow-type multi_gpu_proxy
-```
 
-### 2. Run the Workflow
-
-```bash
 # Run the generated workflow
 ./rtdp run workflow_dir
 
