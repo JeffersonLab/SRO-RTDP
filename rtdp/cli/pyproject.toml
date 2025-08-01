@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.scripts]
-rtdp = "rtdp.cli:cli"
+rtdp = "rtdpcli:cli"
 
 [project.urls]
 Homepage = "https://github.com/JeffersonLab/SRO-RTDP"

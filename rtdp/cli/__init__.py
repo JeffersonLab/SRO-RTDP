@@ -15,4 +15,6 @@ try:
     __all__ = ['cli']
 except ImportError as e:
     print(f"Error importing RTDP CLI: {e}")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Python path: {sys.path}")
     sys.exit(1) 
