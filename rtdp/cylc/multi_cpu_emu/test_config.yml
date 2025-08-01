@@ -15,22 +15,22 @@ containers:
 
 # Receiver configuration
 receiver:
-  listen_port: 5000
+  listen_port: 55555
 
 # Sender configuration (minimal)
 sender:
-  target_port: 5001
+  target_port: 55556
 
 # CPU emulators with minimal required parameters
 cpu_emulators:
   # First emulator - receives from sender, sends to emulator_1
-  - in_port: 5001
-    out_port: 5002
+  - in_port: 55556
+    out_port: 55557
     cpus: 4
     mem: 8G
 
   # Second emulator - receives from emulator_0, sends to receiver
-  - in_port: 5002
-    out_port: 5000
+  - in_port: 55557
+    out_port: 55555
     cpus: 4
     mem: 8G 
