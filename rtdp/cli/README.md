@@ -1,6 +1,6 @@
 # RTDP Workflow CLI
 
-A command-line tool for generating and managing RTDP (Real-Time Data Processing) workflows using Cylc. This CLI supports various workflow types including single-component and multi-component configurations with built-in resource management and validation.
+A command-line tool for generating and managing RTDP workflows using Cylc. This CLI supports various workflow types including single-component and multi-component configurations with built-in resource management and validation.
 
 ## Prerequisites
 
