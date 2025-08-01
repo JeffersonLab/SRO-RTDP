@@ -94,7 +94,7 @@ The setup command will:
 - Install Cylc in the current environment
 - Create necessary Cylc directories (`~/.cylc/flow/`)
 - Copy configuration files (`global.cylc`)
-- Setup Apptainer environment variables
+- Provide guidance for Apptainer environment variables
 - Verify the installation
 
 ### Status Command

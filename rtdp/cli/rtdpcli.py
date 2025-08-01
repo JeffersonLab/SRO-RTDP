@@ -590,28 +590,11 @@ def setup_cylc_configuration(platform=None):
 
 def setup_apptainer_environment():
     """Setup Apptainer environment variables."""
-    import pathlib
-    
-    # Create cache and tmp directories
-    cache_dir = pathlib.Path.home() / '.apptainer' / 'cache'
-    tmp_dir = pathlib.Path.home() / '.apptainer' / 'tmp'
-    
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Check if environment variables are already set
-    import os
-    if not os.environ.get('APPTAINER_CACHEDIR'):
-        click.echo("⚠️  Warning: APPTAINER_CACHEDIR not set")
-        click.echo(f"   Consider adding to your shell profile:")
-        click.echo(f"   export APPTAINER_CACHEDIR={cache_dir}")
-    
-    if not os.environ.get('APPTAINER_TMPDIR'):
-        click.echo("⚠️  Warning: APPTAINER_TMPDIR not set")
-        click.echo(f"   Consider adding to your shell profile:")
-        click.echo(f"   export APPTAINER_TMPDIR={tmp_dir}")
-    
-    click.echo("✅ Apptainer directories created")
+    click.echo("📝 Apptainer Configuration:")
+    click.echo("   Find a large volume path and add to your ~/.bashrc:")
+    click.echo("   export APPTAINER_CACHEDIR=/path/to/large/volume/apptainer/cache")
+    click.echo("   export APPTAINER_TMPDIR=/path/to/large/volume/apptainer/tmp")
+    click.echo("   Example: export APPTAINER_CACHEDIR=/w/epsci-sciwork18/username/apptainer/cache")
 
 def verify_cylc_installation():
     """Verify Cylc installation and configuration."""
@@ -744,17 +727,8 @@ def status():
     else:
         click.echo(f"❌ Config File: {config_file} (missing)")
     
-    # Check Apptainer environment
-    import os
-    if os.environ.get('APPTAINER_CACHEDIR'):
-        click.echo(f"✅ APPTAINER_CACHEDIR: {os.environ['APPTAINER_CACHEDIR']}")
-    else:
-        click.echo("⚠️  APPTAINER_CACHEDIR: Not set")
-    
-    if os.environ.get('APPTAINER_TMPDIR'):
-        click.echo(f"✅ APPTAINER_TMPDIR: {os.environ['APPTAINER_TMPDIR']}")
-    else:
-        click.echo("⚠️  APPTAINER_TMPDIR: Not set")
+    # Apptainer configuration note
+    click.echo("📝 Apptainer: Set APPTAINER_CACHEDIR and APPTAINER_TMPDIR to large volume paths")
     
     # Summary
     click.echo("\n📋 Summary:")
