@@ -63,6 +63,9 @@ The setup command will:
 
 # Monitor the workflow
 ./rtdp monitor workflow_dir
+
+# Alternative: Use Cylc TUI for interactive monitoring
+cylc tui workflow_dir
 ```
 
 ## Workflow Types
@@ -178,6 +181,7 @@ Generate and run:
 | `rtdp generate` | Generate workflow from configuration |
 | `rtdp run` | Run a generated workflow |
 | `rtdp monitor` | Monitor a running workflow |
+| `cylc tui` | Interactive terminal UI monitoring |
 | `rtdp cache` | Manage SIF container cache |
 
 ### Generate Command Options
@@ -316,6 +320,27 @@ Enable debug output for detailed information:
 ```bash
 ./rtdp generate --config config.yml --output workflow --workflow-type multi_gpu_proxy --debug
 ```
+
+### Monitoring Options
+
+The CLI provides two monitoring options:
+
+1. **Basic Monitoring** (using rtdp CLI):
+   ```bash
+   ./rtdp monitor workflow_dir
+   ```
+
+2. **Interactive TUI Monitoring** (using Cylc directly):
+   ```bash
+   cylc tui workflow_dir
+   ```
+
+The Cylc TUI provides an interactive terminal interface with:
+- Real-time workflow status updates
+- Task dependency visualization
+- Interactive task control
+- Detailed log viewing
+- Resource usage monitoring
 
 ## Example Workflows
 
