@@ -25,14 +25,88 @@ cd /path/to/rtdp
 
 # Install development dependencies
 pip install -e .
+
+# Setup RTDP environment (install Cylc and configure directories)
+rtdp setup
 ```
+
+## Quick Start
+
+1. **Check Environment Status**:
+   ```bash
+   rtdp status
+   ```
+
+2. **Setup Environment** (if needed):
+   ```bash
+   rtdp setup
+   ```
+
+3. **Generate a Workflow**:
+   ```bash
+   rtdp generate --config config.yml --output workflow_dir --workflow-type cpu_emu
+   ```
+
+4. **Run the Workflow**:
+   ```bash
+   rtdp run workflow_dir
+   ```
+
+5. **Monitor the Workflow**:
+   ```bash
+   rtdp monitor workflow_dir
+   ```
 
 ## Basic Usage
 
-The CLI provides two main commands:
+The CLI provides several main commands:
 
-1. `generate`: Generate a workflow from a configuration file
-2. `validate`: Validate a workflow configuration file
+1. `setup`: Setup RTDP environment including Cylc installation
+2. `status`: Check the status of RTDP environment and Cylc installation
+3. `generate`: Generate a workflow from a configuration file
+4. `validate`: Validate a workflow configuration file
+5. `run`: Run a workflow
+6. `monitor`: Monitor a workflow
+7. `cache`: Manage SIF container cache
+
+### Setup Command
+
+The setup command installs and configures Cylc in the current environment:
+
+```bash
+# Interactive setup (recommended)
+rtdp setup
+
+# Non-interactive setup with custom platform
+rtdp setup --non-interactive --platform jlab_slurm
+
+# Skip Cylc installation (if already installed)
+rtdp setup --skip-cylc-install
+```
+
+The setup command will:
+- Check if running in a virtual environment (recommended)
+- Install Cylc in the current environment
+- Create necessary Cylc directories (`~/.cylc/flow/`, `~/.cylc/flows/`)
+- Copy configuration files (`global.cylc`)
+- Setup Apptainer environment variables
+- Verify the installation
+
+### Status Command
+
+Check the current status of your RTDP environment:
+
+```bash
+rtdp status
+```
+
+This command will show:
+- Virtual environment status
+- Cylc installation status and version
+- Cylc directory structure
+- Configuration file status
+- Apptainer environment variables
+- Overall environment readiness
 
 ### Generate Command
 
@@ -394,7 +468,30 @@ The CLI validates:
 
 ## Troubleshooting
 
-### Common Issues
+### Setup Issues
+
+1. **Cylc Installation Fails**: 
+   - Ensure you have pip installed and updated
+   - Check your internet connection
+   - Try running `pip install --upgrade pip` first
+   - Verify Python version (3.7 or higher)
+
+2. **Permission Errors**:
+   - Ensure you have write permissions to `~/.cylc/`
+   - Run `rtdp setup` with appropriate permissions
+   - Check if your home directory is writable
+
+3. **Virtual Environment Issues**:
+   - Always use a virtual environment for installation
+   - Activate the virtual environment before running setup
+   - Ensure the virtual environment has internet access
+
+4. **Configuration File Issues**:
+   - If `global.cylc` is missing, check the source path
+   - Verify the file exists in `src/utilities/scripts/install-cylc/`
+   - Manually copy the file if automatic copy fails
+
+### Workflow Issues
 
 1. **Port Conflicts**: Ensure unique ports for each component
 2. **GPU Device IDs**: Use sequential device IDs (0, 1, 2, etc.)

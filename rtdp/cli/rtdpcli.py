@@ -148,6 +148,9 @@ def cli():
 @click.option('--workflow-type', required=True, help='Type of workflow to generate (gpu_proxy, cpu_emu, multi_gpu_proxy, multi_cpu_emu, multi_mixed)')
 @click.option('--consolidated-logging/--no-consolidated-logging', default=True, help='Enable/disable consolidated logging (default: enabled)')
 def generate(config, output, workflow_type, consolidated_logging):
+    # Check Cylc installation
+    if not check_cylc_installation_wrapper():
+        return
     """Generate a Cylc workflow from a YAML configuration file.
 
     The workflow type must be one of:
@@ -332,6 +335,9 @@ def example_config(template):
 @click.option('--skip-sif-build', is_flag=True, help='Skip SIF container building')
 @click.option('--disable-cache', is_flag=True, help='Disable SIF caching')
 def run(workflow, parallel_builds, skip_sif_build, disable_cache):
+    # Check Cylc installation
+    if not check_cylc_installation_wrapper():
+        return
     """Run a workflow: build SIF if missing (only if config is in workflow dir), cd to dir, cylc install --workflow-name=NAME, then cylc play NAME."""
     import subprocess
     import os
@@ -458,6 +464,9 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
 @cli.command()
 @click.option('--workflow', required=True, type=click.Path(exists=True, file_okay=False), help='Path to workflow directory')
 def monitor(workflow):
+    # Check Cylc installation
+    if not check_cylc_installation_wrapper():
+        return
     """Monitor a workflow using Cylc's TUI interface."""
     # Get workflow name from config.yml
     config_path = os.path.join(workflow, 'config.yml')
@@ -504,6 +513,270 @@ def cache(clear, stats):
         click.echo(f"  Cache directory: {stats_info['cache_dir']}")
     else:
         click.echo("Use --stats to view cache statistics or --clear to clear cache")
+
+def detect_cli_environment():
+    """Detect if CLI is running in a virtual environment."""
+    import sys
+    return hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+
+def get_venv_path():
+    """Get the path to the current virtual environment."""
+    import sys
+    return sys.prefix
+
+def check_cylc_installation():
+    """Check if Cylc is properly installed and accessible."""
+    try:
+        result = subprocess.run(['cylc', 'version'], capture_output=True, text=True, check=True)
+        return True, result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False, None
+
+def install_cylc_in_current_env():
+    """Install Cylc in the current environment."""
+    click.echo("📦 Installing Cylc in current environment...")
+    try:
+        result = subprocess.run(
+            ['pip', 'install', 'cylc-flow>=8.0'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        click.echo("✅ Cylc installed successfully!")
+        return True
+    except subprocess.CalledProcessError as e:
+        click.echo(f"❌ Failed to install Cylc: {e.stderr}")
+        return False
+
+def setup_cylc_directories():
+    """Create necessary Cylc directories."""
+    import pathlib
+    
+    cylc_dirs = [
+        pathlib.Path.home() / '.cylc' / 'flow',
+        pathlib.Path.home() / '.cylc' / 'flows'
+    ]
+    
+    for dir_path in cylc_dirs:
+        dir_path.mkdir(parents=True, exist_ok=True)
+        click.echo(f"✅ Created directory: {dir_path}")
+
+def setup_cylc_configuration(platform=None):
+    """Setup Cylc configuration files."""
+    import pathlib
+    import shutil
+    
+    # Source global.cylc file
+    source_global = pathlib.Path(__file__).parent.parent.parent / 'src' / 'utilities' / 'scripts' / 'install-cylc' / 'global.cylc'
+    
+    if not source_global.exists():
+        click.echo(f"⚠️  Warning: Could not find source global.cylc at {source_global}")
+        click.echo("   You may need to manually configure Cylc.")
+        return False
+    
+    # Target locations
+    targets = [
+        pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc',
+        pathlib.Path.home() / '.cylc' / 'flows' / 'global.cylc'
+    ]
+    
+    for target in targets:
+        try:
+            shutil.copy2(source_global, target)
+            click.echo(f"✅ Copied global.cylc to: {target}")
+        except Exception as e:
+            click.echo(f"⚠️  Warning: Could not copy to {target}: {e}")
+    
+    return True
+
+def setup_apptainer_environment():
+    """Setup Apptainer environment variables."""
+    import pathlib
+    
+    # Create cache and tmp directories
+    cache_dir = pathlib.Path.home() / '.apptainer' / 'cache'
+    tmp_dir = pathlib.Path.home() / '.apptainer' / 'tmp'
+    
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Check if environment variables are already set
+    import os
+    if not os.environ.get('APPTAINER_CACHEDIR'):
+        click.echo("⚠️  Warning: APPTAINER_CACHEDIR not set")
+        click.echo(f"   Consider adding to your shell profile:")
+        click.echo(f"   export APPTAINER_CACHEDIR={cache_dir}")
+    
+    if not os.environ.get('APPTAINER_TMPDIR'):
+        click.echo("⚠️  Warning: APPTAINER_TMPDIR not set")
+        click.echo(f"   Consider adding to your shell profile:")
+        click.echo(f"   export APPTAINER_TMPDIR={tmp_dir}")
+    
+    click.echo("✅ Apptainer directories created")
+
+def verify_cylc_installation():
+    """Verify Cylc installation and configuration."""
+    click.echo("🔍 Verifying Cylc installation...")
+    
+    # Check Cylc version
+    is_installed, version = check_cylc_installation()
+    if is_installed:
+        click.echo(f"✅ Cylc is installed: {version}")
+    else:
+        click.echo("❌ Cylc is not properly installed")
+        return False
+    
+    # Check configuration
+    import pathlib
+    config_files = [
+        pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc',
+        pathlib.Path.home() / '.cylc' / 'flows' / 'global.cylc'
+    ]
+    
+    config_exists = any(f.exists() for f in config_files)
+    if config_exists:
+        click.echo("✅ Cylc configuration files found")
+    else:
+        click.echo("⚠️  Warning: Cylc configuration files not found")
+    
+    # Test basic Cylc functionality
+    try:
+        result = subprocess.run(['cylc', 'config'], capture_output=True, text=True, check=True)
+        click.echo("✅ Cylc configuration test passed")
+    except subprocess.CalledProcessError:
+        click.echo("⚠️  Warning: Cylc configuration test failed")
+    
+    return True
+
+@cli.command()
+@click.option('--interactive/--non-interactive', default=True, help='Interactive setup mode')
+@click.option('--platform', help='Target platform (jlab_slurm, local, etc.)')
+@click.option('--skip-cylc-install', is_flag=True, help='Skip Cylc installation')
+def setup(interactive, platform, skip_cylc_install):
+    """Setup RTDP environment including Cylc installation."""
+    click.echo("🚀 RTDP Environment Setup")
+    click.echo("=" * 50)
+    
+    # Check if we're in a virtual environment
+    if not detect_cli_environment():
+        click.echo("⚠️  Warning: CLI is not running in a virtual environment.")
+        click.echo("   It's recommended to install the CLI in a virtual environment first.")
+        if interactive:
+            if not click.confirm("Continue anyway?"):
+                return
+    else:
+        venv_path = get_venv_path()
+        click.echo(f"✅ Running in virtual environment: {venv_path}")
+    
+    # Check if Cylc is already installed
+    is_installed, version = check_cylc_installation()
+    if is_installed:
+        click.echo(f"✅ Cylc is already installed: {version}")
+        if interactive and not click.confirm("Reinstall Cylc?"):
+            skip_cylc_install = True
+    
+    # Install Cylc if needed
+    if not skip_cylc_install:
+        if not install_cylc_in_current_env():
+            if interactive and not click.confirm("Continue with setup despite installation failure?"):
+                return
+    
+    # Setup directories and configuration
+    click.echo("\n📁 Setting up Cylc directories...")
+    setup_cylc_directories()
+    
+    click.echo("\n⚙️  Setting up Cylc configuration...")
+    setup_cylc_configuration(platform)
+    
+    click.echo("\n🐳 Setting up Apptainer environment...")
+    setup_apptainer_environment()
+    
+    # Verify installation
+    click.echo("\n🔍 Verifying installation...")
+    if verify_cylc_installation():
+        click.echo("\n🎉 RTDP environment setup completed successfully!")
+        click.echo("\n📋 Next steps:")
+        click.echo("   1. Generate a workflow: rtdp generate --config config.yml --output workflow_dir --workflow-type cpu_emu")
+        click.echo("   2. Run the workflow: rtdp run workflow_dir")
+        click.echo("   3. Monitor the workflow: rtdp monitor workflow_dir")
+    else:
+        click.echo("\n❌ Setup completed with warnings. Please check the output above.")
+
+def check_cylc_installation_wrapper():
+    """Wrapper to check Cylc installation and prompt for setup if needed."""
+    is_installed, version = check_cylc_installation()
+    if not is_installed:
+        click.echo("❌ Cylc is not installed or not accessible.")
+        click.echo("   Please run 'rtdp setup' to install and configure Cylc.")
+        click.echo("   Or run 'rtdp setup --help' for more options.")
+        return False
+    return True
+
+@cli.command()
+def status():
+    """Check the status of RTDP environment and Cylc installation."""
+    click.echo("🔍 RTDP Environment Status")
+    click.echo("=" * 40)
+    
+    # Check virtual environment
+    if detect_cli_environment():
+        venv_path = get_venv_path()
+        click.echo(f"✅ Virtual Environment: {venv_path}")
+    else:
+        click.echo("⚠️  Virtual Environment: Not detected (recommended)")
+    
+    # Check Cylc installation
+    is_installed, version = check_cylc_installation()
+    if is_installed:
+        click.echo(f"✅ Cylc Installation: {version}")
+    else:
+        click.echo("❌ Cylc Installation: Not found")
+    
+    # Check Cylc directories
+    import pathlib
+    cylc_dirs = [
+        pathlib.Path.home() / '.cylc' / 'flow',
+        pathlib.Path.home() / '.cylc' / 'flows'
+    ]
+    
+    for dir_path in cylc_dirs:
+        if dir_path.exists():
+            click.echo(f"✅ Cylc Directory: {dir_path}")
+        else:
+            click.echo(f"❌ Cylc Directory: {dir_path} (missing)")
+    
+    # Check configuration files
+    config_files = [
+        pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc',
+        pathlib.Path.home() / '.cylc' / 'flows' / 'global.cylc'
+    ]
+    
+    for config_file in config_files:
+        if config_file.exists():
+            click.echo(f"✅ Config File: {config_file}")
+        else:
+            click.echo(f"❌ Config File: {config_file} (missing)")
+    
+    # Check Apptainer environment
+    import os
+    if os.environ.get('APPTAINER_CACHEDIR'):
+        click.echo(f"✅ APPTAINER_CACHEDIR: {os.environ['APPTAINER_CACHEDIR']}")
+    else:
+        click.echo("⚠️  APPTAINER_CACHEDIR: Not set")
+    
+    if os.environ.get('APPTAINER_TMPDIR'):
+        click.echo(f"✅ APPTAINER_TMPDIR: {os.environ['APPTAINER_TMPDIR']}")
+    else:
+        click.echo("⚠️  APPTAINER_TMPDIR: Not set")
+    
+    # Summary
+    click.echo("\n📋 Summary:")
+    if is_installed and all(f.exists() for f in config_files):
+        click.echo("   🎉 RTDP environment is ready!")
+        click.echo("   You can now generate and run workflows.")
+    else:
+        click.echo("   ⚠️  RTDP environment needs setup.")
+        click.echo("   Run 'rtdp setup' to complete the installation.")
 
 if __name__ == '__main__':
     cli() 
