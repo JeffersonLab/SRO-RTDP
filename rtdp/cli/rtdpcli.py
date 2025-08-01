@@ -7,7 +7,11 @@ import concurrent.futures
 import hashlib
 import json
 from pathlib import Path
-from .sif_cache import SIFCache
+try:
+    from .sif_cache import SIFCache
+except ImportError:
+    # Fallback for direct execution
+    from sif_cache import SIFCache
 
 def docker_to_sif_filter(image_path):
     """Convert Docker image name to SIF filename."""
