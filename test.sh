@@ -4,11 +4,11 @@ echo "=== Testing GPU Workflow with Logging Options ==="
 
 echo ""
 echo "1. Testing GPU workflow with consolidated logging (default):"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_gpu_proxy/example_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config gpu_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
 
 echo ""
 echo "2. Testing GPU workflow with separate logging:"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_gpu_proxy/example_config.yml --output gpu_workflow_separate --workflow-type multi_gpu_proxy --no-consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config gpu_config.yml --output gpu_workflow_separate --workflow-type multi_gpu_proxy --no-consolidated-logging
 
 echo ""
 echo "=== CLI Option Summary ==="
