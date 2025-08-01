@@ -428,19 +428,15 @@ def run(workflow, parallel_builds, skip_sif_build, disable_cache):
         click.echo(f"   Proceeding with workflow installation...")
     
     try:
-        # Clean up any existing broken symlinks for this workflow
-        try:
-            subprocess.run(['cylc', 'clean', workflow_name], capture_output=True, check=False)
-        except:
-            pass  # Ignore errors if workflow doesn't exist
+        os.chdir(workflow_abs)
         
         # Install workflow
         click.echo(f"📦 Installing workflow '{workflow_name}'...")
-        click.echo(f"   Working directory: {os.getcwd()}")
-        click.echo(f"   Flow file: {workflow_abs}/flow.cylc")
+        click.echo(f"   Working directory: {workflow_abs}")
+        click.echo(f"   Flow file: {os.path.basename(flow_path)}")
         click.echo(f"   ⏳ Installation in progress... (this may take a moment)")
         
-        result1 = subprocess.run(['cylc', 'install', workflow_abs])
+        result1 = subprocess.run(['cylc', 'install', f'--workflow-name={workflow_name}'])
         if result1.returncode != 0:
             raise click.ClickException("cylc install failed")
         click.echo(f"✅ Workflow '{workflow_name}' installed successfully!")
@@ -587,8 +583,32 @@ def setup_cylc_configuration(platform=None):
     target = pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc'
     
     try:
-        shutil.copy2(source_global, target)
-        click.echo(f"✅ Copied global.cylc to: {target}")
+        # Read the source file
+        with open(source_global, 'r') as f:
+            content = f.read()
+        
+        # Get current paths
+        cli_dir = pathlib.Path(__file__).parent
+        venv_path = get_venv_path()
+        
+        # Update cylc path to point to the virtual environment's bin directory
+        if venv_path:
+            cylc_path = str(pathlib.Path(venv_path) / 'bin')
+            content = content.replace('/w/epsci-sciwork18/jeng/cylc-env/bin/', cylc_path)
+        else:
+            click.echo("⚠️  Warning: Could not determine virtual environment path")
+        
+        # Update run path to point to the current CLI directory
+        run_path = str(cli_dir)
+        content = content.replace('/home/tsai/jeng', run_path)
+        
+        # Write the updated content to target
+        with open(target, 'w') as f:
+            f.write(content)
+        
+        click.echo(f"✅ Updated and copied global.cylc to: {target}")
+        click.echo(f"   cylc path: {cylc_path if venv_path else 'not updated'}")
+        click.echo(f"   run path: {run_path}")
         return True
     except Exception as e:
         click.echo(f"⚠️  Warning: Could not copy to {target}: {e}")
