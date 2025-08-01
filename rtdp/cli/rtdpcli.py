@@ -40,18 +40,6 @@ workflow_types = {
     }
 }
 
-# SIF container mapping for faster lookups
-SIF_MAPPING = {
-    'gpu-proxy': 'jlabtsai/rtdp-gpu_proxy:latest',
-    'cpu-emu': 'jlabtsai/rtdp-cpu_emu:latest',
-    'gpu-proxy.sif': 'jlabtsai/rtdp-gpu_proxy:latest',
-    'cpu-emu.sif': 'jlabtsai/rtdp-cpu_emu:latest',
-}
-
-def get_docker_image_for_sif(sif_name):
-    """Get Docker image for SIF name with optimized lookup."""
-    return SIF_MAPPING.get(sif_name)
-
 def build_sif_container(sif_path, docker_img, cache=None):
     """Build a single SIF container with caching support."""
     # Check cache first
@@ -75,16 +63,27 @@ def build_sif_container(sif_path, docker_img, cache=None):
         return False, f"Failed to build SIF {sif_path}: {e.stderr}"
 
 def extract_sif_requirements(config_data):
-    """Extract SIF requirements from config more efficiently."""
+    """Extract SIF requirements from config using direct Docker image names."""
     unique_sifs = set()
     
     # Helper function to add SIF if needed
-    def add_sif_if_needed(sif_name, sif_dir):
-        if not sif_name:
+    def add_sif_if_needed(image_path, sif_dir):
+        if not image_path:
             return
+        
+        # If image_path is already a Docker image name (contains '/'), use it directly
+        if '/' in image_path:
+            docker_img = image_path
+            # Generate SIF filename from Docker image name
+            sif_name = image_path.replace('/', '_').replace(':', '_') + '.sif'
+        else:
+            # Legacy support: if it's a short name, assume it's a Docker image name
+            # This maintains backward compatibility
+            docker_img = image_path
+            sif_name = image_path + '.sif'
+        
         sif_path = os.path.join(sif_dir, sif_name)
-        docker_img = get_docker_image_for_sif(sif_name)
-        if docker_img and not os.path.exists(sif_path):
+        if not os.path.exists(sif_path):
             unique_sifs.add((sif_path, docker_img))
     
     # Check all sections that might contain image_path
@@ -101,14 +100,18 @@ def extract_sif_requirements(config_data):
         if isinstance(section, dict) and 'image_path' in section:
             add_sif_if_needed(section['image_path'], 'sifs')
     
-    # Handle default SIF names for GPU proxies and CPU emulators
+    # Handle default Docker image names for GPU proxies and CPU emulators
     for proxy in config_data.get('gpu_proxies', []):
         if isinstance(proxy, dict) and proxy.get('device') == 'gpu':
-            add_sif_if_needed('gpu-proxy.sif', 'sifs')
+            # Use default GPU proxy Docker image if no image_path specified
+            if 'image_path' not in proxy:
+                add_sif_if_needed('jlabtsai/rtdp-gpu_proxy:latest', 'sifs')
     
     for emu in config_data.get('cpu_emulators', []):
         if isinstance(emu, dict) and emu.get('device') == 'cpu':
-            add_sif_if_needed('cpu-emu.sif', 'sifs')
+            # Use default CPU emulator Docker image if no image_path specified
+            if 'image_path' not in emu:
+                add_sif_if_needed('jlabtsai/rtdp-cpu_emu:latest', 'sifs')
     
     # Handle mixed workflow components
     for component in config_data.get('components', []):
@@ -117,11 +120,11 @@ def extract_sif_requirements(config_data):
             if 'image_path' in component:
                 add_sif_if_needed(component['image_path'], 'sifs')
             else:
-                # Use default SIF based on component type
+                # Use default Docker images based on component type
                 if component.get('type') == 'gpu_proxy':
-                    add_sif_if_needed('gpu-proxy.sif', 'sifs')
+                    add_sif_if_needed('jlabtsai/rtdp-gpu_proxy:latest', 'sifs')
                 elif component.get('type') == 'cpu_emulator':
-                    add_sif_if_needed('cpu-emu.sif', 'sifs')
+                    add_sif_if_needed('jlabtsai/rtdp-cpu_emu:latest', 'sifs')
     
     return unique_sifs
 

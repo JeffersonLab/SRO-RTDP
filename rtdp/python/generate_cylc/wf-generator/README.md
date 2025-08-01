@@ -122,7 +122,7 @@ edges:
 Container image settings:
 ```yaml
 containers:
-  image_path: "image.sif"
+  image_path: "jlabtsai/rtdp-cpu_emu:latest"
 ```
 
 ## Component Types

@@ -70,7 +70,7 @@ platform:
   name: "gpu_cluster"
 
 containers:
-  image_path: "/path/to/gpu_proxy.sif"
+  image_path: "jlabtsai/rtdp-gpu_proxy:latest"
 
 receiver:
   listen_port: 8000
@@ -120,7 +120,7 @@ platform:
   name: "cpu_cluster"
 
 containers:
-  image_path: "/path/to/cpu_emu.sif"
+  image_path: "jlabtsai/rtdp-cpu_emu:latest"
 
 receiver:
   listen_port: 8000
@@ -162,7 +162,7 @@ platform:
   name: "mixed_cluster"
 
    containers:
-  image_path: "/path/to/mixed.sif"
+  image_path: "jlabtsai/rtdp-cpu_emu:latest"
 
 receiver:
   listen_port: 8000
