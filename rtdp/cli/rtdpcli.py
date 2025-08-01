@@ -496,6 +496,16 @@ def monitor(workflow):
         click.echo(f"Error reading config.yml: {e}", err=True)
         return
     
+    # Check if workflow is installed
+    try:
+        result = subprocess.run(['cylc', 'scan'], capture_output=True, text=True, check=True)
+        if workflow_name not in result.stdout:
+            click.echo(f"⚠️  Workflow '{workflow_name}' is not installed.")
+            click.echo(f"   Run the workflow first using: ./rtdp run --workflow {os.path.basename(workflow)}")
+            return
+    except subprocess.CalledProcessError:
+        click.echo("⚠️  Could not check installed workflows. Proceeding anyway...")
+    
     # Start Cylc TUI
     try:
         click.echo(f"Starting Cylc TUI for workflow {workflow_name}...")
