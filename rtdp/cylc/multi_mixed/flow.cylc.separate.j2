@@ -77,9 +77,9 @@
             
             # Set sender-specific SIF file
             {% if sender.image_path is defined %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ sender.image_path }}"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ sender.image_path | docker_to_sif }}"
             {% else %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ 'jlabtsai/rtdp-cpu_emu:latest' | docker_to_sif }}"
             {% endif %}
             
             # Set port configuration
@@ -160,9 +160,9 @@
             
             # Set proxy-specific SIF file
             {% if comp.image_path is defined %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path }}"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path | docker_to_sif }}"
             {% else %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ 'jlabtsai/rtdp-gpu_proxy:latest' | docker_to_sif }}"
             {% endif %}
             
             # Proxy-specific processing parameters
@@ -299,9 +299,9 @@
             
             # Set emulator-specific SIF file
             {% if comp.image_path is defined %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path }}"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path | docker_to_sif }}"
             {% else %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ 'jlabtsai/rtdp-cpu_emu:latest' | docker_to_sif }}"
             {% endif %}
             
             # Emulator-specific processing parameters
@@ -426,9 +426,9 @@
             
             # Set receiver-specific SIF file
             {% if receiver.image_path is defined %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ receiver.image_path }}"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ receiver.image_path | docker_to_sif }}"
             {% else %}
-            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ 'jlabtsai/rtdp-cpu_emu:latest' | docker_to_sif }}"
             {% endif %}
             
             # Set port configuration
@@ -449,6 +449,8 @@
             # Store hostname and IP for last component
             HOSTNAME=$(hostname)
             echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            # Auto-detect the default network interface
+            RECEIVER_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
             # Get the first non-loopback IPv4 address for the NIC
             IP=$(ip addr show ${RECEIVER_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
             echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip

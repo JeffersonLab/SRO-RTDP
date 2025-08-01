@@ -12,7 +12,7 @@ partition: ifarm
 # Receiver configuration
 receiver:
   listen_port: 55559
-  image_path: cpu-emu.sif  # (optional) CPU emulator SIF for receiver
+  image_path: jlabtsai/rtdp-cpu_emu:latest  # (optional) CPU emulator Docker image for receiver
 
 # Sender configuration with traffic generation parameters
 sender:
@@ -21,7 +21,7 @@ sender:
   rms_fraction: 0.2      # RMS variation fraction (optional)
   duty_cycle: 0.8        # Duty cycle for traffic bursts (optional)
   nic_limit: 50          # NIC bandwidth limit in Gbps (optional)
-  image_path: cpu-emu.sif  # (optional) CPU emulator SIF for sender
+  image_path: jlabtsai/rtdp-cpu_emu:latest  # (optional) CPU emulator Docker image for sender
 
 # Components in order (data flows from sender through components to receiver)
 # Each component has: type, index, in_port, out_port, image_path, and type-specific parameters
@@ -32,7 +32,7 @@ components:
     index: 0
     in_port: 55555
     out_port: 55556
-    image_path: gpu-proxy.sif  # (optional) GPU proxy SIF
+    image_path: jlabtsai/rtdp-gpu_proxy:latest  # (optional) GPU proxy Docker image
     cpus: 4
     mem: 100G
     gpus: 1
@@ -49,7 +49,7 @@ components:
     index: 0
     in_port: 55556
     out_port: 55557
-    image_path: cpu-emu.sif  # (optional) CPU emulator SIF
+    image_path: jlabtsai/rtdp-cpu_emu:latest  # (optional) CPU emulator Docker image
     cpus: 8
     mem: 16G
     # threads: 4            # (optional)
@@ -63,7 +63,7 @@ components:
     index: 1
     in_port: 55557
     out_port: 55558
-    image_path: gpu-proxy.sif  # (optional) GPU proxy SIF
+    image_path: jlabtsai/rtdp-gpu_proxy:latest  # (optional) GPU proxy Docker image
     cpus: 6
     mem: 120G
     gpus: 1
@@ -80,7 +80,7 @@ components:
     index: 1
     in_port: 55558
     out_port: 55559
-    image_path: cpu-emu.sif  # (optional) CPU emulator SIF
+    image_path: jlabtsai/rtdp-cpu_emu:latest  # (optional) CPU emulator Docker image
     cpus: 12
     mem: 24G
     # threads: 6            # (optional)

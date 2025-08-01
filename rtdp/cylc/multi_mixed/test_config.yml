@@ -12,10 +12,12 @@ partition: ifarm
 # Receiver configuration
 receiver:
   listen_port: 55559
+  image_path: jlabtsai/rtdp-cpu_emu:latest
 
 # Sender configuration (minimal)
 sender:
   target_port: 55555
+  image_path: jlabtsai/rtdp-cpu_emu:latest
 
 # Components in order (data flows from sender through components to receiver)
 # Simple GPU-CPU chain for testing
@@ -26,6 +28,7 @@ components:
     index: 0
     in_port: 55555
     out_port: 55556
+    image_path: jlabtsai/rtdp-gpu_proxy:latest
     cpus: 4
     mem: 100G
     gpus: 1
@@ -37,5 +40,6 @@ components:
     index: 0
     in_port: 55556
     out_port: 55559
+    image_path: jlabtsai/rtdp-cpu_emu:latest
     cpus: 4
     mem: 8G 
