@@ -4,27 +4,27 @@ echo "=== Testing Multi-Component Workflows with Logging Options ==="
 
 echo ""
 echo "1. Testing GPU workflow with consolidated logging (default):"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config rtdp/cli/cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
 
 echo ""
 echo "2. Testing GPU workflow with separate logging:"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_separate --workflow-type multi_gpu_proxy --no-consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config rtdp/cli/cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_separate --workflow-type multi_gpu_proxy --no-consolidated-logging
 
 echo ""
 echo "3. Testing CPU emulator workflow with consolidated logging (default):"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_cpu_emu/test_config.yml --output cpu_workflow_consolidated --workflow-type multi_cpu_emu --consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config rtdp/cli/cylc/multi_cpu_emu/test_config.yml --output cpu_workflow_consolidated --workflow-type multi_cpu_emu --consolidated-logging
 
 echo ""
 echo "4. Testing CPU emulator workflow with separate logging:"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_cpu_emu/test_config.yml --output cpu_workflow_separate --workflow-type multi_cpu_emu --no-consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config rtdp/cli/cylc/multi_cpu_emu/test_config.yml --output cpu_workflow_separate --workflow-type multi_cpu_emu --no-consolidated-logging
 
 echo ""
 echo "5. Testing mixed components workflow with consolidated logging (default):"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_mixed/test_config.yml --output mixed_workflow_consolidated --workflow-type multi_mixed --consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config rtdp/cli/cylc/multi_mixed/test_config.yml --output mixed_workflow_consolidated --workflow-type multi_mixed --consolidated-logging
 
 echo ""
 echo "6. Testing mixed components workflow with separate logging:"
-python3 -m rtdp.cli.rtdpcli generate --config rtdp/cylc/multi_mixed/test_config.yml --output mixed_workflow_separate --workflow-type multi_mixed --no-consolidated-logging
+python3 -m rtdp.cli.rtdpcli generate --config rtdp/cli/cylc/multi_mixed/test_config.yml --output mixed_workflow_separate --workflow-type multi_mixed --no-consolidated-logging
 
 echo ""
 echo "=== CLI Option Summary ==="

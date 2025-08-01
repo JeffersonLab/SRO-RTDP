@@ -31,23 +31,20 @@ workflow_types = {
         'template': 'rtdp/cpp/cpu_emu/cylc/flow.cylc.j2',
         'description': 'Single CPU emulator workflow'
     },
-    'chain_workflow': {
-        'template': 'rtdp/cylc/chain_workflow/flow.cylc.j2',
-        'description': 'Simple chain workflow'
-    },
+
     'multi_gpu_proxy': {
-        'template': 'rtdp/cylc/multi_gpu_proxy/flow.cylc.j2',
-        'template_separate': 'rtdp/cylc/multi_gpu_proxy/flow.cylc.separate.j2',
+        'template': 'rtdp/cli/cylc/multi_gpu_proxy/flow.cylc.j2',
+        'template_separate': 'rtdp/cli/cylc/multi_gpu_proxy/flow.cylc.separate.j2',
         'description': 'Multi-GPU proxy workflow'
     },
     'multi_cpu_emu': {
-        'template': 'rtdp/cylc/multi_cpu_emu/flow.cylc.j2',
-        'template_separate': 'rtdp/cylc/multi_cpu_emu/flow.cylc.separate.j2',
+        'template': 'rtdp/cli/cylc/multi_cpu_emu/flow.cylc.j2',
+        'template_separate': 'rtdp/cli/cylc/multi_cpu_emu/flow.cylc.separate.j2',
         'description': 'Multi-CPU emulator workflow'
     },
     'multi_mixed': {
-        'template': 'rtdp/cylc/multi_mixed/flow.cylc.j2',
-        'template_separate': 'rtdp/cylc/multi_mixed/flow.cylc.separate.j2',
+        'template': 'rtdp/cli/cylc/multi_mixed/flow.cylc.j2',
+        'template_separate': 'rtdp/cli/cylc/multi_mixed/flow.cylc.separate.j2',
         'description': 'Mixed multi-component workflow'
     }
 }
@@ -148,7 +145,7 @@ def cli():
 @cli.command()
 @click.option('--config', required=True, help='Path to the YAML configuration file')
 @click.option('--output', required=True, help='Output directory for the generated workflow')
-@click.option('--workflow-type', required=True, help='Type of workflow to generate (gpu_proxy, cpu_emu, chain_workflow, multi_gpu_proxy, multi_cpu_emu, multi_mixed)')
+@click.option('--workflow-type', required=True, help='Type of workflow to generate (gpu_proxy, cpu_emu, multi_gpu_proxy, multi_cpu_emu, multi_mixed)')
 @click.option('--consolidated-logging/--no-consolidated-logging', default=True, help='Enable/disable consolidated logging (default: enabled)')
 def generate(config, output, workflow_type, consolidated_logging):
     """Generate a Cylc workflow from a YAML configuration file.
@@ -156,7 +153,6 @@ def generate(config, output, workflow_type, consolidated_logging):
     The workflow type must be one of:
     - gpu_proxy: Single GPU proxy workflow
     - cpu_emu: Single CPU emulator workflow
-    - chain_workflow: Simple chain workflow
     - multi_gpu_proxy: Multi-GPU proxy workflow (requires 'gpu_proxies' list in config)
     - multi_cpu_emu: Multi-CPU emulator workflow (requires 'cpu_emulators' list in config)
     - multi_mixed: Mixed multi-component workflow (requires 'components' list in config)

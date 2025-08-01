@@ -47,7 +47,6 @@ The CLI supports the following workflow types:
 1. **Single Component Workflows**:
    - `gpu_proxy`: Single GPU proxy workflow
    - `cpu_emu`: Single CPU emulator workflow
-   - `chain_workflow`: Simple chain workflow
 
 2. **Multi-Component Workflows**:
    - `multi_gpu_proxy`: Multi-GPU proxy workflow with exclusive node allocation
@@ -407,7 +406,7 @@ The CLI validates:
 
 Example configuration files are available for each workflow type:
 
-- **Multi-GPU Proxy**: `rtdp/cylc/multi_gpu_proxy/example_config.yml`
+- **Multi-GPU Proxy**: `rtdp/cli/cylc/multi_gpu_proxy/example_config.yml`
   - Demonstrates component-specific parameters
   - Shows explicit node assignment with `nodelist`
   - Includes different processing parameters for each proxy
