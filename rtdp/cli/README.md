@@ -46,6 +46,8 @@ The setup command will:
 - Configure Apptainer environment variables
 - Verify the installation
 
+**Note**: For detailed Cylc setup instructions and configuration options, refer to the comprehensive guide at `src/utilities/scripts/install-cylc/README.md`.
+
 ## Quick Start
 
 ### Option 1: Use Test Script (Recommended)
