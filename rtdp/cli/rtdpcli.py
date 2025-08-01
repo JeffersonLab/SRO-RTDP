@@ -110,6 +110,19 @@ def extract_sif_requirements(config_data):
         if isinstance(emu, dict) and emu.get('device') == 'cpu':
             add_sif_if_needed('cpu-emu.sif', 'sifs')
     
+    # Handle mixed workflow components
+    for component in config_data.get('components', []):
+        if isinstance(component, dict):
+            # Check if component has explicit image_path
+            if 'image_path' in component:
+                add_sif_if_needed(component['image_path'], 'sifs')
+            else:
+                # Use default SIF based on component type
+                if component.get('type') == 'gpu_proxy':
+                    add_sif_if_needed('gpu-proxy.sif', 'sifs')
+                elif component.get('type') == 'cpu_emulator':
+                    add_sif_if_needed('cpu-emu.sif', 'sifs')
+    
     return unique_sifs
 
 @click.group()
