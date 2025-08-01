@@ -43,7 +43,7 @@ echo "   This will build SIF containers and run the workflow."
 echo "   Press Enter to continue or Ctrl+C to skip..."
 read -r
 
-run_rtdp run gpu_workflow_consolidated
+run_rtdp run --workflow gpu_workflow_consolidated
 
 echo ""
 echo "6. Testing monitoring (optional)..."
@@ -51,7 +51,7 @@ echo "   This will open Cylc TUI for monitoring the workflow."
 echo "   Press Enter to continue or Ctrl+C to skip..."
 read -r
 
-run_rtdp monitor gpu_workflow_consolidated
+run_rtdp monitor --workflow gpu_workflow_consolidated
 
 echo ""
 echo "7. Testing cache management..."
@@ -79,13 +79,13 @@ echo "✅ rtdp monitor - Monitor workflow"
 echo "✅ rtdp cache - Manage SIF cache"
 echo ""
 echo "To run the workflow manually:"
-echo "rtdp run gpu_workflow_consolidated"
+echo "./rtdp run --workflow gpu_workflow_consolidated"
 echo ""
 echo "To monitor the workflow:"
-echo "rtdp monitor gpu_workflow_consolidated"
+echo "./rtdp monitor --workflow gpu_workflow_consolidated"
 echo ""
 echo "To check cache:"
-echo "rtdp cache --stats"
-echo "rtdp cache --clear"
+echo "./rtdp cache --stats"
+echo "./rtdp cache --clear"
 echo ""
 echo "🎉 GPU consolidated workflow test completed successfully!" 

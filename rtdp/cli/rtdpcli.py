@@ -37,18 +37,18 @@ workflow_types = {
     },
 
     'multi_gpu_proxy': {
-        'template': 'rtdp/cli/cylc/multi_gpu_proxy/flow.cylc.j2',
-        'template_separate': 'rtdp/cli/cylc/multi_gpu_proxy/flow.cylc.separate.j2',
+        'template': 'cylc/multi_gpu_proxy/flow.cylc.j2',
+        'template_separate': 'cylc/multi_gpu_proxy/flow.cylc.separate.j2',
         'description': 'Multi-GPU proxy workflow'
     },
     'multi_cpu_emu': {
-        'template': 'rtdp/cli/cylc/multi_cpu_emu/flow.cylc.j2',
-        'template_separate': 'rtdp/cli/cylc/multi_cpu_emu/flow.cylc.separate.j2',
+        'template': 'cylc/multi_cpu_emu/flow.cylc.j2',
+        'template_separate': 'cylc/multi_cpu_emu/flow.cylc.separate.j2',
         'description': 'Multi-CPU emulator workflow'
     },
     'multi_mixed': {
-        'template': 'rtdp/cli/cylc/multi_mixed/flow.cylc.j2',
-        'template_separate': 'rtdp/cli/cylc/multi_mixed/flow.cylc.separate.j2',
+        'template': 'cylc/multi_mixed/flow.cylc.j2',
+        'template_separate': 'cylc/multi_mixed/flow.cylc.separate.j2',
         'description': 'Mixed multi-component workflow'
     }
 }
@@ -243,6 +243,7 @@ def validate(config, template):
     with open(template, 'r') as f:
         template_str = f.read()
     env = Environment()
+    env.filters['docker_to_sif'] = docker_to_sif_filter
     ast = env.parse(template_str)
     required_vars = meta.find_undeclared_variables(ast)
 
@@ -291,6 +292,7 @@ def example_config(template):
     with open(template, 'r') as f:
         template_str = f.read()
     env = Environment()
+    env.filters['docker_to_sif'] = docker_to_sif_filter
     ast = env.parse(template_str)
 
     # Recursively collect all variable paths (including nested)
