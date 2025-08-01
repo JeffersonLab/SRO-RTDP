@@ -39,11 +39,11 @@
             --error = slurm_%j.log
         
         [[[environment]]]
-            # Directory paths
-            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
-            INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
-            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
-            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+            # Directory paths - use CLI output directory instead of CYLC_WORKFLOW_RUN_DIR
+            OUTPUT_DIR = "{{ output_dir }}/output"
+            INPUT_DIR = "{{ output_dir }}/input"
+            LOG_DIR = "{{ output_dir }}/logs"
+            DATA_DIR = "{{ output_dir }}/data"
 
     [[sender]]
         script = """
