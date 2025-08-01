@@ -1,6 +1,7 @@
 include README.md
 include requirements.txt
 include *.py
+include rtdp
 include cylc/**/*
 recursive-include cylc *.j2
 recursive-include cylc *.yml
