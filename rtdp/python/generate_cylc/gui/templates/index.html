@@ -1,0 +1,473 @@
+{% extends "base.html" %}
+{% from 'bootstrap5/form.html' import render_form %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Workflow Metadata -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">Workflow Metadata</h5>
+        </div>
+        <div class="card-body">
+            <form id="workflow-metadata-form" onsubmit="return false;">
+                {{ render_form(workflow_metadata_form, button_map={}) }}
+                <button type="button" class="btn btn-primary btn-sm" onclick="applyWorkflowMetadata()">Apply</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Platform Configuration -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">Platform Configuration</h5>
+        </div>
+        <div class="card-body">
+            <form id="platform-config-form" onsubmit="return false;">
+                {{ render_form(platform_form, button_map={}) }}
+                <button type="button" class="btn btn-primary btn-sm" onclick="applyPlatformConfig()">Apply</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Left Panel -->
+        <div class="col-md-2">
+            <!-- Components Card -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Components</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="palette">
+                        <div class="palette-item" draggable="true" data-component-type="sender">
+                            <div class="node sender">Sender</div>
+                        </div>
+                        <div class="palette-item" draggable="true" data-component-type="emulator">
+                            <div class="node emulator">Emulator</div>
+                        </div>
+                        <div class="palette-item" draggable="true" data-component-type="receiver">
+                            <div class="node receiver">Receiver</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Image Path Card -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Image Path</h5>
+                </div>
+                <div class="card-body">
+                    <form id="container-config-form" onsubmit="return false;">
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" name="image_path"
+                                value="cpu-emu.sif">
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm w-100"
+                            onclick="applyContainerConfig()">Apply</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2">
+                <button id="download-btn" class="btn btn-primary btn-sm flex-grow-1"
+                    onclick="downloadConfig()">Download</button>
+                <button id="preview-btn" class="btn btn-secondary btn-sm flex-grow-1"
+                    onclick="previewConfig()">Preview</button>
+            </div>
+        </div>
+
+        <!-- Right Panel - Workflow Graph -->
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Workflow Graph</h5>
+                    <div>
+                        <button class="btn btn-primary btn-sm" onclick="exportWorkflow()">Export</button>
+                        <button class="btn btn-secondary btn-sm" onclick="clearWorkflow()">Clear</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="workflow-graph" class="workflow-graph vis-network"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Component Configuration Modal -->
+<div class="modal fade" id="componentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Component Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {{ render_form(component_form) }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configuration Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="configPreview" class="bg-light p-3"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Load Balancer Config Modal -->
+<div class="modal fade" id="load-balancer-config-form" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Load Balancer Configuration</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="lb-strategy">Load Balancing Strategy</label>
+                        <select class="form-control" id="lb-strategy" required>
+                            <option value="round_robin">Round Robin</option>
+                            <option value="least_loaded">Least Loaded</option>
+                            <option value="consistent_hash">Consistent Hash</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-max-queue-size">Maximum Queue Size</label>
+                        <input type="number" class="form-control" id="lb-max-queue-size" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-health-check-interval">Health Check Interval (seconds)</label>
+                        <input type="number" class="form-control" id="lb-health-check-interval" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-backpressure-threshold">Backpressure Threshold (%)</label>
+                        <input type="number" class="form-control" id="lb-backpressure-threshold" min="0" max="100"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lb-rebalance-threshold">Rebalance Threshold (%)</label>
+                        <input type="number" class="form-control" id="lb-rebalance-threshold" min="0" max="100"
+                            required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveLoadBalancerConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Aggregator Config Modal -->
+<div class="modal fade" id="aggregator-config-form" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aggregator Configuration</h5>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="agg-strategy">Aggregation Strategy</label>
+                        <select class="form-control" id="agg-strategy" required>
+                            <option value="ordered">Ordered</option>
+                            <option value="unordered">Unordered</option>
+                            <option value="time_window">Time Window</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-buffer-size">Buffer Size</label>
+                        <input type="number" class="form-control" id="agg-buffer-size" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-batch-size">Batch Size</label>
+                        <input type="number" class="form-control" id="agg-batch-size" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-max-delay">Maximum Delay (seconds)</label>
+                        <input type="number" class="form-control" id="agg-max-delay" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="agg-window-size">Window Size (seconds)</label>
+                        <input type="number" class="form-control" id="agg-window-size" min="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveAggregatorConfig()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .palette {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: all !important;
+    }
+
+    .palette-item {
+        cursor: grab !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        transition: all 0.2s ease;
+        position: relative;
+        width: 100%;
+        margin: 0;
+        padding: 4px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background-color: white;
+        pointer-events: all !important;
+        -webkit-user-drag: element;
+        display: block;
+        z-index: 10;
+    }
+
+    .card-body {
+        pointer-events: all !important;
+        position: relative;
+        z-index: 1;
+    }
+
+    .node {
+        padding: 8px;
+        border-radius: 4px;
+        text-align: center;
+        font-weight: bold;
+        width: 100%;
+        margin: 0;
+        pointer-events: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        display: block;
+    }
+
+    .sender {
+        background-color: #a8e6cf;
+        border: 2px solid #86c4ad;
+    }
+
+    .emulator {
+        background-color: #bde0fe;
+        border: 2px solid #9bbfe0;
+    }
+
+    .receiver {
+        background-color: #ffd3b6;
+        border: 2px solid #e0b498;
+    }
+
+    .workflow-graph {
+        min-height: 600px;
+        border: 1px solid #dee2e6;
+        background-color: white;
+        transition: all 0.3s ease;
+        z-index: 1;
+    }
+
+    .workflow-graph.drop-target {
+        border-color: #2196F3;
+        background-color: #E3F2FD;
+        box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+    }
+
+    .drag-ghost {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.8;
+        background: white;
+        padding: 8px;
+        border-radius: 4px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        display: none;
+        min-width: 100px;
+    }
+
+    /* Ensure all parent containers allow pointer events */
+    .card,
+    .card-body,
+    .palette,
+    .palette-item {
+        pointer-events: all !important;
+    }
+
+    /* Disable pointer events only on the node content */
+    .node,
+    .node * {
+        pointer-events: none !important;
+    }
+
+    /* Active and hover states */
+    .palette-item:hover {
+        border-color: #adb5bd;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .palette-item:active {
+        cursor: grabbing !important;
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+
+    .palette-item.dragging {
+        opacity: 0.5;
+        transform: scale(0.95);
+        cursor: grabbing !important;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Initialize workflow visualization
+    // The initialization is now handled in workflow.js
+    // No additional initialization needed here
+
+    async function downloadConfig() {
+        try {
+            const response = await fetch('/api/workflow/config/download');
+            if (!response.ok) {
+                throw new Error('Failed to download configuration');
+            }
+
+            // Get the filename from the Content-Disposition header if available
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'workflow_config.yml';
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="(.+)"/);
+                if (match) {
+                    filename = match[1];
+                }
+            }
+
+            // Convert response to blob
+            const blob = await response.blob();
+
+            // Create download link and trigger download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+
+            showSuccess('Configuration downloaded successfully');
+        } catch (error) {
+            console.error('Error downloading configuration:', error);
+            showError('Failed to download configuration');
+        }
+    }
+
+    async function previewConfig() {
+        try {
+            // Just fetch and display the configuration without saving
+            const response = await fetch('/api/workflow/config');
+            if (!response.ok) {
+                throw new Error('Failed to load configuration preview');
+            }
+            const config = await response.json();
+            document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
+            new bootstrap.Modal(document.getElementById('previewModal')).show();
+        } catch (error) {
+            console.error('Error loading preview:', error);
+            showError('Failed to load configuration preview');
+        }
+    }
+
+    async function applyWorkflowMetadata() {
+        try {
+            const form = document.getElementById('workflow-metadata-form');
+            const formData = new FormData(form);
+            const response = await fetch('/api/workflow/metadata', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Failed to save workflow metadata');
+            showSuccess('Workflow metadata saved successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError(error.message);
+        }
+    }
+
+    async function applyPlatformConfig() {
+        try {
+            const form = document.getElementById('platform-config-form');
+            const formData = new FormData(form);
+            const response = await fetch('/api/workflow/platform', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Failed to save platform configuration');
+            showSuccess('Platform configuration saved successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError(error.message);
+        }
+    }
+
+    async function applyContainerConfig() {
+        try {
+            const form = document.getElementById('container-config-form');
+            const formData = new FormData(form);
+            const response = await fetch('/api/workflow/container', {
+                method: 'POST',
+                body: formData
+            });
+            if (!response.ok) throw new Error('Failed to save container configuration');
+            showSuccess('Container configuration saved successfully');
+        } catch (error) {
+            console.error('Error:', error);
+            showError(error.message);
+        }
+    }
+
+    function showError(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.style.backgroundColor = '#dc3545';
+        toast.style.color = 'white';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+    }
+
+    function showSuccess(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+    }
+</script>
+{% endblock %}

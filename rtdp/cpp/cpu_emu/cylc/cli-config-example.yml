@@ -1,0 +1,20 @@
+workflow:
+  name: cpu-emu
+  description: CPU Emulator test
+platform:
+  name: jlab_slurm
+containers:
+  image_path: cpu-emu.sif
+BASE_PORT: 55555
+COMPONENTS: 5
+AVG_RATE: 50
+RMS: 0.3
+DUTY: 0.7
+NIC: 100
+THREADS: 1
+LATENCY: 100
+MEM_FOOTPRINT: 0.01
+OUTPUT_SIZE: 0.001
+SLEEP: 0
+VERBOSE: 2
+partition: ifarm 

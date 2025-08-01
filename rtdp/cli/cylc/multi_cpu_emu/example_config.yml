@@ -1,0 +1,76 @@
+# Multi-CPU Emulator Workflow Configuration Example
+# This configuration demonstrates a workflow with multiple CPU emulators in series
+
+workflow_type: multi_cpu_emu
+workflow_name: multi_cpu_emu_example
+
+# Platform configuration
+platform:
+  name: jlab_slurm
+partition: ifarm
+
+# Container configuration
+containers:
+  image_path: jlabtsai/rtdp-cpu_emu:latest
+
+# Receiver configuration
+receiver:
+  listen_port: 5000
+
+# Sender configuration with traffic generation parameters
+sender:
+  target_port: 5001
+  avg_rate: 100          # Average send rate in Mbps (optional)
+  rms_fraction: 0.2      # RMS variation fraction (optional)
+  duty_cycle: 0.8        # Duty cycle for traffic bursts (optional)
+  nic_limit: 50          # NIC bandwidth limit in Gbps (optional)
+
+# Multiple CPU emulators in series
+cpu_emulators:
+  # First emulator (emulator_0) - receives from sender, sends to emulator_1
+  - in_port: 5001
+    out_port: 5002
+    cpus: 8
+    mem: 16G
+    threads: 4           # (optional)
+    latency: 10          # Processing latency in milliseconds (optional)
+    mem_footprint: 2048  # Memory footprint in MB (optional)
+    output_size: 1024    # Output data size in KB (optional)
+    sleep_time: 5        # Sleep time between processing cycles in ms (optional)
+    nic: eth0            # Network interface (optional, auto-detected if not specified)
+    # nodelist: node001  # (optional) specify specific node
+
+  # Second emulator (emulator_1) - receives from emulator_0, sends to emulator_2
+  - in_port: 5002
+    out_port: 5003
+    cpus: 12
+    mem: 24G
+    threads: 6           # (optional)
+    latency: 15          # (optional)
+    mem_footprint: 3072  # (optional)
+    output_size: 1536    # (optional)
+    sleep_time: 3        # (optional)
+    nic: eth1            # (optional)
+    # nodelist: node002  # (optional)
+
+  # Third emulator (emulator_2) - receives from emulator_1, sends to receiver
+  - in_port: 5003
+    out_port: 5000
+    cpus: 16
+    mem: 32G
+    threads: 8           # (optional)
+    latency: 20          # (optional)
+    mem_footprint: 4096  # (optional)
+    output_size: 2048    # (optional)
+    sleep_time: 2        # (optional)
+    nic: eth0            # (optional)
+    # nodelist: node003  # (optional)
+
+# Alternative configuration with minimal parameters (using defaults)
+# cpu_emulators:
+#   - in_port: 5001      # (required)
+#     out_port: 5002     # (required)
+#   - in_port: 5002      # (required)
+#     out_port: 5003     # (required)
+#   - in_port: 5003      # (required)
+#     out_port: 5000     # (required) 

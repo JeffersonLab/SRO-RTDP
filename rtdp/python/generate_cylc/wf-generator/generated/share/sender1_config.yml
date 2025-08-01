@@ -1,0 +1,19 @@
+connections:
+- buffer_size: 1M
+  data_type: raw
+  target: load_balancer1
+id: sender1
+network:
+  bind_address: 0.0.0.0
+  listen_port: 50800
+resources:
+  cpus_per_task: 4
+  mem: 4G
+  partition: ifarm
+sender_config:
+  chunk_size: 1M
+  data_format: raw
+test_data:
+  pattern: random
+  size: 100M
+type: sender

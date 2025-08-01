@@ -1,0 +1,21 @@
+output_dir: "/output"
+threads: 4
+latency: 50
+mem_footprint: 0.05
+output_size: 0.001
+processing_type: "cpu_intensive"
+network:
+  listen_port: 50801
+  bind_address: "0.0.0.0"
+  target_host: "receiver"
+  target_port: 50804
+  verbosity: 1
+receive_port: 50801
+destination_address: rtdp-receiver
+destination_port: 50804
+num_threads: 2
+memory_footprint_gb: 1
+output_size_gb: 1
+latency_seconds_per_gb: 1
+sleep_vs_burn: false
+verbose: true 

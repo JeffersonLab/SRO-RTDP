@@ -1,0 +1,69 @@
+# Test configuration for multi-GPU proxy workflow with nodelist specification
+workflow:
+  name: multi-gpu-proxy-test
+  description: Multi-GPU proxy workflow with explicit node assignment and component-specific parameters
+
+platform:
+  name: jlab_slurm
+
+containers:
+  image_path: jlabtsai/rtdp-gpu_proxy:latest
+
+# Sender configuration with component-specific parameters
+sender:
+  target_port: 55555
+  send_rate: 150         # (optional)
+  group_size: 30720000   # (optional)
+  send_all_ones: 0       # (optional)
+  socket_hwm: 1          # (optional)
+
+# Receiver configuration  
+receiver:
+  listen_port: 55558
+
+# GPU Proxies with explicit node assignment and component-specific parameters
+gpu_proxies:
+  - device: "gpu"
+    partition: gpu
+    gpus: 1
+    mem: 100G
+    cpus: 4
+    in_port: 55555
+    out_port: 55556
+    device_id: 0
+    nic: eth1  # (optional) specify network interface for this proxy
+    nodelist: "gpu-node-01"  # (optional) explicit node assignment for first proxy
+    # Component-specific processing parameters
+    matrix_width: 1024  # (optional) smaller matrix for first proxy
+    proxy_rate: 0.8     # (optional) slower processing rate
+    socket_hwm: 2       # (optional) higher socket buffer
+    
+  - device: "gpu"
+    partition: gpu
+    gpus: 1
+    mem: 100G
+    cpus: 4
+    in_port: 55556
+    out_port: 55557
+    device_id: 1
+    # nic: eth2  # (optional) if not specified, auto-detects default interface
+    nodelist: "gpu-node-02"  # (optional) explicit node assignment for second proxy
+    # Component-specific processing parameters
+    matrix_width: 4096  # (optional) larger matrix for second proxy
+    proxy_rate: 1.2     # (optional) faster processing rate
+    socket_hwm: 1       # (optional) default socket buffer
+    
+  - device: "gpu"
+    partition: gpu
+    gpus: 1
+    mem: 100G
+    cpus: 4
+    in_port: 55557
+    out_port: 55558
+    device_id: 2
+    nic: eth3  # (optional) specify network interface for this proxy
+    nodelist: "gpu-node-03"  # (optional) explicit node assignment for third proxy
+    # Component-specific processing parameters (uses defaults)
+    # matrix_width: not specified - uses default (2048) (optional)
+    # proxy_rate: not specified - uses default (1.0) (optional)
+    # socket_hwm: not specified - uses default (1) (optional) 

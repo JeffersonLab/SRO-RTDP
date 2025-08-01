@@ -1,0 +1,426 @@
+{# Multi-GPU Proxy Cylc Workflow Template #}
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Dependency chain (reverse of data flow): receiver => proxy_N => proxy_N-1 => ... => proxy_0 => sender
+            receiver:ready => gpu_proxy_{{ gpu_proxies|length - 1 }}:ready
+            {% for i in range(gpu_proxies|length - 1, 0, -1) %}
+            gpu_proxy_{{ i }}:ready => gpu_proxy_{{ i-1 }}:ready
+            {% endfor %}
+            gpu_proxy_0:ready => sender
+
+            # Completion chain
+            #sender:completed => !receiver
+            #receiver:completed
+            #{% for proxy in gpu_proxies %}
+            #    gpu_proxy_{{ loop.index0 }}:completed
+            #{% endfor %}
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = {{ platform.name | default('jlab_slurm') }}
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = {{ partition | default('ifarm') }}
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF file
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ (containers.image_path | default('jlabtsai/rtdp-gpu_proxy:latest')) | docker_to_sif }}"
+            
+            # Port configuration
+            SEND_PORT = "{{ sender.target_port }}"
+            RECV_PORT = "{{ receiver.listen_port }}"
+            
+            # Directory paths - use CLI output directory instead of CYLC_WORKFLOW_RUN_DIR
+            OUTPUT_DIR = "{{ output_dir }}/output"
+            INPUT_DIR = "{{ output_dir }}/input"
+            LOG_DIR = "{{ output_dir }}/logs"
+            DATA_DIR = "{{ output_dir }}/data"
+            
+            # Consolidated log file path
+            CONSOLIDATED_LOG = "{{ output_dir }}/consolidated.log"
+
+    [[sender]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            # Set sender-specific environment variables from config
+            {% if sender.send_rate is defined %}
+            SEND_RATE="{{ sender.send_rate }}"
+            {% else %}
+            SEND_RATE="150"
+            {% endif %}
+            
+            {% if sender.group_size is defined %}
+            GROUP_SIZE="{{ sender.group_size }}"
+            {% else %}
+            GROUP_SIZE="30720000"
+            {% endif %}
+            
+            {% if sender.send_all_ones is defined %}
+            SEND_ALL_ONES="{{ sender.send_all_ones }}"
+            {% else %}
+            SEND_ALL_ONES="0"
+            {% endif %}
+            
+            {% if sender.socket_hwm is defined %}
+            SOCKET_HWM="{{ sender.socket_hwm }}"
+            {% else %}
+            SOCKET_HWM="1"
+            {% endif %}
+            
+            mkdir -p ${LOG_DIR}/sender
+            
+            # Function to log to both individual and consolidated logs
+            log_message() {
+                local timestamp="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')]"
+                local message="$timestamp [SENDER] $1"
+                echo "$message" | tee -a "${LOG_DIR}/sender/stdout.log" >> "${CONSOLIDATED_LOG}"
+            }
+            
+            # Initialize consolidated log if this is the first component
+            if [ ! -f "${CONSOLIDATED_LOG}" ]; then
+                echo "MULTI-GPU PROXY WORKFLOW CONSOLIDATED LOG" > "${CONSOLIDATED_LOG}"
+                echo "Generated at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')" >> "${CONSOLIDATED_LOG}"
+                echo "Workflow ID: $CYLC_WORKFLOW_ID" >> "${CONSOLIDATED_LOG}"
+                echo "Run directory: $CYLC_WORKFLOW_RUN_DIR" >> "${CONSOLIDATED_LOG}"
+                echo "Output directory: {{ output_dir }}" >> "${CONSOLIDATED_LOG}"
+                echo "" >> "${CONSOLIDATED_LOG}"
+            fi
+
+            log_message "Starting sender task"
+            log_message "Configuration Parameters:"
+            log_message "  - SIF_FILE: ${SIF_FILE}"
+            log_message "  - SEND_PORT: ${SEND_PORT}"
+            log_message "  - SEND_RATE: ${SEND_RATE} MB/s"
+            log_message "  - GROUP_SIZE: ${GROUP_SIZE}"
+            log_message "  - SEND_ALL_ONES: ${SEND_ALL_ONES}"
+            log_message "  - SOCKET_HWM: ${SOCKET_HWM}"
+            log_message "  - INPUT_DIR: ${INPUT_DIR}"
+            log_message "  - LOG_DIR: ${LOG_DIR}"
+
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+
+            # Signal ready state immediately (sender doesn't need to wait for proxy IP)
+            log_message "Signaling ready state"
+            cylc message "ready"
+            log_message "Ready message sent"
+
+            # Wait for first proxy to be ready and get its IP
+            log_message "Waiting for first proxy to be ready..."
+            while [ ! -f "$CYLC_WORKFLOW_SHARE_DIR/proxy_0_ip" ]; do
+                sleep 1
+            done
+
+            PROXY_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_0_ip)
+            log_message "Sending data to ${PROXY_IP}:${SEND_PORT}"
+
+            # Send data and capture output with timestamps for consolidated log
+            apptainer run --pwd /tmp ${SIF_FILE} sender \
+                -a ${PROXY_IP} \
+                -p ${SEND_PORT} \
+                -r ${SEND_RATE} \
+                --group-size ${GROUP_SIZE} \
+                --hwm ${SOCKET_HWM} \
+                -v \
+                ${SEND_ALL_ONES:+--all-ones} \
+                2>${LOG_DIR}/sender/apptainer.log | tee -a "${LOG_DIR}/sender/stdout.log" | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [SENDER] $line" >> "${CONSOLIDATED_LOG}"
+                done
+
+            SEND_STATUS=$?
+            log_message "Send completed with status: ${SEND_STATUS}"
+
+            # Add apptainer log to consolidated log
+            if [ -f "${LOG_DIR}/sender/apptainer.log" ]; then
+                echo "--- SENDER APPTAINER LOG ---" >> "${CONSOLIDATED_LOG}"
+                cat "${LOG_DIR}/sender/apptainer.log" >> "${CONSOLIDATED_LOG}"
+                echo "" >> "${CONSOLIDATED_LOG}"
+            fi
+
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:completed"
+            fi
+
+            exit ${SEND_STATUS}
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Send completed successfully"
+
+    {% for proxy in gpu_proxies %}
+    [[gpu_proxy_{{ loop.index0 }}]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            # Set proxy-specific environment variables from config
+            IN_PORT="{{ proxy.in_port }}"
+            OUT_PORT="{{ proxy.out_port }}"
+            GPU_ID="{{ proxy.device_id | default(loop.index0) }}"
+            {% if proxy.nic is defined %}
+            PROXY_NIC="{{ proxy.nic }}"
+            {% else %}
+            # Auto-detect the default network interface
+            PROXY_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
+            {% endif %}
+            
+            # Proxy-specific processing parameters
+            {% if proxy.matrix_width is defined %}
+            PROXY_MATRIX_WIDTH="{{ proxy.matrix_width }}"
+            {% else %}
+            PROXY_MATRIX_WIDTH="2048"
+            {% endif %}
+            
+            {% if proxy.proxy_rate is defined %}
+            PROXY_RATE="{{ proxy.proxy_rate }}"
+            {% else %}
+            PROXY_RATE="1.0"
+            {% endif %}
+            
+            {% if proxy.socket_hwm is defined %}
+            PROXY_SOCKET_HWM="{{ proxy.socket_hwm }}"
+            {% else %}
+            PROXY_SOCKET_HWM="1"
+            {% endif %}
+            
+            mkdir -p ${LOG_DIR}/proxy_{{ loop.index0 }}
+            
+            # Function to log to both individual and consolidated logs
+            log_message() {
+                local timestamp="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')]"
+                local message="$timestamp [PROXY_{{ loop.index0 }}] $1"
+                echo "$message" | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" >> "${CONSOLIDATED_LOG}"
+            }
+
+            log_message "Starting GPU proxy task"
+            log_message "Configuration Parameters:"
+            log_message "  - SIF_FILE: ${SIF_FILE}"
+            log_message "  - PROXY_NIC: ${PROXY_NIC}"
+            log_message "  - IN_PORT: ${IN_PORT}"
+            log_message "  - OUT_PORT: ${OUT_PORT}"
+            log_message "  - PROXY_MATRIX_WIDTH: ${PROXY_MATRIX_WIDTH}"
+            log_message "  - PROXY_RATE: ${PROXY_RATE}"
+            log_message "  - PROXY_SOCKET_HWM: ${PROXY_SOCKET_HWM}"
+            log_message "  - LOG_DIR: ${LOG_DIR}/proxy_{{ loop.index0 }}"
+
+            # Store this proxy's hostname and IP for previous component
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_hostname
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${PROXY_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 }}_ip
+            log_message "Running on host: $HOSTNAME ($IP) using NIC ${PROXY_NIC}"
+
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+
+            # Determine next component's IP and port (in data flow direction)
+            {% if loop.index0 == gpu_proxies|length - 1 %}
+            # Last proxy in dependency chain (proxy_N) connects to receiver
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            log_message "Connecting to receiver at ${NEXT_IP}:${OUT_PORT}"
+            {% else %}
+            # Connect to the proxy that starts after this one in dependency chain
+            # For proxy_i, connect to proxy_{i+1} which starts after proxy_i
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/proxy_{{ loop.index0 + 1 }}_ip)
+            log_message "Connecting to proxy_{{ loop.index0 + 1 }} at ${NEXT_IP}:${OUT_PORT}"
+            {% endif %}
+
+            # Start GPU proxy
+            log_message "Starting GPU proxy"
+            apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
+                --in-port ${IN_PORT} \
+                --out-ip ${NEXT_IP} \
+                --out-port ${OUT_PORT} \
+                -t \
+                -w ${PROXY_MATRIX_WIDTH} \
+                -r ${PROXY_RATE} \
+                --hwm ${PROXY_SOCKET_HWM} \
+                2>&1 | tee -a "${LOG_DIR}/proxy_{{ loop.index0 }}/stdout.log" | while IFS= read -r line; do
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [PROXY_{{ loop.index0 }}] $line" >> "${CONSOLIDATED_LOG}"
+                done &
+            PROXY_PID=$!
+            log_message "GPU proxy started with PID ${PROXY_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $PROXY_PID 2>/dev/null; then
+                log_message "Signaling ready state"
+                cylc message "ready"
+                log_message "Ready message sent"
+            else
+                log_message "ERROR: GPU proxy process not running" >&2
+                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
+                exit 1
+            fi
+
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the proxy process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $PROXY_PID 2>/dev/null; do
+                log_message "GPU proxy process is running (PID: $PROXY_PID)"
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $PROXY_PID; then
+                log_message "ERROR: GPU proxy process failed" >&2
+                cat ${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log >&2
+                exit 1
+            fi
+
+            # Add apptainer log to consolidated log
+            if [ -f "${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log" ]; then
+                echo "--- PROXY {{ loop.index0 }} APPTAINER LOG ---" >> "${CONSOLIDATED_LOG}"
+                cat "${LOG_DIR}/proxy_{{ loop.index0 }}/apptainer.log" >> "${CONSOLIDATED_LOG}"
+                echo "" >> "${CONSOLIDATED_LOG}"
+            fi
+
+            cylc message -- "gpu_proxy_{{ loop.index0 }}:completed"
+        """
+        [[[directives]]]
+            --job-name = proxy_{{ loop.index0 }}
+            --partition = {{ proxy.partition | default('gpu') }}
+            --gres = gpu:{{ proxy.gpus | default('1') }}
+            --mem = {{ proxy.mem | default('100G') }}
+            --cpus-per-task = {{ proxy.cpus | default('4') }}
+            --nodes = 1
+            {% if proxy.nodelist is defined %}
+            --nodelist = {{ proxy.nodelist }}
+            {% endif %}
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Proxy processing completed"
+    {% endfor %}
+
+    [[receiver]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            mkdir -p ${LOG_DIR}/receiver
+            
+            # Function to log to both individual and consolidated logs
+            log_message() {
+                local timestamp="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')]"
+                local message="$timestamp [RECEIVER] $1"
+                echo "$message" | tee -a "${LOG_DIR}/receiver/stdout.log" >> "${CONSOLIDATED_LOG}"
+            }
+
+            log_message "Starting receiver task"
+            log_message "Configuration Parameters:"
+            log_message "  - SIF_FILE: ${SIF_FILE}"
+            log_message "  - RECV_PORT: ${RECV_PORT}"
+            log_message "  - LOG_DIR: ${LOG_DIR}"
+
+            # Store hostname and IP for last proxy
+            HOSTNAME=$(hostname -f)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            # Auto-detect the default network interface
+            RECEIVER_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${RECEIVER_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            log_message "Running on host: $HOSTNAME ($IP) using NIC ${RECEIVER_NIC}"
+
+            # Start receiver
+            log_message "Starting receiver process"
+            apptainer run --pwd /tmp ${SIF_FILE} receiver -p ${RECV_PORT} -v 2>${LOG_DIR}/receiver/apptainer.log | tee -a "${LOG_DIR}/receiver/stdout.log" | while IFS= read -r line; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] [RECEIVER] $line" >> "${CONSOLIDATED_LOG}"
+            done &
+            RECV_PID=$!
+            log_message "Receiver started with PID ${RECV_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                log_message "Signaling ready state"
+                cylc message "ready"
+                log_message "Ready message sent"
+            else
+                log_message "ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the receiver process and log received data information
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                log_message "Receiver process is running (PID: $RECV_PID)"
+                
+                # Log received data statistics if available
+                if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
+                    # Extract and log data transfer information from apptainer output
+                    log_message "Receiver Status:"
+                    # Only capture receiver-specific output, not from other components
+                    tail -n 5 ${LOG_DIR}/receiver/apptainer.log | grep -E "(received|bytes|packets|rate|Queue status|Sent)" >> "${LOG_DIR}/receiver/stdout.log" 2>/dev/null || true
+                fi
+                
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $RECV_PID; then
+                log_message "ERROR: Receiver process failed" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+
+            # Log final received data summary
+            log_message "Receiver completed successfully"
+            log_message "Final receiver statistics:"
+            if [ -f "${LOG_DIR}/receiver/apptainer.log" ]; then
+                echo "=== RECEIVER APPTAINER LOG SUMMARY ===" >> "${CONSOLIDATED_LOG}"
+                cat ${LOG_DIR}/receiver/apptainer.log >> "${CONSOLIDATED_LOG}"
+                echo "=== END RECEIVER LOG SUMMARY ===" >> "${CONSOLIDATED_LOG}"
+            fi
+
+            # Add final summary to consolidated log
+            echo "" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "WORKFLOW COMPLETION SUMMARY" >> "${CONSOLIDATED_LOG}"
+            echo "==========================================" >> "${CONSOLIDATED_LOG}"
+            echo "All components have completed successfully." >> "${CONSOLIDATED_LOG}"
+            echo "Consolidated log file: ${CONSOLIDATED_LOG}" >> "${CONSOLIDATED_LOG}"
+            echo "Individual component logs: ${LOG_DIR}" >> "${CONSOLIDATED_LOG}"
+
+            cylc message -- "receiver:completed"
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = 4
+            --mem = 8G
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Transfer completed successfully" 
