@@ -29,6 +29,9 @@ pip install --upgrade pip
 # Install CLI package in development mode
 pip install -e .
 
+# If you encounter import issues, try reinstalling:
+# pip uninstall rtdp-cli -y && pip install -e .
+
 # Alternative: Run directly with Python
 python rtdpcli.py --help
 
@@ -497,10 +500,11 @@ The CLI validates:
    - Manually copy the file if automatic copy fails
 
 5. **CLI Installation Issues**:
-   - If `rtdp` command is not found, try reinstalling: `pip uninstall rtdp-cli -y && pip install -e .`
+   - If `rtdp` command is not found or has import errors, try reinstalling: `pip uninstall rtdp-cli -y && pip install -e .`
    - Alternative: Run directly with `python rtdpcli.py --help`
    - Check that you're in the correct directory (`rtdp/cli`)
    - Ensure all dependencies are installed: `pip install -r requirements.txt`
+   - If console_scripts entry point fails, use direct Python execution: `python rtdpcli.py setup`
 
 ### Workflow Issues
 
