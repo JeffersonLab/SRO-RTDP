@@ -483,12 +483,9 @@ def monitor(workflow):
     try:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-            # Try different possible locations for workflow name
-            workflow_name = (
-                config.get('workflow', {}).get('name') or  # workflow.name
-                config.get('workflow_name') or             # workflow_name
-                os.path.basename(workflow)                 # fallback to directory name
-            )
+            # For monitoring, use the directory name as the workflow name
+            # since that's what Cylc uses when no explicit name is set in flow.cylc
+            workflow_name = os.path.basename(workflow)
             if not workflow_name:
                 click.echo("Error: workflow name not found in config.yml", err=True)
                 return
