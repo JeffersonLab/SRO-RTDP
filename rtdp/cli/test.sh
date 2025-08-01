@@ -15,10 +15,10 @@ fi
 echo "1. Checking RTDP environment status..."
 # Function to run rtdp command with fallback
 run_rtdp() {
-    if command -v rtdp &> /dev/null; then
+    if command -v rtdp &> /dev/null && rtdp --help &> /dev/null; then
         rtdp "$@"
     else
-        echo "rtdp command not found, using wrapper script..."
+        echo "rtdp command not working, using wrapper script..."
         python run_rtdp.py "$@"
     fi
 }
