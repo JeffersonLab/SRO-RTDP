@@ -34,10 +34,10 @@ pip install -e .
 
 ```bash
 # Setup RTDP environment including Cylc installation
-rtdp setup
+./rtdp setup
 
 # Check environment status
-rtdp status
+./rtdp status
 ```
 
 The setup command will:
@@ -52,17 +52,17 @@ The setup command will:
 
 ```bash
 # Generate a multi-GPU proxy workflow
-rtdp generate --config config.yml --output workflow_dir --workflow-type multi_gpu_proxy
+./rtdp generate --config config.yml --output workflow_dir --workflow-type multi_gpu_proxy
 ```
 
 ### 2. Run the Workflow
 
 ```bash
 # Run the generated workflow
-rtdp run workflow_dir
+./rtdp run workflow_dir
 
 # Monitor the workflow
-rtdp monitor workflow_dir
+./rtdp monitor workflow_dir
 ```
 
 ## Workflow Types
@@ -121,8 +121,8 @@ gpu_proxies:
 Generate and run:
 
 ```bash
-rtdp generate --config gpu_config.yml --output gpu_workflow --workflow-type multi_gpu_proxy
-rtdp run gpu_workflow
+./rtdp generate --config gpu_config.yml --output gpu_workflow --workflow-type multi_gpu_proxy
+./rtdp run gpu_workflow
 ```
 
 ### Multi-CPU Emulator Workflow
@@ -163,8 +163,8 @@ cpu_emulators:
 Generate and run:
 
 ```bash
-rtdp generate --config cpu_config.yml --output cpu_workflow --workflow-type multi_cpu_emu
-rtdp run cpu_workflow
+./rtdp generate --config cpu_config.yml --output cpu_workflow --workflow-type multi_cpu_emu
+./rtdp run cpu_workflow
 ```
 
 ## CLI Commands
@@ -183,7 +183,7 @@ rtdp run cpu_workflow
 ### Generate Command Options
 
 ```bash
-rtdp generate --config <config_file> --output <output_dir> --workflow-type <type> [OPTIONS]
+./rtdp generate --config <config_file> --output <output_dir> --workflow-type <type> [OPTIONS]
 
 Options:
   --consolidated-logging/--no-consolidated-logging  Enable/disable consolidated logging (default: enabled)
@@ -192,7 +192,7 @@ Options:
 ### Run Command Options
 
 ```bash
-rtdp run <workflow_directory> [OPTIONS]
+./rtdp run <workflow_directory> [OPTIONS]
 
 Options:
   --parallel-builds <number>  Number of parallel SIF builds (default: 2)
@@ -204,10 +204,10 @@ Options:
 
 ```bash
 # View cache statistics
-rtdp cache --stats
+./rtdp cache --stats
 
 # Clear all cached containers
-rtdp cache --clear
+./rtdp cache --clear
 ```
 
 ## Configuration File Format
@@ -314,7 +314,7 @@ Sender → Component_0 → Component_1 → ... → Component_N → Receiver
 Enable debug output for detailed information:
 
 ```bash
-rtdp generate --config config.yml --output workflow --workflow-type multi_gpu_proxy --debug
+./rtdp generate --config config.yml --output workflow --workflow-type multi_gpu_proxy --debug
 ```
 
 ## Example Workflows
