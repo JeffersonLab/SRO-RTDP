@@ -557,8 +557,7 @@ def setup_cylc_directories():
     import pathlib
     
     cylc_dirs = [
-        pathlib.Path.home() / '.cylc' / 'flow',
-        pathlib.Path.home() / '.cylc' / 'flows'
+        pathlib.Path.home() / '.cylc' / 'flow'
     ]
     
     for dir_path in cylc_dirs:
@@ -578,20 +577,16 @@ def setup_cylc_configuration(platform=None):
         click.echo("   You may need to manually configure Cylc.")
         return False
     
-    # Target locations
-    targets = [
-        pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc',
-        pathlib.Path.home() / '.cylc' / 'flows' / 'global.cylc'
-    ]
+    # Target location
+    target = pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc'
     
-    for target in targets:
-        try:
-            shutil.copy2(source_global, target)
-            click.echo(f"✅ Copied global.cylc to: {target}")
-        except Exception as e:
-            click.echo(f"⚠️  Warning: Could not copy to {target}: {e}")
-    
-    return True
+    try:
+        shutil.copy2(source_global, target)
+        click.echo(f"✅ Copied global.cylc to: {target}")
+        return True
+    except Exception as e:
+        click.echo(f"⚠️  Warning: Could not copy to {target}: {e}")
+        return False
 
 def setup_apptainer_environment():
     """Setup Apptainer environment variables."""
@@ -632,16 +627,12 @@ def verify_cylc_installation():
     
     # Check configuration
     import pathlib
-    config_files = [
-        pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc',
-        pathlib.Path.home() / '.cylc' / 'flows' / 'global.cylc'
-    ]
+    config_file = pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc'
     
-    config_exists = any(f.exists() for f in config_files)
-    if config_exists:
-        click.echo("✅ Cylc configuration files found")
+    if config_file.exists():
+        click.echo("✅ Cylc configuration file found")
     else:
-        click.echo("⚠️  Warning: Cylc configuration files not found")
+        click.echo("⚠️  Warning: Cylc configuration file not found")
     
     # Test basic Cylc functionality
     try:
@@ -738,28 +729,20 @@ def status():
     
     # Check Cylc directories
     import pathlib
-    cylc_dirs = [
-        pathlib.Path.home() / '.cylc' / 'flow',
-        pathlib.Path.home() / '.cylc' / 'flows'
-    ]
+    cylc_dir = pathlib.Path.home() / '.cylc' / 'flow'
     
-    for dir_path in cylc_dirs:
-        if dir_path.exists():
-            click.echo(f"✅ Cylc Directory: {dir_path}")
-        else:
-            click.echo(f"❌ Cylc Directory: {dir_path} (missing)")
+    if cylc_dir.exists():
+        click.echo(f"✅ Cylc Directory: {cylc_dir}")
+    else:
+        click.echo(f"❌ Cylc Directory: {cylc_dir} (missing)")
     
-    # Check configuration files
-    config_files = [
-        pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc',
-        pathlib.Path.home() / '.cylc' / 'flows' / 'global.cylc'
-    ]
+    # Check configuration file
+    config_file = pathlib.Path.home() / '.cylc' / 'flow' / 'global.cylc'
     
-    for config_file in config_files:
-        if config_file.exists():
-            click.echo(f"✅ Config File: {config_file}")
-        else:
-            click.echo(f"❌ Config File: {config_file} (missing)")
+    if config_file.exists():
+        click.echo(f"✅ Config File: {config_file}")
+    else:
+        click.echo(f"❌ Config File: {config_file} (missing)")
     
     # Check Apptainer environment
     import os
@@ -775,7 +758,7 @@ def status():
     
     # Summary
     click.echo("\n📋 Summary:")
-    if is_installed and all(f.exists() for f in config_files):
+    if is_installed and config_file.exists():
         click.echo("   🎉 RTDP environment is ready!")
         click.echo("   You can now generate and run workflows.")
     else:

@@ -92,7 +92,7 @@ rtdp setup --skip-cylc-install
 The setup command will:
 - Check if running in a virtual environment (recommended)
 - Install Cylc in the current environment
-- Create necessary Cylc directories (`~/.cylc/flow/`, `~/.cylc/flows/`)
+- Create necessary Cylc directories (`~/.cylc/flow/`)
 - Copy configuration files (`global.cylc`)
 - Setup Apptainer environment variables
 - Verify the installation
