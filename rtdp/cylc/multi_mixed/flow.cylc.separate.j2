@@ -1,0 +1,508 @@
+{# Mixed Multi-Component Cylc Workflow Template - Separate Logs Version #}
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Dependency chain (reverse of data flow): receiver => component_N => component_N-1 => ... => component_0 => sender
+            receiver:ready => {{ components[-1].name }}_{{ components[-1].index }}:ready
+            {% for i in range(components|length - 1, 0, -1) %}
+            {{ components[i].name }}_{{ components[i].index }}:ready => {{ components[i-1].name }}_{{ components[i-1].index }}:ready
+            {% endfor %}
+            {{ components[0].name }}_{{ components[0].index }}:ready => sender
+
+            # Completion chain
+            #sender:completed => !receiver
+            #receiver:completed
+            #{% for comp in components %}
+            #    {{ comp.name }}_{{ comp.index }}:completed
+            #{% endfor %}
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = {{ platform.name | default('jlab_slurm') }}
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = {{ partition | default('ifarm') }}
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
+            INPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/input"
+            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
+            DATA_DIR = "$CYLC_WORKFLOW_RUN_DIR/data"
+
+    [[sender]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            # Set sender-specific environment variables from config
+            {% if sender.avg_rate is defined %}
+            AVG_RATE="{{ sender.avg_rate }}"
+            {% else %}
+            AVG_RATE="50"
+            {% endif %}
+            
+            {% if sender.rms_fraction is defined %}
+            RMS_FRACTION="{{ sender.rms_fraction }}"
+            {% else %}
+            RMS_FRACTION="0.3"
+            {% endif %}
+            
+            {% if sender.duty_cycle is defined %}
+            DUTY_CYCLE="{{ sender.duty_cycle }}"
+            {% else %}
+            DUTY_CYCLE="0.7"
+            {% endif %}
+            
+            {% if sender.nic_limit is defined %}
+            NIC_LIMIT="{{ sender.nic_limit }}"
+            {% else %}
+            NIC_LIMIT="100"
+            {% endif %}
+            
+            # Set sender-specific SIF file
+            {% if sender.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ sender.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            {% endif %}
+            
+            # Set port configuration
+            SEND_PORT="{{ sender.target_port }}"
+            
+            mkdir -p ${LOG_DIR}/sender
+            
+            # Redirect output to separate log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - SEND_PORT: ${SEND_PORT}"
+            echo "  - AVG_RATE: ${AVG_RATE} Mbps"
+            echo "  - RMS_FRACTION: ${RMS_FRACTION}"
+            echo "  - DUTY_CYCLE: ${DUTY_CYCLE}"
+            echo "  - NIC_LIMIT: ${NIC_LIMIT} Gbps"
+            echo "  - INPUT_DIR: ${INPUT_DIR}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+
+            # Create input directory
+            mkdir -p ${INPUT_DIR}
+
+            # Signal ready state immediately (sender doesn't need to wait for component IP)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+            cylc message "ready"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+
+            # Wait for first component to be ready and get its IP
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Waiting for first component to be ready..."
+            while [ ! -f "$CYLC_WORKFLOW_SHARE_DIR/{{ components[0].name }}_{{ components[0].index }}_ip" ]; do
+                sleep 1
+            done
+
+            COMPONENT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ components[0].name }}_{{ components[0].index }}_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sending data to ${COMPONENT_IP}:${SEND_PORT}"
+
+            # Send data with apptainer output piped to separate log files
+            apptainer run --pwd /app ${SIF_FILE} sender \
+                --host ${COMPONENT_IP} \
+                --port ${SEND_PORT} \
+                --avg-rate-mbps ${AVG_RATE} \
+                --rms-fraction ${RMS_FRACTION} \
+                --duty-cycle ${DUTY_CYCLE} \
+                --nic-limit-gbps ${NIC_LIMIT} \
+                2>&1 | tee -a "${LOG_DIR}/sender/apptainer.log"
+
+            SEND_STATUS=$?
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Send completed with status: ${SEND_STATUS}"
+
+            if [ $SEND_STATUS -eq 0 ]; then
+                cylc message -- "sender:completed"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Send failed with status ${SEND_STATUS}" >&2
+                exit 1
+            fi
+        """
+
+    {% for comp in components %}
+    {% if comp.type == 'gpu_proxy' %}
+    [[gpu_proxy_{{ comp.index }}]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            # Set proxy-specific environment variables from config
+            IN_PORT="{{ comp.in_port }}"
+            OUT_PORT="{{ comp.out_port }}"
+            GPU_ID="{{ comp.device_id | default(comp.index) }}"
+            {% if comp.nic is defined %}
+            PROXY_NIC="{{ comp.nic }}"
+            {% else %}
+            # Auto-detect the default network interface
+            PROXY_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
+            {% endif %}
+            
+            # Set proxy-specific SIF file
+            {% if comp.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/gpu-proxy.sif"
+            {% endif %}
+            
+            # Proxy-specific processing parameters
+            {% if comp.matrix_width is defined %}
+            PROXY_MATRIX_WIDTH="{{ comp.matrix_width }}"
+            {% else %}
+            PROXY_MATRIX_WIDTH="2048"
+            {% endif %}
+            
+            {% if comp.proxy_rate is defined %}
+            PROXY_RATE="{{ comp.proxy_rate }}"
+            {% else %}
+            PROXY_RATE="1.0"
+            {% endif %}
+            
+            {% if comp.socket_hwm is defined %}
+            PROXY_SOCKET_HWM="{{ comp.socket_hwm }}"
+            {% else %}
+            PROXY_SOCKET_HWM="1"
+            {% endif %}
+            
+            mkdir -p ${LOG_DIR}/gpu_proxy_{{ comp.index }}
+            
+            # Redirect output to separate log files
+            exec 1> >(tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - PROXY_NIC: ${PROXY_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - PROXY_MATRIX_WIDTH: ${PROXY_MATRIX_WIDTH}"
+            echo "  - PROXY_RATE: ${PROXY_RATE}"
+            echo "  - PROXY_SOCKET_HWM: ${PROXY_SOCKET_HWM}"
+            echo "  - LOG_DIR: ${LOG_DIR}/gpu_proxy_{{ comp.index }}"
+
+            # Store this proxy's hostname and IP for previous component
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_{{ comp.index }}_hostname
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${PROXY_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/gpu_proxy_{{ comp.index }}_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${PROXY_NIC}"
+
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+
+            # Determine next component's IP and port (in data flow direction)
+            {% if loop.index0 == components|length - 1 %}
+            # Last component in dependency chain connects to receiver
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to receiver at ${NEXT_IP}:${OUT_PORT}"
+            {% else %}
+            # Connect to the component that starts after this one in dependency chain
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ components[loop.index0 + 1].name }}_{{ components[loop.index0 + 1].index }}_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to {{ components[loop.index0 + 1].name }}_{{ components[loop.index0 + 1].index }} at ${NEXT_IP}:${OUT_PORT}"
+            {% endif %}
+
+            # Start GPU proxy with output piped to separate log files
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting GPU proxy"
+            apptainer run --pwd /tmp --nv ${SIF_FILE} proxy \
+                --in-port ${IN_PORT} \
+                --out-ip ${NEXT_IP} \
+                --out-port ${OUT_PORT} \
+                -t \
+                -w ${PROXY_MATRIX_WIDTH} \
+                -r ${PROXY_RATE} \
+                --hwm ${PROXY_SOCKET_HWM} \
+                2>&1 | tee -a "${LOG_DIR}/gpu_proxy_{{ comp.index }}/apptainer.log" &
+            PROXY_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy started with PID ${PROXY_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $PROXY_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process not running" >&2
+                exit 1
+            fi
+
+            # Set up signal handling for graceful shutdown
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the proxy process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $PROXY_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] GPU proxy process is running (PID: $PROXY_PID)"
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $PROXY_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: GPU proxy process failed" >&2
+                exit 1
+            fi
+
+            cylc message -- "gpu_proxy_{{ comp.index }}:completed"
+        """
+        [[[directives]]]
+            --job-name = gpu_proxy_{{ comp.index }}
+            --partition = {{ comp.partition | default('gpu') }}
+            --gres = gpu:{{ comp.gpus | default('1') }}
+            --mem = {{ comp.mem | default('100G') }}
+            --cpus-per-task = {{ comp.cpus | default('4') }}
+            --nodes = 1
+            {% if comp.nodelist is defined %}
+            --nodelist = {{ comp.nodelist }}
+            {% endif %}
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Proxy processing completed"
+    {% else %}
+    [[emulator_{{ comp.index }}]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            # Set emulator-specific environment variables from config
+            IN_PORT="{{ comp.in_port }}"
+            OUT_PORT="{{ comp.out_port }}"
+            {% if comp.nic is defined %}
+            EMULATOR_NIC="{{ comp.nic }}"
+            {% else %}
+            # Auto-detect the default network interface
+            EMULATOR_NIC="$(ip route | grep default | awk '{print $5}' | head -n1)"
+            {% endif %}
+            
+            # Set emulator-specific SIF file
+            {% if comp.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ comp.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            {% endif %}
+            
+            # Emulator-specific processing parameters
+            {% if comp.threads is defined %}
+            NUM_THREADS="{{ comp.threads }}"
+            {% else %}
+            NUM_THREADS="1"
+            {% endif %}
+            
+            {% if comp.latency is defined %}
+            LATENCY="{{ comp.latency }}"
+            {% else %}
+            LATENCY="100"
+            {% endif %}
+            
+            {% if comp.mem_footprint is defined %}
+            MEM_FOOTPRINT="{{ comp.mem_footprint }}"
+            {% else %}
+            MEM_FOOTPRINT="0.01"
+            {% endif %}
+            
+            mkdir -p ${LOG_DIR}/emulator_{{ comp.index }}
+            
+            # Redirect output to separate log files
+            exec 1> >(tee -a "${LOG_DIR}/emulator_{{ comp.index }}/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator_{{ comp.index }}/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - EMULATOR_NIC: ${EMULATOR_NIC}"
+            echo "  - IN_PORT: ${IN_PORT}"
+            echo "  - OUT_PORT: ${OUT_PORT}"
+            echo "  - NUM_THREADS: ${NUM_THREADS}"
+            echo "  - LATENCY: ${LATENCY}"
+            echo "  - MEM_FOOTPRINT: ${MEM_FOOTPRINT}"
+            echo "  - LOG_DIR: ${LOG_DIR}/emulator_{{ comp.index }}"
+
+            # Store this emulator's hostname and IP for previous component
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator_{{ comp.index }}_hostname
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${EMULATOR_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator_{{ comp.index }}_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${EMULATOR_NIC}"
+
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+
+            # Determine next component's IP and port (in data flow direction)
+            {% if loop.index0 == components|length - 1 %}
+            # Last component in dependency chain connects to receiver
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to receiver at ${NEXT_IP}:${OUT_PORT}"
+            {% else %}
+            # Connect to the component that starts after this one in dependency chain
+            NEXT_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/{{ components[loop.index0 + 1].name }}_{{ components[loop.index0 + 1].index }}_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Connecting to {{ components[loop.index0 + 1].name }}_{{ components[loop.index0 + 1].index }} at ${NEXT_IP}:${OUT_PORT}"
+            {% endif %}
+
+            # Start CPU emulator with output piped to separate log files
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
+            apptainer run --pwd /app ${SIF_FILE} emulator \
+                -i ${NEXT_IP} \
+                -r ${IN_PORT} \
+                -p ${OUT_PORT} \
+                -t ${NUM_THREADS} \
+                -b ${LATENCY} \
+                2>&1 | tee -a "${LOG_DIR}/emulator_{{ comp.index }}/apptainer.log" &
+            EMU_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator started with PID ${EMU_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $EMU_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process not running" >&2
+                exit 1
+            fi
+
+            # Set up signal handling for graceful shutdown
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the emulator process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $EMU_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator process is running (PID: $EMU_PID)"
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $EMU_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process failed" >&2
+                exit 1
+            fi
+
+            cylc message -- "emulator_{{ comp.index }}:completed"
+        """
+        [[[directives]]]
+            --job-name = emulator_{{ comp.index }}
+            --cpus-per-task = {{ comp.cpus | default('8') }}
+            --mem = {{ comp.mem | default('16G') }}
+            --nodes = 1
+            {% if comp.nodelist is defined %}
+            --nodelist = {{ comp.nodelist }}
+            {% endif %}
+        [[[outputs]]]
+            ready = "ready"
+            completed = "CPU emulator processing completed"
+    {% endif %}
+    {% endfor %}
+
+    [[receiver]]
+        script = """
+            #!/bin/bash
+            set -e
+            
+            # Set receiver-specific SIF file
+            {% if receiver.image_path is defined %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/{{ receiver.image_path }}"
+            {% else %}
+            SIF_FILE="$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
+            {% endif %}
+            
+            # Set port configuration
+            RECV_PORT="{{ receiver.listen_port }}"
+            
+            mkdir -p ${LOG_DIR}/receiver
+            
+            # Redirect output to separate log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Configuration Parameters:"
+            echo "  - SIF_FILE: ${SIF_FILE}"
+            echo "  - RECV_PORT: ${RECV_PORT}"
+            echo "  - LOG_DIR: ${LOG_DIR}"
+
+            # Store hostname and IP for last component
+            HOSTNAME=$(hostname)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            # Get the first non-loopback IPv4 address for the NIC
+            IP=$(ip addr show ${RECEIVER_NIC} | grep 'inet ' | grep -v '127.0.0.1' | head -n1 | awk '{print $2}' | cut -d/ -f1)
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP) using NIC ${RECEIVER_NIC}"
+
+            # Start receiver with output piped to separate log files
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
+            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${RECV_PORT} -p ${RECV_PORT} -v 1 2>&1 | tee -a "${LOG_DIR}/receiver/apptainer.log" &
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+
+            # Brief pause to let process start
+            sleep 2
+
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                exit 1
+            fi
+
+            # Set up signal handling for graceful shutdown
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+
+            # Monitor the receiver process and log received data information
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                sleep 5
+            done
+
+            # Check if process died unexpectedly
+            if ! wait $RECV_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process failed" >&2
+                exit 1
+            fi
+
+            # Log final received data summary
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver completed successfully"
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Final receiver statistics:"
+
+            cylc message -- "receiver:completed"
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = {{ receiver.cpus | default('4') }}
+            --mem = {{ receiver.mem | default('32G') }}
+            --nodes = 1
+            {% if receiver.nodelist is defined %}
+            --nodelist = {{ receiver.nodelist }}
+            {% endif %}
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Receiver processing completed" 

@@ -25,14 +25,17 @@ workflow_types = {
     },
     'multi_gpu_proxy': {
         'template': 'rtdp/cylc/multi_gpu_proxy/flow.cylc.j2',
+        'template_separate': 'rtdp/cylc/multi_gpu_proxy/flow.cylc.separate.j2',
         'description': 'Multi-GPU proxy workflow'
     },
     'multi_cpu_emu': {
         'template': 'rtdp/cylc/multi_cpu_emu/flow.cylc.j2',
+        'template_separate': 'rtdp/cylc/multi_cpu_emu/flow.cylc.separate.j2',
         'description': 'Multi-CPU emulator workflow'
     },
     'multi_mixed': {
         'template': 'rtdp/cylc/multi_mixed/flow.cylc.j2',
+        'template_separate': 'rtdp/cylc/multi_mixed/flow.cylc.separate.j2',
         'description': 'Mixed multi-component workflow'
     }
 }
@@ -118,7 +121,8 @@ def cli():
 @click.option('--config', required=True, help='Path to the YAML configuration file')
 @click.option('--output', required=True, help='Output directory for the generated workflow')
 @click.option('--workflow-type', required=True, help='Type of workflow to generate (gpu_proxy, cpu_emu, chain_workflow, multi_gpu_proxy, multi_cpu_emu, multi_mixed)')
-def generate(config, output, workflow_type):
+@click.option('--consolidated-logging/--no-consolidated-logging', default=True, help='Enable/disable consolidated logging (default: enabled)')
+def generate(config, output, workflow_type, consolidated_logging):
     """Generate a Cylc workflow from a YAML configuration file.
 
     The workflow type must be one of:
@@ -127,7 +131,11 @@ def generate(config, output, workflow_type):
     - chain_workflow: Simple chain workflow
     - multi_gpu_proxy: Multi-GPU proxy workflow (requires 'gpu_proxies' list in config)
     - multi_cpu_emu: Multi-CPU emulator workflow (requires 'cpu_emulators' list in config)
-    - multi_mixed: Mixed multi-component workflow (requires both 'gpu_proxies' and 'cpu_emulators' lists in config)
+    - multi_mixed: Mixed multi-component workflow (requires 'components' list in config)
+
+    Logging options (for multi-component workflows):
+    - --consolidated-logging: Generate workflow with consolidated logging (default)
+    - --no-consolidated-logging: Generate workflow with separate log files for each component
     """
     if workflow_type not in workflow_types:
         raise click.ClickException(f"Unknown workflow type: {workflow_type}")
@@ -145,10 +153,20 @@ def generate(config, output, workflow_type):
         if workflow_type == 'multi_mixed' and 'components' not in config_data:
             raise click.ClickException("Mixed workflow requires a 'components' list in the config.")
 
-    # Load the template
-    template_path = workflow_types[workflow_type]['template']
+    # Load the template based on logging preference
+    if workflow_type in ['multi_gpu_proxy', 'multi_cpu_emu', 'multi_mixed']:
+        if consolidated_logging:
+            template_path = workflow_types[workflow_type]['template']
+        else:
+            template_path = workflow_types[workflow_type]['template_separate']
+    else:
+        template_path = workflow_types[workflow_type]['template']
+    
     with open(template_path, 'r') as f:
         template_content = f.read()
+
+    # Add consolidated_logging flag to config data for template rendering
+    config_data['consolidated_logging'] = consolidated_logging
 
     # Render the template
     template = Template(template_content)
