@@ -13,7 +13,17 @@ if [[ "$VIRTUAL_ENV" == "" ]]; then
 fi
 
 echo "1. Checking RTDP environment status..."
-rtdp status
+# Function to run rtdp command with fallback
+run_rtdp() {
+    if command -v rtdp &> /dev/null; then
+        rtdp "$@"
+    else
+        echo "rtdp command not found, using direct Python execution..."
+        python rtdpcli.py "$@"
+    fi
+}
+
+run_rtdp status
 
 echo ""
 echo "2. Setting up RTDP environment (if needed)..."
@@ -21,15 +31,25 @@ echo "   This will install Cylc and configure directories."
 echo "   Press Enter to continue or Ctrl+C to skip..."
 read -r
 
-rtdp setup
+# Function to run rtdp command with fallback
+run_rtdp() {
+    if command -v rtdp &> /dev/null; then
+        rtdp "$@"
+    else
+        echo "rtdp command not found, using direct Python execution..."
+        python rtdpcli.py "$@"
+    fi
+}
+
+run_rtdp setup
 
 echo ""
 echo "3. Testing GPU workflow generation with consolidated logging..."
-rtdp generate --config cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
+run_rtdp generate --config cylc/multi_gpu_proxy/test_config.yml --output gpu_workflow_consolidated --workflow-type multi_gpu_proxy --consolidated-logging
 
 echo ""
 echo "4. Testing workflow validation..."
-rtdp validate --config cylc/multi_gpu_proxy/test_config.yml --template cylc/multi_gpu_proxy/flow.cylc.j2
+run_rtdp validate --config cylc/multi_gpu_proxy/test_config.yml --template cylc/multi_gpu_proxy/flow.cylc.j2
 
 echo ""
 echo "5. Testing workflow execution (optional)..."
@@ -37,7 +57,7 @@ echo "   This will build SIF containers and run the workflow."
 echo "   Press Enter to continue or Ctrl+C to skip..."
 read -r
 
-rtdp run gpu_workflow_consolidated
+run_rtdp run gpu_workflow_consolidated
 
 echo ""
 echo "6. Testing monitoring (optional)..."
@@ -45,11 +65,11 @@ echo "   This will open Cylc TUI for monitoring the workflow."
 echo "   Press Enter to continue or Ctrl+C to skip..."
 read -r
 
-rtdp monitor gpu_workflow_consolidated
+run_rtdp monitor gpu_workflow_consolidated
 
 echo ""
 echo "7. Testing cache management..."
-rtdp cache --stats
+run_rtdp cache --stats
 
 echo ""
 echo "=== Test Summary ==="

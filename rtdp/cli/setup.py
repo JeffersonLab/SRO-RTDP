@@ -34,9 +34,6 @@ setup(
             "rtdp=rtdpcli:cli",
         ],
     },
-    scripts=[
-        "rtdp",
-    ],
     include_package_data=True,
     package_data={
         "": ["*.md", "*.txt", "*.yml", "*.yaml"],

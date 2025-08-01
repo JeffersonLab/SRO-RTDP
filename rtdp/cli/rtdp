@@ -13,12 +13,18 @@ try:
     # Import the CLI function directly from the module
     from rtdpcli import cli
     cli()
-except ImportError as e:
-    print(f"Error importing RTDP CLI: {e}")
-    print("Make sure you're running this from the correct directory.")
-    print("Current directory:", os.getcwd())
-    print("Python path:", sys.path)
-    sys.exit(1)
+except ImportError:
+    try:
+        # Try importing as a module
+        import rtdpcli
+        rtdpcli.cli()
+    except ImportError as e:
+        print(f"Error importing RTDP CLI: {e}")
+        print("Make sure you're running this from the correct directory.")
+        print("Current directory:", os.getcwd())
+        print("Python path:", sys.path)
+        print("Available files:", os.listdir('.'))
+        sys.exit(1)
 except Exception as e:
     print(f"Error running RTDP CLI: {e}")
     sys.exit(1) 
