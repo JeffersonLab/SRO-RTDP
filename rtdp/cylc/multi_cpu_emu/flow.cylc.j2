@@ -37,7 +37,7 @@
             --error = slurm_%j.log
         [[[environment]]]
             # Path to SIF file
-            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('cpu-emu.sif') }}"
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ (containers.image_path | default('jlabtsai/rtdp-cpu_emu:latest')) | docker_to_sif }}"
             
             # Port configuration
             SEND_PORT = "{{ sender.target_port }}"

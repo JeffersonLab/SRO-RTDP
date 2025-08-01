@@ -11,7 +11,7 @@ partition: ifarm
 
 # Container configuration
 containers:
-  image_path: cpu-emu.sif
+  image_path: jlabtsai/rtdp-cpu_emu:latest
 
 # Receiver configuration
 receiver:
