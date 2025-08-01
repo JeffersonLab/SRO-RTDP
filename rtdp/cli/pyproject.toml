@@ -49,4 +49,4 @@ include = ["*"]
 exclude = ["tests*", "test*", "__pycache__*"]
 
 [tool.setuptools.py-modules]
-rtdpcli = "rtdpcli" 
+rtdpcli 
