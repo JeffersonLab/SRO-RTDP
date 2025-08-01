@@ -27,16 +27,6 @@ echo "   This will install Cylc and configure directories."
 echo "   Press Enter to continue or Ctrl+C to skip..."
 read -r
 
-# Function to run rtdp command with fallback
-run_rtdp() {
-    if command -v rtdp &> /dev/null; then
-        rtdp "$@"
-    else
-        echo "rtdp command not found, using direct Python execution..."
-        python rtdpcli.py "$@"
-    fi
-}
-
 run_rtdp setup
 
 echo ""
