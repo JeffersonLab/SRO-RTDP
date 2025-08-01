@@ -13,10 +13,10 @@ if [[ "$VIRTUAL_ENV" == "" ]]; then
 fi
 
 echo "1. Checking RTDP environment status..."
-# Function to run rtdp command with fallback
+# Function to run rtdp command
 run_rtdp() {
-    echo "Using wrapper script (rtdp command has import issues)..."
-    python run_rtdp.py "$@"
+    echo "Running: $*"
+    ./rtdp "$@"
 }
 
 run_rtdp status
