@@ -34,7 +34,6 @@ setup(
             "rtdp=rtdpcli:cli",
         ],
     },
-    py_modules=['rtdpcli'],
     include_package_data=True,
     package_data={
         "": ["*.md", "*.txt", "*.yml", "*.yaml"],

@@ -35,6 +35,9 @@ pip install -e .
 # Alternative: Run directly with Python
 python rtdpcli.py --help
 
+# Alternative: Use wrapper script (if console_scripts fails)
+python run_rtdp.py --help
+
 # Setup RTDP environment (install Cylc and configure directories)
 rtdp setup
 

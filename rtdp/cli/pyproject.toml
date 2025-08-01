@@ -46,7 +46,4 @@ Issues = "https://github.com/JeffersonLab/SRO-RTDP/issues"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["*"]
-exclude = ["tests*", "test*", "__pycache__*"]
-
-[tool.setuptools.py-modules]
-rtdpcli 
+exclude = ["tests*", "test*", "__pycache__*"] 
