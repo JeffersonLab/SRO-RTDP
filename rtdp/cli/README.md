@@ -14,8 +14,8 @@ The RTDP Workflow CLI is a command-line tool for generating and managing RTDP (R
 ### Setup Development Environment
 
    ```bash
-# Navigate to the project root directory
-cd /path/to/rtdp
+# Navigate to the CLI directory
+cd rtdp/cli
 
 # Create and activate virtual environment
    python -m venv venv
@@ -23,7 +23,10 @@ cd /path/to/rtdp
    # or
    .\venv\Scripts\activate  # On Windows
 
-# Install development dependencies
+# Upgrade pip (recommended)
+pip install --upgrade pip
+
+# Install CLI package in development mode
 pip install -e .
 
 # Setup RTDP environment (install Cylc and configure directories)

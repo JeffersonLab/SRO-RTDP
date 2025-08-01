@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rtdp-cli"
+version = "0.1.0"
+description = "RTDP Workflow CLI for generating and managing RTDP workflows"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "JLab"}
+]
+maintainers = [
+    {name = "JLab"}
+]
+keywords = ["workflow", "cylc", "rtdp", "jlab"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "click>=8.0",
+    "PyYAML>=5.4",
+    "Jinja2>=3.0",
+    "cylc-flow>=8.0",
+]
+
+[project.scripts]
+rtdp = "rtdpcli:cli"
+
+[project.urls]
+Homepage = "https://github.com/JeffersonLab/SRO-RTDP"
+Repository = "https://github.com/JeffersonLab/SRO-RTDP"
+Issues = "https://github.com/JeffersonLab/SRO-RTDP/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]
+exclude = ["tests*", "test*", "__pycache__*"] 
