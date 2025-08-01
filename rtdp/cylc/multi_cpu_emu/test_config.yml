@@ -15,7 +15,7 @@ containers:
 
 # Receiver configuration
 receiver:
-  listen_port: 55555
+  listen_port: 55558
 
 # Sender configuration (minimal)
 sender:
@@ -26,11 +26,11 @@ cpu_emulators:
   # First emulator - receives from sender, sends to emulator_1
   - in_port: 55556
     out_port: 55557
-    # cpus: 4
-    # mem: 8G
+    cpus: 4
+    mem: 8G
 
   # Second emulator - receives from emulator_0, sends to receiver
   - in_port: 55557
-    out_port: 55555
-    # cpus: 4
-    # mem: 8G 
+    out_port: 55558
+    cpus: 4
+    mem: 8G 
