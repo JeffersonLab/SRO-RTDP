@@ -1,10 +1,8 @@
-destination:   "129.57.177.5"
-dst_port:      5556
-rcv_port:      5555
-latency:       500          # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
-mem_footprint: 0.05         # Memory footprint in GB
-output_size:   0.0000572    # Output size in GB
-verbose:       1            # verbosity level
-terminal:      0            # if 1 do not forward result to destination
-out_nic:       100          # Outbound NIC speed in Gbps for sim_mode
-frame_cnt:     1000         # Numbers frames sender will send
+cmp_ltnc_nS_B:    500      # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
+output_size_GB:   0.000075 # Output size in GB
+nic_Gbps:         100      # Outbound NIC speed in Gbps for sim_mode
+frame_sz_MB:      0.06     # Frame Size MB
+frame_cnt:        1000     # Numbers frames sender will send
+cmpnt_cnt:        5        # Number of cpu_sim components
+avg_bit_rt_Gbps:  0.01    # Sender bit rate Gbps #0.015
+ 
