@@ -637,8 +637,10 @@ class RTDP:
 
 # Run script
 if __name__ == "__main__":
-    processor = RTDP(rng_seed = None, directory=".", extension=".txt", file="logfile.txt")
-    RTDP.sim()
+    processor = RTDP(rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt")
+    processor.__init__()
+    processor.sim()
+    processor.plot_all()
 
 #$ python
 #Python 3.6.8 (default, Nov 15 2024, 08:11:39) 
