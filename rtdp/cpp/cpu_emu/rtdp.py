@@ -47,58 +47,16 @@ sz1G  = sz1M*sz1K
 
 class RTDP:
     
-    # Compute statistical moments: mean, std, skewness, kurtosis
-    def compute_moments(self, series):
-        values = series #.dropna()
-        return {
-            'count': len(values),
-            'mean': values.mean(),
-            'std': values.std(),
-            'skew': skew(values),
-            'kurtosis': kurtosis(values)
-        }
-    #-----------------------------------------------------
-    def moving_average(self, a, n=5):
-        ret = np.cumsum(a, dtype=float)
-        ret[n:] = ret[n:] - ret[:-n]
-        return ret[n-1:] / n
-    #-----------------------------------------------------
-
-#    # Load the log file into a list of lines
-#    def load_log_file(self, path):
-#        with open(path, 'r') as f:
-#            lines = f.readlines()
-#        return [line.strip() for line in lines if line.strip()]
-
-    def gen_gamma_samples(self, mean, stdev, n_samples):
-        """
-        Generate n_samples from a Gamma distribution with given mean and stdev.
-        
-        Parameters:
-            mean (float): Desired mean of the distribution
-            stdev (float): Desired standard deviation
-            n_samples (int): Number of samples to generate
-            random_state (int, optional): Random seed for reproducibility
-        
-        Returns:
-            numpy.ndarray: Array of gamma-distributed samples
-        """
-        
-        # Derive shape (k) and scale (theta)
-        shape = (mean / stdev) ** 2
-        scale = (stdev ** 2) / mean
-        
-        return self.rng.gamma(shape, scale, n_samples)
-
     def __del__(self):
         self.log_file.close()   
         
-    def __init__(self, rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt"):
+    def __init__(self, rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt", sim_config="cpu_sim.yaml"):
     
-        self.rng = np.random.default_rng(rng_seed)
+        self.rng       = np.random.default_rng(rng_seed)
         self.directory = directory
         self.extension = extension
-        self.log_file = log_file
+        self.log_file  = log_file
+        self.sim_config= sim_config
 
         self.log_file = open(self.log_file, "w")
 
@@ -136,9 +94,13 @@ class RTDP:
             "drp_frctn":   pd.Series(dtype=int)
         })
 
-        # Load YAML
-        with open("cpu_sim.yaml", "r") as f:
-            data = yaml.safe_load(f)
+        try:
+            with open(self.sim_config, "r") as f:
+                data = yaml.safe_load(f)
+            print(f"[INFO] Loaded config from {self.sim_config}")
+        except Exception as e:
+            print(f"[ERROR] Failed to load YAML config: {e}")
+            return
 
         # Flatten into a DataFrame
         prmtrs_df = json_normalize(data, sep=".")
@@ -171,11 +133,11 @@ class RTDP:
         # Plot histogram
         plt.figure(figsize=(8, 5))
         plt.hist(cnst_nl_smpls_uS, bins=50, density=True, alpha=0.7, color="blue", edgecolor="black")
-        plt.title(f"Clipped Gamma Distribution Samples (mean={ntwrk_lt_mean_uS}, std={ntwrk_lt_sd_uS})")
+        plt.title(f"Network Latency Gamma Distribution Samples (mean={ntwrk_lt_mean_uS}, std={ntwrk_lt_sd_uS})")
         plt.xlabel("Value")
         plt.ylabel("Density")
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.savefig("Gamma Distribution Samples.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("NtwrkGmmDstrbnSmpls.png", dpi=300, bbox_inches="tight")  #plt.show()
         #-----------------------------------------------------
         # Sample until > mean Network Latency Samples
 
@@ -198,11 +160,11 @@ class RTDP:
         # Plot histogram
         plt.figure(figsize=(8, 5))
         plt.hist(cnst_nl_smpls_uS, bins=50, density=True, alpha=0.7, color="blue", edgecolor="black")
-        plt.title(f"Clipped Gamma Distribution Samples (mean={ntwrk_lt_mean_uS}, std={ntwrk_lt_sd_uS})")
+        plt.title(f"Clipped Network Latency Gamma Distribution Samples (mean={ntwrk_lt_mean_uS}, std={ntwrk_lt_sd_uS})")
         plt.xlabel("Value")
         plt.ylabel("Density")
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.savefig("Clipped Gamma Distribution Samples.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("ClpdNtwrkGmmDstrbnSmpls.png", dpi=300, bbox_inches="tight")  #plt.show()
         #-----------------------------------------------------
         # Frame Size Samples
 
@@ -222,11 +184,11 @@ class RTDP:
         # Plot histogram
         plt.figure(figsize=(8, 5))
         plt.hist(cnst_fs_smpls_B, bins=50, density=True, alpha=0.7, color="blue", edgecolor="black")
-        plt.title(f"Gamma Frame Size Samples (mean={self.cnst_daq_fs_mean_B}, std={cnst_fs_std_B})")
+        plt.title(f"Frame Size Gamma Samples (mean={self.cnst_daq_fs_mean_B}, std={cnst_fs_std_B})")
         plt.xlabel("Value")
         plt.ylabel("Density")
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.savefig("Gamma Frame Size Samples.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("FrmSzGmmSmpls.png", dpi=300, bbox_inches="tight")  #plt.show()
         #-----------------------------------------------------
         # Out Size Samples
 
@@ -250,8 +212,45 @@ class RTDP:
         plt.xlabel("Value")
         plt.ylabel("Density")
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.savefig("Component Output Size Samples.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("CmpntOtptSzSmpls.png", dpi=300, bbox_inches="tight")  #plt.show()
         #-----------------------------------------------------
+
+    # Compute statistical moments: mean, std, skewness, kurtosis
+    def compute_moments(self, series):
+        values = series #.dropna()
+        return {
+            'count': len(values),
+            'mean': values.mean(),
+            'std': values.std(),
+            'skew': skew(values),
+            'kurtosis': kurtosis(values)
+        }
+    #-----------------------------------------------------
+    def moving_average(self, a, n=5):
+        ret = np.cumsum(a, dtype=float)
+        ret[n:] = ret[n:] - ret[:-n]
+        return ret[n-1:] / n
+    #-----------------------------------------------------
+
+    def gen_gamma_samples(self, mean, stdev, n_samples):
+        """
+        Generate n_samples from a Gamma distribution with given mean and stdev.
+        
+        Parameters:
+            mean (float): Desired mean of the distribution
+            stdev (float): Desired standard deviation
+            n_samples (int): Number of samples to generate
+            random_state (int, optional): Random seed for reproducibility
+        
+        Returns:
+            numpy.ndarray: Array of gamma-distributed samples
+        """
+        
+        # Derive shape (k) and scale (theta)
+        shape = (mean / stdev) ** 2
+        scale = (stdev ** 2) / mean
+        
+        return self.rng.gamma(shape, scale, n_samples)
 
     def sim(self):
 
@@ -350,7 +349,7 @@ class RTDP:
             #plt.ylim(0, np.isfinite(recd['fps_roll'].mean()))
             plt.grid(True)
             plt.tight_layout()
-            plt.savefig(f"Component {i} Send bit Rate.png", dpi=300, bbox_inches="tight")  #plt.show()
+            plt.savefig(f"Cmpnt_{i}_SndBtRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
     def plot_rcv_frm_rate(self):
@@ -380,15 +379,7 @@ class RTDP:
             plt.xlabel("Minutes")
             plt.ylabel("Hz")
             plt.tight_layout()
-            plt.savefig(f"Component {i} Recv Frame Rate.png", dpi=300, bbox_inches="tight")  #plt.show()
-
-#-----------------------------------------------------
-# for drop frames tracking - time delta between new recvd and last done (drop if negative)
-# OK in your above data frame, i need to calculate all algebraic differences between the columns 'rcd_uS' - 'done_uS' such that the value of 'done_uS' 
-# is obtained from the row previous to that of 'rcd_uS' unless the value of 'done_uS' in the same row as 'rcd_uS' is NaN in which case that row is skipped.  
-# Under these conditions the next row will find the value of the previous rows value of 'done_uS' will be NaN and so the next more previous values 
-# of 'done_uS' should be used to find the most recent non-NaN value for 'done_uS'.
-# The first row for each component should be omitted from processing
+            plt.savefig(f"Cmpnt_{i}_RcvFrmRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
     def plot_rcv_frm_dlta(self):
         for i in range(1, self.prm_cmpnt_cnt + 1):
@@ -414,7 +405,7 @@ class RTDP:
             plt.xlabel("Frame")
             plt.ylabel("mS")
             plt.tight_layout()
-            plt.savefig(f"Component {i} Recv Frame Delta.png", dpi=300, bbox_inches="tight")  #plt.show()
+            plt.savefig(f"Cmpnt_{i}_RcvFrmRtDlt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
     def plot_rcv_recv_bit_rate(self):
@@ -442,7 +433,7 @@ class RTDP:
             #plt.ylim(0, np.isfinite(recd['fps_roll'].mean()))
             plt.grid(True)
             plt.tight_layout()
-            plt.savefig(f"Component {i} Recv bit Rate.png", dpi=300, bbox_inches="tight")  #plt.show()
+            plt.savefig(f"Cmpnt_{i}_RcvBtRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
     def plot_cmp_ltnc(self):
@@ -466,7 +457,7 @@ class RTDP:
             #plt.ylim(0, np.isfinite(recd['fps_roll'].mean()))
             plt.grid(True)
             plt.tight_layout()
-            plt.savefig(f"Component {i} Comp Latency.png", dpi=300, bbox_inches="tight")  #plt.show()
+            plt.savefig(f"Cmpnt_{i}_CmpLtnc.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
     def plot_ntwrk_ltnc(self):
@@ -490,7 +481,7 @@ class RTDP:
             #plt.ylim(0, np.isfinite(recd['fps_roll'].mean()))
             plt.grid(True)
             plt.tight_layout()
-            plt.savefig(f"Component {i} Network Latency.png", dpi=300, bbox_inches="tight")  #plt.show()
+            plt.savefig(f"Cmpnt_{i}_NtwrkLtnc.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
     def plot_frm_rcv(self):
@@ -506,7 +497,7 @@ class RTDP:
             plt.ylim(0, max(self.prcsdFrms_df['frm_nm']) * 1.2)
             plt.grid(True)
             plt.tight_layout()
-            plt.savefig(f"Component {i} Frame Recption Over Time.png", dpi=300, bbox_inches="tight")  #plt.show()
+            plt.savefig(f"Cmpnt_{i}_FrmRcvTm.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def plot_tm_frm_rcv(self):
         for i in range(1, self.prm_cmpnt_cnt + 1):
@@ -521,7 +512,7 @@ class RTDP:
         # Show grid and plot
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig("Time Frame Recvd.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("TmFrmRcvd.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def plot_tm_frm_dn(self):
         for i in range(1, self.prm_cmpnt_cnt + 1):
@@ -536,7 +527,7 @@ class RTDP:
         # Show grid and plot
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig("Time Frame Done.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("TmFrmRDn.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def calc_drp_sets_by_component(self):
         self.drp_sets_by_component = self.drpmsdFrms_df.groupby("component")["frm_nm"].apply(set)
@@ -587,7 +578,7 @@ class RTDP:
 
         ax.grid(True)
         fig.tight_layout()
-        plt.savefig("Component Drops.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("CmpntDrps.png", dpi=300, bbox_inches="tight")  #plt.show()
 
         #Frames that components missed because they were never received
         msdFrmsFrctn_df = pd.DataFrame({
@@ -621,7 +612,7 @@ class RTDP:
 
         ax.grid(True)
         fig.tight_layout()
-        plt.savefig("Component Misses.png", dpi=300, bbox_inches="tight")  #plt.show()
+        plt.savefig("CmpntMss.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def plot_all(self):
         self.plot_send_bit_rate()
@@ -637,8 +628,7 @@ class RTDP:
 
 # Run script
 if __name__ == "__main__":
-    processor = RTDP(rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt")
-    processor.__init__()
+    processor = RTDP(rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt", sim_config="cpu_sim.yaml")
     processor.sim()
     processor.plot_all()
 
@@ -653,3 +643,7 @@ if __name__ == "__main__":
 #$ for f in *.png; do eog "$f" & done
 #$ less z.txt
 #$ killall eog
+#$ rm *png *txt
+
+
+
