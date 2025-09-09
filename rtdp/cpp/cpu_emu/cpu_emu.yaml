@@ -1,11 +1,16 @@
-latency:        500         # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
-mem_footprint:  0.05        # Memory footprint in GB
-output_size:    0.0000572   # Output size in GB
-sbscrptn_ip:    127.0.0.1
-sub_prt:        7000
-pub_prt:        7001
-sleep:          0           # if 0 burn cpu else sleep
-threads:        1
-verbose:        1           # verbosity level
-terminal:       0           # if 1 do not forward result to destination
-frame_cnt:      1000        # Numbers frames sender will send
+cmp_ltnc_nS_B:      500         # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
+output_size_GB:     0.0000572   # Output size in GB
+frm_sz_MB:          1
+frm_cnt:            1000        # Numbers frms sender will send
+cmpnt_cnt:          3
+avg_bit_rt_Gbps:    10
+mem_ftprint_GB:     0.05        # Memory footprint in GB
+sleep:              0           # if 0 burn cpu else sleep
+thread_cnt:         1
+verbosity:          1           # verbosity level
+base_port:          6000
+hosts:
+  - 129.57.177.4
+  - 129.57.177.5
+  - 129.57.177.6
+

@@ -3,6 +3,7 @@ import os
 import math
 
 import pandas as pd
+from pandas import json_normalize
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -10,7 +11,7 @@ from scipy.stats import skew, kurtosis
 import re
 from datetime import datetime
 import yaml
-from pandas import json_normalize
+import subprocess
 
 sns.set(style="darkgrid")
 
@@ -57,9 +58,7 @@ class RTDP:
         self.extension = extension
         self.log_file  = log_file
         self.sim_config= sim_config
-
         self.log_file = open(self.log_file, "w")
-
 
         #Frames actually processed by components
         self.prcsdFrms_df = pd.DataFrame({
@@ -322,6 +321,148 @@ class RTDP:
             clk_uS[0] += rtSlp_uS
 
 #-----------------------------------------------------
+
+    def emulate(self, file="cpu_emu.yaml", prog="xyz"):
+        """
+        Load YAML config and deploy daisy-chained binaries across remote hosts.
+        """
+        try:
+            with open(file, "r") as f:
+                self.emu_config = yaml.safe_load(f)
+            self.emu_prog = prog
+            print(f"[INFO] Loaded config from {file}")
+        except Exception as e:
+            print(f"[ERROR] Failed to load YAML config: {e}")
+            return
+
+        try:
+            cmpnt_cnt = self.emu_config["cmpnt_cnt"]
+            base_port  = self.emu_config["base_port"]
+            frm_cnt    = self.emu_config["frm_cnt"]
+            frm_sz_MB     = self.emu_config["frm_sz_MB"]
+            avg_bit_rt_Gbps     = self.emu_config["avg_bit_rt_Gbps"]
+            ip_list    = self.emu_config["hosts"]
+        except KeyError as e:
+            print(f"[ERROR] Missing required config key: {e}")
+            return
+
+        # Flatten into a DataFrame
+        prmtrs_df = json_normalize(self.emu_config, sep=".")
+        print(prmtrs_df.T, file=self.log_file)  # transpose to make it easier to read
+
+        prm_cmp_ltnc_nS_B   = float(prmtrs_df['cmp_ltnc_nS_B'].iloc[0])
+        prm_output_size_GB  = float(prmtrs_df['output_size_GB'].iloc[0])
+        prm_daq_frm_sz_MB   = float(prmtrs_df['frm_sz_MB'].iloc[0])
+        prm_frm_cnt       =   int(prmtrs_df['frm_cnt'].iloc[0])
+        prm_cmpnt_cnt       =   int(prmtrs_df['cmpnt_cnt'].iloc[0])
+        prm_avg_bit_rt_Gbps = float(prmtrs_df['avg_bit_rt_Gbps'].iloc[0])
+
+        prm_mem_ftprint_GB = float(prmtrs_df['mem_ftprint_GB'].iloc[0])
+        prm_sleep          = bool(prmtrs_df['sleep'].iloc[0])
+        prm_thread_cnt     = int(prmtrs_df['thread_cnt'].iloc[0])
+        prm_verbosity      = int(prmtrs_df['verbosity'].iloc[0])
+        prm_base_port      = int(prmtrs_df['base_port'].iloc[0])
+
+        ip_list = self.emu_config.get("hosts", [])
+
+        current_p = prm_base_port
+        current_r = prm_base_port + 1
+
+        for idx, ip in enumerate(ip_list):
+            z_val = 1 if idx == len(ip_list) - 1 else 0
+
+            cmd = [
+                f"./{prog}",
+                "-b", "1",            # placeholder latency per GB
+                "-f", str(frm_cnt),
+                "-i", ip,
+                "-m", "1",            # memory footprint GB
+                "-o", "1",            # output size GB
+                "-p", str(current_p),
+                "-r", str(current_r),
+                "-s", "0",
+                "-t", "10",
+                "-v", "0",
+                "-y", file,
+                "-z", str(z_val)
+            ]
+
+            print(f"[INFO] Deploying to {ip}: {' '.join(cmd)}")
+
+            try:
+                subprocess.run(
+                    ["scp", prog, f"{ip}:/tmp/{prog}"],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                print(f"[INFO] Copied {prog} to {ip}:/tmp/{prog}")
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}")
+                continue
+
+            try:
+                ssh_cmd = ["ssh", ip, f"chmod +x /tmp/{prog} && /tmp/{prog} {' '.join(cmd[1:])}"]
+                subprocess.run(
+                    ssh_cmd,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                print(f"[INFO] Successfully started {prog} on {ip}")
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] Failed to run {prog} on {ip}: {e.stderr.decode().strip()}")
+                continue
+
+            current_p = current_r
+            current_r = current_p + 1
+
+    def send_emu(self, frm_sz_MB=None, frm_cnt=None, bit_rt=None):
+        """
+        Send emulation command to the *first host* in the config.
+        If no args passed, defaults to YAML values.
+        """
+        if not self.emu_config or not self.emu_prog:
+            print("[ERROR] Config not loaded. Run emulate() first.")
+            return
+
+        frm_sz_MB  = frm_sz_MB  if frm_sz_MB  is not None else self.emu_config.get("frm_sz_MB")
+        frm_cnt = frm_cnt if frm_cnt is not None else self.emu_config.get("frm_cnt")
+        avg_bit_rt_Gbps  = avg_bit_rt_Gbps  if avg_bit_rt_Gbps  is not None else self.emu_config.get("avg_bit_rt_Gbps")
+
+        if not ip_list:
+            print("[ERROR] No hosts defined in config.")
+            return
+
+        first_ip = ip_list[0]
+
+        # Build command to send
+        cmd = [
+            f"/tmp/{self.emu_prog}",
+            "-f", str(frm_cnt),
+            "-o", str(frm_sz_MB),
+            "-r", str(avg_bit_rt_Gbps),
+            "-s", "0",
+            "-v", "1"
+        ]
+
+        print(f"[INFO] Sending emulation from {first_ip}: {' '.join(cmd)}")
+
+        try:
+            ssh_cmd = ["ssh", first_ip, " ".join(cmd)]
+            subprocess.run(
+                ssh_cmd,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            print(f"[INFO] Emulation command sent successfully to {first_ip}")
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Failed to send emulation to {first_ip}: {e.stderr.decode().strip()}")
+
+
+#-----------------------------------------------------
+
     def plot_send_bit_rate(self):
         for i in range(0, self.prm_cmpnt_cnt): #last component does not send
 
@@ -639,11 +780,30 @@ if __name__ == "__main__":
 #>>> from rtdp import RTDP
 #>>> rtdp = RTDP(rng_seed=7, log_file="z.txt")
 #>>> rtdp.sim()
+#>>> rtdp.emulate(file="cpu_emu.yaml", prog="cpu_emu")   # deploys daisy chain
+#>>> rtdp.send_emu(frm_sz=2, frm_cnt=100, bit_rt=10)  # triggers sender on first host
+
 #>>> rtdp.plot_all()
 #$ for f in *.png; do eog "$f" & done
 #$ less z.txt
 #$ killall eog
 #$ rm *png *txt
 
+# Example blah.yaml
+
+# cmpnt_cnt: 10
+# base_port: 6000
+# avg-rate: 20
+# frm_cnt: 500
+# frm_sz: 1
+# bit_rt: 10
+# hosts:
+#   - 192.168.1.10
+#   - 192.168.1.11
+#   - 192.168.1.12
+
+# bp = BatchProcessor()
+# bp.emulate(file="blah.yaml", prog="xyz")   # deploys daisy chain
+# bp.send_emu(frm_sz=2, frm_cnt=1000, bit_rt=50)  # triggers sender on first host
 
 
