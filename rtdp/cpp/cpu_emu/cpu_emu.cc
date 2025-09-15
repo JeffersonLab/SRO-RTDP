@@ -63,6 +63,8 @@ const size_t sz1K   = 1024;
 const size_t sz1M   = sz1K*sz1K;
 const size_t sz1G   = sz1M*sz1K;
 
+const size_t swtchLtn_uS = 1; //switch latency
+
 void   Usage()
 {
     char usage_str[] =
@@ -84,13 +86,62 @@ void   Usage()
     cout << "[cpu_emu]: " << usage_str;
 }
 
+#include <iostream>
+#include <random>
+#include <algorithm>  // for std::max
+
+double sample_gamma(double mean, double stdev, std::mt19937 &gen) {
+    // Calculate shape (k) and scale (theta)
+    double shape = (mean * mean) / (stdev * stdev);
+    double scale = (stdev * stdev) / mean;
+
+    // Gamma distribution
+    std::gamma_distribution<double> gamma(shape, scale);
+
+    // Draw sample and clip at lower bound = mean
+    double value = gamma(gen);
+    return value; //std::max(value, mean);
+}
+
+#if 0 //==============================
+int main() {
+    // Parameters
+    double mean = 10.0;
+    double stdev = 3.0;
+
+    // Random generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Generate clipped samples
+    for (int i = 0; i < 10; i++) {
+        double x = sample_gamma(mean, stdev, gen);
+        std::cout << x << "\n";
+    }
+
+    std::cout << "============" << '\n';
+    // Sample until > mean
+    for (int i = 0; i < 10; i++) {
+        double value;
+        do {
+            value = sample_gamma(mean, stdev, gen);
+        } while (value < mean);
+        std::cout << value << '\n';
+    }
+    return 0;
+}
+
+#endif //=========================
+
+// RNG for latency variance generation using a Gamma distribution with lower bound equal to mean 
+
+static random_device rd;
+static mt19937 gen(rd());
+
 // Computational Function to emulate/stimulate processing load/latency, etc. 
 void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t tag, bool vrbs=false) 
 { 
     const float ts_S(cmpLt_S_GB*nmrd_B/(G_1)); //reqd timespan in seconds
-    //const float ts_mS(ts_S*one_m); //reqd timespan in milliseconds
-    //const float ts_uS(ts_S*one_u); //reqd timespan in microseconds
-    const float ts_nS(ts_S*one_n);    //reqd timespan in nanoseconds
     size_t memSz = mem_GB*sz1G; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(sz1K*sz1K*sz1K)) << " Gbytes ..." << endl;
@@ -106,10 +157,10 @@ void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t 
     //usefull work emulation 
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_S   << " secs ..."  << " size " << nmrd_B << endl;
     if(wlSlp) {
-        auto cms_ns = chrono::nanoseconds(size_t(round(ts_nS)));
+        auto cms_us = chrono::nanoseconds(size_t(round(ts_S*one_n)));
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_S  << " secs ..."  << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for " << float(cms_ns.count())*n_m  << " msecs ..." << " size " << nmrd_B << endl;
-        this_thread::sleep_for(cms_ns);
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for " << float(cms_us.count())*u_m  << " msecs ..." << " size " << nmrd_B << endl;
+        this_thread::sleep_for(cms_us);
     }else{
         auto ts_S = (cmpLt_S_GB*nmrd_B/G_1);
         //high_resolution_clock::time_point start_time = chrono::high_resolution_clock::now();
@@ -349,15 +400,6 @@ int main (int argc, char *argv[])
                   << "\tnmThrds = "   << nmThrds    << "\tverbose = " << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
                   << "\tterminal = "  << trmnl      << '\n';
 
-    // RNG for latency variance generation using a Gaussian (normal) distribution to generate a scaling factor 
-    // centered around 1.0, with a standard deviation chosen so that ~99.7% of values fall 
-    // in the 70% to 130% range (i.e., ±3σ ≈ 30%):
-
-    static random_device rd;
-    static mt19937 gen(rd());
-
-    // Mean = 1.0, Std Dev = 0.1 gives 99.7% of samples in [0.7, 1.3]
-    static normal_distribution<> nd_10pcnt(1.0, 1e-1);
 
     //  Prepare our subscription context and socket
     context_t sub_cntxt(1);
@@ -392,7 +434,8 @@ int main (int argc, char *argv[])
     uint32_t lst_frm_nm  = frame_num; //last frame number
     uint64_t msdFrms     = 0; // missed frames count
     uint64_t last_cmp_lat_uS = 0; //last experienced computational latency
-    uint64_t last_nw_lat_uS = one_u*60e3*B_b/(100*G_1); //last experienced network latency defaulto to 60KB over 100 Gbps
+    //last experienced network latency defaul to to 60KB over 100 Gbps
+    uint64_t last_nw_lat_uS  = one_u*60e3*B_b/(100*G_1);
     
     auto now_hrc      = high_resolution_clock::now();
     auto clk0_uSd     = duration_cast<microseconds>(now_hrc.time_since_epoch());
@@ -467,9 +510,14 @@ int main (int argc, char *argv[])
         // load (or emulate load on) system with ensuing work
         {
             vector<thread> threads;
+            // variable latency
+            auto vrblCmpLt_S_GB = 0;
+            do {
+                vrblCmpLt_S_GB = sample_gamma(cmpLt_S_GB, cmpLt_S_GB/10, gen);
+            } while (vrblCmpLt_S_GB < cmpLt_S_GB);
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
-                threads.push_back(thread(func, parsed.size_B, cmpLt_S_GB, mem_GB, wlSlp, sub_prt, vrbs));
+                threads.push_back(thread(func, parsed.size_B, vrblCmpLt_S_GB, mem_GB, wlSlp, sub_prt, vrbs));
 
             for (auto& th : threads) th.join();
             //reqd computational timespan in usec    
@@ -486,14 +534,13 @@ int main (int argc, char *argv[])
                          << " request " << frame_num << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
                          << " to port " + string("tcp://") + sub_ip + ':' +  to_string(sub_prt) << " (" << frame_num << ')' << endl;
             // Publish a message for subscribers
-            size_t outSz_B = otmem_GB*sz1G; //output size in bytes
+            const size_t outSz_B = otmem_GB*sz1G; //output size in bytes
 
             send_result_t sr;
             {
-	        // Send  "frame"
+    	        // Send  output "frame"
                 //represents harvested data
-                auto x = clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
-                vector<uint8_t> payload(outSz_B*x);  //represents harvested data
+                vector<uint8_t> payload(outSz_B);  //represents harvested data
                 if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;///////////frame_num ???
                 auto data = serialize_packet(now_uS, pub_prt, payload.size(), parsed.timestamp_uS, parsed.stream_id, parsed.frame_num, payload);
                 if(DBG) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;

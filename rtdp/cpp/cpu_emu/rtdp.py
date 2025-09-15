@@ -30,7 +30,7 @@ M_1   = 1e6
 one_M = 1/M_1
 m_1   = 1e-3
 one_m = 1/m_1
-m_u   = 1e3 
+m_u   = 1e3
 u_m   = 1/m_u
 u_1   = 1e-6
 one_u = 1/u_1
@@ -47,20 +47,51 @@ sz1G  = sz1M*sz1K
 #-----------------------------------------------------
 
 class RTDP:
-    
     def __del__(self):
-        self.log_file.close()   
-        
+        """
+        destructor
+
+        Parameters
+        ----------
+            none
+
+        Returns
+        -------
+            none
+
+        """
+        self.log_file.close()
+
     def __init__(self, rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt", sim_config="cpu_sim.yaml"):
-    
+        """
+        initializer for implicit constructor
+
+        Parameters
+        ----------
+        rng_seed : int or None
+        directory : str, optional
+            Path to the directory to search. Defaults to the current
+            working directory (``"."``).
+        extension : str, optional
+            File extension to match. Defaults to ``".txt"``.
+        log_file : str, optional
+            File that simulate/emulate will write the execution trace.
+        sim_config : str, optional
+            Run Parameters.
+
+        Returns
+        -------
+            none
+        """
+
+        # Process initializer input parms
         self.rng       = np.random.default_rng(rng_seed)
         self.directory = directory
         self.extension = extension
-        self.log_file  = log_file
         self.sim_config= sim_config
-        self.log_file = open(self.log_file, "w")
+        self.log_file  = open(log_file, "w")
 
-        #Frames actually processed by components
+        # Frames actually processed by components
         self.prcsdFrms_df = pd.DataFrame({
             "component":   pd.Series(dtype=int),
             "rcd_uS":      pd.Series(dtype=float),
@@ -72,7 +103,7 @@ class RTDP:
             "done_uS":     pd.Series(dtype=float)
         }) # contains no dropped/missed frames
 
-        #Frames that components were not ready to receive
+        # Frames that components were not ready to receive
         self.drpmsdFrms_df = pd.DataFrame({
             "component":   pd.Series(dtype=int),
             "rcd_uS":      pd.Series(dtype=float),
@@ -81,18 +112,21 @@ class RTDP:
             "lstDone_uS":  pd.Series(dtype=float)
         }) # contains no dropped/missed frames
 
-        #Data on all sent frames - component 0 is source
+        # Data on all sent frames - component 0 is source
         self.sentFrms_df = pd.DataFrame({
             "component":   pd.Series(dtype=int),
             "snt_uS":      pd.Series(dtype=float),
             "frm_nm":      pd.Series(dtype=int),
             "frm_sz_b":    pd.Series(dtype=float)
-        }) 
+        })
+
+        # Dropped Frames Info
         self.drpdFrmsFrctn_df = pd.DataFrame({
             "component": pd.Series(dtype=int),
             "drp_frctn":   pd.Series(dtype=int)
         })
 
+        # Process config yaml file
         try:
             with open(self.sim_config, "r") as f:
                 data = yaml.safe_load(f)
@@ -216,6 +250,17 @@ class RTDP:
 
     # Compute statistical moments: mean, std, skewness, kurtosis
     def compute_moments(self, series):
+        """
+        report series length and first four statistical moments
+
+        Parameters
+        ----------
+        series : indexable
+
+        Returns
+        -------
+            series length and first four statistical moments
+        """
         values = series #.dropna()
         return {
             'count': len(values),
@@ -225,7 +270,20 @@ class RTDP:
             'kurtosis': kurtosis(values)
         }
     #-----------------------------------------------------
+    # Compute Moving Avg
     def moving_average(self, a, n=5):
+        """
+        moving average for window size
+
+        Parameters
+        ----------
+        a : indexable
+        n : str, optional, window size
+
+        Returns
+        -------
+            reduced size (by n) of same input type
+        """
         ret = np.cumsum(a, dtype=float)
         ret[n:] = ret[n:] - ret[:-n]
         return ret[n-1:] / n
@@ -234,24 +292,35 @@ class RTDP:
     def gen_gamma_samples(self, mean, stdev, n_samples):
         """
         Generate n_samples from a Gamma distribution with given mean and stdev.
-        
+
         Parameters:
             mean (float): Desired mean of the distribution
             stdev (float): Desired standard deviation
             n_samples (int): Number of samples to generate
             random_state (int, optional): Random seed for reproducibility
-        
+
         Returns:
             numpy.ndarray: Array of gamma-distributed samples
         """
-        
+
         # Derive shape (k) and scale (theta)
         shape = (mean / stdev) ** 2
         scale = (stdev ** 2) / mean
-        
+
         return self.rng.gamma(shape, scale, n_samples)
 
     def sim(self):
+        """
+        simulate component daisy chain
+
+        Parameters
+        ----------
+            none
+
+        Returns
+        -------
+            none
+        """
 
         #set of all frame numbers from sender
         self.cnst_all_frm_set = set(range(1, self.prm_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
@@ -266,8 +335,7 @@ class RTDP:
         #Simulation
         for f in range(0, self.prm_frame_cnt):
             # impulse
-        #    if f==self.prm_frame_cnt/2: self.prm_nic_Gbps /= 2 #######################################
-        #    if f==self.prm_frame_cnt/2: self.prm_cmp_ltnc_nS_B *= 2 #######################################
+            #if f==self.prm_frame_cnt/2: self.prm_nic_Gbps /= 2 #######################################
             cnst_daq_frm_sz0_b = B_b*self.cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
             if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.log_file)
             #component zero is the sender
@@ -322,10 +390,23 @@ class RTDP:
 
 #-----------------------------------------------------
 
-    def emulate(self, file="cpu_emu.yaml", prog="xyz"):
+    def emulate(self, file="cpu_emu.yaml", prog="cpu_emu"):
         """
-        Load YAML config and deploy daisy-chained binaries across remote hosts.
+        emulate component daisy chain
+
+        Parameters
+        ----------
+        file : str, optional
+            Path to emulation run parameters
+        prog : str, optional
+            Path to binary object to use for emulation
+
+        Returns
+        -------
+            none
         """
+
+        # parse config file
         try:
             with open(file, "r") as f:
                 self.emu_config = yaml.safe_load(f)
@@ -336,12 +417,12 @@ class RTDP:
             return
 
         try:
-            cmpnt_cnt = self.emu_config["cmpnt_cnt"]
-            base_port  = self.emu_config["base_port"]
-            frm_cnt    = self.emu_config["frm_cnt"]
-            frm_sz_MB     = self.emu_config["frm_sz_MB"]
-            avg_bit_rt_Gbps     = self.emu_config["avg_bit_rt_Gbps"]
-            ip_list    = self.emu_config["hosts"]
+            cmpnt_cnt       = self.emu_config["cmpnt_cnt"]
+            base_port       = self.emu_config["base_port"]
+            frm_cnt         = self.emu_config["frm_cnt"]
+            frm_sz_MB       = self.emu_config["frm_sz_MB"]
+            avg_bit_rt_Gbps = self.emu_config["avg_bit_rt_Gbps"]
+            prm_ip_list     = self.emu_config["hosts"]
         except KeyError as e:
             print(f"[ERROR] Missing required config key: {e}")
             return
@@ -353,62 +434,86 @@ class RTDP:
         prm_cmp_ltnc_nS_B   = float(prmtrs_df['cmp_ltnc_nS_B'].iloc[0])
         prm_output_size_GB  = float(prmtrs_df['output_size_GB'].iloc[0])
         prm_daq_frm_sz_MB   = float(prmtrs_df['frm_sz_MB'].iloc[0])
-        prm_frm_cnt       =   int(prmtrs_df['frm_cnt'].iloc[0])
+        prm_frm_cnt         =   int(prmtrs_df['frm_cnt'].iloc[0])
         prm_cmpnt_cnt       =   int(prmtrs_df['cmpnt_cnt'].iloc[0])
         prm_avg_bit_rt_Gbps = float(prmtrs_df['avg_bit_rt_Gbps'].iloc[0])
 
-        prm_mem_ftprint_GB = float(prmtrs_df['mem_ftprint_GB'].iloc[0])
-        prm_sleep          = bool(prmtrs_df['sleep'].iloc[0])
-        prm_thread_cnt     = int(prmtrs_df['thread_cnt'].iloc[0])
-        prm_verbosity      = int(prmtrs_df['verbosity'].iloc[0])
-        prm_base_port      = int(prmtrs_df['base_port'].iloc[0])
-
-        ip_list = self.emu_config.get("hosts", [])
-
+        prm_mem_ftprint_GB  = float(prmtrs_df['mem_ftprint_GB'].iloc[0])
+        prm_sleep           =  bool(prmtrs_df['sleep'].iloc[0])
+        prm_thread_cnt      =   int(prmtrs_df['thread_cnt'].iloc[0])
+        prm_verbosity       =   int(prmtrs_df['verbosity'].iloc[0])
+        prm_base_port       =   int(prmtrs_df['base_port'].iloc[0])
+        prm_ip_list         = self.emu_config.get("hosts", [])
+        
         current_p = prm_base_port
         current_r = prm_base_port + 1
 
-        for idx, ip in enumerate(ip_list):
-            z_val = 1 if idx == len(ip_list) - 1 else 0
+        # setup and deploy components
+        # for idx, ip in enumerate(prm_ip_list[1:], start=1):
+        for idx, ip in enumerate(prm_ip_list):
+
+            if(len(prm_ip_list) < 2):
+                print(f"[ERROR] Incorrect hosts list in config file")
+                return
+
+            if(idx == 0): continue  #first host is sender
+            
+            z_val = 1 if idx == len(prm_ip_list) - 1 else 0
 
             cmd = [
-                f"./{prog}",
-                "-b", "1",            # placeholder latency per GB
-                "-f", str(frm_cnt),
-                "-i", ip,
-                "-m", "1",            # memory footprint GB
-                "-o", "1",            # output size GB
+                f"~/{prog}",
+                "-b", "100",            # placeholder latency per GB
+                "-f", str(prm_frm_cnt),
+                "-i", prm_ip_list[idx-1],
+                "-m", "0.001",            # memory footprint GB
+                "-o", "0.001",            # output size GB
                 "-p", str(current_p),
                 "-r", str(current_r),
-                "-s", "0",
-                "-t", "10",
-                "-v", "0",
-                "-y", file,
+                "-s", "1",
+                "-t", "1",
+                "-v", "1",
+#                "-y", file,
                 "-z", str(z_val)
             ]
 
-            print(f"[INFO] Deploying to {ip}: {' '.join(cmd)}")
+#            print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}")
+            print(f"[INFO] Deploying {prog} to {ip}")
 
             try:
                 subprocess.run(
-                    ["scp", prog, f"{ip}:/tmp/{prog}"],
+                    ["scp", prog, f"{ip}:~/{prog}"],
                     check=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-                print(f"[INFO] Copied {prog} to {ip}:/tmp/{prog}")
+                print(f"[INFO] Copied {prog} to {ip}:~/{prog}")
             except subprocess.CalledProcessError as e:
                 print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}")
                 continue
 
+            print(f"[INFO] Starting {prog} on {ip}: {' '.join(cmd)}")
+
             try:
-                ssh_cmd = ["ssh", ip, f"chmod +x /tmp/{prog} && /tmp/{prog} {' '.join(cmd[1:])}"]
-                subprocess.run(
+#                ssh_cmd = ["ssh", ip, f"chmod +x ~/{prog} && ~/{prog} {' '.join(cmd[1:])}"]
+#                ssh_cmd = [
+#                    "ssh", ip,
+#                    f"chmod +x ~/{prog} && nohup ~/{prog} {' '.join(cmd[1:])} > /dev/null 2>&1 &"
+#                ] #Redirects standard error to where stdout is currently going
+                ssh_cmd = [
+                    "ssh", "-n", "-T", ip,
+                    f"chmod +x ~/{prog} && nohup ~/{prog} {' '.join(cmd[1:])} > ~/{prog}.out 2>&1 &"
+                ]
+#                subprocess.run(
+#                    ssh_cmd,
+#                    check=True,
+#                    stdout=subprocess.PIPE,
+#                    stderr=subprocess.PIPE
+#                )
+                subprocess.Popen(
                     ssh_cmd,
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+)
                 print(f"[INFO] Successfully started {prog} on {ip}")
             except subprocess.CalledProcessError as e:
                 print(f"[ERROR] Failed to run {prog} on {ip}: {e.stderr.decode().strip()}")
@@ -416,8 +521,9 @@ class RTDP:
 
             current_p = current_r
             current_r = current_p + 1
+            print("(End of emulate method)")
 
-    def send_emu(self, frm_sz_MB=None, frm_cnt=None, bit_rt=None):
+    def send_emu(self, sender="zmq-event-emu-clnt"):
         """
         Send emulation command to the *first host* in the config.
         If no args passed, defaults to YAML values.
@@ -426,27 +532,47 @@ class RTDP:
             print("[ERROR] Config not loaded. Run emulate() first.")
             return
 
-        frm_sz_MB  = frm_sz_MB  if frm_sz_MB  is not None else self.emu_config.get("frm_sz_MB")
-        frm_cnt = frm_cnt if frm_cnt is not None else self.emu_config.get("frm_cnt")
-        avg_bit_rt_Gbps  = avg_bit_rt_Gbps  if avg_bit_rt_Gbps  is not None else self.emu_config.get("avg_bit_rt_Gbps")
+        #frm_sz_MB  = frm_sz_MB  if frm_sz_MB  is not None else self.emu_config.get("frm_sz_MB")
+        #frm_cnt = frm_cnt if frm_cnt is not None else self.emu_config.get("frm_cnt")
+        #avg_bit_rt_Gbps  = avg_bit_rt_Gbps  if avg_bit_rt_Gbps  is not None else self.emu_config.get("avg_bit_rt_Gbps")
 
-        if not ip_list:
+        if not prm_ip_list:
             print("[ERROR] No hosts defined in config.")
             return
 
-        first_ip = ip_list[0]
+        first_ip = prm_ip_list[0]
 
+        print(f"Sender is {first_ip}")
+
+        print(f"[INFO] Deploying {sender} to {ip}")
+
+        try:
+            subprocess.run(
+                ["scp", sender, f"{ip}:~/{sender}"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            print(f"[INFO] Copied {sender} to {ip}:~/{sender}")
+        except subprocess.CalledProcessError as e:
+            print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}")
+            continue
+
+        print(f"[INFO] Starting {sender} on {ip}: {' '.join(cmd)}")
+
+        #prm_base_port       =   int(prmtrs_df['base_port'].iloc[0])
         # Build command to send
         cmd = [
-            f"/tmp/{self.emu_prog}",
-            "-f", str(frm_cnt),
-            "-o", str(frm_sz_MB),
-            "-r", str(avg_bit_rt_Gbps),
-            "-s", "0",
+            f"~/{sender}",
+            "-c", str(prm_frm_cnt),
+            "-s", str(prm_frm_sz_MB),
+            "-r", str(prm_avg_bit_rt_Gbps),
+            "-a", "1",
+            "-p", str(prm_base_port),
             "-v", "1"
         ]
 
-        print(f"[INFO] Sending emulation from {first_ip}: {' '.join(cmd)}")
+        print(f"[INFO] Sending emulatied data from {first_ip}: {' '.join(cmd)}")
 
         try:
             ssh_cmd = ["ssh", first_ip, " ".join(cmd)]
@@ -464,6 +590,26 @@ class RTDP:
 #-----------------------------------------------------
 
     def plot_send_bit_rate(self):
+        """
+        initializer for implicit constructor
+
+        Parameters
+        ----------
+        rng_seed : int or None
+        directory : str, optional
+            Path to the directory to search. Defaults to the current
+            working directory (``"."``).
+        extension : str, optional
+            File extension to match. Defaults to ``".txt"``.
+        log_file : str, optional
+            File that simulate/emulate will write the execution trace.
+        sim_config : str, optional
+            Run Parameters.
+
+        Returns
+        -------
+            none
+        """
         for i in range(0, self.prm_cmpnt_cnt): #last component does not send
 
             sim_tm_uS = self.sentFrms_df.loc[self.sentFrms_df["component"] == i, "snt_uS"][1:].reset_index(drop=True)
@@ -494,7 +640,18 @@ class RTDP:
 
 #-----------------------------------------------------
     def plot_rcv_frm_rate(self):
-        for i in range(1, self.prm_cmpnt_cnt + 1): ######################################################################## 1 + 1): # 
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+        for i in range(1, self.prm_cmpnt_cnt + 1): ######################################################################## 1 + 1): #
             dt_S_arr           = np.diff(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"])
             frame_rates_Hz_arr = np.array(1/dt_S_arr)
 
@@ -523,6 +680,18 @@ class RTDP:
             plt.savefig(f"Cmpnt_{i}_RcvFrmRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
     def plot_rcv_frm_dlta(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         for i in range(1, self.prm_cmpnt_cnt + 1):
 
             plt.figure(figsize=(8, 5))
@@ -550,6 +719,18 @@ class RTDP:
 
 #-----------------------------------------------------
     def plot_rcv_recv_bit_rate(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         for i in range(1, self.prm_cmpnt_cnt + 1):
 
             sim_tm_uS = self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"][1:].reset_index(drop=True)
@@ -578,6 +759,18 @@ class RTDP:
 
 #-----------------------------------------------------
     def plot_cmp_ltnc(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         for i in range(1, self.prm_cmpnt_cnt + 1):
 
             cmpLt_mS = u_m*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "cmp_ltnc_uS"]
@@ -602,6 +795,18 @@ class RTDP:
 
 #-----------------------------------------------------
     def plot_ntwrk_ltnc(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         for i in range(1, self.prm_cmpnt_cnt + 1):
 
             ntwrkLt_uS = self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "ntwrk_lt_uS"]
@@ -626,8 +831,20 @@ class RTDP:
 
 #-----------------------------------------------------
     def plot_frm_rcv(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         for i in range(1, self.prm_cmpnt_cnt + 1):
-            
+
             # Plot
             plt.figure(figsize=(10, 4))
             plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
@@ -644,7 +861,7 @@ class RTDP:
         for i in range(1, self.prm_cmpnt_cnt + 1):
             # Plot
             plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
-            
+
         # Add labels and legend
         plt.xlabel('Sim Time (Mins)')
         plt.ylabel('Frame Number')
@@ -656,10 +873,22 @@ class RTDP:
         plt.savefig("TmFrmRcvd.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def plot_tm_frm_dn(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         for i in range(1, self.prm_cmpnt_cnt + 1):
             # Plot
             plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "done_uS"]/60, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
-            
+
         # Add labels and legend
         plt.xlabel('Sim Time (Hrs)')
         plt.ylabel('Frame Number')
@@ -671,18 +900,52 @@ class RTDP:
         plt.savefig("TmFrmRDn.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def calc_drp_sets_by_component(self):
+        """
+        Lists droped frames for each component
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+            none
+        """
         self.drp_sets_by_component = self.drpmsdFrms_df.groupby("component")["frm_nm"].apply(set)
         cmpnt_drp_nms = set(self.drpmsdFrms_df["component"].unique())
         for c in cmpnt_drp_nms:
             print(f"Number of drops for component {c}: {len(self.drp_sets_by_component[c])}", file=self.log_file)
 #-----------------------------------------------------
     def calc_prcsd_frm_sets_by_component(self):
+        """
+        Lists processed frames for each component
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+            none
+        """
         self.prcsd_frm_sets_by_component = self.prcsdFrms_df.groupby("component")["frm_nm"].apply(set)
         cmpnt_frn_nms = set(self.prcsdFrms_df["component"].unique())
         for c in cmpnt_frn_nms:
             print(f"Number of processed frames for component {c}: {len(self.prcsd_frm_sets_by_component[c])}", file=self.log_file)
 #-----------------------------------------------------
     def plot_drps_mss(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         self.calc_drp_sets_by_component()
         self.calc_prcsd_frm_sets_by_component()
         cmpnt_drp_nms = set(self.drpmsdFrms_df["component"].unique())
@@ -690,7 +953,7 @@ class RTDP:
         for c in set(range(1,self.prm_cmpnt_cnt+1)) - cmpnt_drp_nms: #the set of compnents with no drops
             row = (c,0)
             self.drpdFrmsFrctn_df = pd.concat([self.drpdFrmsFrctn_df, pd.DataFrame([row], columns=self.drpdFrmsFrctn_df.columns)], ignore_index=True)
-            
+
         #dataframe record for components with drops
         self.drp_sets_by_component = self.drpmsdFrms_df.groupby("component")["frm_nm"].apply(set)
         for c in cmpnt_drp_nms:
@@ -756,6 +1019,18 @@ class RTDP:
         plt.savefig("CmpntMss.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
     def plot_all(self):
+        """
+        Plotting procedure
+
+        Parameters
+        ----------
+        none
+
+        Returns
+        -------
+        none
+        """
+
         self.plot_send_bit_rate()
         self.plot_rcv_frm_rate()
         self.plot_rcv_frm_dlta()
@@ -774,7 +1049,7 @@ if __name__ == "__main__":
     processor.plot_all()
 
 #$ python
-#Python 3.6.8 (default, Nov 15 2024, 08:11:39) 
+#Python 3.6.8 (default, Nov 15 2024, 08:11:39)
 #[GCC 8.5.0 20210514 (Red Hat 8.5.0-22)] on linux
 #Type "help", "copyright", "credits" or "license" for more information.
 #>>> from rtdp import RTDP
