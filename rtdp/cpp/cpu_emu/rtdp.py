@@ -556,7 +556,7 @@ class RTDP:
             print(f"[INFO] Copied {sender} to {ip}:~/{sender}")
         except subprocess.CalledProcessError as e:
             print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}")
-            continue
+            return
 
         print(f"[INFO] Starting {sender} on {ip}: {' '.join(cmd)}")
 
