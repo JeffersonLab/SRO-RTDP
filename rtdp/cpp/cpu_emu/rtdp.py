@@ -1048,6 +1048,10 @@ if __name__ == "__main__":
     processor.sim()
     processor.plot_all()
 
+
+#pip3 install pandas matplotlib  seaborn scipy
+##python3 -m pip install --upgrade numpy
+
 #$ python
 #Python 3.6.8 (default, Nov 15 2024, 08:11:39)
 #[GCC 8.5.0 20210514 (Red Hat 8.5.0-22)] on linux
