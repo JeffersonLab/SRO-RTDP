@@ -1,0 +1,106 @@
+# This yaml file is being designed to be the start of the process. 
+# In other words, a user will execute this yaml file to start everything 
+# This is still design under process. Feel free to modify as and when needed.
+# Many of the components are provided as a placeholder that needs to be replaced with file/code locations.
+
+machines:
+  - name: NPS
+    type: NPS_Type
+    incoming_data_sources:
+      - name: callibration_db
+    send-to:
+      - machine: ejfat-fs
+      port: 1234
+  - name: HMS
+    type: HMS_Type
+    incoming_data_sources:
+      - name: callibration_db
+    send-to:
+      - machine: ejfat-fs
+        port: 1111
+machine-ejfat:
+  - name: EJFAT
+    receive_from: [HMS,NPS]
+load-balancer:
+  - name: EJFAT_LB
+    inside_machine: EJFAT
+datasets:
+  - name: VTP-1
+    data:
+      - name: VTP-1_Data
+        port: 7000
+    data:
+      - name: VTP-2_Data
+        port: 7001
+    data:
+      - name: VTP-3_Data
+        port: 7002
+Actors:
+  - name: Filter-1
+    source-config: filter1Config.yaml
+    configurations:
+      #process: this needs to be replaced with the location of the Process for the ersap
+      #source: this needs to be replaced with the location of the Source for the ersap
+      #Sink: this needs to be replaced with the location of the Sink for the ersap
+    i/o:
+      - port: 5555
+        #file: this is where the location of the file will be mentioned if the data is in a file
+        #type: The type of the data sent. 
+  - name: Filter-2
+    source-config: filter2Config.yaml
+    configurations:
+      #process: this needs to be replaced with the location of the Process for the ersap
+      #source: this needs to be replaced with the location of the Source for the ersap
+      #Sink: this needs to be replaced with the location of the Sink for the ersap
+    i/o:
+      - port: 5555
+        #file: this is where the location of the file will be mentioned if the data is in a file
+        #type: The type of the data sent. 
+  - name: Filter-3
+    source-config: filter3Config.yaml
+    configurations:
+      #process: this needs to be replaced with the location of the Process for the ersap
+      #source: this needs to be replaced with the location of the Source for the ersap
+      #Sink: this needs to be replaced with the location of the Sink for the ersap
+    i/o:
+      - port: 5555
+        #file: this is where the location of the file will be mentioned if the data is in a file
+        #type: The type of the data sent. 
+
+event_transfer:
+  loop: true
+  data_sources:
+    - name: Filter-1
+    - name: Filter-2
+    - name: Filter-3
+  destinations:
+    - name: datalake
+    - name: callibration
+
+datalake:
+  incoming_data_sources:
+    - name: event_transfer
+    - name: analyzer
+  outgoing_data_destinations:
+    - name: callibration
+
+callibration:
+  incoming_data_sources:
+    - name: event_transfer
+    - name: datalake
+  outgoing_data_destinations:
+    - name: callibration_db
+
+callibration_db:
+  incoming_data_sources:
+    - callibration
+  outgoing_data_destinations:
+    - name: analyzer
+    - name: NPS
+    - name: HMS
+
+analyzer:
+  incoming_data_sources:
+    - name: callibration_db
+    - name: datalake
+
