@@ -376,7 +376,7 @@ class RTDP:
 
         cnst_swtch_lt_uS = 1 #switch latency
 
-        ib = bernoulli(0.002, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        ib = bernoulli(0.01, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
         
         if vrbs: print("Simulating ...")
         #if vrbs: print(f"ib =  {ib}", file=self.log_file)
@@ -385,9 +385,10 @@ class RTDP:
         for f in range(0, self.prm_frame_cnt):
             # impulse
             if ib[f]==1:
-                x = bernoulli(0.5, n=1, rng=self.rng) # coin toss
-                self.prm_cmp_ltnc_nS_B *= (1 +  if x==1# random effect
-                print(f"{clk_c} Impulse: Compute Latency now at {self.prm_cmp_ltnc_nS_B:10.2f}", file=self.log_file)
+                brn_trl = bernoulli(0.5, n=1, rng=self.rng) # coin toss
+                #if vrbs: print(f"brn_trl = {brn_trl}, 1 + (0.3 if brn_trl[0]==1 else -0.3) = {1 + (0.3 if brn_trl[0]==1 else -0.3)}")
+                self.prm_cmp_ltnc_nS_B *= 1 + (0.3 if brn_trl[0]==1 else -(1-1/1.3)) # random effect
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency now at {self.prm_cmp_ltnc_nS_B:10.2f}", file=self.log_file)
             cnst_daq_frm_sz0_b = B_b*self.cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
             if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.log_file)
             #component zero is the sender
@@ -1097,6 +1098,7 @@ class RTDP:
 
 # Run script
 if __name__ == "__main__":
+    #seed = int.from_bytes(os.urandom(8), "big")
     processor = RTDP(rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt", sim_config="cpu_sim.yaml")
     processor.sim()
     processor.plot_all()
