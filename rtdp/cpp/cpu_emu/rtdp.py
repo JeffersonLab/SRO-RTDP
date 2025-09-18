@@ -45,6 +45,50 @@ sz1K  = 1024
 sz1M  = sz1K*sz1K
 sz1G  = sz1M*sz1K
 #-----------------------------------------------------
+from typing import Optional, Union, List
+import random
+import numpy as np
+
+def bernoulli(p: float, n: int = 1, rng: Optional[Union[random.Random, np.random.Generator]] = None) -> List[int]:
+    """
+    Bernoulli sampler using a provided RNG (Python random.Random or NumPy Generator).
+    
+    Args:
+        p (float): Probability of success, 0 <= p <= 1.
+        n (int): Number of trials.
+        rng (random.Random or np.random.Generator, optional): RNG instance to use.
+            If None, uses Python's default random module.
+    
+    Returns:
+        list[int]: List of 0s and 1s representing Bernoulli trials.
+    """
+    if not (0 <= p <= 1):
+        raise ValueError("Probability p must be between 0 and 1.")
+
+    # Python random
+    if rng is None or isinstance(rng, random.Random):
+        rng = rng or random
+        return [1 if rng.random() < p else 0 for _ in range(n)]
+    
+    # NumPy Generator
+    elif isinstance(rng, np.random.Generator):
+        return (rng.random(n) < p).astype(int).tolist()
+    
+    else:
+        raise TypeError("rng must be either random.Random or np.random.Generator")
+
+# --------------------
+# Example usage
+# --------------------
+
+# # Using Python random.Random
+# py_rng = random.Random(42)
+# print(bernoulli(0.001, n=10, rng=py_rng))
+
+# # Using NumPy Generator
+# np_rng = np.random.default_rng(42)
+# print(bernoulli(0.001, n=10, rng=np_rng))
+
 
 class RTDP:
     def __del__(self):
@@ -110,7 +154,7 @@ class RTDP:
             "frm_nm":      pd.Series(dtype=int),
             "frm_sz_b":    pd.Series(dtype=float),
             "lstDone_uS":  pd.Series(dtype=float)
-        }) # contains no dropped/missed frames
+        }) # contains dropped frames
 
         # Data on all sent frames - component 0 is source
         self.sentFrms_df = pd.DataFrame({
@@ -325,17 +369,25 @@ class RTDP:
         #set of all frame numbers from sender
         self.cnst_all_frm_set = set(range(1, self.prm_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
 
-        # component 0 is the sender
-        clk_uS      = zeros = np.zeros(self.prm_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
+        # set all component clocks to zero; component 0 is the sender
+        clk_uS = np.zeros(self.prm_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
 
         vrbs = True
 
         cnst_swtch_lt_uS = 1 #switch latency
 
+        ib = bernoulli(0.002, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        
+        if vrbs: print("Simulating ...")
+        #if vrbs: print(f"ib =  {ib}", file=self.log_file)
+
         #Simulation
         for f in range(0, self.prm_frame_cnt):
             # impulse
-            #if f==self.prm_frame_cnt/2: self.prm_nic_Gbps /= 2 #######################################
+            if ib[f]==1:
+                x = bernoulli(0.5, n=1, rng=self.rng) # coin toss
+                self.prm_cmp_ltnc_nS_B *= (1 +  if x==1# random effect
+                print(f"{clk_c} Impulse: Compute Latency now at {self.prm_cmp_ltnc_nS_B:10.2f}", file=self.log_file)
             cnst_daq_frm_sz0_b = B_b*self.cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
             if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.log_file)
             #component zero is the sender
@@ -364,11 +416,12 @@ class RTDP:
                 clk_c += ntwrk_lt_uS  #Update temp clk for net latency
                 rcd_uS = clk_c #Time would recv from upstream sender if ready
                 if vrbs: print(f"{clk_c} Component {c} Recv Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.log_file)
+                #If temp clk < components last 'done' time, frame is dropped for this component and missed by all downstream components
                 if (clk_uS[c] > clk_c): # True -> not ready to recv
-                    if vrbs: print(f"{clk_c} Component {c} Missed Frame {f}", file=self.log_file)
+                    if vrbs: print(f"{clk_c} Component {c} Dropped Frame {f}", file=self.log_file)
                     row = (c,rcd_uS,f,frm_sz_b,clk_uS[c])
                     self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, pd.DataFrame([row], columns=self.drpmsdFrms_df.columns)], ignore_index=True)
-                    break; #If temp clk > components last 'done' time, frame is missed for this and all downstream components
+                    break; # All downstream components will miss this frame
                 # component processes with compute latency
                 cmp_ltnc_nS_B = self.gen_gamma_samples(self.prm_cmp_ltnc_nS_B, self.prm_cmp_ltnc_nS_B/10, int(1))[0]
                 cmp_ltnc_uS = float(n_u*cmp_ltnc_nS_B*frm_sz_b*b_B)
@@ -379,7 +432,7 @@ class RTDP:
                 self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
                 clk_c += 10 #add overhead
                 clk_uS[c]  = clk_c #Set as last 'done' time
-                if vrbs and c == self.prm_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.log_file)
+                #if vrbs and c == self.prm_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.log_file)
                 if vrbs: print(f"{clk_c} Component {c} Done Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.log_file)
                 #add self.prcsdFrms_df row
                 row = (c,rcd_uS,f,frm_sz_b,cmp_ltnc_uS,ntwrk_lt_uS,snt_uS,clk_uS[c])
@@ -1085,4 +1138,15 @@ if __name__ == "__main__":
 # bp.emulate(file="blah.yaml", prog="xyz")   # deploys daisy chain
 # bp.send_emu(frm_sz=2, frm_cnt=1000, bit_rt=50)  # triggers sender on first host
 
+#plt.plot(
+#    (u_1 * sim_tm_uS.values) / 60,
+#    btRt_Mbps.values,
+#    marker='o',
+#    linestyle='-'
+#)
+# or
+ 
+# x = (u_1 * sim_tm_uS.to_numpy()) / 60
+# y = btRt_Mbps.to_numpy()
+# plt.plot(x, y, marker='o', linestyle='-')
 
