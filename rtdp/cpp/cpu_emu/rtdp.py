@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 import os
 import math
+import random
 
 import pandas as pd
-from pandas import json_normalize
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy.stats import skew, kurtosis
 import re
-from datetime import datetime
 import yaml
 import subprocess
+
+from typing import Optional, Union, List
+from datetime import datetime
+from scipy.stats import skew, kurtosis
+from pandas import json_normalize
 
 sns.set(style="darkgrid")
 
@@ -45,9 +48,6 @@ sz1K  = 1024
 sz1M  = sz1K*sz1K
 sz1G  = sz1M*sz1K
 #-----------------------------------------------------
-from typing import Optional, Union, List
-import random
-import numpy as np
 
 def bernoulli(p: float, n: int = 1, rng: Optional[Union[random.Random, np.random.Generator]] = None) -> List[int]:
     """
@@ -376,19 +376,23 @@ class RTDP:
 
         cnst_swtch_lt_uS = 1 #switch latency
 
-        ib = bernoulli(0.01, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        clib = bernoulli(0.01, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        nlib = bernoulli(0.01, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
         
         if vrbs: print("Simulating ...")
         #if vrbs: print(f"ib =  {ib}", file=self.log_file)
 
         #Simulation
         for f in range(0, self.prm_frame_cnt):
-            # impulse
-            if ib[f]==1:
+            # impulses
+            if clib[f]==1: # computational latency
                 brn_trl = bernoulli(0.5, n=1, rng=self.rng) # coin toss
-                #if vrbs: print(f"brn_trl = {brn_trl}, 1 + (0.3 if brn_trl[0]==1 else -0.3) = {1 + (0.3 if brn_trl[0]==1 else -0.3)}")
-                self.prm_cmp_ltnc_nS_B *= 1 + (0.3 if brn_trl[0]==1 else -(1-1/1.3)) # random effect
-                if vrbs: print(f"{clk_c} Impulse: Compute Latency now at {self.prm_cmp_ltnc_nS_B:10.2f}", file=self.log_file)
+                self.prm_cmp_ltnc_nS_B *= 1 + (0.2 if brn_trl[0]==1 else -(1-1/1.2)) # random effect
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {self.prm_cmp_ltnc_nS_B:10.2f} frame {f}", file=self.log_file)
+            if nlib[f]==1: # network latency
+                brn_trl = bernoulli(0.5, n=1, rng=self.rng) # coin toss
+                self.prm_nic_Gbps *= 1 + (0.2 if brn_trl[0]==1 else -(1-1/1.2)) # random effect
+                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {self.prm_nic_Gbps:10.2f} frame {f}", file=self.log_file)
             cnst_daq_frm_sz0_b = B_b*self.cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
             if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.log_file)
             #component zero is the sender
