@@ -19,28 +19,64 @@
 #include <map>
 #include <zmq.hpp>
 #include <netinet/in.h>
-#include <new> // for std::bad_alloc
+#include <new> // for bad_alloc
 #include <cstdlib> // Required for exit()
 #include <cmath> // Needed for round()
+#include "buffer_packet_emu.hh"
 #include <random>
+#include <cassert>
+
+#ifdef __linux__
+    #define HTONLL(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))
+    #define NTOHLL(x) ((1==ntohl(1)) ? (x) : (((uint64_t)ntohl((x) & 0xFFFFFFFFUL)) << 32) | ntohl((uint32_t)((x) >> 32)))
+#endif
 
 using namespace std;
 using namespace zmq;
 using namespace chrono;
 
-#define DBG 0	//print extra verbosity apart from -v switch
-  
+// Power of ten scaling constants
+const float  B_b   = 1e1;
+const float  b_B   = 1/B_b;
+const float  G_1   = 1e9;
+const float  one_G = 1/G_1;
+const float  G_K   = 1e6;
+const float  K_G   = 1/G_K;
+const float  G_M   = 1e3;
+const float  M_G   = 1/G_M;
+const float  K_1   = 1e3;
+const float  one_K = 1/K_1;
+const float  M_1   = 1e6;
+const float  one_M = 1/M_1;
+const float  m_1   = 1e-3;
+const float  one_m = 1/m_1;
+const float  m_u   = 1e3 ;
+const float  u_m   = 1/m_u;
+const float  u_1   = 1e-6;
+const float  one_u = 1/u_1;
+const float  n_1   = 1e-9;
+const float  one_n = 1/n_1;
+const float  n_m   = 1e-6;
+const float  m_n   = 1/n_m;
+
+const size_t sz1K   = 1024;
+const size_t sz1M   = sz1K*sz1K;
+const size_t sz1G   = sz1M*sz1K;
+
+const size_t swtchLtn_uS = 1; //switch latency
+
 void   Usage()
 {
     char usage_str[] =
         "\nUsage: \n\
         -h help  \n\
         -b seconds thread latency per GB input \n\
-        -i destination address (string)  \n\
+        -f total frames sender will send  \n\
+        -i subscription address (string)  \n\
         -m thread memory footprint in GB  \n\
         -o output size in GB  \n\
-        -p destination port (default = 8888)  \n\
-        -r receive port (default = 8888)  \n\
+        -p subscription port (default = 8888)  \n\
+        -r publish port (default = 8888)  \n\
         -s sleep versus burn cpu = 0/1 (default = false = 0)  \n\
         -t num threads (default = 10)  \n\
         -v verbose = 0/1 (default = false = 0)  \n\
@@ -50,64 +86,102 @@ void   Usage()
     cout << "[cpu_emu]: " << usage_str;
 }
 
+#include <iostream>
+#include <random>
+#include <algorithm>  // for std::max
+
+double sample_gamma(double mean, double stdev, std::mt19937 &gen) {
+    // Calculate shape (k) and scale (theta)
+    double shape = (mean * mean) / (stdev * stdev);
+    double scale = (stdev * stdev) / mean;
+
+    // Gamma distribution
+    std::gamma_distribution<double> gamma(shape, scale);
+
+    // Draw sample and clip at lower bound = mean
+    double value = gamma(gen);
+    return value; //std::max(value, mean);
+}
+
+#if 0 //==============================
+int main() {
+    // Parameters
+    double mean = 10.0;
+    double stdev = 3.0;
+
+    // Random generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Generate clipped samples
+    for (int i = 0; i < 10; i++) {
+        double x = sample_gamma(mean, stdev, gen);
+        std::cout << x << "\n";
+    }
+
+    std::cout << "============" << '\n';
+    // Sample until > mean
+    for (int i = 0; i < 10; i++) {
+        double value;
+        do {
+            value = sample_gamma(mean, stdev, gen);
+        } while (value < mean);
+        std::cout << value << '\n';
+    }
+    return 0;
+}
+
+#endif //=========================
+
+// RNG for latency variance generation using a Gamma distribution with lower bound equal to mean 
+
+static random_device rd;
+static mt19937 gen(rd());
+
 // Computational Function to emulate/stimulate processing load/latency, etc. 
-void func(size_t nmrd, size_t cmpLt_sGB, double memGB, bool psdS, uint16_t tag, bool vrbs=false) 
+void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t tag, bool vrbs=false) 
 { 
-    const float ts(cmpLt_sGB*nmrd*1e-9); //reqd timespan in seconds
-    const float tsms(cmpLt_sGB*nmrd*1e-6); //reqd timespan in milliseconds
-    const float tsus(cmpLt_sGB*nmrd*1e-3); //reqd timespan in microseconds
-    const float tsns(cmpLt_sGB*nmrd);    //reqd timespan in nanoseconds
-    size_t memSz = memGB*1024*1024*1024; //memory footprint in bytes
+    const float ts_S(cmpLt_S_GB*nmrd_B/(G_1)); //reqd timespan in seconds
+    size_t memSz = mem_GB*sz1G; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(1024*1024*1024)) << " Gbytes ..." << endl;
+    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(sz1K*sz1K*sz1K)) << " Gbytes ..." << endl;
 
     double* x;
     try {
         x = new double[memSz];
-        if(vrbs) std::cout << "Memory allocation for " << memSz << " succeeded.\n";
-    } catch (const std::bad_alloc& e) {
-        if(vrbs) std::cout << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
+        if(vrbs) cout << "Memory allocation for " << memSz << " succeeded.\n";
+    } catch (const bad_alloc& e) {
+        if(vrbs) cout << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
         exit(1);
     }    
     //usefull work emulation 
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts   << " secs ..."  << " size " << nmrd << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << tsms << " msecs ..." << " size " << nmrd << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << tsus << " usecs ..." << " size " << nmrd << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << tsns << " nsecs ..." << " size " << nmrd << endl;
-    if(psdS) {
-        auto cms = chrono::nanoseconds(size_t(round(tsns)));
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts           << " secs ..."  << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << tsms         << " msecs ..." << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << tsus         << " usecs ..." << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << tsns         << " nsecs ..." << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for "       << float(cms.count())/float(1e6)  << " msecs ..." << " size " << nmrd << endl;
-        this_thread::sleep_for(cms);
+    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_S   << " secs ..."  << " size " << nmrd_B << endl;
+    if(wlSlp) {
+        auto cms_us = chrono::nanoseconds(size_t(round(ts_S*one_n)));
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_S  << " secs ..."  << " size " << nmrd_B << endl;
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for " << float(cms_us.count())*u_m  << " msecs ..." << " size " << nmrd_B << endl;
+        this_thread::sleep_for(cms_us);
     }else{
-        auto ts = (cmpLt_sGB*nmrd*1e-9);
-        //high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
-        auto start_time = std::chrono::high_resolution_clock::now();
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning ...";
+        auto ts_S = (cmpLt_S_GB*nmrd_B/G_1);
+        //high_resolution_clock::time_point start_time = chrono::high_resolution_clock::now();
+        auto start_time_hrc = chrono::high_resolution_clock::now();
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning CPU ...";
         
-        double fracsecs, secs;
-        fracsecs = modf (ts , &secs);
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs = " << fracsecs << endl;
-        size_t sz1k = 1024;
+        double fracsecs_S, secs;
+        fracsecs_S = modf (ts_S , &secs);
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs_S = " << fracsecs_S << endl;
         size_t strtMem = 0;
-        auto end_time = std::chrono::high_resolution_clock::now();
-        duration<double> time_span = duration_cast<duration<double>>(end_time - start_time);
-        while (time_span.count() < ts) { 
-            for (size_t i = strtMem; i<min(strtMem + sz1k, memSz); i++) { x[i] = tanh(i); }
-            strtMem += sz1k;
-            if(strtMem > memSz - sz1k) strtMem = 0;
-            end_time = std::chrono::high_resolution_clock::now();
-            time_span = duration_cast<duration<double>>(end_time - start_time);
-            if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span.count() << " against "<< ts  << endl;
+        auto end_time_hrc = chrono::high_resolution_clock::now();
+        duration<double> time_span_Sd = duration_cast<duration<double>>(end_time_hrc - start_time_hrc);
+        while (time_span_Sd.count() < ts_S) { 
+            for (size_t i = strtMem; i<min(strtMem + sz1K, memSz); i++) { x[i] = tanh(i); } //touch all allocated memory
+            strtMem += sz1K;
+            if(strtMem > memSz - sz1K) strtMem = 0;
+            end_time_hrc = chrono::high_resolution_clock::now();
+            time_span_Sd = duration_cast<duration<double>>(end_time_hrc - start_time_hrc);
+            if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span_Sd.count() << " against "<< ts_S  << endl;
         }
-        auto tsc = time_span.count();
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc     << " secs "  << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc*1e3 << " msecs " << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc*1e6 << " usecs " << " size " << nmrd << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << tsc*1e9 << " nsecs " << " size " << nmrd << endl;
+        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << time_span_Sd.count() << " secs "  << " size " << nmrd_B << endl;
     }
     delete x;
 }
@@ -125,7 +199,7 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
     yaml_event_t event;
 
     if (!yaml_parser_initialize(&parser)) {
-        fprintf(stderr, "Failed to initialize parser!\n");
+        cerr << "Failed to initialize parser! " << endl;
         fclose(file);
         return;
     }
@@ -135,10 +209,10 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
     string s, s1;
 
     vector<string> lbls;
-    lbls.push_back("destination"); lbls.push_back("dst_port"); lbls.push_back("rcv_port");
-    lbls.push_back("sleep"); lbls.push_back("threads"); lbls.push_back("latency");
-    lbls.push_back("mem_footprint"); lbls.push_back("output_size"); lbls.push_back("verbose");
-    lbls.push_back("terminal");
+    lbls.push_back("latency"); lbls.push_back("mem_footprint"); lbls.push_back("output_size");    
+    lbls.push_back("sbscrptn_ip"); lbls.push_back("sub_prt"); lbls.push_back("pub_prt");
+    lbls.push_back("sleep"); lbls.push_back("threads"); lbls.push_back("verbose");
+    lbls.push_back("terminal"); lbls.push_back("frame_cnt");
     
     auto it = lbls.begin(); //a hack to get the type
 
@@ -147,83 +221,84 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Stream started\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Stream started " << endl;
             break;
         case YAML_STREAM_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Stream ended\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Stream ended " << endl;
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Document started\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Document started " << endl;
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Document ended\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Document ended " << endl;
             break;
         case YAML_MAPPING_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Mapping started\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Mapping started " << endl;
             break;
         case YAML_MAPPING_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Mapping ended\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Mapping ended " << endl;
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(DBG) printf("[cpu_emu]: Sequence started\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Sequence started " << endl;
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(DBG) printf("[cpu_emu]: Sequence ended\n");
+            if(DBG) cout << 0 << " [cpu_emu]: Sequence ended " << endl;
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Label: " << s << '\n';
+                if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " Label: " << s << endl;
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << '\n';
+                if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << endl;
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
             break;
         default:
-            if(DBG) cout << "[cpu_emu " << tag << " ]: " << " (Default)" << endl;
+            if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " (Default)" << endl;
             break;
         }
 
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(DBG) cout << "[cpu_emu " << tag << " ]: " << " All done parsing, got this:" << endl;
+    if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " All done parsing, got this:" << endl;
     if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
-        cout << it->first << " => " << it->second << '\n';
+        cout << it->first << " => " << it->second << endl;
     
     yaml_parser_delete(&parser);
     fclose(file);
 }
-  
+ 
 int main (int argc, char *argv[])
 { 
     int optc;
 
     bool     psdB=false, psdI=false, psdM=false, psdO=false, psdY=false;
     bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
-    bool     psdZ=false;
+    bool     psdZ=false, psdF=false;
     string   yfn = "cpu_emu.yaml";
-    char     dst_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// target ip
-    uint16_t rcv_prt = 8888;  // receive port default
-    uint16_t dst_prt = 8888;  // target port default
+    char     sub_ip[INET6_ADDRSTRLEN];	// subscription ip
+    uint16_t sub_prt = 8888;  // subscription port default
+    uint16_t pub_prt = 8889;  // publication port default
     auto     nmThrds = 5;     // default
     bool     vrbs    = false; // verbose ?
+    bool     wlSlp   = false; // will sleep versus burn cpu ?
+    bool     trmnl   = false; // am I a terminal node or a pass-thru ?
     // 500 seconds/(input GB) computational latency for 60kB CLAS12
     // 0.5 microseconds/byte
     // 0.5 seconds per megabyte
-    double   cmpLt_sGB  = 500;   // seconds/(input GB) computational latency
-    double   cmpLt_usB  = 0.5;   // usec/(input B) computational latency
-    double   cmpLt_sMB  = 0.5;   // seconds/(input MB) computational latency
-    double   memGB      = 10;    // thread memory footprint in GB
-    double   otmemGB    = 0.01;  // program output in GB
+    double   cmpLt_S_GB = 500;   // seconds/(input GB) computational latency
+    double   mem_GB     = 0.01;  // thread memory footprint in GB
+    double   otmem_GB   = 0.01;  // program output in GB
+    uint64_t frame_cnt  = 0;     //total frames sender will send
 
-    std::cout << std::fixed << std::setprecision(7);  // 6 decimal places            
+    cout << fixed << setprecision(7);  // 6 decimal places            
 
-    while ((optc = getopt(argc, argv, "hb:i:m:o:p:r:st:v:y:z")) != -1)
+    while ((optc = getopt(argc, argv, "hb:f:i:m:o:p:r:s:t:v:y:z:")) != -1)
     {
         switch (optc)
         {
@@ -231,60 +306,67 @@ int main (int argc, char *argv[])
             Usage();
             exit(1);
         case 'b':
-            cmpLt_sGB = (double) atof((const char *) optarg) ;
+            cmpLt_S_GB = (double) atof((const char *) optarg) ;
             psdB = true;
-            if(DBG) cout << " -b " << cmpLt_sGB;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -b " << cmpLt_S_GB << endl;
             break;
         case 'i':
-            strcpy(dst_ip, (const char *) optarg) ;
+            strcpy(sub_ip, (const char *) optarg) ;
             psdI = true;
-            if(DBG) cout << " -i " << dst_ip;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -i " << sub_ip << endl;
+            break;
+        case 'f':
+            frame_cnt = (uint64_t) atoi((const char *) optarg) ;
+            psdF = true;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -f " << frame_cnt << endl;
             break;
         case 'm':
-            memGB = (double) atof((const char *) optarg) ;
+            mem_GB = (double) atof((const char *) optarg) ;
             psdM = true;
-            if(DBG) cout << " -m " << memGB;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -m " << mem_GB << endl;
             break;
         case 'o':
-            otmemGB = (double) atof((const char *) optarg) ;
+            otmem_GB = (double) atof((const char *) optarg) ;
             psdO = true;
-            if(DBG) cout << " -o " << otmemGB;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -o " << otmem_GB << endl;
             break;
         case 'p':
-            dst_prt = (uint16_t) atoi((const char *) optarg) ;
+            sub_prt = (uint16_t) atoi((const char *) optarg) ;
             psdP = true;
-            if(DBG) cout << " -p " << dst_prt;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -p " << sub_prt << endl;
             break;
         case 'r':
-            rcv_prt = (uint16_t) atoi((const char *) optarg) ;
+            pub_prt = (uint16_t) atoi((const char *) optarg) ;
             psdR = true;
-            if(DBG) cout << " -r " << rcv_prt;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -r " << pub_prt << endl;
             break;
         case 's':
-            psdS = true;
-            if(DBG) cout << " -s ";
+            psdS  = true;
+            wlSlp = bool(atoi((const char *) optarg));
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -s " << wlSlp << endl;
             break;
         case 't':
             nmThrds = (uint16_t) atoi((const char *) optarg) ;
-            psdT = true;
-            if(DBG) cout << " -t " << nmThrds;
+            psdT    = true;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -t " << nmThrds << endl;
             break;
         case 'v':
-            vrbs = (bool) atoi((const char *) optarg) ;
+            vrbs = atoi((const char *) optarg) == 1;
             psdV = true;
-            if(DBG) cout << " -v " << vrbs;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -v " << vrbs << endl;
             break;
         case 'y':
-            yfn = (const char *) optarg ;
+            yfn  = (const char *) optarg ;
             psdY = true;
-            if(DBG) cout << " -y " << yfn;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -y " << yfn << endl;
             break;
         case 'z':
             psdZ = true;
-            if(DBG) cout << " -z ";
+            trmnl = atoi((const char *) optarg) == 1;
+            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -z " << trmnl << endl;
             break;
         case '?':
-            cout << "[cpu_emu " << rcv_prt << "]: " << " Unrecognised option: " << optopt;
+            cout << "[cpu_emu " << sub_prt << "]: " << " Unrecognised option: " << optopt << endl;
             Usage();
             exit(1);
         }
@@ -292,135 +374,212 @@ int main (int argc, char *argv[])
 
     if(DBG) cout << endl;
 
+    if(!(psdI && psdP && psdZ) || (!trmnl && !psdR)) {Usage(); exit(1);}
+
     if (psdY) {//parse the yaml file if given        
-        parse_yaml(yfn.c_str(), rcv_prt, vrbs);
-        //cmd line parms overide yaml file settings (which are otherwise in the map)
-        if(!psdB) cmpLt_sGB = stof(mymap["latency"]);
-        if(!psdI) strcpy(dst_ip, mymap["destination"].c_str());
-        if(!psdM) memGB    = stof(mymap["mem_footprint"]);
-        if(!psdO) otmemGB  = stof(mymap["output_size"]);
-        if(!psdP) dst_prt  = stoi(mymap["dst_port"]);
-        if(!psdR) rcv_prt  = stoi(mymap["rcv_port"]);
-        if(!psdS) psdS     = stoi(mymap["sleep"]) == 1;
+        parse_yaml(yfn.c_str(), pub_prt, vrbs);
+        //if not passed as arg, retrieve from yaml map)
+        if(!psdB) cmpLt_S_GB = stof(mymap["latency"]);
+        if(!psdM) mem_GB     = stof(mymap["mem_footprint"]);
+        if(!psdO) otmem_GB   = stof(mymap["output_size"]);
+        if(!psdI) strcpy(sub_ip, mymap["sbscrptn_ip"].c_str());
+        if(!psdP) sub_prt  = stoi(mymap["sub_prt"]);
+        if(!(psdR && psdZ)) pub_prt  = stoi(mymap["pub_prt"]);
+        if(!psdS) wlSlp    = (bool) stoi(mymap["sleep"]) == 1;
         if(!psdT) nmThrds  = stoi(mymap["threads"]);
-        if(!psdV) vrbs     = stoi(mymap["verbose"]);
-        if(!psdZ) psdZ     = stoi(mymap["terminal"]) == 1;
+        if(!psdV) vrbs     = (bool) stoi(mymap["verbose"]) == 1;
+        if(!psdZ) trmnl    = (bool) stoi(mymap["terminal"]) == 1;
+        if(!psdF) frame_cnt= stoi(mymap["frame_cnt"]);
     }    
     ////////
-    if(vrbs) cout << "[cpu_emu "   << rcv_prt                     << " ]: "
-                << " Operating with yaml = " << (psdY?yfn:"N/A")
-                << "\tcmpLt_sGB = " << cmpLt_sGB
-                << "\tdst_ip = "   << (psdZ?"N/A":string(dst_ip)) << "\tmemGB = "       << memGB
-                << "\totmemGB = "  << otmemGB                     << "\tdst_prt = "     << (psdZ?"N/A":to_string(dst_prt))
-                << "\trcv_prt = "  << rcv_prt                     << "\tsleep = "       << psdS
-                << "\tnmThrds = "  << nmThrds                     << "\tverbose = "   << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
-                << "\tterminal = " << psdZ                        << '\n';
+    if(vrbs) cout << "[cpu_emu "   << sub_prt << " ]: "
+                  << " Operating with yaml = "      << (psdY?yfn:"N/A")
+                  << "\tcmpLt_sGB = " << cmpLt_S_GB << "\tsub_ip = "  << sub_ip
+                  << "\tsub_prt = "   << sub_prt    << "\tpub_prt = " << pub_prt                               
+                  << "\tmem_GB = "     << mem_GB      << "\totmem_GB = " << otmem_GB << "\tsleep = " << wlSlp
+                  << "\tnmThrds = "   << nmThrds    << "\tverbose = " << vrbs << "\tyfn = " << (psdY?yfn:"N/A")
+                  << "\tterminal = "  << trmnl      << '\n';
 
 
-    //  Prepare our receiving rcv_cntxt and socket
-    context_t rcv_cntxt(1);
-    context_t dst_cntxt(1);
+    //  Prepare our subscription context and socket
+    context_t sub_cntxt(1);
+    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Defining sub context" << endl;
 
-    socket_t rcv_sckt(rcv_cntxt, socket_type::sub);
-    rcv_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length
+    socket_t sub_sckt(sub_cntxt, socket_type::sub);
+    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Defining SUB protocol rcv socket" << endl;
+    sub_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length: 1 = drop unread, 0 = unlimited
 
+    sub_sckt.connect(string("tcp://") + sub_ip + ':' + to_string(sub_prt));
+    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Subscribing to " << sub_ip << ':' + to_string(sub_prt) << endl;
     // Subscribe to all messages (empty topic)
-    //rcv_sckt.set(zmq::sockopt::subscribe, "");
+    sub_sckt.set(zmq::sockopt::subscribe, "");
+    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " subscribing" << endl;
 
-    socket_t dst_sckt(dst_cntxt, socket_type::pub);
-    dst_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
-    rcv_sckt.bind(string("tcp://*:") + to_string(rcv_prt));
-    rcv_sckt.set(zmq::sockopt::subscribe, "");
-    if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to receiver " + string("tcp://*:") + to_string(rcv_prt) << endl;
-    
-    if(!psdZ) {
-        //  Prepare our destination socket
-        if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Connecting to destination " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << endl;
-        dst_sckt.connect (string("tcp://") + dst_ip + ':' +  to_string(dst_prt));
+    //  Prepare our publication context and socket
+    context_t pub_cntxt(1);
+    socket_t pub_sckt(pub_cntxt, socket_type::pub);
+    if(!trmnl) {
+    	if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Publishing on port " << to_string(pub_prt) << endl;
+    	pub_sckt.bind(string("tcp://*:") + to_string(pub_prt));
+    	pub_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
     }
-    uint64_t request_nbr = 1;
-    double mnBfSz = 0; //mean receive Size (bits)
-    uint64_t bufSiz = 0; //bits
-    uint64_t tsr = 0; // system hi-res clock from in microseconds since epoch
-    uint64_t tsr_base = 0; // base system hi-res clock from in microseconds since epoch
-    uint64_t tsc = 0; // computational latency
-    uint64_t tsn = 0; // outbound network latency
-    while (true) {
-        //if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Setting up request message ..." << endl;
+    
+    uint32_t request_nbr = 1;
+    double   mnBfSz_B    = 0; //mean receive Size bytes
+    uint64_t bufSiz_B    = 0; //bytes
+    //uint64_t cmBufSiz_B  = 0; //bytes - cummulative
+    uint64_t last_timestamp_uS = 0; //previous frame timestamp usec since epoch
+    uint32_t stream_id   = 0;
+    uint32_t frame_num   = 0;
+    uint32_t lst_frm_nm  = frame_num; //last frame number
+    uint64_t msdFrms     = 0; // missed frames count
+    uint64_t last_cmp_lat_uS = 0; //last experienced computational latency
+    //last experienced network latency defaul to to 60KB over 100 Gbps
+    uint64_t last_nw_lat_uS  = one_u*60e3*B_b/(100*G_1);
+    
+    auto now_hrc      = high_resolution_clock::now();
+    auto clk0_uSd     = duration_cast<microseconds>(now_hrc.time_since_epoch());
+    auto clk_uSd      = clk0_uSd;
+    uint64_t start_uS = clk0_uSd.count();    //start of elapsed time measure
+    uint64_t now_uS   = clk_uSd.count();
+    
+    while (frame_num < frame_cnt) {
+        //if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Setting up request message ..." << endl;
         message_t request;
 
         //  Wait for next request from client
-        if(vrbs) cout << "[cpu_emu " << rcv_prt << "]: " << " Waiting for source ..." << endl;
+        if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " Waiting for source ..." << endl;
         
         recv_result_t rtcd;
         
-        rtcd = rcv_sckt.recv (request, recv_flags::none);
-
-        bufSiz = 8*rtcd.value(); //bits
+        rtcd = sub_sckt.recv (request, recv_flags::none);   ///////////  need a timeout here ///////////////////////////
         
-        {
-            auto now = high_resolution_clock::now();
-            auto us = duration_cast<microseconds>(now.time_since_epoch());
-            if(request_nbr == 1) tsr_base = us.count();
-            tsr = us.count()-tsr_base;
+        now_hrc = high_resolution_clock::now();
+        clk_uSd  = duration_cast<microseconds>(now_hrc.time_since_epoch());
+        now_uS  = clk_uSd.count();
+        
+        auto parsed  = deserialize_packet(now_uS, pub_prt, static_cast<uint8_t*>(request.data()), request.size());
+        stream_id    = parsed.stream_id ;
+        frame_num    = parsed.frame_num ;
+        
+        if(frame_num == 1) {
+            //now_hrc  = high_resolution_clock::now();
+            clk0_uSd  = clk_uSd;
+            start_uS  = clk0_uSd.count();
         }
 
-        if(DBG) cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Received request "
-                      << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
+        if(frame_num > lst_frm_nm + 1) msdFrms += frame_num - (lst_frm_nm + 1); //might have missed more than one
+        lst_frm_nm = frame_num;
+
+        if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
+        if(DBG) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
+        bufSiz_B = rtcd.value(); //bytes
+
+
+        if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet ... request.size() " << request.size() 
+                     << " HEADER_SIZE = " << HEADER_SIZE << endl;
+        if(DBG) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]: " << "bufSiz_B = " << bufSiz_B << " parsed.size = " << parsed.size_B 
+                     << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
+
+        if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " recd " << parsed.frame_num << endl;
+        if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " Received request "
+                      << request_nbr << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
-        if(vrbs) cout << tsr  << " [cpu_emu " << rcv_prt << "]: " << " frame size = "
-                      << "(actual) " << bufSiz << " bits " << bufSiz*1e-9 << " Gb "
-                      << " from client " << "ts = " << tsr << " (" << request_nbr << ')' << endl;
+        if(vrbs) cout << now_uS+1  << " [cpu_emu " << sub_prt << "]: " << " frame size = "
+                      << "(actual) " << bufSiz_B << " bytes " << bufSiz_B*one_G << " GB "
+                      << " from client " << "ts = " << now_uS << " (" << request_nbr << ')' << endl;
+                      
+        auto last_rdy_uS = last_timestamp_uS + last_cmp_lat_uS + last_nw_lat_uS;
+        last_nw_lat_uS = one_u*request.size()*B_b/(100*G_1);
+        if(vrbs) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
+             << last_rdy_uS << " to recd_uS " << now_uS << " frame " << frame_num << endl;
+        if(now_uS < last_rdy_uS) {
+            if(vrbs) {
+                cout << now_uS+2  << " [cpu_emu " << sub_prt << "]:  dropped (" << frame_num << ')' << " request_nbr " << request_nbr 
+                     << "(last_rdy_uS,recd_uS) (" << last_rdy_uS << ',' << now_uS << ')' << endl;
+                    }
+            if(frame_num != 0) {
+                if(vrbs) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
+                continue;
+            }
+        }
+        last_timestamp_uS = parsed.timestamp_uS;
+        
         //  Do some 'work'
         // load (or emulate load on) system with ensuing work
         {
             vector<thread> threads;
+            // variable latency
+            auto vrblCmpLt_S_GB = 0;
+            do {
+                vrblCmpLt_S_GB = sample_gamma(cmpLt_S_GB, cmpLt_S_GB/10, gen);
+            } while (vrblCmpLt_S_GB < cmpLt_S_GB);
 
             for (int i=1; i<=nmThrds; ++i)  //start the threads
-                threads.push_back(thread(func, bufSiz/8, cmpLt_sGB, memGB, psdS, rcv_prt, vrbs));
+                threads.push_back(thread(func, parsed.size_B, vrblCmpLt_S_GB, mem_GB, wlSlp, sub_prt, vrbs));
 
             for (auto& th : threads) th.join();
-            if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " synchronized all threads..." << endl;
+            //reqd computational timespan in usec    
+            auto now1_hrc   = high_resolution_clock::now();
+            auto uS1d       = duration_cast<microseconds>(now1_hrc.time_since_epoch());
+            last_cmp_lat_uS = uS1d.count()-now_uS;  //zero based clock
+            now_uS          = uS1d.count();         //update clock for computational latency
+            
+            if(vrbs) cout << now_uS  << " [cpu_emu " << sub_prt << "]: " << " synchronized all threads..." << endl;
         }
 
-        if(!psdZ) {
-            if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " Forwarding "
-                          << " request " << request_nbr << " from port " + string("tcp://") + dst_ip + ':' +  to_string(rcv_prt)
-                          << " to port " + string("tcp://") + dst_ip + ':' +  to_string(dst_prt) << " (" << request_nbr << ')' << endl;
-            //forward to next hop
-            // Send a message to the destination
-            size_t outSz = 8*otmemGB*1.024*1.024*1.024*1e9; //output size in bits
+        if(!trmnl) {
+            if(DBG) cout << now_uS+2  << " [cpu_emu " << sub_prt << "]: " << " Forwarding "
+                         << " request " << frame_num << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
+                         << " to port " + string("tcp://") + sub_ip + ':' +  to_string(sub_prt) << " (" << frame_num << ')' << endl;
+            // Publish a message for subscribers
+            const size_t outSz_B = otmem_GB*sz1G; //output size in bytes
 
             send_result_t sr;
             {
-	        // Send  "frame"
-                message_t dst_msg(outSz/8);  //represents harvested data
-                if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  Sending frame size = " << outSz << " (" 
-                              << request_nbr << ')' << " to " << rcv_prt-1 << endl;
-                sr = dst_sckt.send(dst_msg, send_flags::none);
-                if(DBG) cout << "[cpu_emu " << rcv_prt << "]: " << " output Num written (" << request_nbr << ") "  
+    	        // Send  output "frame"
+                //represents harvested data
+                vector<uint8_t> payload(outSz_B);  //represents harvested data
+                if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;///////////frame_num ???
+                auto data = serialize_packet(now_uS, pub_prt, payload.size(), parsed.timestamp_uS, parsed.stream_id, parsed.frame_num, payload);
+                if(DBG) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
+                zmq::message_t message(data.size());
+                memcpy(message.data(), data.data(), data.size());
+                sr = pub_sckt.send(message, zmq::send_flags::none);
+                if (!sr) cerr << now_uS << " [cpu_emu " << sub_prt << "]:  Failed to send" << endl;
+                if (vrbs && sr.has_value()) cout << now_uS << " [cpu_emu " << sub_prt << "]: Bytes sent = " << sr.value() << endl;
+
+                if(vrbs) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << payload.size() << " (" 
+                              << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
+                if(vrbs) cout << now_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
-                if(sr.value() != outSz/8) cout << "Destination data incorrect size(" << request_nbr << ") "  << endl;
+                if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << "[cpu_emu " << sub_prt << "]: " 
+                                                                    << " sbscrptn_ip data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
-        mnBfSz = (request_nbr-1)*mnBfSz/request_nbr + bufSiz/request_nbr; //incrementally update mean receive size
+        if(vrbs) cout << now_uS + 4 << " [cpu_emu " << sub_prt << "]:  done (" << frame_num << ')' << endl;
+ 
+        mnBfSz_B = (request_nbr-1)*mnBfSz_B/request_nbr + bufSiz_B/request_nbr; //incrementally update mean receive size
         // Record end time
-        uint64_t tsr0 = tsr; // reception system hi-res clock from in microseconds since epoch
-        {
-            auto now = high_resolution_clock::now();
-            auto us = duration_cast<microseconds>(now.time_since_epoch());
-            tsr = us.count()-tsr_base;
-        }
-
-        if (request_nbr % 10 == 0) {
-            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured latencies: tsc = " << tsc << " tsn = " << tsn << " (" << request_nbr << ')' << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured frame rate " << float(1)/(1e-6*float(tsr-tsr0)) << " frame Hz." << " for " << request_nbr << " frames" << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " Measured bit rate " << 1e-6*float(1*mnBfSz)/(1e-6*float(tsr-tsr0)) << " MHz mnBfSz " << mnBfSz << " (" << request_nbr << ')' << std::endl;
-            if(vrbs) std::cout << tsr << " [cpu_emu " << rcv_prt << "]: " << " recd " << request_nbr << std::endl;
-        }
-        if(vrbs) cout << tsr << " [cpu_emu " << rcv_prt << "]:  done (" << request_nbr << ')' << endl;
+        //if(request_nbr < 10) continue; //warmup
+        if(vrbs) cout << now_uS + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: last_cmp_lat_uS = " << last_cmp_lat_uS 
+                           << " last_nw_lat_uS = " << last_nw_lat_uS  << " (" << frame_num << ")" << endl;
+        if(vrbs) cout << now_uS + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " 
+                           << float(request_nbr)/(float(now_uS-start_uS)*one_M) 
+                           << " frame Hz." << " for " << frame_num << " frames" << endl;
+        if(vrbs) cout << now_uS + 7 << " [cpu_emu " << sub_prt << "]: " << " Measured bit rate " 
+                           << float(request_nbr*mnBfSz_B*B_b)/(float(now_uS-start_uS)*one_M)
+                           << " bps mnBfSz_B " << mnBfSz_B << " (" << frame_num << ')' << endl;
+        if(vrbs) cout << now_uS + 8 << " [cpu_emu " << sub_prt << "]:  Missed frames: " << msdFrms << endl;
+        if(vrbs) cout << now_uS + 9 << " [cpu_emu " << sub_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
+                      << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
+        if(vrbs) cout  << now_uS + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
         request_nbr++;
-    }
+    } //main loop
+    cout  << now_uS + 11 << " [cpu_emu " << sub_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") 
+          << " exiting, elasped time S " << float(now_uS-start_uS)*one_M << endl;
+    cout.flush();
+    cerr.flush();
     return 0;
 }

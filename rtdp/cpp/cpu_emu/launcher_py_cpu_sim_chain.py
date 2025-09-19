@@ -8,34 +8,6 @@ import subprocess
 import argparse
 import time
 
-def launch_component_0(index, port):
-
-    # Launch receiver
-    if index > 1:
-        print(f"[launcher_py_cpu_sim] Starting cpu_sim #{index} listening on port {ref_port + index - 1}, forwarding to port {ref_port + index - 2}")
-        subprocess.Popen([
-            "./cpu_sim",
-            "-b", str(500),
-            "-i", str("127.0.0.1"),
-            "-n", str(100),
-            "-o", str(0.0001),
-            "-p", str(port + 1),
-            "-r", str(port),
-            "-v", str(1)
-        ])
-    else:
-        print(f"[launcher_py_cpu_sim] Starting cpu_sim #{index} listening on port {ref_port + index - 1}, acting as sink")
-        subprocess.Popen([
-            "./cpu_sim",
-#            "-b", str(500),          # test of cpu_sim.yaml
-#            "-i", str("127.0.0.1"),
-            "-o", str(0.0001),
-            "-r", str(port),
-            "-v", str(1),
-            "-y", str("cpu_sim.yaml"),
-            "-z", str(1)
-        ])
-        
 def launch_component(port, trmnl, frame_cnt):
     # Launch receiver
     print(f"[launch_component] Starting cpu_sim listening on port {port}, term = {trmnl}, forwarding to port {port + 1}, frame_cnt {frame_cnt}")
@@ -45,7 +17,7 @@ def launch_component(port, trmnl, frame_cnt):
         "-f", str(frame_cnt),
         "-i", str("127.0.0.1"),
         "-n", str(100),
-        "-o", str(0.0001),
+        "-o", str(0.000075),
         "-p", str(port + 1),
         "-r", str(port),
         "-v", str(1),
