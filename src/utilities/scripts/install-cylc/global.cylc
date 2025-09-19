@@ -1,0 +1,16 @@
+# place this in ~/.cylc/flow/global.cylc
+
+[platforms]
+    [[jlab_slurm]]
+        cylc path = /w/epsci-sciwork18/jeng/cylc-env/bin/ # path to cylc-env/bin
+        hosts = tsai@ifarm2401 # make sure that you can ssh into the host without password when you run cylc workflow
+        job runner = slurm
+        install target = localhost 
+
+
+[install]
+    [[symlink dirs]]
+        [[[localhost]]]
+            run = /home/tsai/jeng # path to the directory where you want to run the workflow. You can check the symlink directory in ~/cylc-run/
+
+

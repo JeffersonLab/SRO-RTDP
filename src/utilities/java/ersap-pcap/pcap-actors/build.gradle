@@ -1,0 +1,63 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java']
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+}
+
+jar {
+    archiveBaseName = 'ersap-pcap-actors'
+    archiveVersion = '1.0.0'
+}
+
+repositories {
+    maven {
+        url 'https://clasweb.jlab.org/clas12maven/'
+    }
+    mavenLocal()
+    mavenCentral()
+    flatDir {
+        dirs "$System.env.ERSAP_HOME/lib"
+    }
+}
+
+dependencies {
+    implementation name: 'ersap-java-1.0-SNAPSHOT'
+    implementation name: 'ersap-actor-1.0-SNAPSHOT'
+    
+    // pcap2streams dependency
+    implementation files('../pcap2streams/build/classes/java/main')
+    implementation 'org.json:json:20231013'
+    
+    testImplementation 'junit:junit:4.13.2'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = 'org.jlab.ersap.pcap'
+            artifactId = 'ersap-pcap-actors'
+            version = '1.0.0'
+            
+            from components.java
+        }
+    }
+}
+
+task install(dependsOn: jar) {
+    doLast {
+        copy {
+            from jar.archiveFile
+            into "$System.env.ERSAP_HOME/lib"
+        }
+    }
+} 

@@ -1,0 +1,15 @@
+id: sender2
+type: sender
+emulator_id: emulator2
+network:
+  listen_port: 50801  # Different port for second sender
+  bind_address: "0.0.0.0"
+  connect_to:
+    - host: "localhost"
+      port: 50804
+sender_config:
+  data_format: "raw"
+  chunk_size: "1M"
+  test_data:
+    size: "50M"  # Half of the total data
+    pattern: "random" 

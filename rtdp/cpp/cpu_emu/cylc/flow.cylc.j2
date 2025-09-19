@@ -1,0 +1,276 @@
+[scheduler]
+    allow implicit tasks = True
+    UTC mode = True
+
+[scheduling]
+    cycling mode = integer
+    initial cycle point = 1
+    final cycle point = 1
+
+    [[graph]]
+        R1 = """
+            # Start chain
+            receiver:ready => emulator:ready => sender
+            
+            # Completion chain (separate from start chain)
+            sender:succeeded => !receiver
+            receiver:completed
+        """
+
+[runtime]
+    [[root]]
+        # Common settings for all tasks
+        platform = {{ platform.name | default('jlab_slurm') }}
+        [[[job]]]
+            execution time limit = PT2H    # 2 hours timeout
+        
+        [[[directives]]]
+            --ntasks = 1
+            --partition = {{ partition | default('ifarm') }}
+            --output = slurm_%j.log
+            --error = slurm_%j.log
+        
+        [[[environment]]]
+            # Path to SIF file
+            SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/{{ containers.image_path | default('cpu-emu.sif') }}"
+            
+            # Network configuration
+            BASE_PORT={{ BASE_PORT }}
+            COMPONENTS={{ COMPONENTS }}
+            AVG_RATE={{ AVG_RATE | default(50) }}
+            RMS={{ RMS | default(0.3) }}
+            DUTY={{ DUTY | default(0.7) }}
+            NIC={{ NIC | default(100) }}
+            
+            # Emulator configuration
+            THREADS = "{{ THREADS }}"
+            LATENCY = "{{ LATENCY }}"
+            MEM_FOOTPRINT = "{{ MEM_FOOTPRINT }}"
+            OUTPUT_SIZE = "{{ OUTPUT_SIZE }}"
+            SLEEP = "{{ SLEEP }}"
+            VERBOSE = "{{ VERBOSE }}"
+            
+            # Directory paths
+            OUTPUT_DIR = "$CYLC_WORKFLOW_RUN_DIR/output"
+            LOG_DIR = "$CYLC_WORKFLOW_RUN_DIR/logs"
+
+    [[receiver]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/receiver
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/receiver/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/receiver/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
+            
+            # Store hostname for other tasks
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
+            HOSTNAME=$(hostname -f)
+            IP=$(hostname -i | awk '{print $1}')
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/receiver_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/receiver_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start receiver with verbose output
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
+            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${BASE_PORT} -p ${BASE_PORT} -v ${VERBOSE} > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            
+            RECV_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $RECV_PID 2>/dev/null; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Signaling ready state"
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Receiver process not running" >&2
+                cat ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+            
+            # Create a flag file to indicate we should keep running
+            KEEP_RUNNING=1
+            trap 'KEEP_RUNNING=0' TERM INT
+            
+            # Initialize file size tracking
+            PREV_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                PREV_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            # Monitor the receiver process
+            while [ $KEEP_RUNNING -eq 1 ] && kill -0 $RECV_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver process is running (PID: $RECV_PID)"
+                echo "Process details:" >> ${LOG_DIR}/receiver/process.log
+                ps -fp $RECV_PID >> ${LOG_DIR}/receiver/process.log 2>&1 || true
+                
+                # Check if data has been received by monitoring file size changes
+                CURRENT_SIZE=0
+                if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                    CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+                fi
+                
+                if [ $CURRENT_SIZE -gt $PREV_SIZE ]; then
+                    echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
+                    echo "Transfer completed successfully"
+                    cylc message -- "Transfer completed successfully"
+                fi
+                
+                PREV_SIZE=$CURRENT_SIZE
+                sleep 5
+            done
+            
+            # Check final status
+            FINAL_SIZE=0
+            if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
+                FINAL_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
+            fi
+            
+            if [ $FINAL_SIZE -gt 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Transfer completed successfully (final size: $FINAL_SIZE bytes)"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Transfer failed or incomplete" >&2
+                echo "Last few lines of apptainer log:" >&2
+                tail -n 20 ${LOG_DIR}/receiver/apptainer.log >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = receiver
+            --cpus-per-task = 4
+            --mem = 8G
+        
+        [[[outputs]]]
+            ready = "ready"
+            completed = "Transfer completed successfully"
+
+    [[emulator]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/emulator
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/emulator/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/emulator/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator task"
+            
+            # Get receiver information
+            RECV_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/receiver_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver IP: ${RECV_IP}"
+            
+            # Store hostname for sender
+            HOSTNAME=$(hostname)
+            IP=$(hostname -i)
+            echo "$HOSTNAME" > $CYLC_WORKFLOW_SHARE_DIR/emulator_hostname
+            echo "$IP" > $CYLC_WORKFLOW_SHARE_DIR/emulator_ip
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Running on host: $HOSTNAME ($IP)"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start CPU emulator with configuration
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
+            apptainer run --pwd /app ${SIF_FILE} emulator \
+                -i ${RECV_IP} \
+                -r ${BASE_PORT} \
+                -p ${BASE_PORT} \
+                -s \
+                -x \
+                -v ${VERBOSE} \
+                -m ${MEM_FOOTPRINT} \
+                -t ${THREADS} \
+                2>${LOG_DIR}/emulator/apptainer.log &
+            
+            EMU_PID=$!
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] CPU emulator started with PID ${EMU_PID}"
+            
+            # Brief pause to let process start
+            sleep 2
+            
+            # Signal readiness if process is running
+            if kill -0 $EMU_PID 2>/dev/null; then
+                cylc message "ready"
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Ready message sent"
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process not running" >&2
+                cat ${LOG_DIR}/emulator/apptainer.log >&2
+                exit 1
+            fi
+            
+            # Monitor memory usage
+            while kill -0 $EMU_PID 2>/dev/null; do
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Memory usage:" >> ${LOG_DIR}/emulator/memory.log
+                free -h >> ${LOG_DIR}/emulator/memory.log
+                ps -o pid,ppid,%cpu,%mem,cmd -p $EMU_PID >> ${LOG_DIR}/emulator/memory.log
+                sleep 5
+            done
+            
+            # Check if process died unexpectedly
+            if ! wait $EMU_PID; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: CPU emulator process failed" >&2
+                cat ${LOG_DIR}/emulator/apptainer.log >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = emulator
+            --cpus-per-task = 8
+            --mem = 16G
+        
+        [[[outputs]]]
+            ready = "ready"
+
+    [[sender]]
+        script = """
+            # Create log directory
+            mkdir -p ${LOG_DIR}/sender
+
+            # Redirect all output to log files
+            exec 1> >(tee -a "${LOG_DIR}/sender/stdout.log")
+            exec 2> >(tee -a "${LOG_DIR}/sender/stderr.log")
+
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender task"
+            
+            # Get emulator information
+            EMU_IP=$(cat $CYLC_WORKFLOW_SHARE_DIR/emulator_ip)
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Emulator IP: ${EMU_IP}"
+            
+            # Create output directory
+            mkdir -p ${OUTPUT_DIR}
+            
+            # Start sender with configuration
+            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
+            apptainer run --pwd /app ${SIF_FILE} sender \
+                --host ${EMU_IP} \
+                --port ${BASE_PORT} \
+                --avg-rate-mbps ${AVG_RATE} \
+                --rms-fraction ${RMS} \
+                --duty-cycle ${DUTY} \
+                --nic-limit-gbps ${NIC} \
+                2>${LOG_DIR}/sender/apptainer.log
+            
+            # Check if sender process completed successfully
+            if [ $? -eq 0 ]; then
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Sender completed successfully"
+                exit 0
+            else
+                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Sender process failed" >&2
+                cat ${LOG_DIR}/sender/apptainer.log >&2
+                exit 1
+            fi
+        """
+        [[[directives]]]
+            --job-name = sender
+            --cpus-per-task = 4
+            --mem = 8G 

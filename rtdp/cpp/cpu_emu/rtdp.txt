@@ -1,0 +1,93 @@
+for i in {1..1}; do  xterm  -bg black -fg white -fa 'Monospace' -fs 12 2>/dev/null & done
+
+cd /daqfs/home/goodrich/nvme/SRO-RTDP/rtdp/cpp/cpu_emu
+
+import subprocess
+subprocess.Popen(["python", "simulate_receiver0.py", "--port", str(6000)])
+subprocess.Popen(["python", "simulate_sender0.py","--port", str(6000),"--avg-rate-mbps", str(50),"--rms-fraction", str(0.3),"--duty-cycle", str(0.7),"--nic-limit-gbps", str(100)])
+
+subprocess.Popen(["./cpu_emu","-i", str("127.0.0.1"),"-r", str(6000),"-s","-x","-z","-v", str(1), "-t", str(1)])
+subprocess.Popen(["./zmq-event-clnt", "-i", str("127.0.0.1"),"-p", str(6000), "-c", str(3), "-x", "-s", str(1)])
+
+killall cpu_emu python zmq-event-clnt; t=$(mktemp);echo $t; python launcher_py_cpu_emu_chain.py --components 50 --base-port 7000 --avg-rate 50 --rms 0.3 --duty 0.7 --nic 100 > $t
+
+std::bad_alloc
+
+/proc/sys/vm/overcommit_memory
+
+valgrind --leak-check=full ./your_program
+
+g++ -fsanitize=address -g your_file.cpp -o your_program
+./your_program
+
+grep Est $t|cut -f 8 -d' '|awk 'NR==1 { prev=$1; next } { print $1 - prev; prev=$1 }'|tail -n +11|gnuplot -p -e "set yrange [0:*]
+; p '-' u 1 w l"
+
+grep Est $t|cut -f 6 -d' '|tail -n +11|get_moments
+
+grep Est $t|cut -f 8 -d' '|tail -n +11|awk 'NR==1 { prev=$1; next } { print $1 - prev; prev=$1 }'|get_moments
+
+grep Est $t|cut -f 6 -d' '|tail -n +11|gnuplot -p -e "set yrange [0:*]
+
+while true; do grep Est $t|cut -f 8 -d' '|wc; sleep 1; donetail -f /tmp/junk
+==============================
+killall cpu_emu python zmq-event-clnt; t=$(mktemp);echo $t; python launcher_py_cpu_emu_chain.py --components 1 --base-port 7000 --avg-rate 50 --rms 0 --duty 0.1 --nic 100 > $t
+
+while true; do grep Est $t|cut -f 8 -d' '|wc > /tmp/junk; sleep 1 ; done
+tail -f /tmp/junk
+
+x=$(mktemp); grep "Sim Slept" $t|cut -f 5 -d' ' > $x; vim $x; cat $x|get_moments
+
+echo "bit rate:"; grep Est $t|cut -f 6 -d' '|tail -n +11|get_moments 
+echo "duty sends:"; grep Est $t|cut -f 8 -d' '|tail -n +11|awk 'NR==1 { prev=$1; next } { print $1 - prev; prev=$1 }'|get_moments
+echo "Total duty sends:"; grep Est $t|cut -f 8 -d' '|tail -1
+echo "transmission latency:"; grep transmi $t|cut -f 7 -d' '|get_moments
+echo "Sim sleep time:"; grep "Sim Slept" $t|cut -f 5 -d' '|get_moments
+
+grep Est $t|cut -f 8 -d' '|awk 'NR==1 { prev=$1; next } { print $1 - prev; prev=$1 }'|tail -n +11|gnuplot -p -e "set title 'events/sec'; set yrange [0:*]; p '-' u 1 w l"
+grep Est $t|cut -f 6 -d' '|tail -n +11|gnuplot -p -e "set title 'Est rate(Mbps)'; set yrange [0:*]; p '-' u 1 w l"
+
+#p=7001; grep "Estimated send rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated send rate Gbps'; p '-' w l"
+p=7001; grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated frame rate Hz'; p '-' w l"
+p=7001; grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated bit rate Mhz'; p '-' w l"
+#p=7002; grep "Estimated send rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated send rate Gbps'; p '-' w l"
+p=7002; grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated frame rate Hz'; p '-' w l"
+p=7002; grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated bit rate Mhz'; p '-' w l"
+#p=7003; grep "Estimated send rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated send rate Gbps'; p '-' w l"
+p=7003; grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated frame rate Hz'; p '-' w l"
+p=7003; grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title '$p Estimated bit rate Mhz'; p '-' w l"
+        grep Hz $t|grep "Estimated bit rate" $t|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated bit rate'; p '-' w l"
+        grep Hz $t|grep "Measured event" $t|cut -f 8 -d' '|gnuplot -p -e "set title 'Measured event Hz'; p '-' w l"
+        grep Hz $t|grep "Measured bit" $t|cut -f 8 -d' '|gnuplot -p -e "set title 'Measured bit Hz'; p '-' w l"
+
+echo "Estimated send rate"; grep "Estimated send rate" $t|cut -f6 -d' '|get_moments
+echo "Estimated bit rate"; grep "Estimated bit rate" $t|cut -f6 -d' '|get_moments
+echo "Measured event"; grep "Measured event" $t|cut -f 8 -d' '|get_moments
+echo "Measured bit"; grep "Measured bit" $t|cut -f 8 -d' '|get_moments
+echo "frame size"; grep -i "frame" $t|cut -f 6 -d' '|get_moments
+echo "Event size"; grep -i "Event size" $t|cut -f 9 -d' '|get_moments
+
+==================================basic report =================================
+t0=$(mktemp)
+grep "Estimated frame rate" $t|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated frame rate Hz'; p '-' w l"
+grep "Estimated bit rate" $t|grep MHz|cut -f6 -d' '|gnuplot -p -e "set title 'Estimated bit rate Mhz'; p '-' w l"
+echo -n "frame size: "; grep -i "Sending frame" $t|cut -f 6 -d' '|get_moments
+echo -n "Estimated frame rate: "; grep -i "Estimated frame rate" $t|cut -f6 -d' '|get_moments
+echo -n "Estimated bit rate: "; grep -i "Estimated bit rate" $t|cut -f6 -d' '|get_moments
+echo -n "Avg loop duration: "; grep -i "Avg loop duration" $t|cut -f6 -d' '|get_moments
+echo
+for i in {7001..7003}; do
+    grep "cpu_emu ${i}" $t > $t0
+    echo "cpu_emu ${i}:"
+    grep "Measured frame" $t0|cut -f 8 -d' '|gnuplot -p -e "set title '$i Measured frame Hz'; p '-' w l"
+    grep "Measured bit" $t0|cut -f 8 -d' '|gnuplot -p -e "set title '$i Measured bit Hz'; p '-' w l"
+    echo -n "Sim Sleep Spec: "; grep -i "Sim Sleep Spec" $t0|cut -f 8 -d' '|get_moments
+    echo -n "Transmission Sleep Spec: "; grep -i "Transmission Sleep Spec" $t0|cut -f 8 -d' '|get_moments
+
+    echo -n "Measured frame: "; grep -i "Measured frame" $t0|cut -f 8 -d' '|get_moments
+    echo -n "Measured bit: "; grep -i "Measured bit" $t0|cut -f 8 -d' '|get_moments
+    echo -n "frame size: "; grep -i "Frame size" $t0|cut -f 9 -d' '|get_moments
+    echo
+done
+
+

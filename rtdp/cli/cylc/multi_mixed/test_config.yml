@@ -1,0 +1,45 @@
+# Simplified Mixed Components Test Configuration
+# Contains only essential parameters for testing
+
+workflow_type: multi_mixed
+workflow_name: mixed_workflow_test
+
+# Platform configuration
+platform:
+  name: jlab_slurm
+partition: ifarm
+
+# Receiver configuration
+receiver:
+  listen_port: 55559
+  image_path: jlabtsai/rtdp-cpu_emu:latest
+
+# Sender configuration (minimal)
+sender:
+  target_port: 55555
+  image_path: jlabtsai/rtdp-cpu_emu:latest
+
+# Components in order (data flows from sender through components to receiver)
+# Simple GPU-CPU chain for testing
+components:
+  # First component: GPU Proxy 0 (receives from sender, sends to CPU Emulator 0)
+  - type: gpu_proxy
+    name: gpu_proxy
+    index: 0
+    in_port: 55555
+    out_port: 55556
+    image_path: jlabtsai/rtdp-gpu_proxy:latest
+    cpus: 4
+    mem: 100G
+    gpus: 1
+    partition: gpu
+
+  # Second component: CPU Emulator 0 (receives from GPU Proxy 0, sends to receiver)
+  - type: cpu_emulator
+    name: emulator
+    index: 0
+    in_port: 55556
+    out_port: 55559
+    image_path: jlabtsai/rtdp-cpu_emu:latest
+    cpus: 4
+    mem: 8G 

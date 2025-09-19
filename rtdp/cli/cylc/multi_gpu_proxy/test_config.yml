@@ -1,0 +1,38 @@
+# Simplified GPU Proxy Test Configuration
+# Contains only essential parameters for testing
+
+workflow_type: multi_gpu_proxy
+workflow_name: gpu_proxy_test
+
+platform:
+  name: jlab_slurm
+partition: ifarm
+
+containers:
+  image_path: jlabtsai/rtdp-gpu_proxy:latest
+
+# Sender configuration (minimal)
+sender:
+  target_port: 55555
+
+# Receiver configuration  
+receiver:
+  listen_port: 55557
+
+# GPU Proxies with minimal required parameters
+gpu_proxies:
+  # First proxy - receives from sender, sends to second proxy
+  - in_port: 55555
+    out_port: 55556
+    cpus: 4
+    mem: 100G
+    gpus: 1
+    partition: gpu
+
+  # Second proxy - receives from first proxy, sends to receiver
+  - in_port: 55556
+    out_port: 55557
+    cpus: 4
+    mem: 100G
+    gpus: 1
+    partition: gpu 

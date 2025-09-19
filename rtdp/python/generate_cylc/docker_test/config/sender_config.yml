@@ -1,0 +1,17 @@
+id: sender1
+type: sender
+emulator_ids: ["emulator1", "emulator2"]
+network:
+  listen_port: 50800
+  bind_address: "0.0.0.0"
+  connect_to:
+    - host: "rtdp-emulator1"
+      port: 50801
+    - host: "rtdp-emulator2"
+      port: 50802
+sender_config:
+  data_format: "raw"
+  chunk_size: "1M"
+  test_data:
+    size: "10M"
+    pattern: "sequential" 

@@ -35,10 +35,12 @@
             SIF_FILE = "$CYLC_WORKFLOW_RUN_DIR/sifs/cpu-emu.sif"
             
             # Network configuration
-            EMULATOR_RCV_PORT=55555
-            EMULATOR_SND_PORT=55556
-            RECEIVER_PORT=55556
-            SENDER_PORT=55555
+            BASE_PORT=55555
+            COMPONENTS=5
+            AVG_RATE=50
+            RMS=0.3
+            DUTY=0.7
+            NIC=100
             
             # Emulator configuration
             THREADS = "1"           # Reduced from 2 to 1 thread
@@ -47,10 +49,6 @@
             OUTPUT_SIZE = "0.001"  # GB
             SLEEP = "0"            # Changed from 1 to 0 to burn CPU instead of sleep
             VERBOSE = "2"          # Increased verbosity from 1 to 2
-            
-            # Sender configuration
-            SENDER_EVENT_COUNT = "10"
-            SENDER_EVENT_SIZE = "1"  # Reduced from 10MB to 1MB
             
             # Directory paths
             OUTPUT_DIR = "$CYLC_WORKFLOW_SHARE_DIR/output"
@@ -67,13 +65,6 @@
 
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver task"
             
-            # Check if port is already in use
-            if netstat -tuln | grep -q ":${RECEIVER_PORT}"; then
-                echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] ERROR: Port ${RECEIVER_PORT} is already in use" >&2
-                netstat -tuln | grep ":${RECEIVER_PORT}" >&2
-                exit 1
-            fi
-            
             # Store hostname for other tasks
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Recording hostname information"
             HOSTNAME=$(hostname -f)
@@ -87,7 +78,7 @@
             
             # Start receiver with verbose output
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting receiver process"
-            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${RECEIVER_PORT} -v ${VERBOSE} > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
+            apptainer run --pwd /app ${SIF_FILE} receiver -z -i ${IP} -r ${BASE_PORT} -p ${BASE_PORT} -v ${VERBOSE} > ${OUTPUT_DIR}/received_data.bin 2>${LOG_DIR}/receiver/apptainer.log &
             
             RECV_PID=$!
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Receiver started with PID ${RECV_PID}"
@@ -110,10 +101,6 @@
             KEEP_RUNNING=1
             trap 'KEEP_RUNNING=0' TERM INT
             
-            # Create a flag file to track completion
-            COMPLETION_FILE="${CYLC_WORKFLOW_SHARE_DIR}/receiver_complete"
-            rm -f "${COMPLETION_FILE}"
-            
             # Initialize file size tracking
             PREV_SIZE=0
             if [ -f "${OUTPUT_DIR}/received_data.bin" ]; then
@@ -132,11 +119,10 @@
                     CURRENT_SIZE=$(stat -c %s "${OUTPUT_DIR}/received_data.bin" || echo 0)
                 fi
                 
-                if [ $CURRENT_SIZE -gt $PREV_SIZE ] && [ ! -f "${COMPLETION_FILE}" ]; then
+                if [ $CURRENT_SIZE -gt $PREV_SIZE ]; then
                     echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Data received successfully (size: $CURRENT_SIZE bytes)"
                     echo "Transfer completed successfully"
                     cylc message -- "Transfer completed successfully"
-                    touch "${COMPLETION_FILE}"
                 fi
                 
                 PREV_SIZE=$CURRENT_SIZE
@@ -197,14 +183,13 @@
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting CPU emulator"
             apptainer run --pwd /app ${SIF_FILE} emulator \
                 -i ${RECV_IP} \
-                -p ${EMULATOR_SND_PORT} \
-                -r ${EMULATOR_RCV_PORT} \
-                -t ${THREADS} \
-                -b ${LATENCY} \
-                -m ${MEM_FOOTPRINT} \
-                -o ${OUTPUT_SIZE} \
-                -s ${SLEEP} \
+                -r ${BASE_PORT} \
+                -p ${BASE_PORT} \
+                -s \
+                -x \
                 -v ${VERBOSE} \
+                -m ${MEM_FOOTPRINT} \
+                -t ${THREADS} \
                 2>${LOG_DIR}/emulator/apptainer.log &
             
             EMU_PID=$!
@@ -266,15 +251,13 @@
             
             # Start sender with configuration
             echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Starting sender process"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender connecting to ${EMU_IP}:${SENDER_PORT}"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender command: apptainer run --pwd /app ${SIF_FILE} sender -i ${EMU_IP} -p ${SENDER_PORT} -c ${SENDER_EVENT_COUNT} -s ${SENDER_EVENT_SIZE}"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender hostname: $(hostname)"
-            echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] Debug: Sender IP: $(hostname -i)"
             apptainer run --pwd /app ${SIF_FILE} sender \
-                -i ${EMU_IP} \
-                -p ${SENDER_PORT} \
-                -c ${SENDER_EVENT_COUNT} \
-                -s ${SENDER_EVENT_SIZE} \
+                --host ${EMU_IP} \
+                --port ${BASE_PORT} \
+                --avg-rate-mbps ${AVG_RATE} \
+                --rms-fraction ${RMS} \
+                --duty-cycle ${DUTY} \
+                --nic-limit-gbps ${NIC} \
                 2>${LOG_DIR}/sender/apptainer.log
             
             # Check if sender process completed successfully

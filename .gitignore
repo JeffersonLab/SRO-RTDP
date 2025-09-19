@@ -4,12 +4,9 @@ __pycache__
 
 # Java Binary files
 *.class
-
-# graphviz flowchart files
-*.gv
-*.pdf
-
-# logfiles
+*.jar
+output/
+*.pcap
 *.log
 
 # built files
@@ -36,3 +33,6 @@ grafana-data/
 # SQLite3 DB files
 *.db
 .nfs*
+
+# Add output directory with large binary files
+output/
