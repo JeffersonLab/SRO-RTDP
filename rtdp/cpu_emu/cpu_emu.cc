@@ -183,7 +183,7 @@ void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t 
         }
         if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << time_span_Sd.count() << " secs "  << " size " << nmrd_B << endl;
     }
-    delete x;
+    delete[] x;
 }
 
 map<string,string> mymap;
