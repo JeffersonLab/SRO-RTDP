@@ -2,7 +2,7 @@ cmp_ltnc_nS_B:    500      # Processing latency in nsec/byte input: 500 calibrat
 output_size_GB:   0.00006 # Output size in GB
 nic_Gbps:         100      # Outbound NIC speed in Gbps for sim_mode
 frame_sz_MB:      0.06     # Frame Size MB
-frame_cnt:        100      # Numbers frames sender will send
-cmpnt_cnt:        3        # Number of cpu_sim components
-avg_bit_rt_Gbps:  0.0175    # Sender bit rate Gbps #0.015
+frame_cnt:        100     # Numbers frames sender will send
+cmpnt_cnt:        6        # Number of cpu_sim components
+avg_bit_rt_Gbps:  0.01    # Sender bit rate Gbps #0.015
  
