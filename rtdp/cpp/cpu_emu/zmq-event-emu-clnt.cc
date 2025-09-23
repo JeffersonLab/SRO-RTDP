@@ -50,10 +50,10 @@ void   Usage()
         "\nUsage: \n\
         -h help  \n\
         -a stream/channel id (0) \n\
-        -p publication port (7000) \n\
+        -p publication port (8888) \n\
         -r bit rate to send (Gbps) (1)\n\
-        -c event count (1e3) \n\
-        -v verbose = 0/1 (0)  \n\
+        -c event count (100) \n\
+        -v verbose = 0/1 (1)  \n\
         -s event size (MB) (1) \n\n";
 
     cout << " [emulate_stream]: " << usage_str;
@@ -64,12 +64,12 @@ int main (int argc, char *argv[])
 {
     int optc;
 
-    uint16_t pub_prt       = 0;     // target port
-    uint16_t stream_id     = 0;  // stream or channel id
-    uint64_t evnt_cnt      = 1e3;    // event count
-    float    evnt_szMB     = 1;    // event size (MB)
-    float    bit_rate_gbps = 1; // sending bit rate in Gbps
-    bool     vrbs          = false; // verbose ?
+    uint16_t pub_prt        = 8888;     // target port
+    uint16_t stream_id      = 0;  // stream or channel id
+    uint64_t evnt_cnt       = 1e2;    // event count
+    float    evnt_sz_MB     = 1;    // event size (MB)
+    float    bit_rate_gbps  = 1; // sending bit rate in Gbps
+    bool     vrbs           = true; // verbose ?
 
     cout << std::fixed << std::setprecision(1);
 
@@ -97,8 +97,8 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -r " << bit_rate_gbps;
             break;
         case 's':
-            evnt_szMB = (float) atof((const char *) optarg) ;
-            if(DBG) cout << " -s " << evnt_szMB;
+            evnt_sz_MB = (float) atof((const char *) optarg) ;
+            if(DBG) cout << " -s " << evnt_sz_MB;
             break;
         case 'v':
             vrbs = (bool) atoi((const char *) optarg) ;
@@ -147,7 +147,7 @@ int main (int argc, char *argv[])
 
         // Send  "frame"
         auto x = clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
-        vector<uint8_t> payload(size_t(M_1*evnt_szMB*x));
+        vector<uint8_t> payload(size_t(M_1*evnt_sz_MB*x));
         
         if(DBG) cout << now_uS+1 << " [emulate_stream:] serializing packet for frame_num " << frame_num << endl;
         auto data = serialize_packet(now_uS, pub_prt, payload.size(), now_uS, stream_id, frame_num, payload);

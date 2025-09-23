@@ -1,9 +1,9 @@
 latency:        500         # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
-mem_footprint:  0.05        # Memory footprint in GB
+mem_footprint:  0.01        # Memory footprint in GB
 output_size:    0.0000572   # Output size in GB
 sbscrptn_ip:    127.0.0.1
-sub_prt:        7000
-pub_prt:        7001
+sub_prt:        8888
+pub_prt:        8889
 sleep:          0           # if 0 burn cpu else sleep
 threads:        1
 verbose:        1           # verbosity level
