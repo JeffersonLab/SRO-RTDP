@@ -293,9 +293,9 @@ int main (int argc, char *argv[])
     // 500 seconds/(input GB) computational latency for 60kB CLAS12
     // 0.5 microseconds/byte
     // 0.5 seconds per megabyte
-    double   cmpLt_S_GB = 500;      // seconds/(input GB) computational latency
+    double   cmpLt_S_GB = 100;      // seconds/(input GB) computational latency
     double   mem_GB     = 0.01;     // thread memory footprint in GB
-    double   otmem_GB   = 0.000057; // program output in GB
+    double   otmem_GB   = 0.0000572; // program output in GB
     uint64_t frame_cnt  = 100;      //total frames sender will send
 
     cout << fixed << setprecision(7);  // 6 decimal places            

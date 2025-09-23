@@ -35,13 +35,13 @@ the structure of <yaml_file> is as follows:
         mem_footprint:	0.01			# Thread Memory footprint in GB
         output_size:	0.0000572		# Destination Output size in GB
         sbscriptn_ip:	"127.0.0.1"		# ZMQ subsciption IP
-        sub_port:		8888			# ZMQ subsciption port port
-        pub_port:		8888			# ZMQ puclication port port
-        sleep:			0				# if 1, sleep versus burn cpu cycles
-        threads:		5				# number of independent threads to spawn
-        verbose:		1				# verbosity level (currently only 0/1) if > 0, write something chat to stdout
+        sub_port:       8888            # ZMQ subsciption port
+        pub_port:       8888			# ZMQ puclication port
+        sleep:			0               # if 1, sleep versus burn cpu cycles
+        threads:		1               # number of independent threads to spawn
+        verbose:		1				# verbosity level (currently only 0/1) if > 0, write something to stdout
         terminal:		0				# if 1, do not forward result to a destination
-		frame_cnt:		1000			# number of frames expected in the run
+        frame_cnt:		1000			# number of frames expected in the run
 
 Any of the <yaml_file> settings may be overidden at the command line via the following options:
 
@@ -49,11 +49,11 @@ Any of the <yaml_file> settings may be overidden at the command line via the fol
 
 	cpu_emu Usage: 
 	        -h help  
-	        -b Processing latency in nsec/byte frame size	(default 500)
+	        -b Processing latency in nsec/byte frame size	(default 100)
 	        -f total frames sender will send				(default 100)
 	        -i subscription address							(default 127.0.0.1)  
 	        -m thread memory footprint in GB				(deafult 0.01)
-	        -o output size in GB							(default 0.000057)
+	        -o output size in GB							(default 0.0000572)
 	        -p subscription port							(default = 8888)  
 	        -r publish port									(default = 8889)  
 	        -s sleep versus burn cpu = 0/1					(default = false = 0)  
@@ -73,9 +73,11 @@ Any of the <yaml_file> settings may be overidden at the command line via the fol
 	        -c event count				(default 100) 
 	        -v verbose = 0/1			(default 1 = true)  
 	        -s event size (MB)			(default 1) 
+
 ## Report Processing
 
-The sender and each cpu_emu component should be executed with -v 1 and stdout redirected to a file.  All component output files plus the sender output file should be combined into a single file (order arbitray).  This conglomerate output file  is the input file to the python notebook file emu_rprt.ipynb that will produce various graphs and statistics of the run metrics.
+The sender and each cpu_emu component should be executed with -v 1 and stdout redirected to a file.  All component output files plus the sender output file should be combined into a single file (order arbitray).  This conglomerate output file is the input file to the python notebook file emu_rprt.ipynb that will produce various graphs and statistics of the run metrics.
+
 
 # Simulation
 
@@ -91,19 +93,19 @@ Note that numpy may need to be upgraded as
 
 Parameters for the simulation are set in the yaml file cpu_sim.yaml with structure as follows:
 
-	cmp_ltnc_nS_B:    500		# Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
-	output_size_GB:   0.000057	# Output size in GB
-	nic_Gbps:         100		# Outbound NIC/Network speed in Gbps for sim_mode
-	frame_sz_MB:      0.06		# Frame Size MB
+	cmp_ltnc_nS_B:    100		# Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
+	output_size_GB:   0.0000572	# Output size in GB
+	nic_Gbps:         100		# Outbound NIC/Network speed in Gbps
+	frame_sz_MB:      0.0572	# Frame Size MB
 	frame_cnt:        100		# Numbers frames sender will send
-	cmpnt_cnt:        3			# Number of cpu_sim components
+	cmpnt_cnt:        3			# Number of simulated cpu_emu components
 	avg_bit_rt_Gbps:  0.01		# Sender bit rate Gbps
 
 The simulation is excuted as follows:
 
 	$ python3
 	>>> from rtdp import RTDP
-	>>> rtdp = RTDP(rng_seed=7, log_file="z.txt")
+	>>> rtdp = RTDP(rng_seed=7, log_file="z.txt", sim_config="cpu_sim.yaml")
 	>>> rtdp.sim()
 	>>> rtdp.plot_all()
 
