@@ -776,7 +776,7 @@ class RTDP:
             plt.savefig(f"Cmpnt_{i}_RcvFrmRtDlt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
-    def plot_rcv_recv_bit_rate(self):
+    def plot_rcv_bit_rate(self):
         """
         Plotting procedure
 
@@ -1092,7 +1092,7 @@ class RTDP:
         self.plot_send_bit_rate()
         self.plot_rcv_frm_rate()
         self.plot_rcv_frm_dlta()
-        self.plot_rcv_recv_bit_rate()
+        self.plot_rcv_bit_rate()
         self.plot_cmp_ltnc()
         self.plot_ntwrk_ltnc()
         self.plot_frm_rcv()

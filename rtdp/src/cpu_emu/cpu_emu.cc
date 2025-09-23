@@ -70,13 +70,13 @@ void   Usage()
     char usage_str[] =
         "\nUsage: \n\
         -h help  \n\
-        -b seconds thread latency per GB input \n\
+        -b Processing latency in nsec/byte frame size \n\
         -f total frames sender will send  \n\
         -i subscription address (string)  \n\
         -m thread memory footprint in GB  \n\
         -o output size in GB  \n\
         -p subscription port (default = 8888)  \n\
-        -r publish port (default = 8888)  \n\
+        -r publish port (default = 8889)  \n\
         -s sleep versus burn cpu = 0/1 (default = false = 0)  \n\
         -t num threads (default = 10)  \n\
         -v verbose = 0/1 (default = false = 0)  \n\
@@ -84,6 +84,8 @@ void   Usage()
         -z act as terminal node = 0/1 (default = false = 0)  \n\n";
 
     cout << "[cpu_emu]: " << usage_str;
+    cout << "Either -i required or -y" << "\n\n";
+
 }
 
 #include <iostream>
@@ -141,7 +143,7 @@ static mt19937 gen(rd());
 // Computational Function to emulate/stimulate processing load/latency, etc. 
 void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t tag, bool vrbs=false) 
 { 
-    const float ts_S(cmpLt_S_GB*nmrd_B/(G_1)); //reqd timespan in seconds
+    const float ts_S(cmpLt_S_GB*nmrd_B/(G_1)); //reqd timespan in seconds   ////// fix this for proper units
     size_t memSz = mem_GB*sz1G; //memory footprint in bytes
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
     if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(sz1K*sz1K*sz1K)) << " Gbytes ..." << endl;
@@ -281,20 +283,20 @@ int main (int argc, char *argv[])
     bool     psdP=false, psdR=false, psdS=false, psdT=false, psdV=false;
     bool     psdZ=false, psdF=false;
     string   yfn = "cpu_emu.yaml";
-    char     sub_ip[INET6_ADDRSTRLEN];	// subscription ip
+    char     sub_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// subscription ip
     uint16_t sub_prt = 8888;  // subscription port default
     uint16_t pub_prt = 8889;  // publication port default
-    auto     nmThrds = 5;     // default
-    bool     vrbs    = false; // verbose ?
+    auto     nmThrds = 1;     // default
+    bool     vrbs    = true; // verbose ?
     bool     wlSlp   = false; // will sleep versus burn cpu ?
     bool     trmnl   = false; // am I a terminal node or a pass-thru ?
     // 500 seconds/(input GB) computational latency for 60kB CLAS12
     // 0.5 microseconds/byte
     // 0.5 seconds per megabyte
-    double   cmpLt_S_GB = 500;   // seconds/(input GB) computational latency
-    double   mem_GB     = 0.01;  // thread memory footprint in GB
-    double   otmem_GB   = 0.01;  // program output in GB
-    uint64_t frame_cnt  = 0;     //total frames sender will send
+    double   cmpLt_S_GB = 500;      // seconds/(input GB) computational latency
+    double   mem_GB     = 0.01;     // thread memory footprint in GB
+    double   otmem_GB   = 0.000057; // program output in GB
+    uint64_t frame_cnt  = 100;      //total frames sender will send
 
     cout << fixed << setprecision(7);  // 6 decimal places            
 
@@ -306,7 +308,7 @@ int main (int argc, char *argv[])
             Usage();
             exit(1);
         case 'b':
-            cmpLt_S_GB = (double) atof((const char *) optarg) ;
+            cmpLt_S_GB = (double) atof((const char *) optarg) ; ////// fix this for proper units
             psdB = true;
             if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -b " << cmpLt_S_GB << endl;
             break;
@@ -374,7 +376,7 @@ int main (int argc, char *argv[])
 
     if(DBG) cout << endl;
 
-    if(!(psdI && psdP && psdZ) || (!trmnl && !psdR)) {Usage(); exit(1);}
+    if(!(psdI  || psdY)) {Usage(); exit(1);}
 
     if (psdY) {//parse the yaml file if given        
         parse_yaml(yfn.c_str(), pub_prt, vrbs);
