@@ -1,0 +1,11 @@
+frm_sz_MB:          0.0586
+frm_cnt:            100        # Numbers frms sender will send
+avg_bit_rt_Gbps:    1
+verbosity:          1           # verbosity level
+base_port:          6000
+sender:             129.57.177.3
+hosts:
+  - 129.57.177.4
+  - 129.57.177.5
+  - 129.57.177.6
+

@@ -448,9 +448,9 @@ class RTDP:
 
 #-----------------------------------------------------
 
-    def emulate(self, file="cpu_emu.yaml", prog="cpu_emu"):
+    def emulate(self, config="emulate.yaml", prog="cpu_emu"):
         """
-        emulate component daisy chain
+        setup component daisy chain
 
         Parameters
         ----------
@@ -466,14 +466,14 @@ class RTDP:
 
         # parse config file
         try:
-            with open(file, "r") as f:
-                self.emu_config = yaml.safe_load(f)
-            self.emu_prog = prog
-            print(f"[INFO] Loaded config from {file}")
+            with open(config, "r") as f:
+                emu_setup_prms = yaml.safe_load(f)
+            print(f"[INFO] Loaded config from {config}")
         except Exception as e:
             print(f"[ERROR] Failed to load YAML config: {e}")
             return
 
+        """
         try:
             cmpnt_cnt       = self.emu_config["cmpnt_cnt"]
             base_port       = self.emu_config["base_port"]
@@ -502,40 +502,50 @@ class RTDP:
         prm_verbosity       =   int(prmtrs_df['verbosity'].iloc[0])
         prm_base_port       =   int(prmtrs_df['base_port'].iloc[0])
         prm_ip_list         = self.emu_config.get("hosts", [])
+        """
         
-        current_p = prm_base_port
-        current_r = prm_base_port + 1
+        try:
+            frm_sz_MB       = emu_setup_prms["frm_sz_MB"]
+            frm_cnt         = emu_setup_prms["frm_cnt"]
+            avg_bit_rt_Gbps = emu_setup_prms["avg_bit_rt_Gbps"]
+            verbosity       = emu_setup_prms["verbosity"]
+            base_port       = emu_setup_prms["base_port"]
+            sender          = emu_setup_prms["sender"]
+            host_ip_list    = emu_setup_prms.get("hosts", [])
+        except KeyError as e:
+            print(f"[ERROR] Missing required config key: {e}")
+            return
+
+        if(len(host_ip_list) < 1):
+            print(f"[ERROR] Incorrect hosts list in config file")
+            return
+
+        sender_ip_list = [sender] + host_ip_list
+        
+        current_p = base_port
+        current_r = base_port + 1
 
         # setup and deploy components
-        # for idx, ip in enumerate(prm_ip_list[1:], start=1):
-        for idx, ip in enumerate(prm_ip_list):
+        # for idx, ip in enumerate(host_ip_list[1:], start=1):
+        
+        remote_log = f"~/{prog}.log"
 
-            if(len(prm_ip_list) < 2):
-                print(f"[ERROR] Incorrect hosts list in config file")
-                return
+        for idx, ip in enumerate(host_ip_list):
 
-            if(idx == 0): continue  #first host is sender
-            
-            z_val = 1 if idx == len(prm_ip_list) - 1 else 0
+            z_val = 1 if idx == (len(host_ip_list) - 1) else 0
 
             cmd = [
                 f"~/{prog}",
-                "-b", "100",            # placeholder latency per GB
-                "-f", str(prm_frm_cnt),
-                "-i", prm_ip_list[idx-1],
-                "-m", "0.001",            # memory footprint GB
-                "-o", "0.001",            # output size GB
+                "-f", str(frm_cnt),
+                "-i", sender_ip_list[idx],
                 "-p", str(current_p),
                 "-r", str(current_r),
-                "-s", "1",
-                "-t", "1",
-                "-v", "1",
-#                "-y", file,
-                "-z", str(z_val)
+                "-z", str(z_val),
+                f"> {remote_log} 2>&1"
             ]
 
-#            print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}")
-            print(f"[INFO] Deploying {prog} to {ip}")
+            print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}", file=self.log_file)
+#            print(f"[INFO] Deploying {prog} to {ip}")
 
             try:
                 subprocess.run(
@@ -544,12 +554,12 @@ class RTDP:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-                print(f"[INFO] Copied {prog} to {ip}:~/{prog}")
+                print(f"[INFO] Copied {prog} to {ip}:~/{prog}", file=self.log_file)
             except subprocess.CalledProcessError as e:
-                print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}")
-                continue
+                print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}", file=self.log_file)
+                return #continue
 
-            print(f"[INFO] Starting {prog} on {ip}: {' '.join(cmd)}")
+            print(f"[INFO] Starting {prog} on {ip}: {' '.join(cmd)}", file=self.log_file)
 
             try:
 #                ssh_cmd = ["ssh", ip, f"chmod +x ~/{prog} && ~/{prog} {' '.join(cmd[1:])}"]
@@ -558,7 +568,8 @@ class RTDP:
 #                    f"chmod +x ~/{prog} && nohup ~/{prog} {' '.join(cmd[1:])} > /dev/null 2>&1 &"
 #                ] #Redirects standard error to where stdout is currently going
                 ssh_cmd = [
-                    "ssh", "-n", "-T", ip,
+                    #"ssh", "-n", "-T", ip,
+                    "ssh", ip,
                     f"chmod +x ~/{prog} && nohup ~/{prog} {' '.join(cmd[1:])} > ~/{prog}.out 2>&1 &"
                 ]
 #                subprocess.run(
@@ -572,77 +583,95 @@ class RTDP:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
 )
-                print(f"[INFO] Successfully started {prog} on {ip}")
+                print(f"[INFO] Successfully started {prog} on {ip}", file=self.log_file)
             except subprocess.CalledProcessError as e:
-                print(f"[ERROR] Failed to run {prog} on {ip}: {e.stderr.decode().strip()}")
-                continue
+                print(f"[ERROR] Failed to run {prog} on {ip}: {e.stderr.decode().strip()}", file=self.log_file)
+                return #continue
 
             current_p = current_r
             current_r = current_p + 1
-            print("(End of emulate method)")
+            
+        print("(End of emulate method)")
 
-    def send_emu(self, sender="zmq-event-emu-clnt"):
+
+#    def send_emu(self, sender="zmq-event-emu-clnt", channel=0, pub_prt=6000, bit_rate_Gbps=1, frame_cnt=100, verbosity=1, frame_sz_MB=0.0586, host="127.0.0.1"):
+    def send_emu(self, config="emulate.yaml", prog="zmq-event-emu-clnt"):
         """
         Send emulation command to the *first host* in the config.
         If no args passed, defaults to YAML values.
         """
+
+        """
         if not self.emu_config or not self.emu_prog:
             print("[ERROR] Config not loaded. Run emulate() first.")
             return
-
-        #frm_sz_MB  = frm_sz_MB  if frm_sz_MB  is not None else self.emu_config.get("frm_sz_MB")
-        #frm_cnt = frm_cnt if frm_cnt is not None else self.emu_config.get("frm_cnt")
-        #avg_bit_rt_Gbps  = avg_bit_rt_Gbps  if avg_bit_rt_Gbps  is not None else self.emu_config.get("avg_bit_rt_Gbps")
-
-        if not prm_ip_list:
-            print("[ERROR] No hosts defined in config.")
+        """
+        
+        # parse config file
+        try:
+            with open(config, "r") as f:
+                emu_setup_prms = yaml.safe_load(f)
+            print(f"[INFO] Loaded config from {config}")
+        except Exception as e:
+            print(f"[ERROR] Failed to load YAML config: {e}")
             return
 
-        first_ip = prm_ip_list[0]
+        try:
+            frm_sz_MB       = emu_setup_prms["frm_sz_MB"]
+            frm_cnt         = emu_setup_prms["frm_cnt"]
+            avg_bit_rt_Gbps = emu_setup_prms["avg_bit_rt_Gbps"]
+            verbosity       = emu_setup_prms["verbosity"]
+            base_port       = emu_setup_prms["base_port"]
+            sender          = emu_setup_prms["sender"]
+        except KeyError as e:
+            print(f"[ERROR] Missing required config key: {e}")
+            return
 
-        print(f"Sender is {first_ip}")
+        print(f"Sender is {sender}")
 
-        print(f"[INFO] Deploying {sender} to {ip}")
-
+        print(f"[INFO] Deploying {prog} to {sender}")
+ 
         try:
             subprocess.run(
-                ["scp", sender, f"{ip}:~/{sender}"],
+                ["scp", prog, f"{sender}:~/{prog}"],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
-            print(f"[INFO] Copied {sender} to {ip}:~/{sender}")
+            print(f"[INFO] Copied {prog} to {sender}:~/{prog}")
         except subprocess.CalledProcessError as e:
-            print(f"[ERROR] Failed to copy binary to {ip}: {e.stderr.decode().strip()}")
+            print(f"[ERROR] Failed to copy binary to {sender}: {e.stderr.decode().strip()}")
             return
 
-        print(f"[INFO] Starting {sender} on {ip}: {' '.join(cmd)}")
 
         #prm_base_port       =   int(prmtrs_df['base_port'].iloc[0])
         # Build command to send
+        remote_log = f"~/{prog}.log"
+
         cmd = [
-            f"~/{sender}",
-            "-c", str(prm_frm_cnt),
-            "-s", str(prm_frm_sz_MB),
-            "-r", str(prm_avg_bit_rt_Gbps),
-            "-a", "1",
-            "-p", str(prm_base_port),
-            "-v", "1"
+            f"~/{prog}",
+            "-c", str(frm_cnt),
+            "-s", str(frm_sz_MB),
+            "-r", str(avg_bit_rt_Gbps),
+            "-a", "0",
+            "-p", str(base_port),
+            "-v", str(verbosity),
+            f"> {remote_log} 2>&1"
         ]
 
-        print(f"[INFO] Sending emulatied data from {first_ip}: {' '.join(cmd)}")
+        print(f"[INFO] Starting {prog} on {sender}: {' '.join(cmd)}")
 
         try:
-            ssh_cmd = ["ssh", first_ip, " ".join(cmd)]
+            ssh_cmd = ["ssh", sender, " ".join(cmd)]
             subprocess.run(
                 ssh_cmd,
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
-            print(f"[INFO] Emulation command sent successfully to {first_ip}")
+            print(f"[INFO] Emulation command sent successfully to {sender}")
         except subprocess.CalledProcessError as e:
-            print(f"[ERROR] Failed to send emulation to {first_ip}: {e.stderr.decode().strip()}")
+            print(f"[ERROR] Failed to send emulation sender to {sender}: {e.stderr.decode().strip()}")
 
 
 #-----------------------------------------------------
@@ -1118,8 +1147,8 @@ if __name__ == "__main__":
 #>>> from rtdp import RTDP
 #>>> rtdp = RTDP(rng_seed=7, log_file="z.txt")
 #>>> rtdp.sim()
-#>>> rtdp.emulate(file="cpu_emu.yaml", prog="cpu_emu")   # deploys daisy chain
-#>>> rtdp.send_emu(frm_sz=2, frm_cnt=100, bit_rt=10)  # triggers sender on first host
+#>>> rtdp.emulate(config="emulate.yaml", prog="cpu_emu")   # deploys daisy chain
+#>>> rtdp send_emu(self, config="emulate.yaml", sender="zmq-event-emu-clnt", host="129.57.177.8"):
 
 #>>> rtdp.plot_all()
 #$ for f in *.png; do eog "$f" & done
@@ -1127,23 +1156,8 @@ if __name__ == "__main__":
 #$ killall eog
 #$ rm *png *txt
 
-# Example blah.yaml
 
-# cmpnt_cnt: 10
-# base_port: 6000
-# avg-rate: 20
-# frm_cnt: 500
-# frm_sz: 1
-# bit_rt: 10
-# hosts:
-#   - 192.168.1.10
-#   - 192.168.1.11
-#   - 192.168.1.12
-
-# bp = BatchProcessor()
-# bp.emulate(file="blah.yaml", prog="xyz")   # deploys daisy chain
-# bp.send_emu(frm_sz=2, frm_cnt=1000, bit_rt=50)  # triggers sender on first host
-
+# for numpy:
 #plt.plot(
 #    (u_1 * sim_tm_uS.values) / 60,
 #    btRt_Mbps.values,
