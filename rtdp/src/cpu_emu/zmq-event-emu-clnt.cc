@@ -71,7 +71,7 @@ int main (int argc, char *argv[])
     float    bit_rate_gbps  = 1; // sending bit rate in Gbps
     bool     vrbs           = true; // verbose ?
 
-    cout << std::fixed << std::setprecision(1);
+    cout << std::fixed << std::setprecision(7);
 
     while ((optc = getopt(argc, argv, "a:hp:c:r:s:v:")) != -1)
     {

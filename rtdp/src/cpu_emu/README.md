@@ -76,7 +76,7 @@ Any of the <yaml_file> settings may be overidden at the command line via the fol
 
 ## Report Processing
 
-The sender and each cpu_emu component should be executed with -v 1 and stdout redirected to a file.  All component output files plus the sender output file should be combined into a single file (order arbitray).  This conglomerate output file is the input file to the python notebook file emu_rprt.ipynb that will produce various graphs and statistics of the run metrics.
+The sender and each cpu_emu component should be executed with -v 1 and stdout redirected to a file.  All component output files plus the sender output file should be combined into a single file (order arbitrary).  This conglomerate output file is the input file to the python notebook file emu_rprt.ipynb that will produce various graphs and statistics of the run metrics.
 
 
 # Simulation
