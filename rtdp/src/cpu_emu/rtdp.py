@@ -19,6 +19,8 @@ from scipy.stats import skew, kurtosis
 from pandas import json_normalize
 
 sns.set(style="darkgrid")
+#-----------------------------------------------------
+#-----------------------------------------------------
 
 # Multiplicative scaling constants
 B_b   = 1e1
@@ -49,6 +51,24 @@ u_n   = 1/n_u
 sz1K  = 1024
 sz1M  = sz1K*sz1K
 sz1G  = sz1M*sz1K
+#-----------------------------------------------------
+# Compute statistical moments: mean, std, skewness, kurtosis
+def compute_moments(series):
+    values = series #.dropna()
+    return {
+        'count': len(values),
+        'mean': values.mean(),
+        'std': values.std(),
+        'skew': skew(values),
+        'kurtosis': kurtosis(values)
+    }
+#-----------------------------------------------------
+
+# Load the log file into a list of lines
+def load_log_file(path):
+    with open(path, 'r') as f:
+        lines = f.readlines()
+    return [line.strip() for line in lines if line.strip()]
 #-----------------------------------------------------
 import subprocess
 
@@ -88,6 +108,8 @@ def launch_remote(ip, cmd, prog):
         print(f"[ERROR] Failed to launch remote process: {e}", flush=True)
         return None
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 
 def launch_emulate(ip, cmd, prog):
     """
@@ -104,6 +126,8 @@ def launch_emulate(ip, cmd, prog):
 
     print("(End of launch_emulate)", flush=True)
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 
 def bernoulli(p: float, n: int = 1, rng: Optional[Union[random.Random, np.random.Generator]] = None) -> List[int]:
     """
@@ -146,6 +170,8 @@ def bernoulli(p: float, n: int = 1, rng: Optional[Union[random.Random, np.random
 # print(bernoulli(0.001, n=10, rng=np_rng))
 
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 class RTDP:
     def __del__(self):
         """
@@ -162,6 +188,8 @@ class RTDP:
         """
         self.log_file.close()
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     def __init__(self, rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt", sim_config="cpu_sim.yaml"):
         """
         initializer for implicit constructor
@@ -247,6 +275,10 @@ class RTDP:
         self.prm_cmpnt_cnt       =   int(prmtrs_df['cmpnt_cnt'].iloc[0])
         self.prm_avg_bit_rt_Gbps = float(prmtrs_df['avg_bit_rt_Gbps'].iloc[0])
         #-----------------------------------------------------
+
+        #set of all frame numbers from sender
+        self.cnst_all_frm_set = set(range(1, self.prm_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
+
         # Network Latency Samples
 
         # Target mean and std
@@ -348,6 +380,8 @@ class RTDP:
         plt.savefig("CmpntOtptSzSmpls.png", dpi=300, bbox_inches="tight")  #plt.show()
         #-----------------------------------------------------
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     # Compute statistical moments: mean, std, skewness, kurtosis
     def compute_moments(self, series):
         """
@@ -370,6 +404,8 @@ class RTDP:
             'kurtosis': kurtosis(values)
         }
     #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     # Compute Moving Avg
     def moving_average(self, a, n=5):
         """
@@ -389,6 +425,8 @@ class RTDP:
         return ret[n-1:] / n
     #-----------------------------------------------------
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     def gen_gamma_samples(self, mean, stdev, n_samples):
         """
         Generate n_samples from a Gamma distribution with given mean and stdev.
@@ -409,6 +447,8 @@ class RTDP:
 
         return self.rng.gamma(shape, scale, n_samples)
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     def sim(self):
         """
         simulate component daisy chain
@@ -421,9 +461,6 @@ class RTDP:
         -------
             none
         """
-
-        #set of all frame numbers from sender
-        self.cnst_all_frm_set = set(range(1, self.prm_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
 
         # set all component clocks to zero; component 0 is the sender
         clk_uS = np.zeros(self.prm_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
@@ -506,6 +543,8 @@ class RTDP:
 
 
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     def emulate(self, config="emulate.yaml", prog="cpu_emu"):
         """
         setup component daisy chain
@@ -583,6 +622,8 @@ class RTDP:
         print("(End of emulate method)", flush=True)
 
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     def send_emu(self, config="emulate.yaml", prog="zmq-event-emu-clnt"):
         """
         Send emulation command to the *first host* in the config.
@@ -643,10 +684,192 @@ class RTDP:
             print(f"[INFO] Emulation command sent successfully to {sender}", flush=True)
         except subprocess.CalledProcessError as e:
             print(f"[ERROR] Failed to send emulation sender to {sender}: {e.stderr.decode().strip()}", flush=True)
-
-
 #-----------------------------------------------------
+    def parse_emu_logs(self, log_path="emu_log.txt"):
+        # Load and inspect
+        lines = load_log_file(log_path)
+        print(f"Loaded {len(lines)} lines from the log.")
+        # Extract lines with frame send information for sender
+        frame_rate_lines = [line for line in lines if "[emulate_stream:] Sending frame size" in line]
+        min_uS = 1e30
+        fs_value = pd.NA
+        ts_value = pd.NA
+        fn_match = pd.NA
+        # Parse frame rate values from lines
+        #First determine 'min_uS' value to achieve zero offset clock
+        for line in frame_rate_lines:
+            ts_match = re.search(r"^([\d.]+)", line)
+            if ts_match:
+                ts_value = float(ts_match.group(1) if ts_match else None)
+                min_uS = min(ts_value, min_uS)
+            else:
+                print("No ts_match")
 
+        for line in frame_rate_lines:
+            fs_match = re.search(r"Sending frame size = ([\d.]+)", line)
+            if fs_match:
+                fs_value = B_b*float(fs_match.group(1))
+            else:
+                print("No fs_match")
+            ts_match = re.search(r"^([\d.]+)", line)
+            if ts_match:
+                ts_value = float(ts_match.group(1) if ts_match else None) - min_uS
+            else:
+                print("No ts_match")
+            fn_match = re.search(r"\(([\d.]+)\)", line)
+            if fn_match:
+                fn_value = float(fn_match.group(1) if fn_match else None)
+            else:
+                print("No fn_match")
+            row = (int(0),float(ts_value),int(fn_value),float(fs_value))
+            self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
+        #determine emulation port range
+        #port_lines = [line for line in lines if "Connecting to receiver tcp" in line]
+        cmpnt_ids = []
+        port_lines = [line for line in lines if "Subscribing to" in line]
+        #port_lines
+        for line in port_lines:
+            match = re.search(r"cpu_emu ([\d.]+)", line)
+            if match:
+                value = float(match.group(1))
+                cmpnt_ids.append(int(value))
+            else:
+                print("No match in port line:", line)
+        # Extract lines with frame send information all components
+        for index, cmpnt_id in enumerate(cmpnt_ids):
+            fs_value = pd.NA
+            ts_value = pd.NA
+            fn_value = pd.NA
+            frame_send_lines = [line for line in lines if f"[cpu_emu {cmpnt_id}]:  Sending frame size" in line]    
+            for line in frame_send_lines:
+                fs_match = re.search(r"Sending frame size = ([\d.]+)", line)
+                if fs_match:
+                    fs_value = B_b*float(fs_match.group(1))
+                else:
+                    print("No fs_match")
+                ts_match = re.search(r"^([\d.]+)", line)
+                if ts_match:
+                    ts_value = float(ts_match.group(1) if ts_match else None) - min_uS
+                else:
+                    print("No ts_match")
+                fn_match = re.search(r"\(([\d.]+)\)", line)
+                if fn_match:
+                    fn_value = int(fn_match.group(1) if fn_match else None)
+                else:
+                    print("No fn_match")
+                row = (int(index+1),float(ts_value),int(fn_value),float(fs_value))
+                self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)    
+        # Extract lines with frame rcv information all components
+        for index, cmpnt_id in enumerate(cmpnt_ids):
+            ts_value = pd.NA
+            fn_value = pd.NA
+            frame_rcv_lines = [line for line in lines if f"[cpu_emu {cmpnt_id}]:  recd " in line]
+            for line in frame_rcv_lines:
+                ts_match = re.search(r"^([\d.]+)", line)
+                if ts_match:
+                    ts_value = float(ts_match.group(1) if ts_match else None) - min_uS
+                else:
+                    print("No ts_match")
+                fn_match = re.search(r"recd ([\d.]+)", line)
+                if fn_match:
+                    fn_value = int(fn_match.group(1))
+                else:
+                    print("No fn_match")
+                # New row with only some columns filled
+                row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "rcd_uS": ts_value}])        
+                # Concatenate
+                self.prcsdFrms_df = pd.concat([self.prcsdFrms_df, row], ignore_index=True)
+        # Extract lines with frame done information all components
+        for index, cmpnt_id in enumerate(cmpnt_ids):
+            ts_value = pd.NA
+            fn_value = pd.NA
+            frame_don_lines = [line for line in lines if f"[cpu_emu {cmpnt_id}]:  done" in line]
+            for line in frame_don_lines:
+                ts_match = re.search(r"^([\d.]+)", line)
+                if ts_match:
+                    ts_value = float(ts_match.group(1) if ts_match else None) - min_uS
+                else:
+                    print("No ts_match")
+                fn_match = re.search(r"done \(([\d.]+)\)", line)
+                if fn_match:
+                    fn_value = int(fn_match.group(1))
+                else:
+                    print("No fn_match")
+                # New row with only some columns filled
+                row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "done_uS": ts_value}])        
+                # update done_uS
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "done_uS"] = ts_value
+        # Extract lines with frame size information all components
+        for index, cmpnt_id in enumerate(cmpnt_ids):
+            fs_value = pd.NA
+            fn_match = pd.NA
+            frame_sz_lines = [line for line in lines if f"[cpu_emu {cmpnt_id}]:" in line and "actual" in line]
+            for line in frame_sz_lines:
+                fn_match = re.search(r"\(([\d.]+)\)$", line)
+                if fn_match:
+                    fn_value = int(fn_match.group(1))
+                else:
+                    print("No fn_match")
+                fs_match = re.search(r"\(actual\) ([\d.]+)", line)
+                if fs_match:
+                    fs_value = B_b*float(fs_match.group(1))
+                else:
+                    print("No fs_match")
+                # update frm_sz_b
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "frm_sz_b"] = fs_value
+                # update snt_uS by reteiving value from sentFrms_df
+                if cmpnt_id != max(cmpnt_ids): #not the last or sink component
+                    snt_uS = self.sentFrms_df.loc[(self.sentFrms_df["component"] == int(index+1)) & (self.sentFrms_df["frm_nm"] == fn_value), "snt_uS"].iloc[0]
+                    self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "snt_uS"] = snt_uS
+        # Extract lines with frame size information all components
+        for index, cmpnt_id in enumerate(cmpnt_ids):
+            fs_value = pd.NA
+            fn_value = pd.NA
+            cl_value = pd.NA
+            nl_value = pd.NA
+            frame_ltnc_lines = [line for line in lines if f"[cpu_emu {cmpnt_id}]:" in line and "Measured latencies" in line]
+            for line in frame_ltnc_lines:
+                fn_match = re.search(r"\(([\d.]+)\)$", line)
+                if fn_match:
+                    fn_value = int(fn_match.group(1))
+                else:
+                    print("No fn_match")
+                cl_match = re.search(r"last_cmp_lat_uS = ([\d.]+)", line)
+                if cl_match:
+                    cl_value = float(cl_match.group(1))
+                else:
+                    print("No cl_match")
+                nl_match = re.search(r"last_nw_lat_uS = ([\d.]+)", line)
+                if nl_match:
+                    nl_value = float(nl_match.group(1))
+                else:
+                    print("No cl_match")
+                # update done_uS
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "cmp_ltnc_uS"] = cl_value
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "ntwrk_lt_uS"] = nl_value
+        # Extract lines with frame rcv information all components
+        for index, cmpnt_id in enumerate(cmpnt_ids):
+            fs_value = pd.NA
+            ts_value = pd.NA
+            fn_value = pd.NA
+            frame_drp_lines = [line for line in lines if f"[cpu_emu {cmpnt_id}]" in line and "dropped" in line]
+            for line in frame_drp_lines:
+                ts_match = re.search(r"^([\d.]+)", line)
+                if ts_match:
+                    ts_value = float(ts_match.group(1) if ts_match else None) - min_uS
+                else:
+                    print("No ts_match")
+                fn_match = re.search(r"\(([\d.]+)\)", line)
+                if fn_match:
+                    fn_value = int(fn_match.group(1))
+                else:
+                    print("No fn_match")
+                # New row with only some columns filled
+                row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "rcd_uS": ts_value}])        
+                # Concatenate
+                self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, row], ignore_index=True)
+                                            
+#-----------------------------------------------------
     def plot_send_bit_rate(self):
         """
         initializer for implicit constructor
@@ -697,6 +920,7 @@ class RTDP:
             plt.savefig(f"Cmpnt_{i}_SndBtRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
+#-----------------------------------------------------
     def plot_rcv_frm_rate(self):
         """
         Plotting procedure
@@ -737,6 +961,8 @@ class RTDP:
             plt.tight_layout()
             plt.savefig(f"Cmpnt_{i}_RcvFrmRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
+#-----------------------------------------------------
+#-----------------------------------------------------
     def plot_rcv_frm_dlta(self):
         """
         Plotting procedure
@@ -775,6 +1001,8 @@ class RTDP:
             plt.tight_layout()
             plt.savefig(f"Cmpnt_{i}_RcvFrmRtDlt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 #-----------------------------------------------------
     def plot_rcv_bit_rate(self):
         """
@@ -816,6 +1044,8 @@ class RTDP:
             plt.savefig(f"Cmpnt_{i}_RcvBtRt.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     def plot_cmp_ltnc(self):
         """
         Plotting procedure
@@ -851,6 +1081,8 @@ class RTDP:
             plt.tight_layout()
             plt.savefig(f"Cmpnt_{i}_CmpLtnc.png", dpi=300, bbox_inches="tight")  #plt.show()
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 #-----------------------------------------------------
     def plot_ntwrk_ltnc(self):
         """
@@ -888,6 +1120,8 @@ class RTDP:
             plt.savefig(f"Cmpnt_{i}_NtwrkLtnc.png", dpi=300, bbox_inches="tight")  #plt.show()
 
 #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     def plot_frm_rcv(self):
         """
         Plotting procedure
@@ -915,6 +1149,8 @@ class RTDP:
             plt.tight_layout()
             plt.savefig(f"Cmpnt_{i}_FrmRcvTm.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     def plot_tm_frm_rcv(self):
         for i in range(1, self.prm_cmpnt_cnt + 1):
             # Plot
@@ -929,6 +1165,8 @@ class RTDP:
         plt.grid(True)
         plt.tight_layout()
         plt.savefig("TmFrmRcvd.png", dpi=300, bbox_inches="tight")  #plt.show()
+#-----------------------------------------------------
+#-----------------------------------------------------
 #-----------------------------------------------------
     def plot_tm_frm_dn(self):
         """
@@ -957,6 +1195,8 @@ class RTDP:
         plt.tight_layout()
         plt.savefig("TmFrmRDn.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     def calc_drp_sets_by_component(self):
         """
         Lists droped frames for each component
@@ -974,6 +1214,8 @@ class RTDP:
         for c in cmpnt_drp_nms:
             print(f"Number of drops for component {c}: {len(self.drp_sets_by_component[c])}", file=self.log_file)
 #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     def calc_prcsd_frm_sets_by_component(self):
         """
         Lists processed frames for each component
@@ -990,6 +1232,8 @@ class RTDP:
         cmpnt_frn_nms = set(self.prcsdFrms_df["component"].unique())
         for c in cmpnt_frn_nms:
             print(f"Number of processed frames for component {c}: {len(self.prcsd_frm_sets_by_component[c])}", file=self.log_file)
+#-----------------------------------------------------
+#-----------------------------------------------------
 #-----------------------------------------------------
     def plot_drps_mss(self):
         """
@@ -1076,6 +1320,8 @@ class RTDP:
         fig.tight_layout()
         plt.savefig("CmpntMss.png", dpi=300, bbox_inches="tight")  #plt.show()
 #-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
     def plot_all(self):
         """
         Plotting procedure
@@ -1100,6 +1346,8 @@ class RTDP:
         self.plot_tm_frm_dn()
         self.plot_drps_mss()
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 # Run script
 if __name__ == "__main__":
     #seed = int.from_bytes(os.urandom(8), "big")
@@ -1107,6 +1355,8 @@ if __name__ == "__main__":
     processor.sim()
     processor.plot_all()
 
+#-----------------------------------------------------
+#-----------------------------------------------------
 
 #pip3 install pandas matplotlib  seaborn scipy
 ##python3 -m pip install --upgrade numpy
