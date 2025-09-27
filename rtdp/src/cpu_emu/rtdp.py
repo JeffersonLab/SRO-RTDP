@@ -735,6 +735,8 @@ class RTDP:
                 cmpnt_ids.append(int(value))
             else:
                 print("No match in port line:", line)
+        self.prm_cmpnt_cnt = len(cmpnt_ids)
+        print(f"parse_emu_logs: self.prm_cmpnt_cnt = {self.prm_cmpnt_cnt}")
         # Extract lines with frame send information all components
         for index, cmpnt_id in enumerate(cmpnt_ids):
             fs_value = pd.NA
