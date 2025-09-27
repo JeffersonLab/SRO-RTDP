@@ -264,25 +264,26 @@ class RTDP:
             return
 
         # Flatten into a DataFrame
-        prmtrs_df = json_normalize(data, sep=".")
-        print(prmtrs_df.T, file=self.log_file)  # transpose to make it easier to read
+        sim_prmtrs_df = json_normalize(data, sep=".")
+        print(sim_prmtrs_df.T, file=self.log_file)  # transpose to make it easier to read
 
-        self.prm_cmp_ltnc_nS_B   = float(prmtrs_df['cmp_ltnc_nS_B'].iloc[0])
-        self.prm_output_size_GB  = float(prmtrs_df['output_size_GB'].iloc[0])
-        self.prm_nic_Gbps        = float(prmtrs_df['nic_Gbps'].iloc[0])
-        self.prm_daq_frm_sz_MB   = float(prmtrs_df['frame_sz_MB'].iloc[0])
-        self.prm_frame_cnt       =   int(prmtrs_df['frame_cnt'].iloc[0])
-        self.prm_cmpnt_cnt       =   int(prmtrs_df['cmpnt_cnt'].iloc[0])
-        self.prm_avg_bit_rt_Gbps = float(prmtrs_df['avg_bit_rt_Gbps'].iloc[0])
-        #-----------------------------------------------------
-
+        self.sim_prm_cmp_ltnc_nS_B      = float(sim_prmtrs_df['cmp_ltnc_nS_B'].iloc[0])
+        self.sim_prm_output_size_GB     = float(sim_prmtrs_df['output_size_GB'].iloc[0])
+        self.sim_prm_nic_Gbps           = float(sim_prmtrs_df['nic_Gbps'].iloc[0])
+        self.sim_prm_daq_frm_sz_MB      = float(sim_prmtrs_df['frame_sz_MB'].iloc[0])
+        self.sim_prm_frame_cnt          =   int(sim_prmtrs_df['frame_cnt'].iloc[0])
+        self.sim_prm_cmpnt_cnt          =   int(sim_prmtrs_df['cmpnt_cnt'].iloc[0])
+        self.sim_prm_avg_bit_rt_Gbps    = float(sim_prmtrs_df['avg_bit_rt_Gbps'].iloc[0])
+        #------------------------ setup plots for simulation run ------------------------
+        self.prm_cmpnt_cnt              = self.sim_prm_cmpnt_cnt        
         #set of all frame numbers from sender
-        self.cnst_all_frm_set = set(range(1, self.prm_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
+        self.cnst_all_frm_set = set(range(1, self.sim_prm_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
+        #-----------------------------------------------------
 
         # Network Latency Samples
 
         # Target mean and std
-        ntwrk_lt_mean_uS = float(one_u*M_1*self.prm_daq_frm_sz_MB/(b_B*G_1*self.prm_nic_Gbps))
+        ntwrk_lt_mean_uS = float(one_u*M_1*self.sim_prm_daq_frm_sz_MB/(b_B*G_1*self.sim_prm_nic_Gbps))
         ntwrk_lt_sd_uS = ntwrk_lt_mean_uS/3
 
         # Bound samples to lower bound
@@ -307,7 +308,7 @@ class RTDP:
         # Sample until > mean Network Latency Samples
 
         # Target mean and std
-        ntwrk_lt_mean_uS = float(one_u*M_1*self.prm_daq_frm_sz_MB/(b_B*G_1*self.prm_nic_Gbps))
+        ntwrk_lt_mean_uS = float(one_u*M_1*self.sim_prm_daq_frm_sz_MB/(b_B*G_1*self.sim_prm_nic_Gbps))
         ntwrk_lt_sd_uS = ntwrk_lt_mean_uS/3
 
         # Sample from Gamma
@@ -333,7 +334,7 @@ class RTDP:
         #-----------------------------------------------------
         # Frame Size Samples
 
-        self.cnst_daq_fs_mean_B = float(M_1*self.prm_daq_frm_sz_MB)
+        self.cnst_daq_fs_mean_B = float(M_1*self.sim_prm_daq_frm_sz_MB)
         # Target mean and std
         cnst_fs_std_B = 0.1*self.cnst_daq_fs_mean_B
 
@@ -357,7 +358,7 @@ class RTDP:
         #-----------------------------------------------------
         # Out Size Samples
 
-        cnst_os_mean_B = float(G_1*self.prm_output_size_GB)
+        cnst_os_mean_B = float(G_1*self.sim_prm_output_size_GB)
         # Target mean and std
         cnst_os_std_B = 0.1*cnst_os_mean_B
 
@@ -463,37 +464,37 @@ class RTDP:
         """
 
         # set all component clocks to zero; component 0 is the sender
-        clk_uS = np.zeros(self.prm_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
+        clk_uS = np.zeros(self.sim_prm_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
 
         vrbs = True
 
         cnst_swtch_lt_uS = 1 #switch latency
 
-        clib = bernoulli(0.01, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
-        nlib = bernoulli(0.01, n=self.prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        clib = bernoulli(0.01, n=self.sim_prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        nlib = bernoulli(0.01, n=self.sim_prm_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
         
         if vrbs: print("Simulating ...")
         #if vrbs: print(f"ib =  {ib}", file=self.log_file)
 
         #Simulation
-        for f in range(0, self.prm_frame_cnt):
+        for f in range(0, self.sim_prm_frame_cnt):
             # impulses
             if clib[f]==1: # computational latency
                 brn_trl = bernoulli(0.5, n=1, rng=self.rng) # coin toss
-                self.prm_cmp_ltnc_nS_B *= 1 + (0.2 if brn_trl[0]==1 else -(1-1/1.2)) # random effect
-                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {self.prm_cmp_ltnc_nS_B:10.2f} frame {f}", file=self.log_file)
+                self.sim_prm_cmp_ltnc_nS_B *= 1 + (0.2 if brn_trl[0]==1 else -(1-1/1.2)) # random effect
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {self.sim_prm_cmp_ltnc_nS_B:10.2f} frame {f}", file=self.log_file)
             if nlib[f]==1: # network latency
                 brn_trl = bernoulli(0.5, n=1, rng=self.rng) # coin toss
-                self.prm_nic_Gbps *= 1 + (0.2 if brn_trl[0]==1 else -(1-1/1.2)) # random effect
-                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {self.prm_nic_Gbps:10.2f} frame {f}", file=self.log_file)
+                self.sim_prm_nic_Gbps *= 1 + (0.2 if brn_trl[0]==1 else -(1-1/1.2)) # random effect
+                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {self.sim_prm_nic_Gbps:10.2f} frame {f}", file=self.log_file)
             cnst_daq_frm_sz0_b = B_b*self.cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
             if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.log_file)
             #component zero is the sender
             row = (0,clk_uS[0],f,cnst_daq_frm_sz0_b)
             self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
-            for c in range(1, self.prm_cmpnt_cnt+1):
+            for c in range(1, self.sim_prm_cmpnt_cnt+1):
                 #set component forwarding frame size to component output Size
-                frm_szc_b = B_b*self.os_smpls_B[f*self.prm_cmpnt_cnt+c]
+                frm_szc_b = B_b*self.os_smpls_B[f*self.sim_prm_cmpnt_cnt+c]
                 clk_c = clk_uS[c-1] #temp clk base = upstream senders 'done/sent' value
                 # set recvd frame size: cmpnt #1 is senders size, all others are cmpnt output size
                 # it is assumed that the sender represents a DAQ with fixed frame size
@@ -501,10 +502,10 @@ class RTDP:
                 if c == 1:
                     frm_sz_b = cnst_daq_frm_sz0_b
                 else:
-                    frm_sz_b = B_b*self.os_smpls_B[f*self.prm_cmpnt_cnt+c-1]
+                    frm_sz_b = B_b*self.os_smpls_B[f*self.sim_prm_cmpnt_cnt+c-1]
 
                 # component receives with network latency offset from upstream sender time
-                ntwrk_lt_mean_uS = float(one_u*frm_sz_b/(G_1*self.prm_nic_Gbps))
+                ntwrk_lt_mean_uS = float(one_u*frm_sz_b/(G_1*self.sim_prm_nic_Gbps))
                 ntwrk_lt_sd_uS = math.ceil(ntwrk_lt_mean_uS/20) #5%
                 ntwrk_lt_uS = 0
                 while ntwrk_lt_uS < ntwrk_lt_mean_uS: #enforce lower bound
@@ -521,7 +522,7 @@ class RTDP:
                     self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, pd.DataFrame([row], columns=self.drpmsdFrms_df.columns)], ignore_index=True)
                     break; # All downstream components will miss this frame
                 # component processes with compute latency
-                cmp_ltnc_nS_B = self.gen_gamma_samples(self.prm_cmp_ltnc_nS_B, self.prm_cmp_ltnc_nS_B/10, int(1))[0]
+                cmp_ltnc_nS_B = self.gen_gamma_samples(self.sim_prm_cmp_ltnc_nS_B, self.sim_prm_cmp_ltnc_nS_B/10, int(1))[0]
                 cmp_ltnc_uS = float(n_u*cmp_ltnc_nS_B*frm_sz_b*b_B)
                 clk_c += cmp_ltnc_uS #Update temp clk for compute latency
                 clk_c += 10 #add overhead
@@ -530,13 +531,13 @@ class RTDP:
                 self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
                 clk_c += 10 #add overhead
                 clk_uS[c]  = clk_c #Set as last 'done' time
-                #if vrbs and c == self.prm_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.log_file)
+                #if vrbs and c == self.sim_prm_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.log_file)
                 if vrbs: print(f"{clk_c} Component {c} Done Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.log_file)
                 #add self.prcsdFrms_df row
                 row = (c,rcd_uS,f,frm_sz_b,cmp_ltnc_uS,ntwrk_lt_uS,snt_uS,clk_uS[c])
                 self.prcsdFrms_df = pd.concat([self.prcsdFrms_df, pd.DataFrame([row], columns=self.prcsdFrms_df.columns)], ignore_index=True)
             # Sender Rate Sleep
-            rtSlp_uS   = float(one_u*cnst_daq_frm_sz0_b / (G_1*self.prm_avg_bit_rt_Gbps))
+            rtSlp_uS   = float(one_u*cnst_daq_frm_sz0_b / (G_1*self.sim_prm_avg_bit_rt_Gbps))
             clk_uS[0] += rtSlp_uS
 
 #-----------------------------------------------------
@@ -874,24 +875,15 @@ class RTDP:
 #-----------------------------------------------------
     def plot_send_bit_rate(self):
         """
-        initializer for implicit constructor
+        Plotting procedure
 
         Parameters
         ----------
-        rng_seed : int or None
-        directory : str, optional
-            Path to the directory to search. Defaults to the current
-            working directory (``"."``).
-        extension : str, optional
-            File extension to match. Defaults to ``".txt"``.
-        log_file : str, optional
-            File that simulate/emulate will write the execution trace.
-        sim_config : str, optional
-            Run Parameters.
+        tag : string to prepend to plots for disambuguation
 
         Returns
         -------
-            none
+        none
         """
         for i in range(0, self.prm_cmpnt_cnt): #last component does not send
 
