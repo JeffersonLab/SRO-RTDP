@@ -476,6 +476,12 @@ class RTDP:
         #if vrbs: print(f"ib =  {ib}", file=self.log_file)
 
         #Simulation
+        #reset dataframes
+        self.sentFrms_df        = self.sentFrms_df.iloc[0:0]
+        self.drpmsdFrms_df      = self.drpmsdFrms_df.iloc[0:0]
+        self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
+        self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
+        
         for f in range(0, self.sim_prm_frame_cnt):
             # impulses
             if clib[f]==1: # computational latency
@@ -686,6 +692,11 @@ class RTDP:
             print(f"[ERROR] Failed to send emulation sender to {sender}: {e.stderr.decode().strip()}", flush=True)
 #-----------------------------------------------------
     def parse_emu_logs(self, log_path="emu_log.txt"):
+        #reset dataframes
+        self.sentFrms_df        = self.sentFrms_df.iloc[0:0]
+        self.drpmsdFrms_df      = self.drpmsdFrms_df.iloc[0:0]
+        self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
+        self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
         # Load and inspect
         lines = load_log_file(log_path)
         print(f"Loaded {len(lines)} lines from the log.")
