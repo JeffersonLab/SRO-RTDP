@@ -157,7 +157,52 @@ def bernoulli(p: float, n: int = 1, rng: Optional[Union[random.Random, np.random
     else:
         raise TypeError("rng must be either random.Random or np.random.Generator")
 
-# --------------------
+#-----------------------------------------------------
+# Compute statistical moments: mean, std, skewness, kurtosis
+def compute_moments(series):
+    """
+    report series length and first four statistical moments
+
+    Parameters
+    ----------
+    series : indexable
+
+    Returns
+    -------
+        series length and first four statistical moments
+    """
+    values = series #.dropna()
+    return {
+        'count': len(values),
+        'mean': values.mean(),
+        'std': values.std(),
+        'skew': skew(values),
+        'kurtosis': kurtosis(values)
+    }
+#-----------------------------------------------------
+#-----------------------------------------------------
+#-----------------------------------------------------
+# Compute Moving Avg
+def moving_average(a, n=5):
+    """
+    moving average for window size
+
+    Parameters
+    ----------
+    a : indexable
+    n : str, optional, window size
+
+    Returns
+    -------
+        reduced size (by n) of same input type
+    """
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n-1:] / n
+#-----------------------------------------------------
+
+#-----------------------------------------------------
+## --------------------
 # Example usage
 # --------------------
 
@@ -190,7 +235,7 @@ class RTDP:
 
 #-----------------------------------------------------
 #-----------------------------------------------------
-    def __init__(self, rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt", sim_config="cpu_sim.yaml"):
+    def __init__(self, rng_seed = None, directory=".", extension=".txt", log_file="logfile.txt"):
         """
         initializer for implicit constructor
 
@@ -216,7 +261,6 @@ class RTDP:
         self.rng       = np.random.default_rng(rng_seed)
         self.directory = directory
         self.extension = extension
-        self.sim_config= sim_config
         self.log_file  = open(log_file, "w")
 
         # Frames actually processed by components
@@ -254,7 +298,44 @@ class RTDP:
             "drp_frctn":   pd.Series(dtype=int)
         })
 
+
+#-----------------------------------------------------
+    def gen_gamma_samples(self, mean, stdev, n_samples):
+        """
+        Generate n_samples from a Gamma distribution with given mean and stdev.
+
+        Parameters:
+            mean (float): Desired mean of the distribution
+            stdev (float): Desired standard deviation
+            n_samples (int): Number of samples to generate
+            random_state (int, optional): Random seed for reproducibility
+
+        Returns:
+            numpy.ndarray: Array of gamma-distributed samples
+        """
+
+        # Derive shape (k) and scale (theta)
+        shape = (mean / stdev) ** 2
+        scale = (stdev ** 2) / mean
+
+        return self.rng.gamma(shape, scale, n_samples)
+
+#-----------------------------------------------------
+#-----------------------------------------------------
+    def sim(self, sim_config="cpu_sim.yaml"):
+        """
+        simulate component daisy chain
+
+        Parameters
+        ----------
+            none
+
+        Returns
+        -------
+            none
+        """
         # Process config yaml file
+        self.sim_config= sim_config
         try:
             with open(self.sim_config, "r") as f:
                 data = yaml.safe_load(f)
@@ -290,7 +371,7 @@ class RTDP:
         cnst_nl_smpls_uS = self.gen_gamma_samples(ntwrk_lt_mean_uS, ntwrk_lt_sd_uS, int(1e4))
 
         # Verification
-        nl_stats_uS = self.compute_moments(cnst_nl_smpls_uS)
+        nl_stats_uS = compute_moments(cnst_nl_smpls_uS)
 
         print(f"DAQ (Component {0}) Network Latency Statistics (uS):", file=self.log_file)
         for k, v in nl_stats_uS.items():
@@ -318,7 +399,7 @@ class RTDP:
 
         # Verification
 
-        nl_stats_uS = self.compute_moments(cnst_nl_smpls_uS)
+        nl_stats_uS = compute_moments(cnst_nl_smpls_uS)
         print(f"DAQ (Component {0}) Network Latency Statistics with lower bound (uS):", file=self.log_file)
         for k, v in nl_stats_uS.items():
             print(f"{k}: {v:.3f}", file=self.log_file)
@@ -342,7 +423,7 @@ class RTDP:
         cnst_fs_smpls_B = self.gen_gamma_samples(self.cnst_daq_fs_mean_B, cnst_fs_std_B, int(1e4))
 
         # Verification
-        cnst_fs_stats_B = self.compute_moments(cnst_fs_smpls_B)
+        cnst_fs_stats_B = compute_moments(cnst_fs_smpls_B)
         print(f"DAQ (Component {0}) Frame Size Statistics (B):", file=self.log_file)
         for k, v in cnst_fs_stats_B.items():
             print(f"{k}: {v:.3f}", file=self.log_file)
@@ -366,7 +447,7 @@ class RTDP:
         self.os_smpls_B = self.gen_gamma_samples(cnst_os_mean_B, cnst_os_std_B, int(1e4))
 
         # Verification
-        os_stats_B = self.compute_moments(self.os_smpls_B)
+        os_stats_B = compute_moments(self.os_smpls_B)
         print(f"Component Output Size Statistics: (B)", file=self.log_file)
         for k, v in os_stats_B.items():
             print(f"{k}: {v:.3f}", file=self.log_file)
@@ -380,88 +461,6 @@ class RTDP:
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.savefig("CmpntOtptSzSmpls.png", dpi=300, bbox_inches="tight")  #plt.show()
         #-----------------------------------------------------
-
-#-----------------------------------------------------
-#-----------------------------------------------------
-    # Compute statistical moments: mean, std, skewness, kurtosis
-    def compute_moments(self, series):
-        """
-        report series length and first four statistical moments
-
-        Parameters
-        ----------
-        series : indexable
-
-        Returns
-        -------
-            series length and first four statistical moments
-        """
-        values = series #.dropna()
-        return {
-            'count': len(values),
-            'mean': values.mean(),
-            'std': values.std(),
-            'skew': skew(values),
-            'kurtosis': kurtosis(values)
-        }
-    #-----------------------------------------------------
-#-----------------------------------------------------
-#-----------------------------------------------------
-    # Compute Moving Avg
-    def moving_average(self, a, n=5):
-        """
-        moving average for window size
-
-        Parameters
-        ----------
-        a : indexable
-        n : str, optional, window size
-
-        Returns
-        -------
-            reduced size (by n) of same input type
-        """
-        ret = np.cumsum(a, dtype=float)
-        ret[n:] = ret[n:] - ret[:-n]
-        return ret[n-1:] / n
-    #-----------------------------------------------------
-
-#-----------------------------------------------------
-#-----------------------------------------------------
-    def gen_gamma_samples(self, mean, stdev, n_samples):
-        """
-        Generate n_samples from a Gamma distribution with given mean and stdev.
-
-        Parameters:
-            mean (float): Desired mean of the distribution
-            stdev (float): Desired standard deviation
-            n_samples (int): Number of samples to generate
-            random_state (int, optional): Random seed for reproducibility
-
-        Returns:
-            numpy.ndarray: Array of gamma-distributed samples
-        """
-
-        # Derive shape (k) and scale (theta)
-        shape = (mean / stdev) ** 2
-        scale = (stdev ** 2) / mean
-
-        return self.rng.gamma(shape, scale, n_samples)
-
-#-----------------------------------------------------
-#-----------------------------------------------------
-    def sim(self):
-        """
-        simulate component daisy chain
-
-        Parameters
-        ----------
-            none
-
-        Returns
-        -------
-            none
-        """
 
         # set all component clocks to zero; component 0 is the sender
         clk_uS = np.zeros(self.sim_prm_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
@@ -893,7 +892,7 @@ class RTDP:
 
             btRt_Mbps = one_M*szs_b/dts_S
             # Display statistics
-            btRt_stats_Mbps = self.compute_moments(btRt_Mbps)
+            btRt_stats_Mbps = compute_moments(btRt_Mbps)
 
             print(f"Component {i} Send bit Rate Statistics (Mbps):", file=self.log_file)
             for k, v in btRt_stats_Mbps.items():
@@ -932,7 +931,7 @@ class RTDP:
             frame_rates_Hz_arr = np.array(1/dt_S_arr)
 
             # Display statistics
-            frame_rate_stats = self.compute_moments(frame_rates_Hz_arr)
+            frame_rate_stats = compute_moments(frame_rates_Hz_arr)
 
             print(f"Component {i} Recv Frame Rate: (Hz)", file=self.log_file)
             for k, v in frame_rate_stats.items():
@@ -944,7 +943,7 @@ class RTDP:
 
             timestamps_S_arr = np.array(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"][1:])
             window = 1
-            sns.lineplot(x=timestamps_S_arr[window-1:]/60.0, y=self.moving_average(frame_rates_Hz_arr, n=window), marker="o")
+            sns.lineplot(x=timestamps_S_arr[window-1:]/60.0, y=moving_average(frame_rates_Hz_arr, n=window), marker="o")
             # plt.plot(timestamps_S_arr/60.0, frame_rates_Hz_arr, marker='o', linestyle='-')
             # plt.ylim(frame_rates_Hz_arr.min(), max(frame_rates_Hz_arr))
             plt.ticklabel_format(style='plain', axis='y')   # disable scientific/offset notation
@@ -980,7 +979,7 @@ class RTDP:
             delta_mS = u_m*(rcd_uS - done_uS)
 
             # Display statistics
-            delta_stats_mS = self.compute_moments(delta_mS)
+            delta_stats_mS = compute_moments(delta_mS)
 
             print(f"Component {i} Recv Frame Delta Statistics (mS):", file=self.log_file)
             for k, v in delta_stats_mS.items():
@@ -1019,7 +1018,7 @@ class RTDP:
 
             btRt_Mbps = one_M*szs_b/dts_S
             # Display statistics
-            btRt_stats_Mbps = self.compute_moments(btRt_Mbps)
+            btRt_stats_Mbps = compute_moments(btRt_Mbps)
 
             print(f"Component {i} Recv bit Rate Statistics (Mbps):", file=self.log_file)
             for k, v in btRt_stats_Mbps.items():
@@ -1057,7 +1056,7 @@ class RTDP:
 
             cmpLt_mS = u_m*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "cmp_ltnc_uS"]
             # Display statistics
-            cmpLt_stats_mS = self.compute_moments(cmpLt_mS)
+            cmpLt_stats_mS = compute_moments(cmpLt_mS)
 
             print(f"Component {i} Comp Latency Statistics (mS):", file=self.log_file)
             for k, v in cmpLt_stats_mS.items():
@@ -1095,7 +1094,7 @@ class RTDP:
 
             ntwrkLt_uS = self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "ntwrk_lt_uS"]
             # Display statistics
-            ntwrkLt_stats_uS = self.compute_moments(ntwrkLt_uS)
+            ntwrkLt_stats_uS = compute_moments(ntwrkLt_uS)
 
             print(f"Component {i} Network Latency Statistics (uS):", file=self.log_file)
             for k, v in ntwrkLt_stats_uS.items():
