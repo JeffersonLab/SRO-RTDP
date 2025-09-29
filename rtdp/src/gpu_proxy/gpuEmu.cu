@@ -14,6 +14,8 @@
 #include <cmath>
 #include <atomic>
 #include <unistd.h> // For getpid()
+#include <iomanip>
+#include <ctime>
 
 #include <zmq.hpp>
 
@@ -22,34 +24,15 @@
 #include <cublas_v2.h>
 
 
-// ZMQ settings
+// ZMQ port settings
 constexpr const int ZMQ_IN_PORT = 55555;
 constexpr const int ZMQ_OUT_PORT = 55556;
-
-/// TODO: @xmei, Design the SQL Rate Logger
-// #include "SQLiteRateLogger.h"  // Check Podio2tcp
-
-// Global SQlite Rate logger
-/// NOTE: data schema for the receiver DB
-// sqlite> .schema rate_logs
-// CREATE TABLE rate_logs (
-//     id INTEGER PRIMARY KEY AUTOINCREMENT,
-//     timestamp_utc_ms INTEGER,
-//     pid STRING,
-//     rateHz_recv_period REAL,
-//     rateMbps_recv_period REAL
-// );
-// SQLiteRateLogger rate_logger;
-// std::string RATE_DB_COLUMNS = "timestamp_utc_ms, pid, "
-//                             "rateHz_recv_period, "
-//                             "rateMbps_recv_period";
-
 
 //.........................................................................
 // Matrix multiplication setup
 
 constexpr int MATRIX_IN_COLUMN_WIDTH = 2048;
-constexpr float MATRIX_OUT_REDUCE_RATE = 0.5; // Define reduction rate
+constexpr float MATRIX_OUT_REDUCE_RATE = 1.0; // Define reduction rate
 
 // CUDA error check
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) { \
@@ -82,14 +65,14 @@ void matrixProcess(float* d_A, float* d_B, float* d_C, int rows, int in_cols, in
     cublasHandle_t handle;
     CUBLAS_CALL(cublasCreate(&handle));
     const float alpha = 1.0f, beta = 0.0f;
-    
+
     // Perform matrix multiplication: C = A * B
-    CUBLAS_CALL(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, 
-                            out_cols, rows, in_cols, 
-                            &alpha, d_B, out_cols, 
-                            d_A, in_cols, 
+    CUBLAS_CALL(cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N,
+                            out_cols, rows, in_cols,
+                            &alpha, d_B, out_cols,
+                            d_A, in_cols,
                             &beta, d_C, out_cols));
-    
+
     CUBLAS_CALL(cublasDestroy(handle));
 }
 
@@ -111,7 +94,7 @@ void cpuMatrixMultiply(
 
 
 //.........................................................................
-// Based on the podio2tcp application.
+// CommandLine inputs
 class CommandLineOptions {
 public:
     int recv_port = ZMQ_IN_PORT;
@@ -119,11 +102,8 @@ public:
     double rate = MATRIX_OUT_REDUCE_RATE;
     int width = MATRIX_IN_COLUMN_WIDTH; // Default matrix column size
 
-    std::string out_ip = "127.0.0.1";  // Default out IP is local
-    bool useTensorCores = false;
+    std::string in_ip = "127.0.0.1";  // Default out IP is local
     bool verbose = false;
-
-    std::string sqliteFilename;      // SQL file parameter
 
     static CommandLineOptions Parse(int argc, char* argv[]) {
         CommandLineOptions options;
@@ -132,15 +112,13 @@ public:
             if (arg == "-h" || arg == "--help") {
                 PrintUsage();
                 exit(0);
-            } else if (arg == "--in-port" && i + 1 < argc) {
+            } else if (arg == "-i" || arg == "--in-ip" && i + 1 < argc) {
+                options.in_ip = argv[++i];
+            } else if (arg == "-p" ||arg == "--in-port") {
                 options.recv_port = std::stoi(argv[++i]);
-            } else if (arg == "-a" || arg == "--out-ip") {
-                if (i + 1 < argc) {
-                    options.out_ip = argv[++i];
-                }
-            } else if (arg == "--out-port" && i + 1 < argc) {
+            } else if (arg == "-r" || arg == "--out-port") {
                 options.send_port = std::stoi(argv[++i]);
-            } else if (arg == "-r" || arg == "--rate") {
+            } else if (arg == "--rate") {
                 if (i + 1 < argc) {
                     options.rate = std::stod(argv[++i]);
                 }
@@ -148,39 +126,41 @@ public:
                 if (i + 1 < argc) {
                     options.width = std::stoi(argv[++i]);
                 }
-            } else if (arg == "-s" || arg == "--sqlfile") {
+            }
+            /* For future extension
+            else if (arg == "-s" || arg == "--sqlfile") {
                 if (i + 1 < argc) {
                     options.sqliteFilename = argv[++i];
                 }
             } else if (arg == "--tc") {
                 options.useTensorCores = true;
-            } else if (arg == "-v" || arg == "--verbose") {
+            } */
+            else if (arg == "-v" || arg == "--verbose") {
                 options.verbose = true;
             }
         }
         return options;
     }
 
-
     static void PrintUsage() {
-        std::cout << "\n" 
+        std::cout << "\n"
                   << "Usage: gpu_emu [--in-port] [-a|--out-ip] [--out-port]\n"
                   << "\n"
                   << "-h, --help     Print this help statement\n"
-                  << "    --in-port  <port> Set ZMQ port to listen on (default is 55555)\n"
-                  << "-a, --out-ip   <IP_Address> The IP address ZMQ push to (default is localhost)\n"
-                  << "    --out-port <port> Set ZMQ port to push to (default is 55556)\n"
-                  << "-r, --rate     Control the ratio of output/input volume (default is 0.5)\n"
+                  << "-i, --in-ip    <IPv4_Address> The IP address ZMQ subscribe from (default is localhost)\n"
+                  << "-p, --in-port  <incoming port> Set ZMQ port to subscribe from (default is 55555)\n"
+                  << "-r, --out-port <outgoing port> Set ZMQ port to publish to (default is 55556)\n"
+                  << "    --rate     Control the ratio of output/input volume (default is 1.0)\n"
                   << "-w, --width    Set the GPU input matrix column size (default is 2048)\n"
                 //   << "-s, --sqlfile  <file> Specify the SQL rate logger file\n"
                 //   << "    --tc       Use GPU Tensor Cores instead of FP units\n"
-                  << "-v, --verbose    Enable the verbose mode (default is false)\n"
+                  << "-v, --verbose  Enable the verbose mode (default is false)\n"
 
                   << "\n"
                   << "This is a GPU Proxy\n"
-                  << "It takes input from a ZMQ PULL port and builds a matrix, sends to GPU and do matrix\n"
-                  << "multiplication on the GPU. After that, it copies the result back to CPU and PUSH to\n"
-                  << "another ZMQ IP & port.\n"
+                  << "It takes input from a ZMQ SUB IPv4 address and builds a matrix, sends to GPU and\n"
+                  << "do matrix multiplication on the GPU. After that, it copies the result back to CPU\n"
+                  << "and PUB to another ZMQ TCP port.\n"
                   << "\n"
                 //   << "If --sqlfile is used, it specifies a SQLite rate logger.\n"
                   << "\n";
@@ -194,20 +174,47 @@ public:
 std::atomic<size_t> totalInBytes{0};
 std::atomic<size_t> totalOutBytes{0};
 
+static std::string utc_now_hms_ms() {
+    using namespace std::chrono;
+    auto now = system_clock::now();
+    auto tt  = system_clock::to_time_t(now);
+    auto ms  = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+    std::tm tm{};
+#if defined(_WIN32)
+    gmtime_s(&tm, &tt);
+#else
+    gmtime_r(&tt, &tm);
+#endif
+    std::ostringstream oss;
+    oss << '[' << std::put_time(&tm, "%Y-%m-%d %H:%M:%S")
+        << '.' << std::setfill('0') << std::setw(3) << ms.count()
+        << " UTC]";
+    return oss.str();
+}
+
+
 void monitorTraffic(std::atomic<size_t>* inBytes, std::atomic<size_t>* outBytes) {
     using namespace std::chrono;
+    constexpr int sleep_in_seconds = 2;
     while (true) {
-        size_t prevIn = inBytes->load();
-        size_t prevOut = outBytes->load();
-        std::this_thread::sleep_for(seconds(2));
-        size_t curIn = inBytes->load();
-        size_t curOut = outBytes->load();
+        size_t prevIn  = inBytes->load(std::memory_order_relaxed);
+        size_t prevOut = outBytes->load(std::memory_order_relaxed);
+        auto t0 = steady_clock::now();
+        std::this_thread::sleep_for(seconds(sleep_in_seconds));
+        auto t1 = steady_clock::now();
+        double elapsed = duration_cast<duration<double>>(t1 - t0).count();
+        size_t curIn  = inBytes->load(std::memory_order_relaxed);
+        size_t curOut = outBytes->load(std::memory_order_relaxed);
 
-        double inRate_MBps = (curIn - prevIn) / (1000.0 * 1000.0) / 2.0;
-        double outRate_MBps = (curOut - prevOut) / (1000.0 * 1000.0) / 2.0;
+        double inRate_Gbps  = 8.0e-9 * double(curIn  - prevIn)  / elapsed;
+        double outRate_Gbps = 8.0e-9 * double(curOut - prevOut) / elapsed;
 
-        std::cout << "[Monitor] Incoming: [" << inRate_MBps << " MB/s], "
-                  << "Outgoing: [" << outRate_MBps << " MB/s]" << std::endl;
+        if (inRate_Gbps == 0.0 && outRate_Gbps == 0.0)
+            continue;       // skip low rate logging
+        std::cout << utc_now_hms_ms()
+                  << "  Incoming: [" << inRate_Gbps  << " Gbps], total [" << curIn/1.0e6 << " MB] "
+                  << "; Outgoing: [" << outRate_Gbps << " Gbps], total [" << curOut/1.0e6 << " MB] "
+                  << std::endl;
     }
 }
 //.........................................................................
@@ -227,30 +234,27 @@ int main(int narg, char *argv[]){
     // Setup network communication via zmq
     zmq::context_t context(1);
 
-    // Receiving socket
-    zmq::socket_t receiver(context, ZMQ_PULL);
-    // Taken from podio2tcp: set High Water Mark for maximum number of messages to queue before stalling
-    receiver.set(zmq::sockopt::rcvhwm, 10000);
-    std::string recv_addr = "tcp://*:" + std::to_string(options.recv_port);
+    // Receiving socket. Subscribe from an extrnal/upstream IPv4 address.
+    zmq::socket_t receiver(context, ZMQ_SUB);
+    std::string recv_addr = "tcp://"+ options.in_ip + ":" + std::to_string(options.recv_port);
     try {
-        // Listen to localhost only
-        receiver.bind(recv_addr.c_str());
-        std::cout << "RECV - ZeroMQ pulling from: " << recv_addr << "\n";
+        receiver.connect(recv_addr.c_str());
+        receiver.set(zmq::sockopt::subscribe, "");    // subscribe to all topics
+        std::cout << "SUB - ZeroMQ subscribed to: " << recv_addr << "\n";
     }  catch (const zmq::error_t& e) {
         std::cout << "Error: Failed to bind to the receiving address [" << recv_addr << "]:" << e.what() << "\n";
         return 1;
     }
 
-    // Sending socket
-    zmq::socket_t sender(context, ZMQ_PUSH);
-    // Set High Water Mark for maximum number of messages to queue before stalling
-    sender.set(zmq::sockopt::sndhwm, 10000);
-    std::string send_addr = "tcp://" + options.out_ip + ":" + std::to_string(options.send_port);
+    // Sending socket. Publish to a port on localhost.
+    zmq::socket_t sender(context, ZMQ_PUB);
+    std::string send_addr = "tcp://*:" + std::to_string(options.send_port);
+
     try {
-        sender.connect(send_addr.c_str());  // NOTE: connect() not bind()!!!!
-        std::cout << "SEND - ZeroMQ pushing to: " << send_addr << "\n";
-    }  catch (const zmq::error_t& e) {
-        std::cout << "Error: Failed to connect to the sending address [" << send_addr << "]:" << e.what() << "\n";
+        sender.bind(send_addr.c_str());
+        std::cout << "PUB - ZeroMQ publishing on: " << send_addr << "\n";
+    } catch (const zmq::error_t& e) {
+        std::cout << "Error: Failed to bind PUB [" << send_addr << "]:" << e.what() << "\n";
         return 1;
     }
     //............................................
@@ -270,10 +274,10 @@ int main(int narg, char *argv[]){
         if (verbose_mode) {
             std::cout << "Received [" << res.value() << "] bytes from ZeroMQ socket." << std::endl;
         }
-        
+
         size_t curr_inBytes = recv_buffer.size();
         totalInBytes += curr_inBytes;
-        if( curr_inBytes == 0 ) { 
+        if( curr_inBytes == 0 ) {
             if (verbose_mode) {
                 std::cout << "  (skipping empty buffer)" << std::endl;
             }
@@ -330,7 +334,7 @@ int main(int narg, char *argv[]){
         if (verbose_mode) {
             std::vector<float> h_rand(rand_elements, 0);
             CUDA_CALL(cudaMemcpy(h_rand.data(), d_rand, rand_elements * sizeof(float), cudaMemcpyDeviceToHost));
-    
+
             std::cout << "First 10 elements of h_out:" << std::endl;
             for (size_t i = 0; i < std::min(h_out.size(), static_cast<size_t>(10)); ++i) {
                 std::cout << h_out[i] << " ";
