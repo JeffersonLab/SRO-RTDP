@@ -33,7 +33,7 @@ std::vector<uint8_t> serialize_packet(uint64_t tsr_us, uint16_t rcv_prt, uint32_
                                       const std::vector<uint8_t>& payload) {
     if(DBG) std::cout << timestamp_uS << " [cpu_emu " << rcv_prt << "]: serialize_packet: size_B = " << size_B << " stream_id = " << stream_id << " timestamp_uS = " << timestamp_uS << " frame_num = " 
                     << frame_num << " payload size_B = " << payload.size() << std::endl;
-    if (size_B != payload.size()) {
+    if (DBG && size_B != payload.size()) {
         std::cout.flush();
         std::cerr.flush();
         throw std::invalid_argument("Size does not match payload length");
@@ -74,7 +74,7 @@ DeserializedPacket deserialize_packet(uint64_t tsr_us, uint16_t rcv_prt, const u
 
     uint32_t size_B = ntohl(header.size_B); //bits to bytes
     if(DBG) std::cout << tsr_us << " [cpu_emu " << rcv_prt << "]: deserialize_packet: header.size_B = " << size_B << " size_B = " << uint32_t(size_B) << " length = " << length << std::endl;
-    if (length != HEADER_SIZE + size_B) {
+    if (DBG && length != HEADER_SIZE + size_B) {
         std::cout.flush();
         std::cerr.flush();
         throw std::runtime_error("Packet length mismatch");

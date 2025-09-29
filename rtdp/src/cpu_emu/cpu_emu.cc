@@ -141,37 +141,37 @@ static random_device rd;
 static mt19937 gen(rd());
 
 // Computational Function to emulate/stimulate processing load/latency, etc. 
-void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t tag, bool vrbs=false) 
+void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t tag, uint8_t vrbs=0) 
 { 
     const float ts_S(cmpLt_S_GB*nmrd_B/(G_1)); //reqd timespan in seconds   ////// fix this for proper units
     size_t memSz = mem_GB*sz1G; //memory footprint in bytes
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(sz1K*sz1K*sz1K)) << " Gbytes ..." << endl;
+    if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << memSz << " bytes ..." << endl;
+    if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Allocating " << float(memSz/(sz1K*sz1K*sz1K)) << " Gbytes ..." << endl;
 
     double* x;
     try {
         x = new double[memSz];
-        if(vrbs) cout << "Memory allocation for " << memSz << " succeeded.\n";
+        if(vrbs>1) cout << "Memory allocation for " << memSz << " succeeded.\n";
     } catch (const bad_alloc& e) {
-        if(vrbs) cout << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
+        if(vrbs>1) cout << "Memory allocation for " << memSz << " failed: " << e.what() << '\n';
         exit(1);
     }    
     //usefull work emulation 
-    if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_S   << " secs ..."  << " size " << nmrd_B << endl;
+    if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Threading for " << ts_S   << " secs ..."  << " size " << nmrd_B << endl;
     if(wlSlp) {
         auto cms_us = chrono::nanoseconds(size_t(round(ts_S*one_n)));
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_S  << " secs ..."  << " size " << nmrd_B << endl;
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for " << float(cms_us.count())*u_m  << " msecs ..." << " size " << nmrd_B << endl;
+        if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Sleep_Threaded for " << ts_S  << " secs ..."  << " size " << nmrd_B << endl;
+        if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Sleeping for " << float(cms_us.count())*u_m  << " msecs ..." << " size " << nmrd_B << endl;
         this_thread::sleep_for(cms_us);
     }else{
         auto ts_S = (cmpLt_S_GB*nmrd_B/G_1);
         //high_resolution_clock::time_point start_time = chrono::high_resolution_clock::now();
         auto start_time_hrc = chrono::high_resolution_clock::now();
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Burning CPU ...";
+        if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Burning CPU ...";
         
         double fracsecs_S, secs;
         fracsecs_S = modf (ts_S , &secs);
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs_S = " << fracsecs_S << endl;
+        if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " secs = " << secs << " fracsecs_S = " << fracsecs_S << endl;
         size_t strtMem = 0;
         auto end_time_hrc = chrono::high_resolution_clock::now();
         duration<double> time_span_Sd = duration_cast<duration<double>>(end_time_hrc - start_time_hrc);
@@ -181,16 +181,16 @@ void func(size_t nmrd_B, size_t cmpLt_S_GB, double mem_GB, bool wlSlp, uint16_t 
             if(strtMem > memSz - sz1K) strtMem = 0;
             end_time_hrc = chrono::high_resolution_clock::now();
             time_span_Sd = duration_cast<duration<double>>(end_time_hrc - start_time_hrc);
-            if(DBG) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span_Sd.count() << " against "<< ts_S  << endl;
+            if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Checking " << time_span_Sd.count() << " against "<< ts_S  << endl;
         }
-        if(vrbs) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << time_span_Sd.count() << " secs "  << " size " << nmrd_B << endl;
+        if(vrbs>1) cout << "[cpu_emu " << tag << " ]: " << " Threaded for " << time_span_Sd.count() << " secs "  << " size " << nmrd_B << endl;
     }
     delete[] x;
 }
 
 map<string,string> mymap;
 
-void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
+void parse_yaml(const char *filename, uint16_t tag, uint8_t vrbs=0) {
     FILE *file = fopen(filename, "r");
     if (!file) {
         perror("Failed to open file");
@@ -223,52 +223,52 @@ void parse_yaml(const char *filename, uint16_t tag, bool vrbs=false) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Stream started " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Stream started " << endl;
             break;
         case YAML_STREAM_END_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Stream ended " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Stream ended " << endl;
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Document started " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Document started " << endl;
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Document ended " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Document ended " << endl;
             break;
         case YAML_MAPPING_START_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Mapping started " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Mapping started " << endl;
             break;
         case YAML_MAPPING_END_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Mapping ended " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Mapping ended " << endl;
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Sequence started " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Sequence started " << endl;
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(DBG) cout << 0 << " [cpu_emu]: Sequence ended " << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu]: Sequence ended " << endl;
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " Label: " << s << endl;
+                if(vrbs>1) cout << 0 << " [cpu_emu " << tag << " ]: " << " Label: " << s << endl;
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << endl;
+                if(vrbs>1) cout << 0 << " [cpu_emu " << tag << " ]: " << " Label: " << s1 << " Datum: " << s << endl;
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
             break;
         default:
-            if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " (Default)" << endl;
+            if(vrbs>1) cout << 0 << " [cpu_emu " << tag << " ]: " << " (Default)" << endl;
             break;
         }
 
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(DBG) cout << 0 << " [cpu_emu " << tag << " ]: " << " All done parsing, got this:" << endl;
-    if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
+    if(vrbs>1) cout << 0 << " [cpu_emu " << tag << " ]: " << " All done parsing, got this:" << endl;
+    if(vrbs>1) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << endl;
     
     yaml_parser_delete(&parser);
@@ -284,15 +284,12 @@ int main (int argc, char *argv[])
     bool     psdZ=false, psdF=false;
     string   yfn = "cpu_emu.yaml";
     char     sub_ip[INET6_ADDRSTRLEN] = "127.0.0.1";	// subscription ip
-    uint16_t sub_prt = 8888;  // subscription port default
-    uint16_t pub_prt = 8889;  // publication port default
-    auto     nmThrds = 1;     // default
-    bool     vrbs    = true; // verbose ?
-    bool     wlSlp   = false; // will sleep versus burn cpu ?
-    bool     trmnl   = false; // am I a terminal node or a pass-thru ?
-    // 500 seconds/(input GB) computational latency for 60kB CLAS12
-    // 0.5 microseconds/byte
-    // 0.5 seconds per megabyte
+    uint16_t sub_prt = 8888;    // subscription port default
+    uint16_t pub_prt = 8889;    // publication port default
+    auto     nmThrds = 1;       // default
+    uint8_t  vrbs    = 0;       // verbosity; 0 -> nothing to stdout
+    bool     wlSlp   = false;   // will sleep versus burn cpu ?
+    bool     trmnl   = false;   // am I a terminal node or a pass-thru ?
     double   cmpLt_S_GB = 100;      // seconds/(input GB) computational latency
     double   mem_GB     = 0.01;     // thread memory footprint in GB
     double   otmem_GB   = 0.0000572; // program output in GB
@@ -310,62 +307,62 @@ int main (int argc, char *argv[])
         case 'b':
             cmpLt_S_GB = (double) atof((const char *) optarg) ; ////// fix this for proper units
             psdB = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -b " << cmpLt_S_GB << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -b " << cmpLt_S_GB << endl;
             break;
         case 'i':
             strcpy(sub_ip, (const char *) optarg) ;
             psdI = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -i " << sub_ip << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -i " << sub_ip << endl;
             break;
         case 'f':
             frame_cnt = (uint64_t) atoi((const char *) optarg) ;
             psdF = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -f " << frame_cnt << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -f " << frame_cnt << endl;
             break;
         case 'm':
             mem_GB = (double) atof((const char *) optarg) ;
             psdM = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -m " << mem_GB << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -m " << mem_GB << endl;
             break;
         case 'o':
             otmem_GB = (double) atof((const char *) optarg) ;
             psdO = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -o " << otmem_GB << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -o " << otmem_GB << endl;
             break;
         case 'p':
             sub_prt = (uint16_t) atoi((const char *) optarg) ;
             psdP = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -p " << sub_prt << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -p " << sub_prt << endl;
             break;
         case 'r':
             pub_prt = (uint16_t) atoi((const char *) optarg) ;
             psdR = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -r " << pub_prt << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -r " << pub_prt << endl;
             break;
         case 's':
             psdS  = true;
             wlSlp = bool(atoi((const char *) optarg));
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -s " << wlSlp << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -s " << wlSlp << endl;
             break;
         case 't':
             nmThrds = (uint16_t) atoi((const char *) optarg) ;
             psdT    = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -t " << nmThrds << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -t " << nmThrds << endl;
             break;
         case 'v':
-            vrbs = atoi((const char *) optarg) == 1;
+            vrbs = (uint8_t) atoi((const char *) optarg) ;
             psdV = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -v " << vrbs << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -v " << vrbs << endl;
             break;
         case 'y':
             yfn  = (const char *) optarg ;
             psdY = true;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -y " << yfn << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -y " << yfn << endl;
             break;
         case 'z':
             psdZ = true;
             trmnl = atoi((const char *) optarg) == 1;
-            if(DBG) cout << "[cpu_emu " << sub_prt << "]: " << " -z " << trmnl << endl;
+            if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " -z " << trmnl << endl;
             break;
         case '?':
             cout << "[cpu_emu " << sub_prt << "]: " << " Unrecognised option: " << optopt << endl;
@@ -374,7 +371,7 @@ int main (int argc, char *argv[])
         }
     }
 
-    if(DBG) cout << endl;
+    if(vrbs>1) cout << endl;
 
     if(!(psdI  || psdY)) {Usage(); exit(1);}
 
@@ -394,7 +391,7 @@ int main (int argc, char *argv[])
         if(!psdF) frame_cnt= stoi(mymap["frame_cnt"]);
     }    
     ////////
-    if(vrbs) cout << "[cpu_emu "   << sub_prt << " ]: "
+    if(vrbs>1) cout << "[cpu_emu "   << sub_prt << " ]: "
                   << " Operating with yaml = "      << (psdY?yfn:"N/A")
                   << "\tcmpLt_sGB = " << cmpLt_S_GB << "\tsub_ip = "  << sub_ip
                   << "\tsub_prt = "   << sub_prt    << "\tpub_prt = " << pub_prt                               
@@ -405,23 +402,23 @@ int main (int argc, char *argv[])
 
     //  Prepare our subscription context and socket
     context_t sub_cntxt(1);
-    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Defining sub context" << endl;
+    if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " Defining sub context" << endl;
 
     socket_t sub_sckt(sub_cntxt, socket_type::sub);
-    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Defining SUB protocol rcv socket" << endl;
+    if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " Defining SUB protocol rcv socket" << endl;
     sub_sckt.set(zmq::sockopt::rcvhwm, int(0)); // queue length: 1 = drop unread, 0 = unlimited
 
     sub_sckt.connect(string("tcp://") + sub_ip + ':' + to_string(sub_prt));
-    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Subscribing to " << sub_ip << ':' + to_string(sub_prt) << endl;
+    if(vrbs>0) cout << "[cpu_emu " << sub_prt << "]: " << " Subscribing to " << sub_ip << ':' + to_string(sub_prt) << endl;
     // Subscribe to all messages (empty topic)
     sub_sckt.set(zmq::sockopt::subscribe, "");
-    if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " subscribing" << endl;
+    if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " subscribing" << endl;
 
     //  Prepare our publication context and socket
     context_t pub_cntxt(1);
     socket_t pub_sckt(pub_cntxt, socket_type::pub);
     if(!trmnl) {
-    	if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Publishing on port " << to_string(pub_prt) << endl;
+    	if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " Publishing on port " << to_string(pub_prt) << endl;
     	pub_sckt.bind(string("tcp://*:") + to_string(pub_prt));
     	pub_sckt.set(zmq::sockopt::sndhwm, int(0)); // queue length
     }
@@ -446,11 +443,11 @@ int main (int argc, char *argv[])
     uint64_t now_uS   = clk_uSd.count();
     
     while (frame_num < frame_cnt) {
-        //if(vrbs) cout << "[cpu_emu " << sub_prt << "]: " << " Setting up request message ..." << endl;
+        //if(vrbs>1) cout << "[cpu_emu " << sub_prt << "]: " << " Setting up request message ..." << endl;
         message_t request;
 
         //  Wait for next request from client
-        if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " Waiting for source ..." << endl;
+        if(vrbs>1) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " Waiting for source ..." << endl;
         
         recv_result_t rtcd;
         
@@ -473,36 +470,36 @@ int main (int argc, char *argv[])
         if(frame_num > lst_frm_nm + 1) msdFrms += frame_num - (lst_frm_nm + 1); //might have missed more than one
         lst_frm_nm = frame_num;
 
-        if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
-        if(DBG) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
+        if(vrbs>1) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet for request_nbr " << request_nbr << endl;
+        if(vrbs>1) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "deserializing success for frame_num " << parsed.frame_num << endl;
         bufSiz_B = rtcd.value(); //bytes
 
 
-        if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet ... request.size() " << request.size() 
+        if(vrbs>1) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "deserializing packet ... request.size() " << request.size() 
                      << " HEADER_SIZE = " << HEADER_SIZE << endl;
-        if(DBG) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]: " << "bufSiz_B = " << bufSiz_B << " parsed.size = " << parsed.size_B 
+        if(vrbs>1) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]: " << "bufSiz_B = " << bufSiz_B << " parsed.size = " << parsed.size_B 
                      << " sizeof(struct DeserializedPacket) = " << sizeof(struct DeserializedPacket) << endl;
 
-        if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " recd " << parsed.frame_num << endl;
-        if(vrbs) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " Received request "
+        if(vrbs>0) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " recd " << parsed.frame_num << endl;
+        if(vrbs>1) cout << now_uS << " [cpu_emu " << sub_prt << "]: " << " Received request "
                       << request_nbr << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
                       << " rtcd = " << int(rtcd.value()) << " from client" << endl;
                       
-        if(vrbs) cout << now_uS+1  << " [cpu_emu " << sub_prt << "]: " << " frame size = "
+        if(vrbs>0) cout << now_uS+1  << " [cpu_emu " << sub_prt << "]: " << " frame size = "
                       << "(actual) " << bufSiz_B << " bytes " << bufSiz_B*one_G << " GB "
                       << " from client " << "ts = " << now_uS << " (" << request_nbr << ')' << endl;
                       
         auto last_rdy_uS = last_timestamp_uS + last_cmp_lat_uS + last_nw_lat_uS;
         last_nw_lat_uS = one_u*request.size()*B_b/(100*G_1);
-        if(vrbs) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
+        if(vrbs>1) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: comparing last_rdy_uS " 
              << last_rdy_uS << " to recd_uS " << now_uS << " frame " << frame_num << endl;
         if(now_uS < last_rdy_uS) {
-            if(vrbs) {
+            if(vrbs>0) {
                 cout << now_uS+2  << " [cpu_emu " << sub_prt << "]:  dropped (" << frame_num << ')' << " request_nbr " << request_nbr 
                      << "(last_rdy_uS,recd_uS) (" << last_rdy_uS << ',' << now_uS << ')' << endl;
                     }
             if(frame_num != 0) {
-                if(vrbs) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
+                if(vrbs>1) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << " going to wait_for_frame " << endl; 
                 continue;
             }
         }
@@ -528,11 +525,11 @@ int main (int argc, char *argv[])
             last_cmp_lat_uS = uS1d.count()-now_uS;  //zero based clock
             now_uS          = uS1d.count();         //update clock for computational latency
             
-            if(vrbs) cout << now_uS  << " [cpu_emu " << sub_prt << "]: " << " synchronized all threads..." << endl;
+            if(vrbs>1) cout << now_uS  << " [cpu_emu " << sub_prt << "]: " << " synchronized all threads..." << endl;
         }
 
         if(!trmnl) {
-            if(DBG) cout << now_uS+2  << " [cpu_emu " << sub_prt << "]: " << " Forwarding "
+            if(vrbs>1) cout << now_uS+2  << " [cpu_emu " << sub_prt << "]: " << " Forwarding "
                          << " request " << frame_num << " from port " + string("tcp://") + sub_ip + ':' +  to_string(pub_prt)
                          << " to port " + string("tcp://") + sub_ip + ':' +  to_string(sub_prt) << " (" << frame_num << ')' << endl;
             // Publish a message for subscribers
@@ -543,40 +540,40 @@ int main (int argc, char *argv[])
     	        // Send  output "frame"
                 //represents harvested data
                 vector<uint8_t> payload(outSz_B);  //represents harvested data
-                if(DBG) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;///////////frame_num ???
+                if(vrbs>1) cout << now_uS+1 << " [cpu_emu " << sub_prt << "]: " << "serializing packet for request_nbr " << request_nbr << endl;///////////frame_num ???
                 auto data = serialize_packet(now_uS, pub_prt, payload.size(), parsed.timestamp_uS, parsed.stream_id, parsed.frame_num, payload);
-                if(DBG) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
+                if(vrbs>1) cout << now_uS+2 << " [cpu_emu " << sub_prt << "]: " << "serializing success for frame_num " << parsed.frame_num << endl;
                 zmq::message_t message(data.size());
                 memcpy(message.data(), data.data(), data.size());
                 sr = pub_sckt.send(message, zmq::send_flags::none);
                 if (!sr) cerr << now_uS << " [cpu_emu " << sub_prt << "]:  Failed to send" << endl;
                 if (vrbs && sr.has_value()) cout << now_uS << " [cpu_emu " << sub_prt << "]: Bytes sent = " << sr.value() << endl;
 
-                if(vrbs) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << payload.size() << " (" 
+                if(vrbs>0) cout << now_uS+3 << " [cpu_emu " << sub_prt << "]:  Sending frame size = " << payload.size() << " (" 
                               << frame_num << ')' << " to " << pub_prt << " at " << now_uS << " with code " << endl;
-                if(vrbs) cout << now_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
+                if(vrbs>1) cout << now_uS+4 << "[cpu_emu " << sub_prt << "]: " << " output Num written (" << request_nbr << ") "  
                              << sr.value() << " (" << request_nbr << ')' << endl;
                 if(sr.value() != HEADER_SIZE + payload.size()) cout << now_uS+3 << "[cpu_emu " << sub_prt << "]: " 
                                                                     << " sbscrptn_ip data incorrect size(" << request_nbr << ") "  << endl;
             }
         }
-        if(vrbs) cout << now_uS + 4 << " [cpu_emu " << sub_prt << "]:  done (" << frame_num << ')' << endl;
+        if(vrbs>0) cout << now_uS + 4 << " [cpu_emu " << sub_prt << "]:  done (" << frame_num << ')' << endl;
  
         mnBfSz_B = (request_nbr-1)*mnBfSz_B/request_nbr + bufSiz_B/request_nbr; //incrementally update mean receive size
         // Record end time
         //if(request_nbr < 10) continue; //warmup
-        if(vrbs) cout << now_uS + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: last_cmp_lat_uS = " << last_cmp_lat_uS 
+        if(vrbs>0) cout << now_uS + 5 << " [cpu_emu " << sub_prt << "]: " << " Measured latencies: last_cmp_lat_uS = " << last_cmp_lat_uS 
                            << " last_nw_lat_uS = " << last_nw_lat_uS  << " (" << frame_num << ")" << endl;
-        if(vrbs) cout << now_uS + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " 
+        if(vrbs>1) cout << now_uS + 6 << " [cpu_emu " << sub_prt << "]: " << " Measured frame rate " 
                            << float(request_nbr)/(float(now_uS-start_uS)*one_M) 
                            << " frame Hz." << " for " << frame_num << " frames" << endl;
-        if(vrbs) cout << now_uS + 7 << " [cpu_emu " << sub_prt << "]: " << " Measured bit rate " 
+        if(vrbs>1) cout << now_uS + 7 << " [cpu_emu " << sub_prt << "]: " << " Measured bit rate " 
                            << float(request_nbr*mnBfSz_B*B_b)/(float(now_uS-start_uS)*one_M)
                            << " bps mnBfSz_B " << mnBfSz_B << " (" << frame_num << ')' << endl;
-        if(vrbs) cout << now_uS + 8 << " [cpu_emu " << sub_prt << "]:  Missed frames: " << msdFrms << endl;
-        if(vrbs) cout << now_uS + 9 << " [cpu_emu " << sub_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
+        if(vrbs>1) cout << now_uS + 8 << " [cpu_emu " << sub_prt << "]:  Missed frames: " << msdFrms << endl;
+        if(vrbs>1) cout << now_uS + 9 << " [cpu_emu " << sub_prt << "]:  Missed frame ratio: " << float(msdFrms)/float(frame_num) 
                       << " frame_num " << frame_num  << " request_nbr " << request_nbr << endl;
-        if(vrbs) cout  << now_uS + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
+        if(vrbs>1) cout  << now_uS + 10 << " [cpu_emu " << sub_prt << "]:  stats computed ..." << endl;
         request_nbr++;
     } //main loop
     cout  << now_uS + 11 << " [cpu_emu " << sub_prt << "]:  " << (trmnl?"Terminal":"Non Terminal") 
