@@ -2,7 +2,7 @@
 import os
 import math
 import random
-
+import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -97,6 +97,8 @@ def launch_remote(ip, cmd, prog):
         print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
         return None
 
+    time.sleep(30) #pause for OTP rollover
+    
     try:
         # Step 2: Build remote command
         remote_cmd = f"chmod +x ~/{prog_rn} && nohup ~/{prog_rn} {' '.join(args)} > ~/{prog_rn}.out 2>&1 &"
@@ -617,6 +619,7 @@ class RTDP:
                 "-i", sender_ip_list[idx],
                 "-p", str(current_p),
                 "-r", str(current_r),
+                "-v", str(verbosity),
                 "-z", str(z_val)#,
                 #f"> {remote_log} 2>&1"
             ]
@@ -629,6 +632,8 @@ class RTDP:
 
             current_p = current_r
             current_r = current_p + 1
+
+            time.sleep(30) #pause for OTP rollover
             
         print("(End of emulate method)", flush=True)
         return(prog_tags)
