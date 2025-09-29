@@ -7,5 +7,5 @@ pub_prt:        8889        # ZMQ publication port
 sleep:          0           # if 0 burn cpu else sleep
 threads:        1           # num threads to spawn
 verbose:        1           # verbosity level
-terminal:       0           # if 1 do not forward result to destination
+terminal:       1           # if 1 do not forward result to destination
 frame_cnt:      100         # Numbers frames sender will send
