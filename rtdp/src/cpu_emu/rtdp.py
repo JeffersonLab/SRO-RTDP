@@ -697,17 +697,19 @@ class RTDP:
         except subprocess.CalledProcessError as e:
             print(f"[ERROR] Failed to send emulation sender to {sender}: {e.stderr.decode().strip()}", flush=True)
 #-----------------------------------------------------
-    def parse_emu_logs(self, log_path="emu_log.txt"):
-        #reset dataframes
-        self.sentFrms_df        = self.sentFrms_df.iloc[0:0]
-        self.drpmsdFrms_df      = self.drpmsdFrms_df.iloc[0:0]
-        self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
-        self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
+    def parse_emu_logs(self, log_path="emu_log.txt", lognum=0):
+
+        if(lognum==0):
+            #reset dataframes
+            self.sentFrms_df        = self.sentFrms_df.iloc[0:0]
+            self.drpmsdFrms_df      = self.drpmsdFrms_df.iloc[0:0]
+            self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
+            self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
         # Load and inspect
         lines = load_log_file(log_path)
         print(f"Loaded {len(lines)} lines from the log.")
         # Extract lines with frame send information for sender
-        frame_rate_lines = [line for line in lines if "[emulate_stream:] Sending frame size" in line]
+        frame_rate_lines = [line for line in lines if "Sending frame size = " in line]
         min_uS = 1e30
         fs_value = pd.NA
         ts_value = pd.NA
@@ -738,8 +740,8 @@ class RTDP:
                 fn_value = float(fn_match.group(1) if fn_match else None)
             else:
                 print("No fn_match")
-            row = (int(0),float(ts_value),int(fn_value),float(fs_value))
-            self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
+            row = pd.DataFrame([{"component": int(0), "snt_uS": ts_value, "frm_nm": int(fn_value), "rcd_uS": fs_value}])     
+            self.sentFrms_df = pd.concat([self.sentFrms_df, row], ignore_index=True)    
         #determine emulation port range
         #port_lines = [line for line in lines if "Connecting to receiver tcp" in line]
         cmpnt_ids = []
@@ -776,8 +778,9 @@ class RTDP:
                     fn_value = int(fn_match.group(1) if fn_match else None)
                 else:
                     print("No fn_match")
-                row = (int(index+1),float(ts_value),int(fn_value),float(fs_value))
-                self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)    
+                row = pd.DataFrame([{"component": int(index+lognum+1), "snt_uS": ts_value, "frm_nm": fn_value, "rcd_uS": fs_value}])     
+                self.sentFrms_df = pd.concat([self.sentFrms_df, row], ignore_index=True)    
+                self.sentFrms_df.loc[(self.sentFrms_df["component"] == int(index+lognum+1)) & (self.sentFrms_df["frm_nm"] == fn_value), "timestamp"] = int(ts_match.group(1))
         # Extract lines with frame rcv information all components
         for index, cmpnt_id in enumerate(cmpnt_ids):
             ts_value = pd.NA
@@ -795,9 +798,10 @@ class RTDP:
                 else:
                     print("No fn_match")
                 # New row with only some columns filled
-                row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "rcd_uS": ts_value}])        
+                row = pd.DataFrame([{"component": int(index+lognum+1), "frm_nm": int(fn_value), "rcd_uS": ts_value}])        
                 # Concatenate
                 self.prcsdFrms_df = pd.concat([self.prcsdFrms_df, row], ignore_index=True)
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+lognum+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "timestamp"] = int(ts_match.group(1))
         # Extract lines with frame done information all components
         for index, cmpnt_id in enumerate(cmpnt_ids):
             ts_value = pd.NA
@@ -814,10 +818,8 @@ class RTDP:
                     fn_value = int(fn_match.group(1))
                 else:
                     print("No fn_match")
-                # New row with only some columns filled
-                row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "done_uS": ts_value}])        
-                # update done_uS
-                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "done_uS"] = ts_value
+                # update row with done_uS, timestamp
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+lognum+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "done_uS"] = ts_value
         # Extract lines with frame size information all components
         for index, cmpnt_id in enumerate(cmpnt_ids):
             fs_value = pd.NA
@@ -835,11 +837,12 @@ class RTDP:
                 else:
                     print("No fs_match")
                 # update frm_sz_b
-                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "frm_sz_b"] = fs_value
-                # update snt_uS by reteiving value from sentFrms_df
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+lognum+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "frm_sz_b"] = fs_value
+                self.sentFrms_df.loc[(self.sentFrms_df["component"] == int(index+lognum+1)) & (self.sentFrms_df["frm_nm"] == fn_value), "frm_sz_b"] = fs_value
+                # update snt_uS by receiving value from sentFrms_df
                 if cmpnt_id != max(cmpnt_ids): #not the last or sink component
-                    snt_uS = self.sentFrms_df.loc[(self.sentFrms_df["component"] == int(index+1)) & (self.sentFrms_df["frm_nm"] == fn_value), "snt_uS"].iloc[0]
-                    self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "snt_uS"] = snt_uS
+                    snt_uS = self.sentFrms_df.loc[(self.sentFrms_df["component"] == int(index+lognum+1)) & (self.sentFrms_df["frm_nm"] == fn_value), "snt_uS"].iloc[0]
+                    self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+lognum+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "snt_uS"] = snt_uS
         # Extract lines with frame size information all components
         for index, cmpnt_id in enumerate(cmpnt_ids):
             fs_value = pd.NA
@@ -864,10 +867,11 @@ class RTDP:
                 else:
                     print("No cl_match")
                 # update done_uS
-                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "cmp_ltnc_uS"] = cl_value
-                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "ntwrk_lt_uS"] = nl_value
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+lognum+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "cmp_ltnc_uS"] = cl_value
+                self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+lognum+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "ntwrk_lt_uS"] = nl_value
         # Extract lines with frame rcv information all components
         for index, cmpnt_id in enumerate(cmpnt_ids):
+            if(lognum!=0 and index==0): continue # already added
             fs_value = pd.NA
             ts_value = pd.NA
             fn_value = pd.NA
@@ -884,12 +888,43 @@ class RTDP:
                 else:
                     print("No fn_match")
                 # New row with only some columns filled
-                row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "rcd_uS": ts_value}])        
+                row = pd.DataFrame([{"component": int(index+lognum+1), "frm_nm": fn_value, "rcd_uS": ts_value}])        
                 # Concatenate
                 self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, row], ignore_index=True)
 
-        self.cnst_all_frm_set = set(range(1, self.sentFrms_df.loc[self.sentFrms_df["component"] == 0, "frm_nm"].max() + 1))   # range is exclusive at the end, so add 1 for inclusive
-                                            
+        self.cnst_all_frm_set = set(range(1, int(self.sentFrms_df.loc[self.sentFrms_df["component"] == 0, "frm_nm"].max()) + 1))   # range is exclusive at the end, so add 1 for inclusive
+
+        
+    def parse_emu_logs_multi(self, log_files):
+        for lognum, log_file in enumerate(log_files):
+            self.parse_emu_logs(log_path=log_file,lognum=lognum)
+
+            # Drop component==0 from self.sentFrms_df
+            self.sentFrms_df = self.sentFrms_df[self.sentFrms_df["component"] != 0].copy() 
+
+            # Get bitrate for sent frames (copied from plot_send_bit_rate)
+            dts_S = u_1*(np.ediff1d(self.sentFrms_df.loc[self.sentFrms_df["component"] == lognum+1, "snt_uS"], to_begin=-1e99)) # Delta t, dummy val for first row
+            szs_b = self.sentFrms_df.loc[self.sentFrms_df["component"] == lognum+1, "frm_sz_b"]
+            if(lognum==0): self.sentFrms_df["send_btRt_Mbps"] = one_M*szs_b/dts_S
+            else: self.sentFrms_df.loc[self.sentFrms_df["component"] == lognum+1, "send_btRt_Mbps"] = one_M*szs_b/dts_S
+
+            # Get bitrate for sent frames (copied from plot_send_bit_rate)
+            dts_S = u_1*(np.ediff1d(self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == lognum+1, "rcd_uS"], to_begin=-1e99)) # Delta t, dummy val for first row
+            szs_b = self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == lognum+1, "frm_sz_b"]
+            if(lognum==0): self.prcsdFrms_df["recv_btRt_Mbps"] = one_M*szs_b/dts_S
+            else: self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == lognum+1, "recv_btRt_Mbps"] = one_M*szs_b/dts_S
+
+        # Timestamp should be integer
+        self.sentFrms_df["timestamp"]  = self.sentFrms_df["timestamp"].astype("int")
+        self.prcsdFrms_df["timestamp"] = self.prcsdFrms_df["timestamp"].astype("int")
+        # Re-index by timestamp
+        self.sentFrms_df.set_index("timestamp", inplace=True)
+        self.sentFrms_df.sort_index(inplace=True)
+        self.prcsdFrms_df.set_index("timestamp", inplace=True)
+        self.prcsdFrms_df.sort_index(inplace=True)
+        # Save output CSV
+        self.sentFrms_df.to_csv("sent_frame_info.csv")
+        self.prcsdFrms_df.to_csv("processed_frame_info.csv")
 #-----------------------------------------------------
     def plot_send_bit_rate(self):
         """
