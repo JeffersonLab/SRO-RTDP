@@ -146,7 +146,7 @@ int main (int argc, char *argv[])
         send_result_t sr;
 
         // Send  "frame"
-        auto x = clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
+        auto x = 1; // No frame size variation for DAQ system   // clamp(nd_10pcnt(gen), 0.7, 1.3);  //+/- 3 sd
         vector<uint8_t> payload(size_t(M_1*evnt_sz_MB*x));
         
         if(DBG) cout << now_uS+1 << " [emulate_stream:] serializing packet for frame_num " << frame_num << endl;

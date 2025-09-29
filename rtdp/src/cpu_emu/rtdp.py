@@ -12,6 +12,7 @@ import yaml
 import subprocess
 #import pexpect
 import shlex
+import random
 
 from typing import Optional, Union, List
 from datetime import datetime
@@ -79,12 +80,15 @@ def launch_remote(ip, cmd, prog):
     """
     receiver = prog
     args = cmd[1:]
-
+    rnd_tag = random.randint(0, 9999)
+    prog_rn = f"{receiver}{rnd_tag}"
+    
     try:
         # Step 1: Copy receiver to remote host
-        scp_cmd = ["scp", receiver, f"{ip}:~/{receiver}"]
-        print(f"[INFO] Copying {receiver} to {ip}...", flush=True)
+        scp_cmd = ["scp", receiver, f"{ip}:~/{prog_rn}"]
+        print(f"[INFO] Copying {receiver} to {ip}:~/{prog_rn}...", flush=True)
         subprocess.run(scp_cmd, check=True)  # OTP prompt
+        print(f"[INFO] SCP Success...", flush=True)
 
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] SCP failed: {e}", flush=True)
@@ -95,13 +99,13 @@ def launch_remote(ip, cmd, prog):
 
     try:
         # Step 2: Build remote command
-        remote_cmd = f"chmod +x ~/{receiver} && nohup ~/{receiver} {' '.join(args)} > ~/{receiver}.out 2>&1 &"
+        remote_cmd = f"chmod +x ~/{prog_rn} && nohup ~/{prog_rn} {' '.join(args)} > ~/{prog_rn}.out 2>&1 &"
         ssh_cmd = ["ssh", ip, remote_cmd]
 
-        print(f"[INFO] Launching {receiver} on {ip}...", flush=True)
+        print(f"[INFO] Launching {prog_rn} on {ip}...", flush=True)
         # Launch asynchronously, keep stdin open for OTP
         process = subprocess.Popen(ssh_cmd)
-        print(f"[INFO] {receiver} launched on {ip}. Continuing Python script...", flush=True)
+        print(f"[INFO] {prog_rn} launched on {ip}. Continuing Python script...", flush=True)
         return process
 
     except Exception as e:
@@ -297,7 +301,6 @@ class RTDP:
             "component": pd.Series(dtype=int),
             "drp_frctn":   pd.Series(dtype=int)
         })
-
 
 #-----------------------------------------------------
     def gen_gamma_samples(self, mean, stdev, n_samples):
@@ -602,6 +605,7 @@ class RTDP:
         # for idx, ip in enumerate(host_ip_list[1:], start=1):
         
         remote_log = f"~/{prog}.log"
+        prog_tags = []
 
         for idx, ip in enumerate(host_ip_list):
 
@@ -613,19 +617,21 @@ class RTDP:
                 "-i", sender_ip_list[idx],
                 "-p", str(current_p),
                 "-r", str(current_r),
-                "-z", str(z_val),
-                f"> {remote_log} 2>&1"
+                "-z", str(z_val)#,
+                #f"> {remote_log} 2>&1"
             ]
 
             print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}", flush=True)
 #            print(f"[INFO] Deploying {prog} to {ip}")
-
-            launch_emulate(ip, cmd, prog)
+            tag = launch_emulate(ip, cmd, prog)
+            print(f"Appending {tag}")
+            prog_tags.append(tag)
 
             current_p = current_r
             current_r = current_p + 1
             
         print("(End of emulate method)", flush=True)
+        return(prog_tags)
 
 
 #-----------------------------------------------------
@@ -881,6 +887,8 @@ class RTDP:
                 row = pd.DataFrame([{"component": int(index+1), "frm_nm": fn_value, "rcd_uS": ts_value}])        
                 # Concatenate
                 self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, row], ignore_index=True)
+
+        self.cnst_all_frm_set = set(range(1, self.sentFrms_df.loc[self.sentFrms_df["component"] == 0, "frm_nm"].max() + 1))   # range is exclusive at the end, so add 1 for inclusive
                                             
 #-----------------------------------------------------
     def plot_send_bit_rate(self):
