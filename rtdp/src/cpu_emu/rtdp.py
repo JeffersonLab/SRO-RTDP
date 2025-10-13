@@ -73,7 +73,7 @@ def load_log_file(path):
 #-----------------------------------------------------
 import subprocess
 
-def launch_remote(ip, cmd, prog):
+def launch_remote(ip, cmd, prog, login_pause=False):
     """
     Copy receiver program to remote host and launch it asynchronously.
     cmd[0] = receiver program, cmd[1:] = arguments
@@ -97,7 +97,7 @@ def launch_remote(ip, cmd, prog):
         print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
         return None
 
-    time.sleep(30) #pause for OTP rollover
+    if login_pause is True: time.sleep(30) #pause (e.g., for OTP rollover)
     
     try:
         # Step 2: Build remote command
@@ -117,13 +117,13 @@ def launch_remote(ip, cmd, prog):
 #-----------------------------------------------------
 #-----------------------------------------------------
 
-def launch_emulate(ip, cmd, prog):
+def launch_emulate(ip, cmd, prog, login_pause=False):
     """
     Emulate a receiver on a remote host.
     """
     print(f"[INFO] Starting emulation for {cmd[0]} on {ip}...", flush=True)
 
-    process = launch_remote(ip, cmd, prog)
+    process = launch_remote(ip, cmd, prog, login_pause)
 
     if process is None:
         print("[WARN] Remote launch failed. Emulation did not start.", flush=True)
@@ -556,7 +556,7 @@ class RTDP:
 
 #-----------------------------------------------------
 #-----------------------------------------------------
-    def emulate(self, config="emulate.yaml", prog="cpu_emu"):
+    def emulate(self, config="emulate.yaml", prog="cpu_emu", login_pause=False):
         """
         setup component daisy chain
 
@@ -626,14 +626,14 @@ class RTDP:
 
             print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}", flush=True)
 #            print(f"[INFO] Deploying {prog} to {ip}")
-            tag = launch_emulate(ip, cmd, prog)
+            tag = launch_emulate(ip, cmd, prog, login_pause)
             print(f"Appending {tag}")
             prog_tags.append(tag)
 
             current_p = current_r
             current_r = current_p + 1
 
-            time.sleep(30) #pause for OTP rollover
+            if login_pause is True:  time.sleep(30) #pause for OTP rollover
             
         print("(End of emulate method)", flush=True)
         return(prog_tags)
@@ -641,7 +641,7 @@ class RTDP:
 
 #-----------------------------------------------------
 #-----------------------------------------------------
-    def send_emu(self, config="emulate.yaml", prog="zmq-event-emu-clnt"):
+    def send_emu(self, config="emulate.yaml", prog="zmq-event-emu-clnt", login_pause=False):
         """
         Send emulation command to the *first host* in the config.
         If no args passed, defaults to YAML values.
@@ -696,7 +696,7 @@ class RTDP:
 
         try:
             
-            launch_remote(sender, cmd, prog)
+            launch_remote(sender, cmd, prog, login_pause)
 
             print(f"[INFO] Emulation command sent successfully to {sender}", flush=True)
         except subprocess.CalledProcessError as e:
@@ -1408,4 +1408,9 @@ if __name__ == "__main__":
 # x = (u_1 * sim_tm_uS.to_numpy()) / 60
 # y = btRt_Mbps.to_numpy()
 # plt.plot(x, y, marker='o', linestyle='-')
+
+
+#top -p $(pgrep -d',' -x cpu_emu)
+#killall cpu*
+#rm cpu_emu* zmq*
 
