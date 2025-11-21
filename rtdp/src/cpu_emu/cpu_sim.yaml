@@ -1,4 +1,4 @@
-cmp_ltnc_nS_B:    500       # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
+cmp_ltnc_nS_B:    100       # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
 output_size_GB:   0.000057  # Output size in GB
 nic_Gbps:         100       # Outbound NIC/Network speed in Gbps for sim_mode
 frame_sz_MB:      0.06      # Frame Size MB
