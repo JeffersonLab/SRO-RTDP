@@ -75,19 +75,18 @@ import subprocess
 
 def launch_remote(ip, cmd, prog, login_pause=False, sleep_time=30):
     """
-    Copy receiver program to remote host and launch it asynchronously.
-    cmd[0] = receiver program, cmd[1:] = arguments
+    Copy prog  to remote host and launch it asynchronously.
+    cmd[0] = prog , cmd[1:] = arguments
     """
-    receiver = prog
-    args = cmd[1:]
+    args    = cmd[1:]
     rnd_tag = random.randint(0, 9999)
-    prog_rn = f"{receiver}{rnd_tag}"
+    prog_rn = f"{prog}{rnd_tag}"
     
     try:
-        # Step 1: Copy receiver to remote host
-        scp_cmd = ["scp", receiver, f"{ip}:~/{prog_rn}"]
-        print(f"[INFO] Copying {receiver} to {ip}:~/{prog_rn}...", flush=True)
-        subprocess.run(scp_cmd, check=True)  # blocking PW/OTP prompt
+        # Step 1: Copy prog to remote host
+        scp_cmd = ["scp", prog, f"{ip}:~/{prog_rn}"]
+        print(f"[INFO] Copying {prog} to {ip}:~/{prog_rn}...", flush=True)
+        subprocess.run(scp_cmd, check=True)  # blocking, PW/OTP prompt
         print(f"[INFO] SCP Success...", flush=True)
 
     except subprocess.CalledProcessError as e:
@@ -554,15 +553,34 @@ class RTDP:
 
             z_val = 1 if idx == (len(host_ip_list) - 1) else 0
 
+#            cmd = [
+#                f"~/{prog}",
+#                "-f", str(frm_cnt),
+#                "-i", sender_ip_list[idx],
+#                "-p", str(current_p),
+#                "-r", str(current_r),
+#                "-v", str(verbosity),
+#                "-z", str(z_val)#,
+#                #f"> {remote_log} 2>&1"
+#            ]
+
+            try:
+                # Step 1: Copy associated yaml to remote host
+                scp_cmd = ["scp", emu_yaml_list[idx], f"{ip}:~/{emu_yaml_list[idx]}"]
+                print(f"[INFO] Copying {emu_yaml_list[idx]} to {ip}:~/{emu_yaml_list[idx]}...", flush=True)
+                subprocess.run(scp_cmd, check=True)  # blocking, PW/OTP prompt
+                print(f"[INFO] SCP Success...", flush=True)
+
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] SCP failed: {e}", flush=True)
+                return None
+            except Exception as e:
+                print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
+                return None
+
             cmd = [
                 f"~/{prog}",
-                "-f", str(frm_cnt),
-                "-i", sender_ip_list[idx],
-                "-p", str(current_p),
-                "-r", str(current_r),
-                "-v", str(verbosity),
-                "-z", str(z_val)#,
-                #f"> {remote_log} 2>&1"
+                f"-y ~/{emu_yaml_list[idx]}"
             ]
 
             print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}", flush=True)
@@ -570,7 +588,7 @@ class RTDP:
             prog_rn = launch_emulate(ip, cmd, prog, login_pause, sleep_time)
             print(f"Appending {prog_rn}")
             prog_tags.append(prog_rn)
-
+            
             current_p = current_r
             current_r = current_p + 1
 
@@ -640,8 +658,8 @@ class RTDP:
             "-r", str(avg_bit_rt_Gbps),
             "-a", "0",
             "-p", str(base_port),
-            "-v", str(verbosity),
-            f"> {remote_log} 2>&1"
+            "-v", str(verbosity)#,
+            #f"> {remote_log} 2>&1"
         ]
 
         print(f"[INFO] Starting {prog} on {sender_ip}: {' '.join(cmd)}", flush=True)
@@ -1340,8 +1358,10 @@ if __name__ == "__main__":
 #>>> from rtdp import RTDP
 #>>> rtdp = RTDP(rng_seed=7, log_file="z.txt")
 #>>> rtdp.sim()
-#>>> rtdp.emulate(config="emulate.yaml", prog="cpu_emu")   # deploys daisy chain
-#>>> rtdp send_emu(self, config="emulate.yaml", prog="zmq-event-emu-clnt")
+
+#>>> from rtdp import RTDP
+#>>> rtdp = RTDP(rng_seed=37)
+#>>> rtdp.emulate(login_pause=True, sleep_time=5)
 
 #>>> rtdp.plot_all()
 #$ for f in *.png; do eog "$f" & done
