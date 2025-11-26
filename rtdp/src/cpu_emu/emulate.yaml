@@ -7,7 +7,7 @@ emu_yamls:
   - "cpu_emu_1.yaml"
   - "cpu_emu_2.yaml"
   - "cpu_emu_3.yaml"
-  - "sndr.yaml"
+  - "zmq-event-emu-clnt.yaml"
 hosts:
   - 127.0.0.1
   - 127.0.0.1

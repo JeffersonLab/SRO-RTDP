@@ -456,11 +456,6 @@ class RTDP:
         self.log_file = self.sim_log_file
 
 #-----------------------------------------------------
-
-
-
-#-----------------------------------------------------
-#-----------------------------------------------------
     def emulate(self, login_pause=False, emu_config="emulate.yaml", sleep_time=30):
         """
         setup component daisy chain
@@ -553,57 +548,57 @@ class RTDP:
         #now start sender
 
 #-----------------------------------------------------
-    def parse_emu_logs(self):
+    def parse_emu_logs(self, retrieve=True):
         self.log_file = self.emu_log_file
 
         #reset dataframes
-        # Retrieve component log files
-        for idx, ip in enumerate(self.emu_prm_host_ip_list):
-            try:
-                # Step 1: Copy associated yaml to remote host
-                scp_cmd = ["scp", f"{ip}:~/{self.emu_cmpnt_nms[idx]}.out", "."]
-                print(f"[INFO] {scp_cmd}", flush=True)
-                subprocess.run(scp_cmd, check=True)  # blocking, PW/OTP prompt
-                print(f"[INFO] {scp_cmd} Success...", flush=True)
+        if retrieve:
+            # Retrieve component log files
+            for idx, ip in enumerate(self.emu_prm_host_ip_list):
+                try:
+                    # Step 1: Copy associated yaml to remote host
+                    scp_cmd = ["scp", f"{ip}:~/{self.emu_cmpnt_nms[idx]}.out", "."]
+                    print(f"[INFO] {scp_cmd}", flush=True)
+                    subprocess.run(scp_cmd, check=True)  # blocking, PW/OTP prompt
+                    print(f"[INFO] {scp_cmd} Success...", flush=True)
 
-            except subprocess.CalledProcessError as e:
-                print(f"[ERROR] SCP failed: {e}", flush=True)
-                return None
-            except Exception as e:
-                print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
-                return None
+                except subprocess.CalledProcessError as e:
+                    print(f"[ERROR] SCP failed: {e}", flush=True)
+                    return None
+                except Exception as e:
+                    print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
+                    return None
 
-            #cleanup deployed files
-            #rm_cmd = [
-            #   f"rm -f ~/{self.emu_prm_emu_yaml_list[idx]} ~/{self.emu_prm_emu_yaml_list[idx]}.out ~/cpu_emu_{idx}.yaml"
-            #]
+                #cleanup deployed files
+                #rm_cmd = [
+                #   f"rm -f ~/{self.emu_prm_emu_yaml_list[idx]} ~/{self.emu_prm_emu_yaml_list[idx]}.out ~/cpu_emu_{idx}.yaml"
+                #]
 
-            rm_cmd = f"rm -f ~/{self.emu_cmpnt_nms[idx]} ~/{self.emu_cmpnt_nms[idx]}.out ~/*.yaml"
+                rm_cmd = f"rm -f ~/{self.emu_cmpnt_nms[idx]} ~/{self.emu_cmpnt_nms[idx]}.out ~/*.yaml"
 
-            print(f"[INFO] Deleting {rm_cmd} ...", flush=True)
-            
-            try:
-                subprocess.run(rm_cmd, check=True, shell=True)  # blocking, PW/OTP prompt
-                #subprocess.run(rm_cmd, check=True)
-                print(f"[INFO] rm Success...", flush=True)
+                print(f"[INFO] Deleting {rm_cmd} ...", flush=True)
+                
+                try:
+                    subprocess.run(rm_cmd, check=True, shell=True)  # blocking, PW/OTP prompt
+                    #subprocess.run(rm_cmd, check=True)
+                    print(f"[INFO] rm Success...", flush=True)
 
-            except subprocess.CalledProcessError as e:
-                print(f"[ERROR] rm failed: {e}", flush=True)
-                return None
-            except Exception as e:
-                print(f"[ERROR] Unexpected error during rm: {e}", flush=True)
-                return None
+                except subprocess.CalledProcessError as e:
+                    print(f"[ERROR] rm failed: {e}", flush=True)
+                    return None
+                except Exception as e:
+                    print(f"[ERROR] Unexpected error during rm: {e}", flush=True)
+                    return None
         
-
         # Concatenate component log files
-        with open("emu.log", "wb") as outfile:
-            for fname in sorted(glob.glob("*.out")):
-                with open(fname, "rb") as infile:
+        with open("emu.out", "wb") as outfile:
+            for fname in self.emu_cmpnt_nms:
+                with open(f"{fname}.out", "rb") as infile:
                     outfile.write(infile.read())
 
         # Load and inspect
-        lines = load_log_file("emu.log")
-        print(f"Loaded {len(lines)} lines from the log.")
+        lines = load_log_file("emu.out")
+        print(f"Loaded {len(lines)} lines from emu.out.")
         # Extract lines with frame send information for sender
         frame_rate_lines = [line for line in lines if "[emulate_stream:] Sending frame size" in line]
         min_uS = 1e30

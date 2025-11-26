@@ -1,5 +1,5 @@
 //
-//  Basic ZeoMQ client in C++
+//  Basic ZeoMQ emulation client in C++
 //  Sends frames to subscriber
 //
 #include <unistd.h>
@@ -385,14 +385,7 @@ int main (int argc, char *argv[])
         for (auto &kv : config) {
             cout << kv.first << " = " << kv.second << endl;
         }
-/***************************
-        int stream_id        = stoi(config["stream_id"]);
-        double frame_sz_MB   = stod(config["frame_sz_MB"]);
-        int frame_cnt        = stoi(config["frame_cnt"]);
-        double avg_bit_rt    = stod(config["avg_bit_rt_Gbps"]);
-        int verbosity        = stoi(config["verbosity"]);
-        int pub_port         = stoi(config["pub_port"]);
-*****************************/
+
         stream_id       = stoi(config["stream_id"]);
         frame_sz_MB     = stod(config["frame_sz_MB"]);
         frame_cnt       = stoi(config["frame_cnt"]);
@@ -405,18 +398,7 @@ int main (int argc, char *argv[])
     } catch (const exception &e) {
         cerr << "ERROR: " << e.what() << endl;
     }
-/***********************
-    if (psdY) {//parse the yaml file if given        
-        parse_yaml(yfn.c_str(), vrbs);
-        //if not passed as arg, retrieve from yaml map)
-        if(!psdA) stream_id         = stof(mymap["stream_id"]);
-        if(!psdF) frame_cnt         = stof(mymap["frame_cnt"]);
-        if(!psdP) pub_port           = stof(mymap["pub_port"]);
-        if(!psdR) avg_bit_rt_Gbps   = stoi(mymap["avg_bit_rt_Gbps"]);
-        if(!psdS) frame_sz_MB       = stoi(mymap["frame_sz_MB"]);
-        if(!psdV) vrbs              = (bool) stoi(mymap["verbosity"]) == 1;
-    }
-***********************/    
+
     if(vrbs>0) cout << 0 << " [emulate_stream:] yaml parsed" << endl;
 
     // RNG for latency variance generation using a Gaussian (normal) distribution to generate a scaling factor 
