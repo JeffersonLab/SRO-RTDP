@@ -1,0 +1,12 @@
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.svg
+*.txt
+*.out
+*.log
+*.err
+*.ipynb
