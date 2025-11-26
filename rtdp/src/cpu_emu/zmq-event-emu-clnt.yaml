@@ -1,0 +1,7 @@
+stream_id:          0
+frame_sz_MB:        0.0586
+frame_cnt:          100
+avg_bit_rt_Gbps:    0.01
+verbosity:          1
+pub_port:           6000
+

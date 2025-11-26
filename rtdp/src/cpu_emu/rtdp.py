@@ -13,6 +13,7 @@ import subprocess
 #import pexpect
 import shlex
 import random
+import glob
 
 from typing import Optional, Union, List
 from datetime import datetime
@@ -118,25 +119,6 @@ def launch_remote(ip, cmd, prog, login_pause=False, sleep_time=30):
 #-----------------------------------------------------
 #-----------------------------------------------------
 
-def launch_emulate(ip, cmd, prog, login_pause=False, sleep_time=30):
-    """
-    Emulate a receiver on a remote host.
-    """
-    print(f"[INFO] Starting emulation for {cmd[0]} on {ip}...", flush=True)
-
-    prog_rn = launch_remote(ip, cmd, prog, login_pause, sleep_time)
-
-    if prog_rn is None:
-        print("[WARN] Remote launch failed. Emulation did not start.", flush=True)
-    else:
-        print("[INFO] Remote emulation started successfully.", flush=True)
-
-    print("(End of launch_emulate)", flush=True)
-    return prog_rn
-
-#-----------------------------------------------------
-#-----------------------------------------------------
-
 def bernoulli(p: float, n: int = 1, rng: Optional[Union[random.Random, np.random.Generator]] = None) -> List[int]:
     """
     Bernoulli sampler using a provided RNG (Python random.Random or NumPy Generator).
@@ -236,7 +218,8 @@ class RTDP:
             none
 
         """
-        self.log_file.close()
+        self.sim_log_file.close()
+        self.emu_log_file.close()
 
 #-----------------------------------------------------
     def __init__(self, rng_seed = None, directory=".", extension=".txt"):
@@ -265,7 +248,8 @@ class RTDP:
         self.rng       = np.random.default_rng(rng_seed)
         self.directory = directory
         self.extension = extension
-        self.log_file  = None
+        self.sim_log_file  = None
+        self.emu_log_file  = None
 
         # Frames actually processed by components
         self.prcsdFrms_df = pd.DataFrame({
@@ -324,7 +308,7 @@ class RTDP:
         return self.rng.gamma(shape, scale, n_samples)
 
 #-----------------------------------------------------
-    def sim(self, sim_config="cpu_sim.yaml", log_file="sim_log.txt"):
+    def sim(self, sim_config="simulate.yaml"):
         """
         simulate component daisy chain
 
@@ -347,19 +331,19 @@ class RTDP:
             return
 
         try:
-            self.log_file
+            self.sim_log_file
         except NameError:
             pass
         else:
-            if self.log_file is not None and not self.log_file.closed:
-                self.log_file.close()
+            if self.sim_log_file is not None and not self.sim_log_file.closed:
+                self.sim_log_file.close()
 
-        #if not self.log_file.closed: #may have been openend by emulate()
-        #    self.log_file.close()
-        self.log_file  = open(log_file, "w")
+        #if not self.sim_log_file.closed: #may have been openend by emulate()
+        #    self.sim_log_file.close()
+        self.sim_log_file  = open(f"{sim_config}.log", "w")
         # Flatten into a DataFrame
         sim_prmtrs_df = json_normalize(data, sep=".")
-        print(sim_prmtrs_df.T, file=self.log_file)  # transpose to make it easier to read
+        print(sim_prmtrs_df.T, file=self.sim_log_file)  # transpose to make it easier to read
 
         self.prm_sim_cmp_ltnc_nS_B      = float(sim_prmtrs_df['cmp_ltnc_nS_B'].iloc[0])
         self.prm_sim_output_size_GB     = float(sim_prmtrs_df['output_size_GB'].iloc[0])
@@ -395,7 +379,7 @@ class RTDP:
         nlib = bernoulli(0.02, n=self.prm_sim_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
         
         if vrbs: print("Simulating ...")
-        #if vrbs: print(f"ib =  {ib}", file=self.log_file)
+        #if vrbs: print(f"ib =  {ib}", file=self.sim_log_file)
 
         #Simulation
         #reset dataframes
@@ -408,15 +392,15 @@ class RTDP:
             # impulses
             if clib[f]==1: # computational latency
                 sim_cmp_ltnc_nS_B = self.gen_gamma_samples(self.prm_sim_nic_Gbps, self.prm_sim_nic_Gbps/5, int(1))[0]
-                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {sim_cmp_ltnc_nS_B:10.2f} frame {f}, time {u_1*clk_uS[0]/60.0:10.2f}", file=self.log_file)
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {sim_cmp_ltnc_nS_B:10.2f} frame {f}, time {u_1*clk_uS[0]/60.0:10.2f}", file=self.sim_log_file)
             if nlib[f]==1: # network latency
                 sim_nic_Gbps = 10*self.prm_sim_nic_Gbps #so the first 'while' test will pass
                 while sim_nic_Gbps > self.prm_sim_nic_Gbps: #enforce upper bound
                     sim_nic_Gbps = self.gen_gamma_samples(self.prm_sim_nic_Gbps, self.prm_sim_nic_Gbps/5, int(1))[0]
                     
-                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {sim_nic_Gbps:10.2f} frame {f}, time {u_1*clk_uS[0]/60.0:10.2f}", file=self.log_file)
+                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {sim_nic_Gbps:10.2f} frame {f}, time {u_1*clk_uS[0]/60.0:10.2f}", file=self.sim_log_file)
             cnst_daq_frm_sz0_b = B_b*cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
-            if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.log_file)
+            if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.sim_log_file)
             #component zero is the sender
             row = (0,clk_uS[0],f,cnst_daq_frm_sz0_b)
             self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
@@ -443,10 +427,10 @@ class RTDP:
                 ntwrk_lt_uS += cnst_swtch_lt_uS  #add switch latency
                 clk_c += ntwrk_lt_uS  #Update temp clk for net latency
                 rcd_uS = clk_c #Time would recv from upstream sender if ready
-                if vrbs: print(f"{clk_c} Component {c} Recv Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.log_file)
+                if vrbs: print(f"{clk_c} Component {c} Recv Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file)
                 #If temp clk < components last 'done' time, frame is dropped for this component and missed by all downstream components
                 if (clk_uS[c] > clk_c): # True -> not ready to recv
-                    if vrbs: print(f"{clk_c} Component {c} Dropped Frame {f}", file=self.log_file)
+                    if vrbs: print(f"{clk_c} Component {c} Dropped Frame {f}", file=self.sim_log_file)
                     row = (c,rcd_uS,f,frm_sz_b,clk_uS[c])
                     self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, pd.DataFrame([row], columns=self.drpmsdFrms_df.columns)], ignore_index=True)
                     break; # All downstream components will miss this frame
@@ -460,14 +444,16 @@ class RTDP:
                 self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
                 clk_c += 10 #add overhead
                 clk_uS[c]  = clk_c #Set as last 'done' time
-                #if vrbs and c == self.prm_sim_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.log_file)
-                if vrbs: print(f"{clk_c} Component {c} Done Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.log_file)
+                #if vrbs and c == self.prm_sim_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.sim_log_file)
+                if vrbs: print(f"{clk_c} Component {c} Done Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file)
                 #add self.prcsdFrms_df row
                 row = (c,rcd_uS,f,frm_sz_b,cmp_ltnc_uS,ntwrk_lt_uS,snt_uS,clk_uS[c])
                 self.prcsdFrms_df = pd.concat([self.prcsdFrms_df, pd.DataFrame([row], columns=self.prcsdFrms_df.columns)], ignore_index=True)
             # Sender Rate Sleep
             rtSlp_uS   = float(one_u*cnst_daq_frm_sz0_b / (G_1*self.prm_sim_avg_bit_rt_Gbps))
             clk_uS[0] += rtSlp_uS
+            
+        self.log_file = self.sim_log_file
 
 #-----------------------------------------------------
 
@@ -475,7 +461,7 @@ class RTDP:
 
 #-----------------------------------------------------
 #-----------------------------------------------------
-    def emulate(self, prog="cpu_emu", login_pause=False, emu_config="emulate.yaml", log_file="emu_log.txt", sleep_time=30):
+    def emulate(self, login_pause=False, emu_config="emulate.yaml", sleep_time=30):
         """
         setup component daisy chain
 
@@ -493,6 +479,8 @@ class RTDP:
             none
         """
 
+        self.emu_cmpnt_nms = []
+
         # parse emu_config file
         try:
             with open(emu_config, "r") as f:
@@ -503,71 +491,41 @@ class RTDP:
             return
 
         try:
-            self.log_file
+            self.emu_log_file
         except NameError:
             pass
         else:
-            if self.log_file is not None and not self.log_file.closed:
-                self.log_file.close()
+            if self.emu_log_file is not None and not self.emu_log_file.closed:
+                self.emu_log_file.close()
                 
-        self.log_file  = open(log_file, "w")
+        self.emu_log_file  = open(f"{emu_config}.log", "w")
         
         try:
-            frm_sz_MB       = emu_setup_prms["frm_sz_MB"]
-            frm_cnt         = emu_setup_prms["frm_cnt"]
-            avg_bit_rt_Gbps = emu_setup_prms["avg_bit_rt_Gbps"]
-            verbosity       = emu_setup_prms["verbosity"]
-            base_port       = emu_setup_prms["base_port"]
-            sender          = emu_setup_prms["sender"]
-            prog_list       = emu_setup_prms.get("progs", [])
-            host_ip_list    = emu_setup_prms.get("hosts", [])
-            emu_yaml_list   = emu_setup_prms.get("emu_yamls", [])
+            self.emu_prm_prog_list      = emu_setup_prms.get("progs", [])
+            self.emu_prm_host_ip_list   = emu_setup_prms.get("hosts", [])
+            self.emu_prm_emu_yaml_list  = emu_setup_prms.get("emu_yamls", [])
         except KeyError as e:
             print(f"[ERROR] Missing required config key: {e}", flush=True)
             return
 
-        if(len(prog_list) < 1):
+        if(len(self.emu_prm_prog_list) < 1):
             print(f"[ERROR] Incorrect progs list in config file", flush=True)
             return
 
-        if(len(prog_list) < len(host_ip_list)):
+        if(len(self.emu_prm_prog_list) < len(self.emu_prm_host_ip_list)):
             print(f"[ERROR] Incorrect hosts list in config file", flush=True)
             return
 
-        if(len(prog_list) < len(emu_yaml_list)):
+        if(len(self.emu_prm_prog_list) < len(self.emu_prm_emu_yaml_list)):
             print(f"[ERROR] Incorrect yamls list in config file", flush=True)
             return
 
-        sender_ip_list = [sender] + host_ip_list
-        
-        current_p = base_port
-        current_r = base_port + 1
-
-        # setup and deploy components
-        # for idx, ip in enumerate(host_ip_list[1:], start=1):
-        
-        remote_log = f"~/{prog}.log"
-        prog_tags = []
-
-        for idx, ip in enumerate(host_ip_list):
-
-            z_val = 1 if idx == (len(host_ip_list) - 1) else 0
-
-#            cmd = [
-#                f"~/{prog}",
-#                "-f", str(frm_cnt),
-#                "-i", sender_ip_list[idx],
-#                "-p", str(current_p),
-#                "-r", str(current_r),
-#                "-v", str(verbosity),
-#                "-z", str(z_val)#,
-#                #f"> {remote_log} 2>&1"
-#            ]
+        for idx, ip in enumerate(self.emu_prm_host_ip_list):
 
             try:
                 # Step 1: Copy associated yaml to remote host
-                scp_cmd = ["scp", emu_yaml_list[idx], f"{ip}:~/{emu_yaml_list[idx]}"]
-                print(f"[INFO] Copying {emu_yaml_list[idx]} to {ip}:~/{emu_yaml_list[idx]}...", flush=True)
+                scp_cmd = ["scp", self.emu_prm_emu_yaml_list[idx], f"{ip}:~/{self.emu_prm_emu_yaml_list[idx]}"]
+                print(f"[INFO] Copying {self.emu_prm_emu_yaml_list[idx]} to {ip}:~/{self.emu_prm_emu_yaml_list[idx]}...", flush=True)
                 subprocess.run(scp_cmd, check=True)  # blocking, PW/OTP prompt
                 print(f"[INFO] SCP Success...", flush=True)
 
@@ -579,108 +537,72 @@ class RTDP:
                 return None
 
             cmd = [
-                f"~/{prog}",
-                f"-y ~/{emu_yaml_list[idx]}"
+                f"~/{self.emu_prm_prog_list[idx]}",
+                f"-y ~/{self.emu_prm_emu_yaml_list[idx]}"
             ]
 
-            print(f"[INFO] Deploying {prog} to {ip}: {' '.join(cmd)}", flush=True)
+            print(f"[INFO] Deploying {self.emu_prm_prog_list[idx]} to {ip}: {' '.join(cmd)}", flush=True)
 #            print(f"[INFO] Deploying {prog} to {ip}")
-            prog_rn = launch_emulate(ip, cmd, prog, login_pause, sleep_time)
+            prog_rn = launch_remote(ip, cmd, self.emu_prm_prog_list[idx], login_pause, sleep_time)
             print(f"Appending {prog_rn}")
-            prog_tags.append(prog_rn)
+            self.emu_cmpnt_nms.append(prog_rn)
             
-            current_p = current_r
-            current_r = current_p + 1
-
             #if login_pause is True:  time.sleep(sleep_time) #pause for OTP rollover
             
         print("[INFO] programs deployed ...", flush=True)
         #now start sender
-        print("[INFO] starting sender ...", flush=True)
-        prog_rn = self.send_emu(emu_config=emu_config, prog="zmq-event-emu-clnt", login_pause=login_pause, sleep_time=sleep_time)
-        if login_pause is True:
-            #print(f"[INFO] Login Pause Sleeping for {sleep_time} on {ip}...", flush=True)
-            time.sleep(sleep_time) #pause (e.g., for OTP rollover)
-        print(f"Pre-pending {prog_rn}")
-        prog_tags = [prog_rn] + prog_tags  #sender is first
-        #now gather sender, progs outputs
-        #self.parse(
-        #now cleanup
-        return(prog_tags)
-
 
 #-----------------------------------------------------
-#-----------------------------------------------------
-    def send_emu(self, emu_config="emulate.yaml", prog="zmq-event-emu-clnt", login_pause=False, sleep_time=30):
-        """
-        Send emulation command to the *first host* in the config.
-        If no args passed, defaults to YAML values.
-        """
+    def parse_emu_logs(self):
+        self.log_file = self.emu_log_file
 
-        """
-        if not self.emu_config or not self.emu_prog:
-            print("[ERROR] Config not loaded. Run emulate() first.")
-            return
-        """
-        
-        # parse emu_config file
-        try:
-            with open(emu_config, "r") as f:
-                emu_setup_prms = yaml.safe_load(f)
-            print(f"[INFO] Loaded config from {emu_config}", flush=True)
-        except Exception as e:
-            print(f"[ERROR] Failed to load YAML config: {e}", flush=True)
-            return
-
-        try:
-            frm_sz_MB       = emu_setup_prms["frm_sz_MB"]
-            frm_cnt         = emu_setup_prms["frm_cnt"]
-            avg_bit_rt_Gbps = emu_setup_prms["avg_bit_rt_Gbps"]
-            verbosity       = emu_setup_prms["verbosity"]
-            base_port       = emu_setup_prms["base_port"]
-            sender_ip       = emu_setup_prms["sender"]
-        except KeyError as e:
-            print(f"[ERROR] Missing required config key: {e}", flush=True)
-            return
-
-        print(f"Sender is {sender_ip}", flush=True)
-
-        print(f"[INFO] Deploying {prog} to {sender_ip}", flush=True)
- 
-
-        # Build command to send
-        remote_log = f"~/{prog}.log"
-
-        cmd = [
-            f"~/{prog}",
-            "-c", str(frm_cnt),
-            "-s", str(frm_sz_MB),
-            "-r", str(avg_bit_rt_Gbps),
-            "-a", "0",
-            "-p", str(base_port),
-            "-v", str(verbosity)#,
-            #f"> {remote_log} 2>&1"
-        ]
-
-        print(f"[INFO] Starting {prog} on {sender_ip}: {' '.join(cmd)}", flush=True)
-
-        try:
-            
-            prog_rn = launch_remote(sender_ip, cmd, prog, login_pause, sleep_time)
-
-            print(f"[INFO] Sender command sent successfully to {sender_ip}", flush=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[ERROR] Failed to send emulation sender to {sender_ip}: {e.stderr.decode().strip()}", flush=True)
-        return prog_rn
-#-----------------------------------------------------
-    def parse_emu_logs(self, log_path="emu_log.txt"):
         #reset dataframes
-        self.sentFrms_df        = self.sentFrms_df.iloc[0:0]
-        self.drpmsdFrms_df      = self.drpmsdFrms_df.iloc[0:0]
-        self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
-        self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
+        # Retrieve component log files
+        for idx, ip in enumerate(self.emu_prm_host_ip_list):
+            try:
+                # Step 1: Copy associated yaml to remote host
+                scp_cmd = ["scp", f"{ip}:~/{self.emu_cmpnt_nms[idx]}.out", "."]
+                print(f"[INFO] {scp_cmd}", flush=True)
+                subprocess.run(scp_cmd, check=True)  # blocking, PW/OTP prompt
+                print(f"[INFO] {scp_cmd} Success...", flush=True)
+
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] SCP failed: {e}", flush=True)
+                return None
+            except Exception as e:
+                print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
+                return None
+
+            #cleanup deployed files
+            #rm_cmd = [
+            #   f"rm -f ~/{self.emu_prm_emu_yaml_list[idx]} ~/{self.emu_prm_emu_yaml_list[idx]}.out ~/cpu_emu_{idx}.yaml"
+            #]
+
+            rm_cmd = f"rm -f ~/{self.emu_cmpnt_nms[idx]} ~/{self.emu_cmpnt_nms[idx]}.out ~/*.yaml"
+
+            print(f"[INFO] Deleting {rm_cmd} ...", flush=True)
+            
+            try:
+                subprocess.run(rm_cmd, check=True, shell=True)  # blocking, PW/OTP prompt
+                #subprocess.run(rm_cmd, check=True)
+                print(f"[INFO] rm Success...", flush=True)
+
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] rm failed: {e}", flush=True)
+                return None
+            except Exception as e:
+                print(f"[ERROR] Unexpected error during rm: {e}", flush=True)
+                return None
+        
+
+        # Concatenate component log files
+        with open("emu.log", "wb") as outfile:
+            for fname in sorted(glob.glob("*.out")):
+                with open(fname, "rb") as infile:
+                    outfile.write(infile.read())
+
         # Load and inspect
-        lines = load_log_file(log_path)
+        lines = load_log_file("emu.log")
         print(f"Loaded {len(lines)} lines from the log.")
         # Extract lines with frame send information for sender
         frame_rate_lines = [line for line in lines if "[emulate_stream:] Sending frame size" in line]
@@ -1361,7 +1283,8 @@ if __name__ == "__main__":
 
 #>>> from rtdp import RTDP
 #>>> rtdp = RTDP(rng_seed=37)
-#>>> rtdp.emulate(login_pause=True, sleep_time=5)
+#>>> rtdp.emulate(login_pause=True, emu_config="emulate.yaml", sleep_time=2)
+#>>> rtdp.parse_emu_logs()
 
 #>>> rtdp.plot_all()
 #$ for f in *.png; do eog "$f" & done
