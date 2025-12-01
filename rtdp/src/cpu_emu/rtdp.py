@@ -324,7 +324,7 @@ class RTDP:
         self.sim_config= sim_config
         try:
             with open(self.sim_config, "r") as f:
-                data = yaml.safe_load(f)
+                sim_setup_prms = yaml.safe_load(f)
             print(f"[INFO] Loaded config from {self.sim_config}")
         except Exception as e:
             print(f"[ERROR] Failed to load YAML config: {e}")
@@ -341,42 +341,50 @@ class RTDP:
         #if not self.sim_log_file.closed: #may have been openend by emulate()
         #    self.sim_log_file.close()
         self.sim_log_file  = open(f"{sim_config}.log", "w")
-        # Flatten into a DataFrame
-        sim_prmtrs_df = json_normalize(data, sep=".")
-        print(sim_prmtrs_df.T, file=self.sim_log_file)  # transpose to make it easier to read
 
-        self.prm_sim_cmp_ltnc_nS_B      = float(sim_prmtrs_df['cmp_ltnc_nS_B'].iloc[0])
-        self.prm_sim_output_size_GB     = float(sim_prmtrs_df['output_size_GB'].iloc[0])
-        self.prm_sim_nic_Gbps           = float(sim_prmtrs_df['nic_Gbps'].iloc[0])
-        self.prm_sim_daq_frm_sz_MB      = float(sim_prmtrs_df['frame_sz_MB'].iloc[0])
-        self.prm_sim_frame_cnt          =   int(sim_prmtrs_df['frame_cnt'].iloc[0])
-        self.prm_sim_cmpnt_cnt          =   int(sim_prmtrs_df['cmpnt_cnt'].iloc[0])
-        self.prm_sim_avg_bit_rt_Gbps    = float(sim_prmtrs_df['avg_bit_rt_Gbps'].iloc[0])
+        try:
+            self.prm_sim_daq_frame_cnt              = sim_setup_prms['daq_frame_cnt']
+            self.prm_sim_daq_frame_sz_MB            = sim_setup_prms['daq_frame_sz_MB']
+            self.prm_sim_daq_avg_bit_rt_Gbps        = sim_setup_prms['daq_avg_bit_rt_Gbps']
+            self.prm_sim_cmp_nic_Gbps_list          = sim_setup_prms.get('cmp_nic_Gbps', [])
+            self.prm_sim_cmp_ltnc_nS_B_list         = sim_setup_prms.get('cmp_ltnc_nS_B', [])
+            self.prm_sim_cmp_output_size_GB_list    = sim_setup_prms.get('cmp_output_size_GB', [])
+        except KeyError as e:
+            print(f"[ERROR] Missing required sim config key: {e}", flush=True)
+            return
+
+        if(len(self.prm_sim_cmp_nic_Gbps_list) < 1):
+            print(f"[ERROR] Incorrect nics list in config file", flush=True)
+            return
+
+        if(len(self.prm_sim_cmp_nic_Gbps_list) < len(self.prm_sim_cmp_ltnc_nS_B_list)):
+            print(f"[ERROR] Incorrect ltnc list in config file", flush=True)
+            return
+
+        if(len(self.prm_sim_cmp_nic_Gbps_list) < len(self.prm_sim_cmp_output_size_GB_list)):
+            print(f"[ERROR] Incorrect output_size list in config file", flush=True)
+            return
+
         #------------------------ setup plots for simulation run ------------------------
-        self.prm_cmpnt_cnt              = self.prm_sim_cmpnt_cnt        
+        self.prm_sim_cmpnt_cnt  = len(self.prm_sim_cmp_nic_Gbps_list)
+        self.prm_cmpnt_cnt      =  self.prm_sim_cmpnt_cnt       
         #set of all frame numbers from sender
-        self.cnst_all_frm_set = set(range(1, self.prm_sim_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
+        self.cnst_all_frm_set   = set(range(1, self.prm_sim_daq_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
 
-        cnst_daq_fs_mean_B = float(M_1*self.prm_sim_daq_frm_sz_MB)
+        cnst_daq_fs_mean_B      = float(M_1*self.prm_sim_daq_frame_sz_MB)
+        cnst_daq_frm_sz_b       = B_b*cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
 
-        cnst_os_mean_B = float(G_1*self.prm_sim_output_size_GB)
-        cnst_os_std_B = 0.1*cnst_os_mean_B
-        sim_nic_Gbps = self.prm_sim_nic_Gbps
-        sim_cmp_ltnc_nS_B = self.prm_sim_cmp_ltnc_nS_B
-
-        ntwrk_lt_mean_uS = float(B_b*self.prm_sim_daq_frm_sz_MB/(G_1*self.prm_sim_nic_Gbps))
-        ntwrk_lt_sd_uS = math.ceil(ntwrk_lt_mean_uS/20) #5%
         #-----------------------------------------------------
         
-        # set all component clocks to zero; component 0 is the sender
+        # set all component clocks to zero; #component self.prm_sim_cmpnt_cnt is the sender
         clk_uS = np.zeros(self.prm_sim_cmpnt_cnt+1, dtype=float) #Time last frame finished processing
 
         vrbs = True
 
         cnst_swtch_lt_uS = 1 #switch latency
 
-        clib = bernoulli(0.02, n=self.prm_sim_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
-        nlib = bernoulli(0.02, n=self.prm_sim_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        clib = bernoulli(0.02, n=self.prm_sim_daq_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        nlib = bernoulli(0.02, n=self.prm_sim_daq_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
         
         if vrbs: print("Simulating ...")
         #if vrbs: print(f"ib =  {ib}", file=self.sim_log_file)
@@ -388,70 +396,79 @@ class RTDP:
         self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
         self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
         
-        for f in range(0, self.prm_sim_frame_cnt):
+        for f in range(0, self.prm_sim_daq_frame_cnt):
             # impulses
+            """
             if clib[f]==1: # computational latency
                 sim_cmp_ltnc_nS_B = self.gen_gamma_samples(self.prm_sim_nic_Gbps, self.prm_sim_nic_Gbps/5, int(1))[0]
-                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {sim_cmp_ltnc_nS_B:10.2f} frame {f}, time {u_1*clk_uS[0]/60.0:10.2f}", file=self.sim_log_file)
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {sim_cmp_ltnc_nS_B:10.2f} frame {f}, time {u_1*clk_uS[self.prm_sim_cmpnt_cnt]/60.0:10.2f}", file=self.sim_log_file, flush=True)
             if nlib[f]==1: # network latency
                 sim_nic_Gbps = 10*self.prm_sim_nic_Gbps #so the first 'while' test will pass
                 while sim_nic_Gbps > self.prm_sim_nic_Gbps: #enforce upper bound
                     sim_nic_Gbps = self.gen_gamma_samples(self.prm_sim_nic_Gbps, self.prm_sim_nic_Gbps/5, int(1))[0]
                     
-                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {sim_nic_Gbps:10.2f} frame {f}, time {u_1*clk_uS[0]/60.0:10.2f}", file=self.sim_log_file)
-            cnst_daq_frm_sz0_b = B_b*cnst_daq_fs_mean_B; #cnst_fs_smpls_B[f]
-            if vrbs: print(f"{clk_uS[0]} Send frame {f} Size (b): {cnst_daq_frm_sz0_b:10.2f}", file=self.sim_log_file)
-            #component zero is the sender
-            row = (0,clk_uS[0],f,cnst_daq_frm_sz0_b)
+                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {sim_nic_Gbps:10.2f} frame {f}, time {u_1*clk_uS[self.prm_sim_cmpnt_cnt]/60.0:10.2f}", file=self.sim_log_file, flush=True)
+            """
+            if vrbs: print(f"{clk_uS[self.prm_sim_cmpnt_cnt]} Send frame {f} Size (b): {cnst_daq_frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
+            #component self.prm_sim_cmpnt_cnt is the sender
+            row = (0,clk_uS[self.prm_sim_cmpnt_cnt],f,cnst_daq_frm_sz_b) #for the daq/sender
             self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
-            for c in range(1, self.prm_sim_cmpnt_cnt+1):
+            for idx, nic_Gbps in enumerate(self.prm_sim_cmp_nic_Gbps_list):
+                if vrbs: print(f"{clk_uS[idx]} Component {idx}, nic {nic_Gbps} Waiting ...", file=self.sim_log_file, flush=True)
                 #set component forwarding frame size to component output Size
-                frm_szc_b = B_b*self.gen_gamma_samples(cnst_os_mean_B, cnst_os_std_B, int(1))[0]
+                if idx < self.prm_sim_cmpnt_cnt-1: #not last component
+                    frwrd_frm_sz_b = B_b*self.gen_gamma_samples(self.prm_sim_cmp_output_size_GB_list[idx], 0.1*self.prm_sim_cmp_output_size_GB_list[idx], int(1))[0]
 
-                clk_c = clk_uS[c-1] #temp clk base = upstream senders 'done/sent' value
+                if idx == 0: #temp clk base = upstream senders 'done/sent'
+                    clk_c = clk_uS[self.prm_sim_cmpnt_cnt] #use daq clock
+                else:
+                    clk_c = clk_uS[idx-1] #use upstream senders 'done/sent' value
                 # set recvd frame size: cmpnt #1 is senders size, all others are cmpnt output size
                 # it is assumed that the sender represents a DAQ with fixed frame size
                 # inducing (highly)? variable computational lateny
-                if c == 1:
-                    frm_sz_b = cnst_daq_frm_sz0_b
-                else:
-                    frm_sz_b = B_b*self.gen_gamma_samples(cnst_os_mean_B, cnst_os_std_B, int(1))[0]
+                if idx == 0: #from the daq
+                    frm_sz_b = cnst_daq_frm_sz_b
+                else: #from upstream component
+                    frm_sz_b = G_1*B_b*self.gen_gamma_samples(self.prm_sim_cmp_output_size_GB_list[idx-1], 0.1*self.prm_sim_cmp_output_size_GB_list[idx-1], int(1))[0]
+                if vrbs: print(f"{clk_c} Component {idx} recv frame Size (b): {frm_sz_b:10.2f} ({self.prm_sim_cmp_output_size_GB_list[idx-1]})", file=self.sim_log_file, flush=True)
 
                 # component receives with network latency offset from upstream sender time
-                ntwrk_lt_mean_uS = float(one_u*frm_sz_b/(G_1*sim_nic_Gbps))
+                ntwrk_lt_mean_uS = float(one_u*frm_sz_b/(G_1*nic_Gbps))
                 ntwrk_lt_sd_uS = math.ceil(ntwrk_lt_mean_uS/20) #5%
                 ntwrk_lt_uS = 0
                 while ntwrk_lt_uS < ntwrk_lt_mean_uS: #enforce lower bound
                     ntwrk_lt_uS = self.gen_gamma_samples(ntwrk_lt_mean_uS, ntwrk_lt_sd_uS, int(1))[0]
+                    #if vrbs: print(f"{clk_c} Component {idx} Testing {ntwrk_lt_uS} < {ntwrk_lt_mean_uS} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
+                #if vrbs: print(f"{clk_c} Component {idx} Exiting while ...", file=self.sim_log_file, flush=True)
 
                 ntwrk_lt_uS += cnst_swtch_lt_uS  #add switch latency
                 clk_c += ntwrk_lt_uS  #Update temp clk for net latency
                 rcd_uS = clk_c #Time would recv from upstream sender if ready
-                if vrbs: print(f"{clk_c} Component {c} Recv Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file)
+                if vrbs: print(f"{clk_c} Component {idx} Recv Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
                 #If temp clk < components last 'done' time, frame is dropped for this component and missed by all downstream components
-                if (clk_uS[c] > clk_c): # True -> not ready to recv
-                    if vrbs: print(f"{clk_c} Component {c} Dropped Frame {f}", file=self.sim_log_file)
-                    row = (c,rcd_uS,f,frm_sz_b,clk_uS[c])
+                if (clk_uS[idx] > clk_c): # True -> not ready to recv
+                    if vrbs: print(f"{clk_c} Component {c} Dropped Frame {f}", file=self.sim_log_file, flush=True)
+                    row = (idx+1,rcd_uS,f,frm_sz_b,clk_uS[idx])
                     self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, pd.DataFrame([row], columns=self.drpmsdFrms_df.columns)], ignore_index=True)
                     break; # All downstream components will miss this frame
                 # component processes with compute latency
-                cmp_ltnc_nS_B = self.gen_gamma_samples(sim_cmp_ltnc_nS_B, sim_cmp_ltnc_nS_B/10, int(1))[0]
+                cmp_ltnc_nS_B = self.gen_gamma_samples(self.prm_sim_cmp_ltnc_nS_B_list[idx], self.prm_sim_cmp_ltnc_nS_B_list[idx]/10, int(1))[0]
                 cmp_ltnc_uS = float(n_u*cmp_ltnc_nS_B*frm_sz_b*b_B)
                 clk_c += cmp_ltnc_uS #Update temp clk for compute latency
                 clk_c += 10 #add overhead
                 snt_uS = clk_c
-                row = (c,snt_uS,f,frm_szc_b)
+                row = (idx+1,snt_uS,f,frwrd_frm_sz_b)
                 self.sentFrms_df = pd.concat([self.sentFrms_df, pd.DataFrame([row], columns=self.sentFrms_df.columns)], ignore_index=True)
                 clk_c += 10 #add overhead
-                clk_uS[c]  = clk_c #Set as last 'done' time
-                #if vrbs and c == self.prm_sim_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.sim_log_file)
-                if vrbs: print(f"{clk_c} Component {c} Done Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file)
+                clk_uS[idx]  = clk_c #Set as last 'done' time
+                #if vrbs and c == self.prm_sim_cmpnt_cnt: print(f"Update sim clock to {clk_c} (uS) for component {c}", file=self.sim_log_file, flush=True)
+                if vrbs: print(f"{clk_c} Component {idx} Done Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
                 #add self.prcsdFrms_df row
-                row = (c,rcd_uS,f,frm_sz_b,cmp_ltnc_uS,ntwrk_lt_uS,snt_uS,clk_uS[c])
+                row = (idx+1,rcd_uS,f,frm_sz_b,cmp_ltnc_uS,ntwrk_lt_uS,snt_uS,clk_uS[idx])
                 self.prcsdFrms_df = pd.concat([self.prcsdFrms_df, pd.DataFrame([row], columns=self.prcsdFrms_df.columns)], ignore_index=True)
             # Sender Rate Sleep
-            rtSlp_uS   = float(one_u*cnst_daq_frm_sz0_b / (G_1*self.prm_sim_avg_bit_rt_Gbps))
-            clk_uS[0] += rtSlp_uS
+            rtSlp_uS   = float(one_u*cnst_daq_frm_sz_b / (G_1*self.prm_sim_daq_avg_bit_rt_Gbps))
+            clk_uS[self.prm_sim_cmpnt_cnt] += rtSlp_uS #advance sender
             
         self.log_file = self.sim_log_file
 
@@ -552,6 +569,11 @@ class RTDP:
         self.log_file = self.emu_log_file
 
         #reset dataframes
+        self.sentFrms_df        = self.sentFrms_df.iloc[0:0]
+        self.drpmsdFrms_df      = self.drpmsdFrms_df.iloc[0:0]
+        self.prcsdFrms_df       = self.prcsdFrms_df.iloc[0:0]
+        self.drpdFrmsFrctn_df   = self.drpdFrmsFrctn_df.iloc[0:0]
+        
         if retrieve:
             # Retrieve component log files
             for idx, ip in enumerate(self.emu_prm_host_ip_list):
@@ -568,11 +590,6 @@ class RTDP:
                 except Exception as e:
                     print(f"[ERROR] Unexpected error during SCP: {e}", flush=True)
                     return None
-
-                #cleanup deployed files
-                #rm_cmd = [
-                #   f"rm -f ~/{self.emu_prm_emu_yaml_list[idx]} ~/{self.emu_prm_emu_yaml_list[idx]}.out ~/cpu_emu_{idx}.yaml"
-                #]
 
                 rm_cmd = f"rm -f ~/{self.emu_cmpnt_nms[idx]} ~/{self.emu_cmpnt_nms[idx]}.out ~/*.yaml"
 

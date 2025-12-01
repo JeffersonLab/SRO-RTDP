@@ -1,0 +1,15 @@
+daq_frame_cnt:        100   # Numbers frames sender will send
+daq_frame_sz_MB:      0.06  # Frame Size MB
+daq_avg_bit_rt_Gbps:  0.01  # Sender bit rate Gbps #0.015
+cmp_nic_Gbps:   # Outbound NIC/Network speed in Gbps for sim_mode
+  - 10
+  - 10
+  - 10
+cmp_ltnc_nS_B:  # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
+  - 100
+  - 100
+  - 100
+cmp_output_size_GB: # Output size in GB
+  - 0.00006
+  - 0.000057
+  - 0.000057 
