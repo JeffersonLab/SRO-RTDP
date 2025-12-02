@@ -218,8 +218,7 @@ class RTDP:
             none
 
         """
-        self.sim_log_file.close()
-        self.emu_log_file.close()
+        self.log_file.close()
 
 #-----------------------------------------------------
     def __init__(self, rng_seed = None, directory=".", extension=".txt"):
@@ -748,7 +747,7 @@ class RTDP:
                 self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "frm_sz_b"] = fs_value
                 # update snt_uS by reteiving value from sentFrms_df
                 #################################################################################################################
-                if cmpnt_id != max(cmpnt_ids): #not the last or sink component
+                if index < len(cmpnt_ids)-1: #not the last or sink component
                     snt_uS = self.sentFrms_df.loc[(self.sentFrms_df["component"] == int(index+1)) & (self.sentFrms_df["frm_nm"] == fn_value), "snt_uS"].iloc[0]
                     self.prcsdFrms_df.loc[(self.prcsdFrms_df["component"] == int(index+1)) & (self.prcsdFrms_df["frm_nm"] == fn_value), "snt_uS"] = snt_uS
                 #################################################################################################################
@@ -1260,9 +1259,9 @@ class RTDP:
         """
 
         self.plot_send_bit_rate()
+        self.plot_rcv_bit_rate()
         self.plot_rcv_frm_rate()
         self.plot_rcv_frm_dlta()
-        self.plot_rcv_bit_rate()
         self.plot_cmp_ltnc()
         self.plot_ntwrk_ltnc()
         self.plot_frm_rcv()
@@ -1277,6 +1276,9 @@ if __name__ == "__main__":
     #seed = int.from_bytes(os.urandom(8), "big")
     processor = RTDP(rng_seed = None, directory=".", extension=".txt")
     processor.sim()
+    #processor.emulate(login_pause=True, emu_config="emulate.yaml", sleep_time=1)
+    #time.sleep(10) # wait for emulation to finish
+    #processor.parse_emu_logs()
     processor.plot_all()
 
 #-----------------------------------------------------
