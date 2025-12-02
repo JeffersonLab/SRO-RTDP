@@ -416,7 +416,7 @@ class RTDP:
                 if vrbs: print(f"{clk_uS[idx]} Component {idx}, nic {nic_Gbps} Waiting ...", file=self.sim_log_file, flush=True)
                 #set component forwarding frame size to component output Size
                 if idx < self.prm_sim_cmpnt_cnt-1: #not last component
-                    frwrd_frm_sz_b = B_b*self.gen_gamma_samples(self.prm_sim_cmp_output_size_GB_list[idx], 0.1*self.prm_sim_cmp_output_size_GB_list[idx], int(1))[0]
+                    frwrd_frm_sz_b = G_1*B_b*self.gen_gamma_samples(self.prm_sim_cmp_output_size_GB_list[idx], 0.1*self.prm_sim_cmp_output_size_GB_list[idx], int(1))[0]
 
                 if idx == 0: #temp clk base = upstream senders 'done/sent'
                     clk_c = clk_uS[self.prm_sim_cmpnt_cnt] #use daq clock
