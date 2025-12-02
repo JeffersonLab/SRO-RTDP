@@ -366,7 +366,7 @@ class RTDP:
 
         #------------------------ setup plots for simulation run ------------------------
         self.prm_sim_cmpnt_cnt  = len(self.prm_sim_cmp_nic_Gbps_list)
-        self.prm_cmpnt_cnt      =  self.prm_sim_cmpnt_cnt       
+        self.prm_cmpnt_cnt      = self.prm_sim_cmpnt_cnt       
         #set of all frame numbers from sender
         self.cnst_all_frm_set   = set(range(1, self.prm_sim_daq_frame_cnt + 1))   # range is exclusive at the end, so add 1 for inclusive
 
@@ -397,17 +397,16 @@ class RTDP:
         
         for f in range(0, self.prm_sim_daq_frame_cnt):
             # impulses
-            """
             if clib[f]==1: # computational latency
-                sim_cmp_ltnc_nS_B = self.gen_gamma_samples(self.prm_sim_nic_Gbps, self.prm_sim_nic_Gbps/5, int(1))[0]
-                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) now at {sim_cmp_ltnc_nS_B:10.2f} frame {f}, time {u_1*clk_uS[self.prm_sim_cmpnt_cnt]/60.0:10.2f}", file=self.sim_log_file, flush=True)
+                i = random.randint(0, self.prm_sim_cmpnt_cnt-1)
+                x = sim_setup_prms.get('cmp_ltnc_nS_B', [])[i]
+                self.prm_sim_cmp_ltnc_nS_B_list[i] = self.gen_gamma_samples(x, 0.5*x, int(1))[0]
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) for cmpnt {i+1} now at {self.prm_sim_cmp_ltnc_nS_B_list[i]:10.2f} frame {f}, time {u_1*clk_uS[i+1]/60.0:10.2f}", file=self.sim_log_file, flush=True)
             if nlib[f]==1: # network latency
-                sim_nic_Gbps = 10*self.prm_sim_nic_Gbps #so the first 'while' test will pass
-                while sim_nic_Gbps > self.prm_sim_nic_Gbps: #enforce upper bound
-                    sim_nic_Gbps = self.gen_gamma_samples(self.prm_sim_nic_Gbps, self.prm_sim_nic_Gbps/5, int(1))[0]
-                    
-                if vrbs: print(f"{clk_c} Impulse: Network Speed (Gbps) now at {sim_nic_Gbps:10.2f} frame {f}, time {u_1*clk_uS[self.prm_sim_cmpnt_cnt]/60.0:10.2f}", file=self.sim_log_file, flush=True)
-            """
+                i = random.randint(0, self.prm_sim_cmpnt_cnt-1)
+                x = sim_setup_prms.get('cmp_nic_Gbps', [])[i]
+                self.prm_sim_cmp_nic_Gbps_list[i] = self.gen_gamma_samples(x, 0.5*x, int(1))[0]
+                if vrbs: print(f"{clk_c} Impulse: Network Latency (ns/B) for cmpnt {i+1} now at {self.prm_sim_cmp_nic_Gbps_list[i]:10.2f} frame {f}, time {u_1*clk_uS[i+1]/60.0:10.2f}", file=self.sim_log_file, flush=True)
             if vrbs: print(f"{clk_uS[self.prm_sim_cmpnt_cnt]} Send frame {f} Size (b): {cnst_daq_frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
             #component self.prm_sim_cmpnt_cnt is the sender
             row = (0,clk_uS[self.prm_sim_cmpnt_cnt],f,cnst_daq_frm_sz_b) #for the daq/sender
@@ -424,7 +423,6 @@ class RTDP:
                     clk_c = clk_uS[idx-1] #use upstream senders 'done/sent' value
                 # set recvd frame size: cmpnt #1 is senders size, all others are cmpnt output size
                 # it is assumed that the sender represents a DAQ with fixed frame size
-                # inducing (highly)? variable computational lateny
                 if idx == 0: #from the daq
                     frm_sz_b = cnst_daq_frm_sz_b
                 else: #from upstream component
@@ -437,8 +435,6 @@ class RTDP:
                 ntwrk_lt_uS = 0
                 while ntwrk_lt_uS < ntwrk_lt_mean_uS: #enforce lower bound
                     ntwrk_lt_uS = self.gen_gamma_samples(ntwrk_lt_mean_uS, ntwrk_lt_sd_uS, int(1))[0]
-                    #if vrbs: print(f"{clk_c} Component {idx} Testing {ntwrk_lt_uS} < {ntwrk_lt_mean_uS} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
-                #if vrbs: print(f"{clk_c} Component {idx} Exiting while ...", file=self.sim_log_file, flush=True)
 
                 ntwrk_lt_uS += cnst_swtch_lt_uS  #add switch latency
                 clk_c += ntwrk_lt_uS  #Update temp clk for net latency
