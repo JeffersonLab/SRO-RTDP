@@ -307,7 +307,7 @@ class RTDP:
         return self.rng.gamma(shape, scale, n_samples)
 
 #-----------------------------------------------------
-    def sim(self, sim_config="simulate.yaml"):
+    def simulate(self, sim_config="simulate.yaml"):
         """
         simulate component daisy chain
 
@@ -1271,7 +1271,7 @@ class RTDP:
 if __name__ == "__main__":
     #seed = int.from_bytes(os.urandom(8), "big")
     processor = RTDP(rng_seed = None, directory=".", extension=".txt")
-    processor.sim()
+    processor.simulate()
     #processor.emulate(login_pause=True, emu_config="emulate.yaml", sleep_time=1)
     #time.sleep(10) # wait for emulation to finish
     #processor.parse_emu_logs()
@@ -1289,7 +1289,7 @@ if __name__ == "__main__":
 #Type "help", "copyright", "credits" or "license" for more information.
 #>>> from rtdp import RTDP
 #>>> rtdp = RTDP(rng_seed=7, log_file="z.txt")
-#>>> rtdp.sim()
+#>>> rtdp.simulate()
 
 #>>> from rtdp import RTDP
 #>>> rtdp = RTDP(rng_seed=37)
@@ -1334,5 +1334,5 @@ Pending:
     documentation
     more interesting scenarios (?)
     if cmpnt_id != max(cmpnt_ids): #not the last or sink component    BUG
-    sim_log in constructor but used in sim() and all plots()
+    sim_log in constructor but used in simulate() and all plots()
 """
