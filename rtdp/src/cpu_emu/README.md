@@ -2,7 +2,10 @@
 
 The RTDP user should use the rtdp.py python, e.g.
 
-	$ python3 rtdp.py
+	$ python3
+	>>> from rtdp import RTDP
+	>>> rtdp = RTDP(rng_seed=37)
+	>>> rtdp.<method()>
 
 Python dependies are
 
@@ -107,6 +110,7 @@ Any of the <yaml_file> settings may be overidden at the command line via the com
 
 To run the emulation via rtdp.py:
 
+	$ python3
 	>>> from rtdp import RTDP
 	>>> rtdp = RTDP(rng_seed=37)
 	>>> rtdp.emulate(login_pause=True, emu_config="emulate.yaml", sleep_time=2)
@@ -146,12 +150,13 @@ The <i>hosts</i> section lists the IPV4 addresses where each component is to be 
 The <i>emulate()</i> method will stage each component on the indicated host in the users home directory along with the associated yamls config files.
 The <i>parse_emu_logs()</i> logs will retrieve the output log files for each deployed component, and parse them into an internal database for plotting and statistcs.
 
-Note the use of the  <i>sleep_time=2</i>  parameter for <i>emulate()</i>.  This is necessary to accomodate remote logins to the IPV4 hosts and must be generous enough to accomodate the login process for each host.  E.g. a two factor login with a required token roolover may require 30 seconds or more.  Network security should be setup to obviate user logins.
+Note the use of the  <i>sleep_time=2</i>  parameter for <i>emulate()</i>.  This is necessary to accomodate remote logins to the IPV4 hosts and must be generous enough to accomodate the login process for each host.  E.g. a two factor login with a required token rollover may require 30 seconds or more.  Network security should be setup to obviate user logins.
 
 # Simulation
 
 The simulation is available in the python file rtdp.py and excuted as follows:
 
+	$ python3
 	>>> from rtdp import RTDP
 	>>> rtdp = RTDP(rng_seed=7)
 	>>> rtdp.simulate(sim_config="simulate.yaml")
