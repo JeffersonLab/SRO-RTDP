@@ -4,9 +4,9 @@
 
         ./buildp cpu_emu
 
-## Build C++ zmq-event-emu-clnt sender:
+## Build C++ zmq-frame-emu-clnt sender:
 
-        ./buildp zmq-event-emu-clnt
+        ./buildp zmq-frame-emu-clnt
 
 where ./buildp assumes .cc suffix which shows you any build errors via 'less' - just hit 'q' to exit. 
 
@@ -15,7 +15,7 @@ where ./buildp assumes .cc suffix which shows you any build errors via 'less' - 
 ### Data source:
 
         <some ZeroMQ based sender>, e.g., 
-		./zmq-event-emu-clnt -a <stream_id> -p <ZMQ pub port> -r <bit rate Gbps>  -v <verbosity> -s <frame_sz MB> -c <frame count>
+		./zmq-frame-emu-clnt -a <stream_id> -p <ZMQ pub port> -r <bit rate Gbps>  -v <verbosity> -s <frame_sz MB> -c <frame count>
 
 ### cpu emu components:
 
@@ -65,14 +65,14 @@ Any of the <yaml_file> settings may be overidden at the command line via the fol
 
 ### Source data system:
 
-	zmq-event-emu-clnt Usage: 
+	zmq-frame-emu-clnt Usage: 
 	        -h help  
 	        -a stream/channel id		(default 0) 
 	        -p publication port			(default 8888) 
 	        -r bit rate to send (Gbps)	(default 1)
-	        -c event count				(default 100) 
+	        -c frame count				(default 100) 
 	        -v verbose = 0/1			(default 1 = true)  
-	        -s event size (MB)			(default 1) 
+	        -s frame size (MB)			(default 1) 
 
 ## Report Processing
 

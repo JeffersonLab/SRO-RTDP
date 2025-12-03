@@ -51,8 +51,8 @@ docker run -p 5555:5555 cpu-emu sender -i <destination_ip> -p <port> [-c <count>
 Options for sender mode:
 - -i: destination IP (required)
 - -p: destination port (required)
-- -c: event count (default: 10)
-- -s: event size in MB (default: 10)
+- -c: frame count (default: 10)
+- -s: frame size in MB (default: 10)
 
 ## Example YAML Configuration
 

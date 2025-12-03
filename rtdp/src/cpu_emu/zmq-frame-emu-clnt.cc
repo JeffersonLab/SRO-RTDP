@@ -53,10 +53,10 @@ void   Usage()
         "\nUsage: \n\
         -h help  \n\
         -a stream/channel id (0) \n\
-        -f event count (100) \n\
+        -f frame count (100) \n\
         -p publication port (8888) \n\
         -r bit rate to send (Gbps) (1)\n\
-        -s event size (MB) (1) \n\
+        -s frame size (MB) (1) \n\
         -v verbose = 0/1 (1)  \n\
         -y yaml config file  \n\n";
 
@@ -97,51 +97,51 @@ void parse_yaml0(const char *filename, uint8_t vrbs=0) {
         case YAML_NO_EVENT:
             break;
         case YAML_STREAM_START_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Stream started " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Stream started " << endl;
             break;
         case YAML_STREAM_END_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Stream ended " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Stream ended " << endl;
             break;
         case YAML_DOCUMENT_START_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Document started " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Document started " << endl;
             break;
         case YAML_DOCUMENT_END_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Document ended " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Document ended " << endl;
             break;
         case YAML_MAPPING_START_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Mapping started " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Mapping started " << endl;
             break;
         case YAML_MAPPING_END_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Mapping ended " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Mapping ended " << endl;
             break;
         case YAML_SEQUENCE_START_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Sequence started " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Sequence started " << endl;
             break;
         case YAML_SEQUENCE_END_EVENT:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: Sequence ended " << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: Sequence ended " << endl;
             break;
         case YAML_SCALAR_EVENT:
             s = (const char*)event.data.scalar.value;
             it = find(lbls.begin(), lbls.end(), s);
             if (it != lbls.end()) {
-                if(DBG) cout << 0 << " [zmq-event-emu-clnt]: " << " Label: " << s << endl;
+                if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: " << " Label: " << s << endl;
                 lbl_stk.push(s);
             } else {
                 s1 = lbl_stk.top();
-                if(DBG) cout << 0 << " [zmq-event-emu-clnt]: " << " Label: " << s1 << " Datum: " << s << endl;
+                if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: " << " Label: " << s1 << " Datum: " << s << endl;
                 mymap[s1] = s;
                 lbl_stk.pop();
             }
             break;
         default:
-            if(DBG) cout << 0 << " [zmq-event-emu-clnt]: " << " (Default)" << endl;
+            if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: " << " (Default)" << endl;
             break;
         }
 
         if(event.type == YAML_STREAM_END_EVENT) break;
         yaml_event_delete(&event);
     }
-    if(DBG) cout << 0 << " [zmq-event-emu-clnt]: " << " All done parsing, got this:" << endl;
+    if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: " << " All done parsing, got this:" << endl;
     if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << endl;
     
@@ -229,7 +229,7 @@ void parse_yaml1(const char* filename, uint8_t vrbs = 0) {
     catch (...) {
         std::cerr << "[parse_yaml] Unknown internal error" << std::endl;
     }
-    if(DBG) cout << 0 << " [zmq-event-emu-clnt]: " << " All done parsing, got this:" << endl;
+    if(DBG) cout << 0 << " [zmq-frame-emu-clnt]: " << " All done parsing, got this:" << endl;
     if(DBG) for (map<string,string>::iterator it=mymap.begin(); it!=mymap.end(); ++it)
         cout << it->first << " => " << it->second << endl;    
 }
@@ -319,12 +319,12 @@ int main (int argc, char *argv[])
     bool     psdA=false, psdF=false, psdP=false, psdR=false, psdS=false;
     bool     psdV=false, psdY=false;
 
-    string   yfn = "zmq-event-emu-clnt.yaml";
+    string   yfn = "zmq-frame-emu-clnt.yaml";
 
     uint16_t stream_id          = 0;    // stream or channel id
     uint16_t pub_port            = 8888; // target port
-    uint64_t frame_cnt          = 1e2;  // event count
-    float    frame_sz_MB        = 1;    // event size (MB)
+    uint64_t frame_cnt          = 1e2;  // frame count
+    float    frame_sz_MB        = 1;    // frame size (MB)
     float    avg_bit_rt_Gbps    = 1;    // sending bit rate in Gbps
     uint8_t  vrbs               = 1; // verbosity; 0 -> nothing to stdout
 
@@ -373,7 +373,7 @@ int main (int argc, char *argv[])
             if(DBG) cout << " -y " << yfn << endl;
             break;
          case '?':
-            cout << " [zmq-event-emu-clnt]: Unrecognised option: " << optopt;
+            cout << " [zmq-frame-emu-clnt]: Unrecognised option: " << optopt;
             Usage();
             exit(1);
         }
@@ -412,7 +412,7 @@ int main (int argc, char *argv[])
     static normal_distribution<> nd_10pcnt(1.0, 0.1);
 
     //  Prepare our publication context and socket
-    if(DBG) cout << "[zmq-event-emu-clnt " << pub_port << "]" << endl;
+    if(DBG) cout << "[zmq-frame-emu-clnt " << pub_port << "]" << endl;
     if(DBG) cout << "[emulate_sender-zmq " << pub_port << "]: Publishing on port " << to_string(pub_port) << endl;
     context_t pub_cntxt(1);
     socket_t pub_sckt(pub_cntxt, socket_type::pub);
