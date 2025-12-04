@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
 # Install Python dependencies
-RUN pip3 install pyzmq numpy
+RUN pip3 install pyzmq numpy pandas matplotlib  seaborn scipy
 
 # Set working directory
 WORKDIR /app
@@ -25,22 +25,23 @@ WORKDIR /app
 # Copy source files
 COPY cpu_emu.cc .
 COPY buffer_packet.hh .
-COPY zmq-frame-clnt.cc .
-COPY buffer_packet_zmq_emu.py .
-COPY launcher_py_cpu_emu.py .
-COPY simulate_sender-zmq-emu.py .
+COPY zmq-frame-emu-clnt.cc .
+COPY simulate.yaml .
+COPY emulate.yaml .
+COPY zmq-frame-emu-clnt.yaml .
+COPY cpu_emu.yaml .
 
 # Build cpu_emu
-RUN g++ -o cpu_emu cpu_emu.cc -lzmq -lyaml-cpp -lyaml -pthread
+RUN g++ -DNO_MAKEFILE -Wall -std=c++17 -O3 cpu_emu.cc -o cpu_emu -lm -pthread -lyaml -lzmq
 
-# Build zmq-frame-clnt
-RUN g++ -o zmq-frame-clnt zmq-frame-clnt.cc -lzmq
+# Build zmq-frame-emu-clnt
+RUN g++ -DNO_MAKEFILE -Wall -std=c++17 -O3 zmq-frame-emu-clnt.cc -o zmq-frame-emu-clnt -lm -pthread -lyaml -lzmq
 
 # Create entrypoint script
 COPY <<'EOF' /app/entrypoint.sh
 #!/bin/bash
 
-# Default mode is emulator
+# Default mode is emulator ############### must be overhauled
 MODE=${1:-emulator}
 shift
 
@@ -74,7 +75,7 @@ case "$MODE" in
         ;;
 esac
 EOF
-
+##########################################################
 # Make entrypoint script executable
 RUN chmod +x /app/entrypoint.sh
 
