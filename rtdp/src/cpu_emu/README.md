@@ -150,7 +150,7 @@ The <i>hosts</i> section lists the IPV4 addresses where each component is to be 
 The <i>emulate()</i> method will stage each component on the indicated host in the users home directory along with the associated yamls config files.
 The <i>parse_emu_logs()</i> logs will retrieve the output log files for each deployed component, and parse them into an internal database for plotting and statistcs.
 
-Note the use of the  <i>sleep_time=2</i>  parameter for <i>emulate()</i>.  This is necessary to accomodate remote logins to the IPV4 hosts and must be generous enough to accomodate the login process for each host.  E.g. a two factor login with a required token rollover may require 30 seconds or more.  Network security should be setup to obviate user logins.
+<b>Note</b> the use of the <i>login_pause=True,  sleep_time=2</i>  parameters for <i>emulate()</i>.  This is necessary to accomodate remote logins to the IPV4 hosts and the  <i>sleep_time</i> parameter must be generous enough to accomodate the login process for each host.  E.g. a two factor login with a required token rollover may require 30 seconds or more.  Network security should be setup to obviate this need.
 
 # Simulation
 
