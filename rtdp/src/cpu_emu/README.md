@@ -117,6 +117,16 @@ To run the emulation via rtdp.py:
 	>>> time.sleep(10) # MUST wait enough time for emulation to finish
 	>>> rtdp.parse_emu_logs()
 
+<b>Note</b> the use of the
+
+	>>> time.sleep(10) # MUST wait enough time for emulation to finish
+
+Python command step.  This is necessary to allow the emulation components to finish processing and close their log files before they are remotely retrieved by the following
+
+	>>> rtdp.parse_emu_logs()
+
+command.   Failure to wait adequate time leads to upredictable results.
+
 Plots can then be produced individually as follows:
 
 	>>> rtdp.plot_rcv_bit_rate()
@@ -165,20 +175,20 @@ Note that numpy may need to be upgraded as
 
 	python3 -m pip install --upgrade numpy
 
-the structure of <yaml_file> passed to the <i>simulate()</i> method is as follows:
+The structure of <yaml_file> passed to the <i>simulate()</i> method is as follows:
 
-	daq_frame_cnt:        100   # Numbers frames sender will send
+	daq_frame_cnt:        100   # Number of frames sender will send
 	daq_frame_sz_MB:      0.06  # Frame Size MB
-	daq_avg_bit_rt_Gbps:  0.01  # Sender bit rate Gbps #0.015
-	cmp_nic_Gbps:   # Outbound NIC/Network speed in Gbps for sim_mode
+	daq_avg_bit_rt_Gbps:  0.01  # Sender bit rate Gbps
+	cmp_nic_Gbps:   			# Outbound NIC/Network speeds in Gbps for sim_mode
 	  - 10
 	  - 10
 	  - 10
-	cmp_ltnc_nS_B:  # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
+	cmp_ltnc_nS_B:  			# Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
 	  - 100
 	  - 100
 	  - 100
-	cmp_output_size_GB: # Output size in GB
+	cmp_output_size_GB: 		# Mean component Output size in GB
 	  - 0.00006
 	  - 0.000057
 	  - 0.000057 
