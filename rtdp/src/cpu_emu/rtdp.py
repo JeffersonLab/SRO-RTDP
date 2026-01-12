@@ -442,7 +442,7 @@ class RTDP:
                 if vrbs: print(f"{clk_c} Component {idx} Recv Frame {f} Size (b): {frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
                 #If temp clk < components last 'done' time, frame is dropped for this component and missed by all downstream components
                 if (clk_uS[idx] > clk_c): # True -> not ready to recv
-                    if vrbs: print(f"{clk_c} Component {c} Dropped Frame {f}", file=self.sim_log_file, flush=True)
+                    if vrbs: print(f"{clk_c} Component {idx} Dropped Frame {f}", file=self.sim_log_file, flush=True)
                     row = (idx+1,rcd_uS,f,frm_sz_b,clk_uS[idx])
                     self.drpmsdFrms_df = pd.concat([self.drpmsdFrms_df, pd.DataFrame([row], columns=self.drpmsdFrms_df.columns)], ignore_index=True)
                     break; # All downstream components will miss this frame
