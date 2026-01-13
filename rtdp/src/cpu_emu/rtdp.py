@@ -916,10 +916,12 @@ class RTDP:
                 print(f"{k}: {v:.3f}", file=self.log_file)
 
             plt.figure(figsize=(8, 5))
-            sns.lineplot(x=self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"][1:].reset_index(drop=True), y=delta_mS , marker="o")       # line + markers
+            timestamps_S_arr = np.array(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"][1:])
+            window = 1
+            sns.lineplot(x=timestamps_S_arr[window-1:]*s_m, y=delta_mS , marker="o")       # line + markers
             plt.title(f"Component {i} Recv Frame Delta")
         #    plt.xlabel("Minutes")
-            plt.xlabel("Frame")
+            plt.xlabel("Time (minutes)")
             plt.ylabel("mS")
             plt.tight_layout()
             plt.savefig(f"Cmpnt_{i}_RcvFrmRtDlt.png", dpi=300, bbox_inches="tight")  #plt.show()
@@ -1185,11 +1187,14 @@ class RTDP:
             row = (c,len(self.drp_sets_by_component[c])/(len(self.drp_sets_by_component[c]) + len(self.prcsd_frm_sets_by_component[c])))
             self.drpdFrmsFrctn_df = pd.concat([self.drpdFrmsFrctn_df, pd.DataFrame([row], columns=self.drpdFrmsFrctn_df.columns)], ignore_index=True)
 
-
-        # self.drpdFrmsFrctn_df
+        # above processing requires this step for plotting
+        self.drpdFrmsFrctn_df.sort_values(by="component", ascending=True, inplace=True)
 
         # Plot
         from matplotlib.ticker import MaxNLocator
+
+        print("dropped frames dataframe", file=self.sim_log_file, flush=True)
+        print(self.drpdFrmsFrctn_df.to_string(index=False), file=self.sim_log_file, flush=True)
 
         x = self.drpdFrmsFrctn_df['component'].astype(int)
         y = 100*self.drpdFrmsFrctn_df['drp_frctn']
@@ -1224,6 +1229,9 @@ class RTDP:
         for c in range(1,self.prm_cmpnt_cnt+1):
             row = (c,1-(len(set(self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == c, "frm_nm"])) + len(set(self.drpmsdFrms_df.loc[self.drpmsdFrms_df["component"] == c, "frm_nm"])))/len(self.cnst_all_frm_set))
             msdFrmsFrctn_df = pd.concat([msdFrmsFrctn_df, pd.DataFrame([row], columns=msdFrmsFrctn_df.columns)], ignore_index=True)
+
+        print("missed frames dataframe", file=self.sim_log_file, flush=True)
+        print(msdFrmsFrctn_df.to_string(index=False), file=self.sim_log_file, flush=True)
 
         x = msdFrmsFrctn_df['component'].astype(int)
         y = 100*msdFrmsFrctn_df['msd_frctn']
@@ -1329,14 +1337,3 @@ if __name__ == "__main__":
 # ss -tulnp | grep '6000'
 # pgrep -f "^cpu_emu" >/dev/null && echo "running" || echo "not running"
 
-"""
-Pending: 
-    Remote deployment of emulator yaml files
-    Remote log retrieval
-    clean up of remote deployment files
-    accommodation of GPU emulator
-    documentation
-    more interesting scenarios (?)
-    if cmpnt_id != max(cmpnt_ids): #not the last or sink component    BUG
-    sim_log in constructor but used in simulate() and all plots()
-"""
