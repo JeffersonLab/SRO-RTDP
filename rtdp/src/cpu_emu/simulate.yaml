@@ -1,17 +1,20 @@
 daq_frame_cnt:          1000    # Numbers frames sender will send
 daq_frame_sz_MB:        1.00    # Frame Size MB
-daq_avg_bit_rt_Gbps:    0.10    # Sender bit rate Gbps #0.015
-clib:                   0.01    # computational latency impulse boolean probability
-nlib:                   0.01    # network latency impulse boolean probability
+daq_avg_bit_rt_Gbps:    0.038   # Sender bit rate Gbps #0.015
+clib:                   0.01    # computational latency blaack swan event probability
+nlib:                   0.01    # network latency blaack swan event probability
 cmp_nic_Gbps:                   # Outbound NIC/Network speed in Gbps for sim_mode
   - 10
   - 100
   - 10
+  - 10
 cmp_ltnc_nS_B:                  # Processing latency in nsec/byte input: 500 calibrated from 60kB CLAS12
   - 100
-  - 100
-  - 100
+  - 150
+  - 200
+  - 250
 cmp_output_size_GB:             # Output size in GB
-  - 0.00006 
-  - 0.00006
-  - 0.00006 
+  - 0.001 
+  - 0.001
+  - 0.001 
+  - 0.001 
