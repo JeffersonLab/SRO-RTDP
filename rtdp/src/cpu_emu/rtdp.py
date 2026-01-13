@@ -25,30 +25,32 @@ sns.set(style="darkgrid")
 #-----------------------------------------------------
 
 # Multiplicative scaling constants
-B_b   = 1e1
-b_B   = 1/B_b
-G_1   = 1e9
-one_G = 1/G_1
-G_K   = 1e6
-K_G   = 1/G_K
-G_M   = 1e3
-M_G   = 1/G_M
-K_1   = 1e3
-one_K = 1/K_1
-M_1   = 1e6
-one_M = 1/M_1
-m_1   = 1e-3
-one_m = 1/m_1
-m_u   = 1e3
-u_m   = 1/m_u
-u_1   = 1e-6
-one_u = 1/u_1
-n_1   = 1e-9
-one_n = 1/n_1
-n_m   = 1e-6
-m_n   = 1/n_m
-n_u   = 1e-3
-u_n   = 1/n_u
+B_b     = 1e1   # Bytes to bits
+b_B     = 1/B_b
+G_1     = 1e9   # Giga to 1
+one_G   = 1/G_1
+G_K     = 1e6   # Giga to Kilo
+K_G     = 1/G_K
+G_M     = 1e3   # Giga to Mega
+M_G     = 1/G_M
+K_1     = 1e3   # Kilo to 1
+one_K   = 1/K_1
+M_1     = 1e6   # Mega to 1
+one_M   = 1/M_1
+m_1     = 1e-3  # milli to 1
+one_m   = 1/m_1
+m_u     = 1e3   # milli to micro
+u_m     = 1/m_u
+u_1     = 1e-6  # micro to 1
+one_u   = 1/u_1
+n_1     = 1e-9  # nano to 1
+one_n   = 1/n_1
+n_m     = 1e-6  # nano to milli
+m_n     = 1/n_m
+n_u     = 1e-3  # nano to micro
+u_n     = 1/n_u
+s_m     = 1/60.0# secs to mins
+m_s     = 1/s_m
 
 sz1K  = 1024
 sz1M  = sz1K*sz1K
@@ -342,12 +344,14 @@ class RTDP:
         self.sim_log_file  = open(f"{sim_config}.log", "w")
 
         try:
-            self.prm_sim_daq_frame_cnt              = sim_setup_prms['daq_frame_cnt']
-            self.prm_sim_daq_frame_sz_MB            = sim_setup_prms['daq_frame_sz_MB']
-            self.prm_sim_daq_avg_bit_rt_Gbps        = sim_setup_prms['daq_avg_bit_rt_Gbps']
-            self.prm_sim_cmp_nic_Gbps_list          = sim_setup_prms.get('cmp_nic_Gbps', [])
-            self.prm_sim_cmp_ltnc_nS_B_list         = sim_setup_prms.get('cmp_ltnc_nS_B', [])
-            self.prm_sim_cmp_output_size_GB_list    = sim_setup_prms.get('cmp_output_size_GB', [])
+            self.prm_sim_daq_frame_cnt          = sim_setup_prms['daq_frame_cnt']
+            self.prm_sim_daq_frame_sz_MB        = sim_setup_prms['daq_frame_sz_MB']
+            self.prm_sim_daq_avg_bit_rt_Gbps    = sim_setup_prms['daq_avg_bit_rt_Gbps']
+            self.prm_sim_clib                   = sim_setup_prms['clib']
+            self.prm_sim_nlib                   = sim_setup_prms['nlib']
+            self.prm_sim_cmp_nic_Gbps_list      = sim_setup_prms.get('cmp_nic_Gbps', [])
+            self.prm_sim_cmp_ltnc_nS_B_list     = sim_setup_prms.get('cmp_ltnc_nS_B', [])
+            self.prm_sim_cmp_output_size_GB_list= sim_setup_prms.get('cmp_output_size_GB', [])
         except KeyError as e:
             print(f"[ERROR] Missing required sim config key: {e}", flush=True)
             return
@@ -382,8 +386,8 @@ class RTDP:
 
         cnst_swtch_lt_uS = 1 #switch latency
 
-        clib = bernoulli(0.02, n=self.prm_sim_daq_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
-        nlib = bernoulli(0.02, n=self.prm_sim_daq_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        clibs = bernoulli(self.prm_sim_clib, n=self.prm_sim_daq_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
+        nlibs = bernoulli(self.prm_sim_nlib, n=self.prm_sim_daq_frame_cnt, rng=self.rng) #impulse boolean with given % probability of success
         
         if vrbs: print("Simulating ...")
         #if vrbs: print(f"ib =  {ib}", file=self.sim_log_file)
@@ -397,16 +401,16 @@ class RTDP:
         
         for f in range(0, self.prm_sim_daq_frame_cnt):
             # impulses
-            if clib[f]==1: # computational latency
+            if clibs[f]==1: # computational latency
                 i = random.randint(0, self.prm_sim_cmpnt_cnt-1)
                 x = sim_setup_prms.get('cmp_ltnc_nS_B', [])[i]
                 self.prm_sim_cmp_ltnc_nS_B_list[i] = self.gen_gamma_samples(x, 0.5*x, int(1))[0]
-                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) for cmpnt {i+1} now at {self.prm_sim_cmp_ltnc_nS_B_list[i]:10.2f} frame {f}, time {u_1*clk_uS[i+1]/60.0:10.2f}", file=self.sim_log_file, flush=True)
-            if nlib[f]==1: # network latency
+                if vrbs: print(f"{clk_c} Impulse: Compute Latency (ns/B) for cmpnt {i+1} now at {self.prm_sim_cmp_ltnc_nS_B_list[i]:10.2f} frame {f}, time {u_1*clk_uS[i+1]*s_m:10.2f}", file=self.sim_log_file, flush=True)
+            if nlibs[f]==1: # network latency
                 i = random.randint(0, self.prm_sim_cmpnt_cnt-1)
                 x = sim_setup_prms.get('cmp_nic_Gbps', [])[i]
                 self.prm_sim_cmp_nic_Gbps_list[i] = self.gen_gamma_samples(x, 0.5*x, int(1))[0]
-                if vrbs: print(f"{clk_c} Impulse: Network Latency (ns/B) for cmpnt {i+1} now at {self.prm_sim_cmp_nic_Gbps_list[i]:10.2f} frame {f}, time {u_1*clk_uS[i+1]/60.0:10.2f}", file=self.sim_log_file, flush=True)
+                if vrbs: print(f"{clk_c} Impulse: NIC Speed (Gbps) for cmpnt {i+1} now at {self.prm_sim_cmp_nic_Gbps_list[i]:10.2f} frame {f}, time {u_1*clk_uS[i+1]*s_m:10.2f}", file=self.sim_log_file, flush=True)
             if vrbs: print(f"{clk_uS[self.prm_sim_cmpnt_cnt]} Send frame {f} Size (b): {cnst_daq_frm_sz_b:10.2f}", file=self.sim_log_file, flush=True)
             #component self.prm_sim_cmpnt_cnt is the sender
             row = (0,clk_uS[self.prm_sim_cmpnt_cnt],f,cnst_daq_frm_sz_b) #for the daq/sender
@@ -430,11 +434,11 @@ class RTDP:
                 if vrbs: print(f"{clk_c} Component {idx} recv frame Size (b): {frm_sz_b:10.2f} ({self.prm_sim_cmp_output_size_GB_list[idx-1]})", file=self.sim_log_file, flush=True)
 
                 # component receives with network latency offset from upstream sender time
-                ntwrk_lt_mean_uS = float(one_u*frm_sz_b/(G_1*nic_Gbps))
-                ntwrk_lt_sd_uS = math.ceil(ntwrk_lt_mean_uS/20) #5%
+                ntwrk_lt_lb_uS = float(one_u*frm_sz_b/(G_1*nic_Gbps))   # theoretical lower bound
+                ntwrk_lt_sd_uS = math.ceil(ntwrk_lt_lb_uS/20) #5%
                 ntwrk_lt_uS = 0
-                while ntwrk_lt_uS < ntwrk_lt_mean_uS: #enforce lower bound
-                    ntwrk_lt_uS = self.gen_gamma_samples(ntwrk_lt_mean_uS, ntwrk_lt_sd_uS, int(1))[0]
+                while ntwrk_lt_uS < ntwrk_lt_lb_uS: #enforce lower bound
+                    ntwrk_lt_uS = self.gen_gamma_samples(ntwrk_lt_lb_uS, ntwrk_lt_sd_uS, int(1))[0]
 
                 ntwrk_lt_uS += cnst_swtch_lt_uS  #add switch latency
                 clk_c += ntwrk_lt_uS  #Update temp clk for net latency
@@ -869,8 +873,8 @@ class RTDP:
 
             timestamps_S_arr = np.array(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"][1:])
             window = 1
-            sns.lineplot(x=timestamps_S_arr[window-1:]/60.0, y=moving_average(frame_rates_Hz_arr, n=window), marker="o")
-            # plt.plot(timestamps_S_arr/60.0, frame_rates_Hz_arr, marker='o', linestyle='-')
+            sns.lineplot(x=timestamps_S_arr[window-1:]*s_m, y=moving_average(frame_rates_Hz_arr, n=window), marker="o")
+            # plt.plot(timestamps_S_arr*s_m, frame_rates_Hz_arr, marker='o', linestyle='-')
             # plt.ylim(frame_rates_Hz_arr.min(), max(frame_rates_Hz_arr))
             plt.ticklabel_format(style='plain', axis='y')   # disable scientific/offset notation
 
@@ -952,8 +956,8 @@ class RTDP:
 
             # Plot
             plt.figure(figsize=(10, 4))
-            # plt.plot(u_1*sim_tm_uS/60, btRt_Mbps, marker='o', linestyle='-')
-            sns.lineplot(x=u_1*sim_tm_uS/60, y=btRt_Mbps, marker='o', linestyle='-')
+            # plt.plot(u_1*sim_tm_uS*s_m, btRt_Mbps, marker='o', linestyle='-')
+            sns.lineplot(x=u_1*sim_tm_uS*s_m, y=btRt_Mbps, marker='o', linestyle='-')
             plt.title(f"Component {i} Recv bit Rate (Mbps)")
             plt.xlabel('Time (minutes)')
             plt.ylabel('Mbps')
@@ -990,8 +994,8 @@ class RTDP:
 
             # Plot
             plt.figure(figsize=(10, 4))
-            # plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, cmpLt_mS, marker='o', linestyle='-')
-            sns.lineplot(x=u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, y=cmpLt_mS, marker='o', linestyle='-')
+            # plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, cmpLt_mS, marker='o', linestyle='-')
+            sns.lineplot(x=u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, y=cmpLt_mS, marker='o', linestyle='-')
             plt.title(f"Component {i} Comp Latency (mS)")
             plt.xlabel('Time (minutes)')
             plt.ylabel('Latency (mS)')
@@ -1028,8 +1032,8 @@ class RTDP:
 
             # Plot
             plt.figure(figsize=(10, 4))
-            # plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, ntwrkLt_uS, marker='o', linestyle='-')
-            sns.lineplot(x=u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, y=ntwrkLt_uS, marker='o', linestyle='-')
+            # plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, ntwrkLt_uS, marker='o', linestyle='-')
+            sns.lineplot(x=u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, y=ntwrkLt_uS, marker='o', linestyle='-')
             plt.title(f"Component {i} Network Latency (uS)")
             plt.xlabel('Time (minutes)')
             plt.ylabel('Latency (uS)')
@@ -1058,8 +1062,8 @@ class RTDP:
 
             # Plot
             plt.figure(figsize=(10, 4))
-            plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
-            # sns.lineplot(x=u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, y=self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o')
+            plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
+            # sns.lineplot(x=u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, y=self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o')
             plt.title(f"Component {i} Frame Recption Over Time")
             plt.xlabel('Time (Minutes)')
             plt.ylabel('recd (Frame num)')
@@ -1073,7 +1077,7 @@ class RTDP:
     def plot_tm_frm_rcv(self):
         for i in range(1, self.prm_cmpnt_cnt + 1):
             # Plot
-            plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]/60, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
+            plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "rcd_uS"]*s_m, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
 
         # Add labels and legend
         plt.xlabel('Sim Time (Mins)')
@@ -1102,7 +1106,7 @@ class RTDP:
 
         for i in range(1, self.prm_cmpnt_cnt + 1):
             # Plot
-            plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "done_uS"]/60, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
+            plt.plot(u_1*self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "done_uS"]*s_m, self.prcsdFrms_df.loc[self.prcsdFrms_df["component"] == i, "frm_nm"], marker='o', linestyle='-')
 
         # Add labels and legend
         plt.xlabel('Sim Time (Hrs)')
